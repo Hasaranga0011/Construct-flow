@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+supabase
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+python-multipart
+numpy
+pandas
+scikit-learn
