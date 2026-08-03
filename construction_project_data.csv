@@ -1,0 +1,11 @@
+Project_ID,Project_Name,Cost_Estimate,Actual_Cost,Start_Date,End_Date,Risk_Factor,Region
+1,Project A,500000,550000,2022-01-01,2022-12-31,High,North
+2,Project B,300000,310000,2022-02-01,2022-11-30,Medium,South
+3,Project C,450000,460000,2022-03-01,2022-10-15,Low,East
+4,Project D,200000,250000,2022-04-01,2022-12-01,High,West
+5,Project E,700000,690000,2022-05-01,2023-01-31,Medium,North
+6,Project F,600000,650000,2022-06-01,2022-11-30,Low,South
+7,Project G,400000,420000,2022-07-01,2023-02-28,High,East
+8,Project H,350000,370000,2022-08-01,2022-10-31,Medium,West
+9,Project I,800000,850000,2022-09-01,2023-06-30,Low,North
+10,Project J,500000,480000,2022-10-01,2023-03-31,High,South
