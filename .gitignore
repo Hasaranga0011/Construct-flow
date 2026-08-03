@@ -1,8 +1,11 @@
-# Machine learning models
+# ML Models
 backend/models/*.pkl
 backend/models/*.joblib
 backend/models/*.pth
-
+# ML Models
+backend/models/*.pkl
+backend/models/*.joblib
+backend/models/*.pth
 # Python cache
 __pycache__/
 *.pyc
