@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { buildNotificationFilter, isNotificationForUser } from '../utils/notifications';
 
 export interface AppNotification {
   id: string;
@@ -21,6 +22,8 @@ export const useRealtimeNotifications = () => {
 
   useEffect(() => {
     let isMounted = true;
+    setNotifications([]);
+    setLoading(!!user);
 
     const loadNotifications = async () => {
       if (!user) {
@@ -31,7 +34,7 @@ export const useRealtimeNotifications = () => {
         const { data, error } = await supabase
           .from('notifications')
           .select('*')
-          .or(`target_role.eq.All,target_role.eq.${role},target_user_id.eq.${user.id}`)
+          .or(buildNotificationFilter(user.id, role))
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -62,11 +65,7 @@ export const useRealtimeNotifications = () => {
           if (!isMounted) return;
           const newNotif = payload.new as AppNotification;
           // Check if it belongs to this user
-          if (
-            newNotif.target_role === 'All' ||
-            newNotif.target_role === role ||
-            newNotif.target_user_id === user?.id
-          ) {
+          if (user && isNotificationForUser(newNotif, user.id, role)) {
             setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
           }
         }
@@ -78,7 +77,8 @@ export const useRealtimeNotifications = () => {
           if (!isMounted) return;
           const updatedNotif = payload.new as AppNotification;
           setNotifications((prev) =>
-            prev.map((n) => (n.id === updatedNotif.id ? updatedNotif : n))
+            prev.flatMap((n) => n.id !== updatedNotif.id ? [n]
+              : user && isNotificationForUser(updatedNotif, user.id, role) ? [updatedNotif] : [])
           );
         }
       )
@@ -102,7 +102,11 @@ export const useRealtimeNotifications = () => {
     // Optimistic update
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+      const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+      if (error) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+        throw error;
+      }
     } catch (e) {
       console.error('Error marking as read', e);
     }
@@ -115,7 +119,11 @@ export const useRealtimeNotifications = () => {
       // Find IDs of unread notifications we just optimistically updated
       const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
       if (unreadIds.length > 0) {
-        await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
+        const { error } = await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
+        if (error) {
+          setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
+          throw error;
+        }
       }
     } catch (e) {
       console.error('Error marking all as read', e);

@@ -1,3 +1,4 @@
+// Modified for Expo Go mobile compatibility
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, ActivityIndicator } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
@@ -7,8 +8,12 @@ import { SupplierOrdersTable } from '../../components/supplier/SupplierOrdersTab
 import { SupplierAlertsPanel } from '../../components/supplier/SupplierAlertsPanel';
 import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { useResponsive } from '../../hooks/useResponsive';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SupplierDashboardScreen() {
+  const { isMobile } = useResponsive();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     pendingOrders: 0,
     confirmedOrders: 0,
@@ -26,14 +31,15 @@ export default function SupplierDashboardScreen() {
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return;
 
-        // Fetch supplier orders (omitting strict supplier_id filter for demo visibility)
+        if (!user) return;
+        // Supplier dashboards only show orders assigned to the signed-in supplier.
         const today = new Date().toISOString().split('T')[0];
         
         const [pendingReq, confirmedReq, lateReq, allOrdersReq] = await Promise.all([
-          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'Pending Delivery'),
-          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'Confirmed'),
-          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).in('status', ['Pending Delivery', 'Confirmed']).lt('expected_date', today),
-          supabase.from('purchase_orders').select('total_price').neq('status', 'Cancelled')
+          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('supplier_id', user.id).eq('status', 'Pending Delivery'),
+          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('supplier_id', user.id).eq('status', 'Confirmed'),
+          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('supplier_id', user.id).in('status', ['Pending Delivery', 'Confirmed']).lt('expected_date', today),
+          supabase.from('purchase_orders').select('total_price').eq('supplier_id', user.id).neq('status', 'Cancelled')
         ]);
 
         let totalRevenue = 0;
@@ -57,8 +63,26 @@ export default function SupplierDashboardScreen() {
     };
 
     loadStats();
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+
+    // Realtime: update supplier stats whenever a purchase_order row changes for this supplier.
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (user) {
+      channel = supabase
+        .channel(`supplier-dashboard:${user.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `supplier_id=eq.${user.id}`,
+        }, () => { loadStats(); })
+        .subscribe();
+    }
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [refreshTrigger, user]);
 
   const handleOrderAction = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -87,8 +111,8 @@ export default function SupplierDashboardScreen() {
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
-            <AnimatedCard delay={100} style={{ flex: 1 }}>
+          <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="New Orders" 
                 value={stats.pendingOrders.toString()} 
@@ -96,7 +120,7 @@ export default function SupplierDashboardScreen() {
                 indicatorType="warning" 
               />
             </AnimatedCard>
-            <AnimatedCard delay={200} style={{ flex: 1 }}>
+            <AnimatedCard delay={200} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="In Transit" 
                 value={stats.confirmedOrders.toString()} 
@@ -104,7 +128,7 @@ export default function SupplierDashboardScreen() {
                 indicatorType="success"
               />
             </AnimatedCard>
-            <AnimatedCard delay={300} style={{ flex: 1 }}>
+            <AnimatedCard delay={300} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Late Deliveries" 
                 value={stats.lateDeliveries.toString()} 
@@ -113,7 +137,7 @@ export default function SupplierDashboardScreen() {
                 icon={<Ionicons name={stats.lateDeliveries > 0 ? "warning" : "checkmark-circle"} size={16} color={stats.lateDeliveries > 0 ? "#EF4444" : "#10B981"} />}
               />
             </AnimatedCard>
-            <AnimatedCard delay={400} style={{ flex: 1 }}>
+            <AnimatedCard delay={400} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Total Revenue" 
                 value={formatCurrency(stats.totalRevenue)} 
@@ -123,14 +147,14 @@ export default function SupplierDashboardScreen() {
           </View>
 
           {/* Center Row: Orders & Alerts */}
-          <View className="flex-row mb-6">
+          <View className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
             {/* Main Content Area (Orders) */}
-            <View className="flex-[2] mr-6">
+            <View className="flex-[2] w-full">
               <SupplierOrdersTable refreshTrigger={refreshTrigger} onOrderAction={handleOrderAction} />
             </View>
             
             {/* Side Panel (Late Alerts) */}
-            <View className="flex-[1]">
+            <View className="flex-[1] w-full">
               <SupplierAlertsPanel refreshTrigger={refreshTrigger} />
             </View>
           </View>

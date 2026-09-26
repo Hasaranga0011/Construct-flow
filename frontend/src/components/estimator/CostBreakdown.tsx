@@ -37,7 +37,7 @@ export const CostBreakdown = ({ refreshTrigger = 0 }: { refreshTrigger?: number 
   };
 
   const cost = latestEstimate?.estimated_cost || 0;
-  const confidence = latestEstimate?.confidence_score || 0;
+  const confidence = latestEstimate?.confidence_score ?? null;
 
   if (loading) {
     return (
@@ -57,7 +57,7 @@ export const CostBreakdown = ({ refreshTrigger = 0 }: { refreshTrigger?: number 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1">
       <View className="flex-row justify-between items-center mb-6">
-        <Text className="text-lg font-bold text-brand-text">Estimated Cost Breakdown</Text>
+        <Text className="text-lg font-bold text-brand-text">Illustrative Cost Breakdown</Text>
         <Pressable className="flex-row items-center border border-gray-200 px-3 py-1.5 rounded-full">
           <Ionicons name="time-outline" size={14} color="#6B7280" className="mr-1.5" />
           <Text className="text-gray-600 text-xs font-semibold">Live Estimate</Text>
@@ -65,10 +65,10 @@ export const CostBreakdown = ({ refreshTrigger = 0 }: { refreshTrigger?: number 
       </View>
 
       <View className="flex-row items-center mb-8">
-        {/* Mock Donut Chart (Simulated with a colored block grid for now) */}
+        {/* Compact cost-category visualization for native and web layouts. */}
         <View className="w-32 h-32 rounded-full border-[16px] border-gray-100 items-center justify-center relative overflow-hidden">
            {/* Simulate segments using absolute borders/blocks, or just a segmented bar.
-               For this mock, we'll just style a unified circle since CSS pie charts in RN are tricky without SVG.
+               The category segments stay lightweight so the panel works consistently on native and web.
            */}
            <View className="absolute top-0 right-0 w-16 h-16 bg-gray-400" />
            <View className="absolute bottom-0 right-0 w-16 h-16 bg-brand-dark" />
@@ -89,12 +89,12 @@ export const CostBreakdown = ({ refreshTrigger = 0 }: { refreshTrigger?: number 
           <View className="flex-row items-center justify-between">
             <View>
               <Text className="text-gray-500 text-[10px] uppercase">Estimated Timeline</Text>
-              <Text className="text-brand-text font-bold text-sm">28 weeks</Text>
+              <Text className="text-brand-text font-bold text-sm">Not calculated</Text>
             </View>
             <View>
               <Text className="text-gray-500 text-[10px] uppercase text-right mb-0.5">Confidence Score</Text>
               <View className="bg-[#DCFCE7] px-2 py-0.5 rounded-full self-end">
-                <Text className="text-brand-success text-[10px] font-bold">{confidence}%</Text>
+                <Text className="text-brand-success text-[10px] font-bold">{confidence == null ? 'Not validated' : `${confidence}%`}</Text>
               </View>
             </View>
           </View>

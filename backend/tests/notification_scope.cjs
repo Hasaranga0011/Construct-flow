@@ -1,0 +1,18 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('../../frontend/node_modules/typescript');
+const source = fs.readFileSync(path.join(__dirname, '../../frontend/src/utils/notifications.ts'), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
+const loaded = { exports: {} };
+new Function('exports', compiled.outputText)(loaded.exports);
+const { isNotificationForUser: visible, buildNotificationFilter: filter } = loaded.exports;
+assert.equal(visible({ target_user_id: 'other', target_role: 'pm' }, 'me', 'pm'), false);
+assert.equal(visible({ target_user_id: 'other', target_role: 'All' }, 'me', 'pm'), false);
+assert.equal(visible({ target_user_id: 'me', target_role: 'client' }, 'me', 'pm'), true);
+assert.equal(visible({ target_user_id: null, target_role: 'Manager' }, 'me', 'pm'), true);
+assert.equal(visible({ target_user_id: null, target_role: 'Admin' }, 'me', 'super_admin'), true);
+assert.equal(visible({ target_user_id: null, target_role: 'All' }, 'me', 'worker'), true);
+assert.equal(visible({ target_user_id: null, target_role: 'pm' }, 'me', 'worker'), false);
+assert.ok(filter('me', 'pm').includes('and(target_user_id.is.null,or('));
+console.log('8 notification scope checks passed');

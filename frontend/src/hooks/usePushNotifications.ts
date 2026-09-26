@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -20,8 +20,19 @@ export function usePushNotifications(userId: string | null) {
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
+  const requestToken = useCallback(async () => {
+    if (!userId || Platform.OS === 'web') return null;
+    const token = await registerForPushNotificationsAsync();
+    if (token) {
+      const { error } = await supabase.from('profiles').update({ expo_push_token: token }).eq('id', userId);
+      if (error) throw error;
+      setExpoPushToken(token);
+    }
+    return token ?? null;
+  }, [userId]);
+
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || Platform.OS === 'web') return;
 
     registerForPushNotificationsAsync()
       .then(async (token) => {
@@ -54,7 +65,7 @@ export function usePushNotifications(userId: string | null) {
     };
   }, [userId]);
 
-  return { expoPushToken };
+  return { expoPushToken, requestToken };
 }
 
 async function registerForPushNotificationsAsync() {
@@ -84,6 +95,10 @@ async function registerForPushNotificationsAsync() {
     }
     
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    if (!projectId) {
+      console.log('No projectId found in app.json. Skipping push token generation.');
+      return null;
+    }
     token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   } else {
     console.log('Must use physical device for Push Notifications');

@@ -1,8 +1,10 @@
+// Modified for Expo Go mobile compatibility
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 
 export default function WorkerDashboard() {
   const [loading, setLoading] = useState(true);
@@ -19,27 +21,33 @@ export default function WorkerDashboard() {
         if (!sessionData?.session) return;
         const userId = sessionData.session.user.id;
 
-        const [profileReq, attendanceReq] = await Promise.all([
-          supabase.from('profiles').select('*').eq('id', userId).single(),
-          supabase
-            .from('attendance')
-            .select('*, sites(name)')
-            .eq('worker_id', userId)
-            .eq('status', 'Present')
-            .order('date', { ascending: false })
-            .limit(7)
-        ]);
+        const profileReq = await supabase.from('profiles').select('*').eq('id', userId).single();
+        let attendanceData: any[] = [];
+        let countRes = 0;
 
-        const { count: countRes } = await supabase
-          .from('attendance')
-          .select('id', { count: 'exact', head: true })
-          .eq('worker_id', userId)
-          .eq('status', 'Present');
+        if (userId) {
+          const [recentReq, countReq] = await Promise.all([
+            supabase
+              .from('labour')
+              .select('*, projects(name)')
+              .eq('worker_id', userId)
+              .eq('status', 'Present')
+              .order('date', { ascending: false })
+              .limit(7),
+            supabase
+              .from('labour')
+              .select('id', { count: 'exact', head: true })
+              .eq('worker_id', userId)
+              .eq('status', 'Present')
+          ]);
+          attendanceData = recentReq.data || [];
+          countRes = countReq.count || 0;
+        }
 
         if (isMounted) {
           setProfile(profileReq.data);
-          setRecentAttendance(attendanceReq.data || []);
-          setTotalDays(countRes || 0);
+          setRecentAttendance(attendanceData);
+          setTotalDays(countRes);
         }
       } catch (error) {
         console.error('Worker dashboard error:', error);
@@ -61,11 +69,11 @@ export default function WorkerDashboard() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
 
           {/* Profile Header */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 flex-row items-center">
-            <View className="w-16 h-16 bg-brand-orange rounded-full items-center justify-center mr-6">
+          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-8 mb-6 flex-col sm:flex-row items-center">
+            <View className="w-16 h-16 bg-brand-orange rounded-full items-center justify-center mb-4 sm:mb-0 sm:mr-6">
               <Text className="text-white text-3xl font-bold">
                 {(profile?.full_name || 'W').charAt(0).toUpperCase()}
               </Text>
@@ -80,33 +88,21 @@ export default function WorkerDashboard() {
             </View>
           </View>
 
-          {/* Mock QR Code */}
+          {/* Worker QR Code */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 items-center">
             <Text className="text-lg font-bold text-gray-800 mb-2">Your Worker ID Card</Text>
             <Text className="text-gray-500 text-sm text-center mb-6">Show this QR code to your Site Manager to be scanned in.</Text>
 
-            {/* QR Code Simulation */}
-            <View className="border-4 border-gray-800 p-3 rounded-xl mb-4">
-              <View className="w-40 h-40 items-center justify-center bg-white">
-                {/* Simulated QR pattern using nested Views */}
-                <View className="flex-row flex-wrap w-36 h-36">
-                  {/* Corner patterns */}
-                  <View className="absolute top-0 left-0 w-10 h-10 border-[4px] border-gray-800 rounded-sm">
-                    <View className="w-4 h-4 bg-gray-800 m-1 rounded-sm" />
-                  </View>
-                  <View className="absolute top-0 right-0 w-10 h-10 border-[4px] border-gray-800 rounded-sm">
-                    <View className="w-4 h-4 bg-gray-800 m-1 rounded-sm" />
-                  </View>
-                  <View className="absolute bottom-0 left-0 w-10 h-10 border-[4px] border-gray-800 rounded-sm">
-                    <View className="w-4 h-4 bg-gray-800 m-1 rounded-sm" />
-                  </View>
-                  {/* Center Icon */}
-                  <View className="flex-1 items-center justify-center">
-                    <Ionicons name="person-circle" size={48} color="#F97316" />
-                  </View>
-                </View>
+            {profile?.qr_code ? (
+              <View className="border-4 border-gray-800 p-3 rounded-xl mb-4 bg-white">
+                <QRCode value={profile.qr_code} size={160} color="black" backgroundColor="white" />
               </View>
-            </View>
+            ) : (
+              <View className="w-44 h-44 border border-dashed border-gray-300 rounded-xl items-center justify-center mb-4">
+                <Ionicons name="qr-code-outline" size={48} color="#D1D5DB" />
+                <Text className="text-gray-400 text-xs text-center mt-2 px-4">QR code has not been assigned yet.</Text>
+              </View>
+            )}
 
             <Text className="text-brand-text font-bold text-base">Worker ID</Text>
             <Text className="text-gray-400 text-xs mt-1 font-mono">{profile?.id?.slice(0, 20)}...</Text>
@@ -129,7 +125,7 @@ export default function WorkerDashboard() {
                     <Ionicons name="checkmark" size={18} color="#22C55E" />
                   </View>
                   <View className="flex-1">
-                    <Text className="font-bold text-gray-800">{record.sites?.name || 'Unknown Site'}</Text>
+                    <Text className="font-bold text-gray-800">{record.projects?.name || 'Unknown Project'}</Text>
                     <Text className="text-gray-500 text-xs mt-0.5">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</Text>
                   </View>
                   <View className="bg-green-100 px-2.5 py-1 rounded-full">

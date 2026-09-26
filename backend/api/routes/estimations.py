@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from ..models import EstimationCreate, EstimationResponse
-from core.database import supabase
+from core.database import get_auth_client
 
 router = APIRouter(
     prefix="/estimations",
@@ -14,13 +14,14 @@ from sklearn.linear_model import LinearRegression
 
 class PredictRequest(BaseModel):
     project_name: str
-    square_footage: float
-    num_floors: int
+    square_footage: float = Field(gt=0, le=500000, allow_inf_nan=False)
+    num_floors: int = Field(gt=0, le=200)
     material_quality: str
-    location_index: float
+    location_index: float = Field(gt=0, allow_inf_nan=False)
 
 @router.get("/", response_model=List[EstimationResponse])
-def get_estimations():
+def get_estimations(request: Request):
+    supabase = get_auth_client(request)
     try:
         response = supabase.table("estimations").select("*").order("created_at", desc=True).execute()
         return response.data
@@ -28,7 +29,8 @@ def get_estimations():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=EstimationResponse)
-def create_estimation(estimation: EstimationCreate):
+def create_estimation(estimation: EstimationCreate, request: Request):
+    supabase = get_auth_client(request)
     try:
         response = supabase.table("estimations").insert(estimation.model_dump()).execute()
         
@@ -62,17 +64,14 @@ def predict_cost(req: PredictRequest, request: Request):
         features = np.array([[req.square_footage, req.num_floors, req.location_index]])
         base_prediction = model.predict(features)[0]
         
-        final_cost = float(base_prediction * quality_mult)
-        
-        # Calculate a pseudo-confidence score (higher sqft -> lower confidence due to variance)
-        confidence = max(40, min(98, 100 - (req.square_footage / 200)))
+        final_cost = max(0.0, float(base_prediction * quality_mult))
         
         # Save to DB
         estimation_data = {
             "project_name": req.project_name,
             "estimated_cost": final_cost,
             "status": "Pending",
-            "confidence_score": int(confidence)
+            "confidence_score": None
         }
         
         from core.database import get_auth_client

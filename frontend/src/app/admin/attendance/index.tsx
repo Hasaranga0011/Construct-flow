@@ -5,9 +5,11 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function AdminAttendanceIndex() {
   const router = useRouter();
+  const { isMobile } = useResponsive();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -73,19 +75,19 @@ export default function AdminAttendanceIndex() {
           <Text className="text-gray-500 font-semibold ml-2">Back to Labour</Text>
         </Pressable>
 
-        <View className="flex-row justify-between items-center mb-6">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
           <View>
             <Text className="text-2xl font-bold text-brand-text mb-1">Select Construction Site</Text>
             <Text className="text-gray-500 text-sm">Choose a project to view and manage worker attendance.</Text>
           </View>
           
-          <View className="flex-row items-center gap-4">
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, width: isMobile ? '100%' : 'auto' }}>
             <View className="bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 flex-row items-center">
               <Ionicons name="people" size={20} color="#4F46E5" />
               <Text className="text-indigo-700 font-bold ml-2">{globalStats.checkedIn} / {globalStats.totalWorkers} Checked In Today</Text>
             </View>
 
-            <View className="flex-row items-center bg-white border border-gray-200 rounded-lg px-3 py-2 w-64 shadow-sm">
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
               <Ionicons name="search" size={16} color="#9CA3AF" />
               <TextInput 
                 className="flex-1 ml-2 text-sm text-brand-text outline-none"

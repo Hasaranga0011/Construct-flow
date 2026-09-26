@@ -5,11 +5,15 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useResponsive } from '../../../hooks/useResponsive';
+import { formatMoney } from '../../../utils/format';
+
 export default function AdminProjectsList() {
   const router = useRouter();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     let isMounted = true;
@@ -38,11 +42,11 @@ export default function AdminProjectsList() {
       <View className="flex-1 flex-col h-screen overflow-hidden">
         <TopNav title="Projects" actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
         
-        <ScrollView className="flex-1 px-8 py-6" showsVerticalScrollIndicator={false}>
-          <View className="flex-row justify-between items-center mb-6">
+        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
             <Text className="text-2xl font-bold text-brand-text">All Projects</Text>
             
-            <View className="flex-row items-center bg-white border border-gray-200 rounded-lg px-3 py-2 w-64 shadow-sm">
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
               <Ionicons name="search" size={16} color="#9CA3AF" />
               <TextInput 
                 className="flex-1 ml-2 text-sm text-brand-text outline-none"
@@ -54,14 +58,16 @@ export default function AdminProjectsList() {
             </View>
           </View>
           
-          <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-h-[400px]">
-            <View className="flex-row py-3 border-b border-gray-200 pr-2">
-              <Text className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Project Name</Text>
-              <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Location</Text>
-              <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Budget</Text>
-              <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
-              <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
-            </View>
+          <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>
+            {!isMobile && (
+              <View className="flex-row py-3 border-b border-gray-200 pr-2">
+                <Text className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Project Name</Text>
+                <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Location</Text>
+                <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Budget</Text>
+                <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+                <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
+              </View>
+            )}
 
             {loading ? (
               <View className="py-20 items-center justify-center">
@@ -72,6 +78,36 @@ export default function AdminProjectsList() {
                 <Ionicons name="folder-open-outline" size={48} color="#D1D5DB" className="mb-4" />
                 <Text className="text-gray-400 text-lg font-medium">No projects found.</Text>
               </View>
+            ) : isMobile ? (
+              projects.map(p => (
+                <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
+                  <View className="flex-row items-center mb-3">
+                    <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center mr-3">
+                      <Text className="text-brand-orange font-bold text-lg">{p.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-brand-text font-bold text-base" numberOfLines={1}>{p.name}</Text>
+                      <Text className="text-gray-500 text-xs font-medium">{formatMoney(p.total_budget)}</Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-center mb-4 pl-[52px]">
+                    <View className="flex-row items-center flex-1">
+                      <Ionicons name="location-outline" size={14} color="#6B7280" />
+                      <Text className="text-gray-500 text-xs ml-1" numberOfLines={1}>{p.location || 'N/A'}</Text>
+                    </View>
+                    <View className={`px-2 py-1 rounded-full ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                      <Text className={`text-[10px] font-bold uppercase ${p.status === 'active' ? 'text-brand-success' : p.status === 'completed' ? 'text-blue-600' : 'text-gray-500'}`}>
+                        {p.status}
+                      </Text>
+                    </View>
+                  </View>
+                  <Link href={`/admin/projects/${p.id}` as any} asChild>
+                    <Pressable className="bg-brand-orange py-3 rounded-lg items-center">
+                      <Text className="text-white text-sm font-bold">View Details</Text>
+                    </Pressable>
+                  </Link>
+                </View>
+              ))
             ) : (
               projects.map(p => (
                 <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">

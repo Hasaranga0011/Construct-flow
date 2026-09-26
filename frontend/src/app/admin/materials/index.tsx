@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Pressable, Text, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../../components/common/StatCard';
@@ -10,6 +10,8 @@ import { RecentDeliveries } from '../../../components/materials/RecentDeliveries
 import { NewMaterialModal } from '../../../components/materials/NewMaterialModal';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function MaterialsScreen() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function MaterialsScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     let isMounted = true;
@@ -77,8 +80,6 @@ export default function MaterialsScreen() {
         title="Materials" 
         actionLabel="+ New Order" 
         onActionPress={() => router.push('/admin/materials/orders/create')} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
       />
       
       {loading ? (
@@ -86,9 +87,25 @@ export default function MaterialsScreen() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+          
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+            <Text className="text-2xl font-bold text-brand-text">All Materials</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput 
+                className="flex-1 ml-2 text-sm text-brand-text outline-none"
+                placeholder="Search materials..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
             <StatCard 
               label="Total Materials" 
               value={stats.totalMaterials.toString()} 
@@ -109,14 +126,13 @@ export default function MaterialsScreen() {
             <StatCard 
               label="Total Inventory Value" 
               value={`Rs. ${(stats.totalValue / 1000000).toFixed(1)}M`}
-
               indicatorText="+8% this month" 
               indicatorType="success" 
             />
           </View>
 
           {/* Quick Actions */}
-          <View className="flex-row gap-4 mb-6">
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 24 }}>
             <Pressable onPress={() => router.push('/admin/materials/orders')} className="bg-emerald-50 px-4 py-3 rounded-lg border border-emerald-100 flex-row items-center">
               <Ionicons name="cart-outline" size={20} color="#10B981" />
               <Text className="text-emerald-700 font-bold ml-2">All Purchase Orders</Text>
@@ -128,14 +144,14 @@ export default function MaterialsScreen() {
           </View>
 
           {/* Main Content Layout */}
-          <View className="flex-row">
+          <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Inventory Table) */}
-            <View className="flex-[2] mr-6">
+            <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
               <InventoryTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
             {/* Side Panel (Alerts & Deliveries) */}
-            <View className="flex-[1]">
+            <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1 }}>
               <LowStockAlerts refreshTrigger={refreshTrigger} />
               <PendingOrders refreshTrigger={refreshTrigger} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
               <RecentDeliveries refreshTrigger={refreshTrigger} />

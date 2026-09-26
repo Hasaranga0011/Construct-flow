@@ -3,7 +3,8 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView,
 import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
-import toast from 'react-hot-toast';
+import { toast } from '../../lib/toast';
+import { ProjectAssignmentDropdown } from '../common/ProjectAssignmentDropdown';
 
 type NewProjectModalProps = {
   visible: boolean;
@@ -30,13 +31,41 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [mapSearchResults, setMapSearchResults] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [totalBudget, setTotalBudget] = useState('');
+  const [pms, setPms] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [siteManagers, setSiteManagers] = useState<any[]>([]);
+  const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [pmId, setPmId] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [selectedSiteManagers, setSelectedSiteManagers] = useState<string[]>([]);
+  const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [selectedAdmins, setSelectedAdmins] = useState<string[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Milestones State
+  const [milestones, setMilestones] = useState<{ title: string, description: string, due_date: string }[]>([]);
+
+  const addMilestone = () => setMilestones([...milestones, { title: '', description: '', due_date: '' }]);
+  
+  const updateMilestone = (index: number, field: string, value: string) => {
+    const newMilestones = [...milestones];
+    newMilestones[index] = { ...newMilestones[index], [field]: value };
+    setMilestones(newMilestones);
+  };
+
+  const removeMilestone = (index: number) => {
+    setMilestones(milestones.filter((_, i) => i !== index));
+  };
 
   // Map state
   const [markerPos, setMarkerPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -47,6 +76,32 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   });
 
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const [pmData, clientData, smData, workerData, supplierData, adminData] = await Promise.all([
+          supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']),
+          supabase.from('profiles').select('*').in('role', ['client', 'Client']),
+          supabase.from('profiles').select('*').in('role', ['site_manager', 'Site Manager', 'site manager']),
+          supabase.from('profiles').select('*').in('role', ['worker', 'Worker']),
+          supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']),
+          supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']),
+        ]);
+
+        setPms(pmData.data || []);
+        setClients(clientData.data || []);
+        setSiteManagers(smData.data || []);
+        setAvailableWorkers(workerData.data || []);
+        setSuppliers(supplierData.data || []);
+        setAdmins(adminData.data || []);
+      } catch (err) {
+        console.error('Failed to fetch users for project assignments', err);
+      }
+    };
+
+    if (visible) fetchUsers();
+  }, [visible]);
 
   // Store map instance to manually pan
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
@@ -64,6 +119,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         
         setMarkerPos({ lat: loc.lat, lng: loc.lng });
         setLocation(result.formatted_address);
+        setMapSearchResults([]);
         if (mapInstance) {
           mapInstance.panTo({ lat: loc.lat, lng: loc.lng });
           mapInstance.setZoom(14);
@@ -71,24 +127,44 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       } else if (data.status === 'REQUEST_DENIED' || data.status === 'OVER_QUERY_LIMIT') {
         console.warn('Google Maps API failed (Billing/Permissions). Falling back to free OpenStreetMap API...');
         
-        // Fallback to Free OpenStreetMap (Nominatim) API
-        const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(mapSearchQuery)}&format=json&limit=1`);
-        const osmData = await osmRes.json();
+        // Fallback to Free OpenStreetMap (Nominatim) API with progressive retries
+        let queryParts = mapSearchQuery.trim().split(/\s+/);
+        let foundResults: any[] = [];
         
-        if (osmData && osmData.length > 0) {
-          const loc = { lat: parseFloat(osmData[0].lat), lng: parseFloat(osmData[0].lon) };
+        while (queryParts.length > 0) {
+          const currentQuery = queryParts.join(' ');
+          const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(currentQuery)}&format=json&limit=5&countrycodes=lk`);
+          const osmData = await osmRes.json();
+          
+          if (osmData && osmData.length > 0) {
+            foundResults = osmData;
+            break;
+          }
+          // Drop the last word and retry
+          queryParts.pop();
+        }
+        
+        if (foundResults.length > 0) {
+          // Auto-pin the first result
+          const topResult = foundResults[0];
+          const loc = { lat: parseFloat(topResult.lat), lng: parseFloat(topResult.lon) };
           setMarkerPos(loc);
-          setLocation(osmData[0].display_name);
+          setLocation(topResult.display_name);
           
           if (mapInstance) {
             mapInstance.panTo(loc);
             mapInstance.setZoom(14);
           }
+          
+          // Show the rest as alternatives if there are more than 1
+          setMapSearchResults(foundResults);
           setErrorMsg(''); // Clear error if fallback succeeds
         } else {
-          setErrorMsg('Location not found in OpenStreetMap Fallback either.');
+          setMapSearchResults([]);
+          setErrorMsg('Location not found in OpenStreetMap Fallback after trying variations.');
         }
       } else {
+        setMapSearchResults([]);
         setErrorMsg('Location not found (Status: ' + data.status + ').');
       }
     } catch (e) {
@@ -150,32 +226,156 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     setErrorMsg('');
 
     try {
-      const { error, data: newProject } = await supabase.from('projects').insert([
-        {
-          name,
-          location,
-          start_date: startDate,
-          end_date: endDate,
-          status: 'active',
-          completion_percentage: 0,
-          total_budget: Number(totalBudget) || 0,
-          client_id: null // Would normally look up client ID from email
+      let resolvedClientId = clientId;
+      if (clientEmail.trim()) {
+        const cleanEmail = clientEmail.trim();
+        const { data: existingClient, error: clientLookupError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+
+        if (clientLookupError) throw clientLookupError;
+        if (existingClient) {
+          resolvedClientId = existingClient.id;
+          setClientId(existingClient.id);
         }
-      ]).select('id').single();
+      }
 
-      if (error) throw error;
-      
-      toast.success('Project created!');
+      const payload = {
+        name,
+        location,
+        address: location,
+        status: 'active',
+        start_date: startDate,
+        end_date: endDate,
+        client_id: resolvedClientId || null,
+        pm_id: pmId || null,
+        site_managers: selectedSiteManagers,
+        workers: selectedWorkers,
+        suppliers: selectedSuppliers,
+        admins: selectedAdmins,
+        total_budget: Number(totalBudget) || 0,
+        latitude: markerPos?.lat ?? null,
+        longitude: markerPos?.lng ?? null,
+      };
 
-      // Trigger Notification for Project Managers
-      await supabase.from('notifications').insert({
-        project_id: newProject.id,
-        target_role: 'Project Manager',
-        title: 'New Project Created',
-        message: `Admin has created a new project: ${name}. Please review the details.`,
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      // Reset form
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to create project');
+      }
+
+      const newProject = await response.json();
+
+      const validMilestones = milestones.filter(m => m.title && m.due_date);
+      if (validMilestones.length > 0) {
+        const msInserts = validMilestones.map(ms => ({
+          project_id: newProject.id,
+          title: ms.title,
+          description: ms.description,
+          due_date: ms.due_date,
+          planned_date: ms.due_date,
+          status: 'Pending'
+        }));
+        await supabase.from('milestones').insert(msInserts);
+      }
+
+      const notifications: { project_id: string; target_role?: string; target_user_id?: string; title: string; message: string }[] = [
+        {
+          project_id: newProject.id,
+          target_role: 'Project Manager',
+          title: 'New Project Created',
+          message: `Admin has created a new project: ${name}. Please review the details.`,
+        },
+      ];
+
+      if (resolvedClientId) {
+        notifications.push({
+          project_id: newProject.id,
+          target_user_id: resolvedClientId,
+          title: 'New Project Assigned',
+          message: `You have been assigned as the client for ${name}.`,
+        });
+      }
+
+      if (clientEmail.trim()) {
+        await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/email/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            to: clientEmail.trim(),
+            subject: `New project started: ${name}`,
+            html_body: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #F97316; padding: 24px; border-radius: 12px 12px 0 0;">
+                  <h1 style="color: white; margin: 0;">ConstructFlow</h1>
+                </div>
+                <div style="padding: 32px; background: white; border: 1px solid #e5e7eb;">
+                  <h2 style="color: #1F2937;">New project started</h2>
+                  <p style="color: #6B7280;">A new project has been started for you:</p>
+                  <div style="background: #F9FAFB; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 4px 0;"><strong>Project:</strong> ${name}</p>
+                    <p style="margin: 4px 0;"><strong>Location:</strong> ${location}</p>
+                  </div>
+                  <p style="color: #6B7280;">Please log in to the client portal to track milestones and project updates.</p>
+                </div>
+              </div>
+            `,
+          }),
+        });
+      selectedSiteManagers.forEach((id: string) => {
+        notifications.push({
+          project_id: newProject.id,
+          target_user_id: id,
+          title: 'New Project Assignment',
+          message: `You have been assigned as a Site Manager for ${name}.`,
+        });
+      });
+
+      selectedWorkers.forEach((id: string) => {
+        notifications.push({
+          project_id: newProject.id,
+          target_user_id: id,
+          title: 'New Project Assignment',
+          message: `You have been assigned as a Worker for ${name}.`,
+        });
+      });
+
+      selectedSuppliers.forEach((id: string) => {
+        notifications.push({
+          project_id: newProject.id,
+          target_user_id: id,
+          title: 'New Project Assignment',
+          message: `You have been assigned as a Supplier for ${name}.`,
+        });
+      });
+
+      selectedAdmins.forEach((id: string) => {
+        notifications.push({
+          project_id: newProject.id,
+          target_user_id: id,
+          title: 'New Project Assignment',
+          message: `You have been assigned as an Admin for ${name}.`,
+        });
+      });
+
+      await supabase.from('notifications').insert(notifications);
+
+      toast.success('Project created!');
+
       setName('');
       setLocation('');
       setStartDate('');
@@ -183,6 +383,14 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       setClientEmail('');
       setTotalBudget('');
       setMarkerPos(null);
+      setMapSearchResults([]);
+      setMilestones([]);
+      setPmId('');
+      setClientId('');
+      setSelectedSiteManagers([]);
+      setSelectedWorkers([]);
+      setSelectedSuppliers([]);
+      setSelectedAdmins([]);
       
       onSuccess();
     } catch (e: any) {
@@ -231,6 +439,32 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                     onChangeText={setName}
                   />
                 </View>
+
+                <ProjectAssignmentDropdown
+                  label="Assign Project Manager"
+                  users={pms}
+                  selectedIds={pmId ? [pmId] : []}
+                  onChange={(ids) => setPmId(ids[0] || '')}
+                />
+
+                <ProjectAssignmentDropdown
+                  label="Assign Client"
+                  users={clients}
+                  selectedIds={clientId ? [clientId] : []}
+                  onChange={(ids) => {
+                    setClientId(ids[0] || '');
+                    const selectedClient = clients.find((user) => user.id === (ids[0] || ''));
+                    if (selectedClient?.email) setClientEmail(selectedClient.email);
+                  }}
+                />
+
+                <ProjectAssignmentDropdown
+                  label="Assign Administrators"
+                  users={admins}
+                  multiple
+                  selectedIds={selectedAdmins}
+                  onChange={setSelectedAdmins}
+                />
 
                 <View className="mb-6">
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Start Date</Text>
@@ -282,6 +516,30 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                   />
                 </View>
 
+                <ProjectAssignmentDropdown
+                  label="Assign Site Managers"
+                  users={siteManagers}
+                  multiple
+                  selectedIds={selectedSiteManagers}
+                  onChange={setSelectedSiteManagers}
+                />
+
+                <ProjectAssignmentDropdown
+                  label="Assign Workers"
+                  users={availableWorkers}
+                  multiple
+                  selectedIds={selectedWorkers}
+                  onChange={setSelectedWorkers}
+                />
+
+                <ProjectAssignmentDropdown
+                  label="Assign Suppliers"
+                  users={suppliers}
+                  multiple
+                  selectedIds={selectedSuppliers}
+                  onChange={setSelectedSuppliers}
+                />
+
                 <View className="mb-6">
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Client Email</Text>
                   <TextInput
@@ -323,6 +581,31 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                     </Pressable>
                   </View>
                   <Text className="text-xs text-gray-400 mt-2">Search for a place and click the button to set it as the location.</Text>
+                  
+                  {mapSearchResults.length > 1 && (
+                    <View className="mt-3 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <Text className="text-xs font-semibold text-gray-500 bg-gray-50 px-4 py-2 border-b border-gray-200">Alternative Matches</Text>
+                      {mapSearchResults.slice(1).map((result, idx) => (
+                        <Pressable
+                          key={idx}
+                          onPress={() => {
+                            const loc = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
+                            setMarkerPos(loc);
+                            setLocation(result.display_name);
+                            if (mapInstance) {
+                              mapInstance.panTo(loc);
+                              mapInstance.setZoom(14);
+                            }
+                            // Clear alternatives after selecting one
+                            setMapSearchResults([]);
+                          }}
+                          className={`px-4 py-3 ${idx !== mapSearchResults.length - 2 ? 'border-b border-gray-100' : ''}`}
+                        >
+                          <Text className="text-sm text-gray-700" numberOfLines={2}>{result.display_name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {Platform.OS === 'web' ? (
@@ -357,6 +640,68 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                   </View>
                 )}
               </View>
+            </View>
+
+            {/* Milestones Section */}
+            <View className="mt-8 border-t border-gray-100 pt-6">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-lg font-bold text-gray-800">Project Milestones</Text>
+                <Pressable onPress={addMilestone} className="flex-row items-center bg-gray-100 px-3 py-1.5 rounded-lg">
+                  <Ionicons name="add" size={16} color="#4B5563" />
+                  <Text className="text-gray-700 font-semibold ml-1 text-sm">Add</Text>
+                </Pressable>
+              </View>
+
+              {milestones.length === 0 ? (
+                <Text className="text-gray-400 italic text-sm">No milestones added yet. You can add them later.</Text>
+              ) : (
+                milestones.map((ms, index) => (
+                  <View key={index} className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
+                    <View className="flex-row justify-between mb-3">
+                      <Text className="font-semibold text-gray-700">Milestone {index + 1}</Text>
+                      <Pressable onPress={() => removeMilestone(index)}>
+                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      </Pressable>
+                    </View>
+                    
+                    <View className="flex-row gap-4 mb-3">
+                      <View className="flex-[2]">
+                        <TextInput 
+                          placeholder="Title (e.g. Foundation)" 
+                          className="bg-white border border-gray-300 rounded-lg p-3 text-sm"
+                          value={ms.title}
+                          onChangeText={(t) => updateMilestone(index, 'title', t)}
+                        />
+                      </View>
+                      <View className="flex-1">
+                        {Platform.OS === 'web' ? (
+                          // @ts-ignore
+                          <input 
+                            type="date"
+                            className="w-full bg-white border border-gray-300 rounded-lg p-3 text-sm outline-none"
+                            value={ms.due_date}
+                            onChange={(e) => updateMilestone(index, 'due_date', e.target.value)}
+                          />
+                        ) : (
+                          <TextInput 
+                            placeholder="YYYY-MM-DD" 
+                            className="bg-white border border-gray-300 rounded-lg p-3 text-sm"
+                            value={ms.due_date}
+                            onChangeText={(t) => updateMilestone(index, 'due_date', t)}
+                          />
+                        )}
+                      </View>
+                    </View>
+                    
+                    <TextInput 
+                      placeholder="Description (Optional)" 
+                      className="bg-white border border-gray-300 rounded-lg p-3 text-sm"
+                      value={ms.description}
+                      onChangeText={(t) => updateMilestone(index, 'description', t)}
+                    />
+                  </View>
+                ))
+              )}
             </View>
 
             <View className="flex-row gap-4 pt-6 border-t border-gray-100 mt-6">

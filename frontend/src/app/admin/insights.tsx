@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../lib/api';
 import { TopNav } from '@/components/common/TopNav';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function MLInsightsDashboard() {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     const fetchInsights = async () => {
@@ -24,6 +26,7 @@ export default function MLInsightsDashboard() {
     fetchInsights();
   }, []);
 
+  if (loading) {
     return (
       <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
         <ActivityIndicator size="large" color="#F97316" />
@@ -46,14 +49,14 @@ export default function MLInsightsDashboard() {
   return (
     <View className="flex-1 bg-brand-light dark:bg-[#0F172A]">
       <TopNav title="AI Analytics & Insights" showAction={false} />
-      <ScrollView showsVerticalScrollIndicator={false} className="p-8">
+      <ScrollView showsVerticalScrollIndicator={false} className={isMobile ? "p-4" : "p-8"}>
         <View className="mb-8">
           <Text className="text-3xl font-bold text-brand-text dark:text-white mb-2">ML Insights</Text>
-          <Text className="text-gray-500 dark:text-gray-400">Real-time market trends and AI model performance metrics.</Text>
+          <Text className="text-gray-500 dark:text-gray-400">Project statistics and prototype model information. Model accuracy has not been validated.</Text>
         </View>
 
         {/* Model Performance Overview */}
-        <View className="flex-row gap-4 mb-6">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, marginBottom: 24 }}>
           <View className="flex-1 bg-white dark:bg-[#1E293B] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex-row items-center">
             <View className="w-12 h-12 rounded-full bg-blue-50 dark:bg-gray-800 items-center justify-center mr-4">
               <Ionicons name="server-outline" size={24} color="#3B82F6" />
@@ -85,9 +88,9 @@ export default function MLInsightsDashboard() {
           </View>
         </View>
 
-        <View className="flex-row gap-6 mb-8">
-          {/* Feature Importance Bar Chart Mock */}
-          <View className="flex-[3] bg-white dark:bg-[#1E293B] p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 32 }}>
+          {/* Feature importance data from the insights endpoint */}
+          <View style={{ flex: isMobile ? undefined : 3, width: isMobile ? '100%' : undefined, backgroundColor: '#fff', borderRadius: 16, padding: isMobile ? 16 : 28, borderWidth: 1, borderColor: '#F3F4F6' }}>
             <Text className="text-lg font-bold text-brand-text dark:text-white mb-6">Cost Driver Analysis (Feature Importance)</Text>
             
             <View className="gap-5">
@@ -112,7 +115,7 @@ export default function MLInsightsDashboard() {
           </View>
 
           {/* New Panel: Real-time Stats from Supabase via AI Endpoint */}
-          <View className="flex-[2] gap-6">
+          <View style={{ flex: isMobile ? undefined : 2, width: isMobile ? '100%' : undefined, gap: 16 }}>
             <View className="bg-white dark:bg-[#1E293B] p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
               <Text className="text-lg font-bold text-brand-text dark:text-white mb-6">Project Health Overview</Text>
               
@@ -150,7 +153,7 @@ export default function MLInsightsDashboard() {
                   <Text className="text-gray-500 dark:text-gray-400 font-semibold">Productivity Score</Text>
                   <View className="flex-row items-center gap-1">
                     <Ionicons name="trending-up" size={16} color="#10B981" />
-                    <Text className="font-bold text-green-500 text-lg">{insights?.labour_stats?.productivity_score || 0}%</Text>
+                    <Text className="font-bold text-green-500 text-lg">{insights?.labour_stats?.productivity_score == null ? 'Unavailable' : `${insights.labour_stats.productivity_score}%`}</Text>
                   </View>
               </View>
             </View>
@@ -161,6 +164,7 @@ export default function MLInsightsDashboard() {
             <Text className="text-lg font-bold text-brand-text dark:text-white mb-6">Market Trends (Avg Cost / SqFt)</Text>
             
             <View className="flex-row flex-wrap gap-4">
+              {!insights?.market_trends?.length && <Text className="text-gray-500">Verified market price data is not available.</Text>}
               {insights?.market_trends?.map((trend: any, index: number) => {
                 const prevCost = index > 0 ? insights.market_trends[index-1].avg_cost_sqft : trend.avg_cost_sqft;
                 const percentChange = ((trend.avg_cost_sqft - prevCost) / prevCost * 100).toFixed(1);

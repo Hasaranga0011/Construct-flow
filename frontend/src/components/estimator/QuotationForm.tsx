@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
-import toast from 'react-hot-toast';
+import { toast } from '../../lib/toast';
 
 export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCreated?: () => void }) => {
   const [projectType, setProjectType] = useState('Residential');
@@ -18,7 +18,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
   };
 
   const handleGenerate = async () => {
-    if (!squareFootage || isNaN(Number(squareFootage))) {
+    if (!squareFootage || !Number.isFinite(Number(squareFootage)) || Number(squareFootage) <= 0) {
       toast.error('Please enter a valid square footage.');
       return;
     }
@@ -45,7 +45,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       const estimatedCost = aiData.estimated_cost;
       const confidence = aiData.confidence_score;
 
-      toast.success(`AI Estimate Generated: Rs. ${(estimatedCost / 1000000).toFixed(2)}M\nConfidence: ${confidence}%`, { duration: 4000 });
+      toast.success(`AI Estimate Generated: Rs. ${(estimatedCost / 1000000).toFixed(2)}M\nConfidence: ${confidence == null ? 'Not validated (synthetic prototype)' : `${confidence}%`}`);
       setSquareFootage('');
       onEstimateCreated();
     } catch (error: any) {
@@ -68,7 +68,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       </View>
 
       <View className="flex-row flex-wrap -mx-3">
-        <View className="w-1/2 px-3 mb-4">
+        <View className="w-full md:w-1/2 px-3 mb-4">
           <Text className="text-gray-500 text-xs font-semibold mb-2">Project Type</Text>
           <Pressable 
             onPress={() => cycleOption(projectType, ['Residential', 'Commercial', 'Industrial'], setProjectType)}
@@ -79,7 +79,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
           </Pressable>
         </View>
 
-        <View className="w-1/2 px-3 mb-4">
+        <View className="w-full md:w-1/2 px-3 mb-4">
           <Text className="text-gray-500 text-xs font-semibold mb-2">Square Footage (sq.ft)</Text>
           <View className="border border-gray-200 rounded-lg px-4 py-2.5">
             <TextInput 
@@ -93,7 +93,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
           </View>
         </View>
 
-        <View className="w-1/2 px-3 mb-4">
+        <View className="w-full md:w-1/2 px-3 mb-4">
           <Text className="text-gray-500 text-xs font-semibold mb-2">Location</Text>
           <Pressable 
             onPress={() => cycleOption(location, ['Colombo', 'Kandy', 'Galle', 'Other'], setLocation)}
@@ -104,7 +104,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
           </Pressable>
         </View>
 
-        <View className="w-1/2 px-3 mb-4">
+        <View className="w-full md:w-1/2 px-3 mb-4">
           <Text className="text-gray-500 text-xs font-semibold mb-2">Quality Tier</Text>
           <Pressable 
             onPress={() => cycleOption(qualityTier, ['Standard', 'Premium', 'Luxury'], setQualityTier)}

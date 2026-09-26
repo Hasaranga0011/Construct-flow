@@ -5,9 +5,12 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useResponsive } from '../../../hooks/useResponsive';
+import { formatMoney } from '../../../utils/format';
 
 export default function AdminSuppliersIndex() {
   const router = useRouter();
+  const { isMobile } = useResponsive();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -72,13 +75,13 @@ export default function AdminSuppliersIndex() {
   );
 
   return (
-    <View className="flex-1 flex-col bg-gray-50 h-screen overflow-hidden">
+    <View className="flex-1 flex-col bg-gray-50">
       <TopNav title="Suppliers Directory" />
       
-      <ScrollView className="flex-1 px-8 py-6" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
         
         {/* Stat Cards */}
-        <View className="flex-row gap-6 mb-8">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 32 }}>
           <View className="flex-1 bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex-row items-center">
             <View className="w-12 h-12 bg-blue-50 rounded-full items-center justify-center mr-4">
               <Ionicons name="business" size={24} color="#3B82F6" />
@@ -110,9 +113,9 @@ export default function AdminSuppliersIndex() {
           </View>
         </View>
 
-        <View className="flex-row justify-between items-center mb-6">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
           <Text className="text-2xl font-bold text-brand-text">Supplier Database</Text>
-          <View className="flex-row items-center bg-white border border-gray-200 rounded-lg px-3 py-2 w-72 shadow-sm">
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
             <Ionicons name="search" size={16} color="#9CA3AF" />
             <TextInput 
               className="flex-1 ml-2 text-sm text-brand-text outline-none"
@@ -125,13 +128,15 @@ export default function AdminSuppliersIndex() {
         </View>
 
         <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-h-[400px]">
-          <View className="flex-row py-3 border-b border-gray-200 pr-2">
-            <Text className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Supplier Name</Text>
-            <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Contact</Text>
-            <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Active Orders</Text>
-            <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-right">Total Spent</Text>
-            <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
-          </View>
+          {!isMobile && (
+            <View className="flex-row py-3 border-b border-gray-200 pr-2">
+              <Text className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Supplier Name</Text>
+              <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Contact</Text>
+              <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Active Orders</Text>
+              <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-right">Total Spent</Text>
+              <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
+            </View>
+          )}
 
           {loading ? (
             <View className="py-20 items-center justify-center">
@@ -143,45 +148,83 @@ export default function AdminSuppliersIndex() {
               <Text className="text-gray-400 text-lg font-medium">No suppliers found.</Text>
             </View>
           ) : (
-            filteredSuppliers.map(sup => (
-              <View key={sup.id} className="flex-row items-center py-4 border-b border-gray-50">
-                <View className="w-[30%] pr-2 flex-row items-center">
-                  <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                    <Text className="text-blue-700 font-bold">{sup.full_name?.charAt(0) || 'S'}</Text>
+            filteredSuppliers.map((sup, idx) => (
+              isMobile ? (
+                <View key={sup.id} style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ color: '#1D4ED8', fontWeight: 'bold' }}>{sup.full_name?.charAt(0) || 'S'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 16 }}>{sup.full_name || 'Unnamed'}</Text>
+                      <Text style={{ color: '#6B7280', fontSize: 12 }}>{sup.email || 'No email provided'}</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text className="text-brand-text font-bold text-sm truncate">{sup.full_name || 'Unnamed'}</Text>
-                    <Text className="text-gray-400 text-[10px]">Joined {format(new Date(sup.created_at), 'MMM yyyy')}</Text>
+                  
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <View>
+                      <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Active Orders</Text>
+                      <View style={{ backgroundColor: sup.activeOrders > 0 ? '#FFEDD5' : '#F3F4F6', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: sup.activeOrders > 0 ? '#C2410C' : '#6B7280' }}>
+                          {sup.activeOrders} Pending
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Total Spent</Text>
+                      <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 14 }}>
+                        {formatMoney(sup.totalSpent || 0)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                
-                <View className="w-[20%] pr-2">
-                  <Text className="text-gray-600 text-xs truncate">{sup.email || 'No email provided'}</Text>
-                </View>
-
-                <View className="w-[15%] flex-row justify-center">
-                  <View className={`px-2 py-1 rounded-full ${sup.activeOrders > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
-                    <Text className={`text-xs font-bold ${sup.activeOrders > 0 ? 'text-orange-700' : 'text-gray-500'}`}>
-                      {sup.activeOrders} Pending
-                    </Text>
-                  </View>
-                </View>
-                
-                <View className="w-[15%]">
-                  <Text className="text-brand-text font-bold text-right text-sm">
-                    Rs. {(sup.totalSpent || 0).toLocaleString()}
-                  </Text>
-                </View>
-                
-                <View className="flex-1 flex-row justify-end pl-1">
+                  
                   <Pressable 
-                    onPress={() => router.push(`/admin/suppliers/${sup.id}`)} 
-                    className="bg-brand-dark px-4 py-1.5 rounded-md shadow-sm hover:bg-gray-800"
+                    onPress={() => router.push(`/admin/suppliers/${sup.id}/orders`)} 
+                    style={{ backgroundColor: '#111827', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
                   >
-                    <Text className="text-white text-xs font-bold">Profile</Text>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>View Profile</Text>
                   </Pressable>
                 </View>
-              </View>
+              ) : (
+                <View key={sup.id} className="flex-row items-center py-4 border-b border-gray-50">
+                  <View className="w-[30%] pr-2 flex-row items-center">
+                    <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                      <Text className="text-blue-700 font-bold">{sup.full_name?.charAt(0) || 'S'}</Text>
+                    </View>
+                    <View>
+                      <Text className="text-brand-text font-bold text-sm truncate">{sup.full_name || 'Unnamed'}</Text>
+                      <Text className="text-gray-400 text-[10px]">Joined {format(new Date(sup.created_at), 'MMM yyyy')}</Text>
+                    </View>
+                  </View>
+                  
+                  <View className="w-[20%] pr-2">
+                    <Text className="text-gray-600 text-xs truncate">{sup.email || 'No email provided'}</Text>
+                  </View>
+  
+                  <View className="w-[15%] flex-row justify-center">
+                    <View className={`px-2 py-1 rounded-full ${sup.activeOrders > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                      <Text className={`text-xs font-bold ${sup.activeOrders > 0 ? 'text-orange-700' : 'text-gray-500'}`}>
+                        {sup.activeOrders} Pending
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <View className="w-[15%]">
+                    <Text className="text-brand-text font-bold text-right text-sm">
+                      {formatMoney(sup.totalSpent || 0)}
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-1 flex-row justify-end pl-1">
+                    <Pressable 
+                      onPress={() => router.push(`/admin/suppliers/${sup.id}/orders`)} 
+                      className="bg-brand-dark px-4 py-1.5 rounded-md shadow-sm hover:bg-gray-800"
+                    >
+                      <Text className="text-white text-xs font-bold">Profile</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )
             ))
           )}
         </View>

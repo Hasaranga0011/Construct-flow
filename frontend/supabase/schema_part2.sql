@@ -39,7 +39,5 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- Permissive Policies (FOR DEVELOPMENT MVP ONLY)
-CREATE POLICY "Allow all access for invoices" ON public.invoices FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access for photos" ON public.photos FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access for messages" ON public.messages FOR ALL USING (true) WITH CHECK (true);
+-- Policies are intentionally omitted here. Install reviewed, project-scoped
+-- policies before exposing these legacy tables to authenticated clients.

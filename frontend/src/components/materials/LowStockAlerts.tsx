@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useRealtimeStats } from '../../hooks/useRealtimeStats';
+
 
 const AlertRow = ({ material, project, remaining }: { material: string, project: string, remaining: string }) => {
   return (
@@ -19,49 +21,47 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadAlerts = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('material_requests')
-          .select(`
-            id, item_name, unit,
-            projects(name),
-            materials(global_stock_quantity, low_stock_threshold)
-          `)
-          .order('updated_at', { ascending: false });
-
-        if (error) throw error;
-        
-        let lowStock = [];
-        if (data) {
-          lowStock = data.filter((req: any) => {
-            const m = Array.isArray(req.materials) ? req.materials[0] : req.materials;
-            if (!m) return false;
-            return (m.global_stock_quantity || 0) < (m.low_stock_threshold || 1);
-          }).slice(0, 5);
-        }
-
-        if (isMounted) setAlerts(lowStock);
-      } catch (error) {
-        console.warn('Failed to load low stock alerts:', error);
-      } finally {
-        if (isMounted) setLoading(false);
+  const loadAlerts = useCallback(async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setLoading(false);
+        return;
       }
-    };
-    
-    loadAlerts();
-    
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+
+      const { data, error } = await supabase
+        .from('material_requests')
+        .select(`
+          id, item_name, unit,
+          projects(name),
+          materials(global_stock_quantity, low_stock_threshold)
+        `)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      
+      let lowStock: any[] = [];
+      if (data) {
+        lowStock = data.filter((req: any) => {
+          const m = Array.isArray(req.materials) ? req.materials[0] : req.materials;
+          if (!m) return false;
+          return (m.global_stock_quantity || 0) < (m.low_stock_threshold || 1);
+        }).slice(0, 5);
+      }
+
+      setAlerts(lowStock);
+    } catch (error) {
+      console.warn('Failed to load low stock alerts:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts, refreshTrigger]);
+
+  // Realtime: refresh list whenever materials rows change
+  useRealtimeStats(loadAlerts);
+
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">

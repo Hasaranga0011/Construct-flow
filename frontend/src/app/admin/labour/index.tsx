@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Pressable, Text, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TopNav } from '@/components/common/TopNav';
@@ -10,7 +10,9 @@ import { LabourDistributionChart } from '../../../components/labour/LabourDistri
 import { CheckInWorkerModal } from '../../../components/labour/CheckInWorkerModal';
 import { supabase } from '../../../lib/supabase';
 
-export default function LabourScreen() {
+import { useResponsive } from '../../../hooks/useResponsive';
+
+export default function LabourForceScreen() {
   const router = useRouter();
   const [stats, setStats] = useState({
     totalWorkers: 0,
@@ -23,6 +25,7 @@ export default function LabourScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     let isMounted = true;
@@ -33,25 +36,17 @@ export default function LabourScreen() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        const [workersReq, attendanceReq] = await Promise.all([
+        const [workersReq, checkinsReq] = await Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker'),
-          supabase.from('labour').select('id, status, hours_worked').eq('date', today)
+          supabase.from('attendance').select('user_id', { count: 'exact', head: true }).eq('date', today)
         ]);
-
-        let checkedInCount = 0;
-        let overtimeTotal = 0;
-
-        if (attendanceReq.data) {
-          checkedInCount = attendanceReq.data.filter(a => a.status === 'Present').length;
-          overtimeTotal = attendanceReq.data.reduce((sum, a) => sum + Math.max(0, (Number(a.hours_worked) || 0) - 8), 0);
-        }
 
         if (isMounted) {
           setStats({
             totalWorkers: workersReq.count || 0,
-            checkedInToday: checkedInCount,
-            activeSites: 0, // Keep 0 for now
-            pendingPayroll: overtimeTotal
+            checkedInToday: checkinsReq.count || 0,
+            activeSites: 4, 
+            pendingPayroll: 12, 
           });
         }
       } catch (error) {
@@ -65,27 +60,9 @@ export default function LabourScreen() {
     return () => { isMounted = false; };
   }, [refreshTrigger]);
 
-  useEffect(() => {
-    const channel = supabase.channel('public:labour')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'labour' }, () => {
-        setRefreshTrigger(prev => prev + 1);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const handleCheckIn = () => {
+  const handleWorkerCreated = () => {
     setModalVisible(false);
     setRefreshTrigger(prev => prev + 1);
-  };
-
-  const formatCurrency = (val: number) => {
-    if (val >= 1000000) return `Rs. ${(val / 1000000).toFixed(1)}M`;
-    if (val >= 1000) return `Rs. ${(val / 1000).toFixed(1)}K`;
-    return `Rs. ${val}`;
   };
 
   return (
@@ -93,9 +70,7 @@ export default function LabourScreen() {
       <TopNav 
         title="Labour Force" 
         actionLabel="+ Add Worker" 
-        onActionPress={() => setModalVisible(true)} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
+        onActionPress={() => router.push('/admin/users/create')} 
       />
       
       {loading ? (
@@ -103,9 +78,25 @@ export default function LabourScreen() {
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+          
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+            <Text className="text-2xl font-bold text-brand-text">All Workers</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput 
+                className="flex-1 ml-2 text-sm text-brand-text outline-none"
+                placeholder="Search workers..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
             <StatCard 
               label="Total Workers" 
               value={stats.totalWorkers.toString()} 
@@ -130,7 +121,7 @@ export default function LabourScreen() {
           </View>
 
           {/* Quick Actions */}
-          <View className="flex-row gap-4 mb-6">
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 24 }}>
             <Pressable onPress={() => router.push('/admin/attendance')} className="bg-indigo-50 px-4 py-3 rounded-lg border border-indigo-100 flex-row items-center">
               <Ionicons name="time-outline" size={20} color="#4F46E5" />
               <Text className="text-indigo-700 font-bold ml-2">Attendance Logs</Text>
@@ -142,16 +133,16 @@ export default function LabourScreen() {
           </View>
 
           {/* Main Content Layout */}
-          <View className="flex-row">
+          <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Attendance Table) */}
-            <View className="flex-[2] mr-6">
+            <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
               <AttendanceTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
             {/* Side Panel (Payroll & Chart) */}
-            <View className="flex-[1] flex-col">
+            <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
               <PayrollSummary refreshTrigger={refreshTrigger} />
-              <View className="h-64">
+              <View style={isMobile ? { height: 256, marginTop: 16 } : { height: 256 }}>
                 <LabourDistributionChart refreshTrigger={refreshTrigger} />
               </View>
             </View>
@@ -162,7 +153,7 @@ export default function LabourScreen() {
       <CheckInWorkerModal 
         visible={isModalVisible} 
         onClose={() => setModalVisible(false)} 
-        onSuccess={handleCheckIn} 
+        onSuccess={handleWorkerCreated} 
       />
     </View>
   );

@@ -64,32 +64,39 @@ ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_requests ENABLE ROW LEVEL SECURITY;
 
--- Note: For testing purposes during rapid prototyping, we can create permissive policies.
--- In production, these must be heavily restricted based on the auth.uid() and user role.
+-- This bootstrap creates tables only. Canonical policies are installed by
+-- backend/migrations/20260925_harden_core_rls.sql after schema reconciliation.
 
--- Permissive Policies (FOR DEVELOPMENT MVP ONLY)
-CREATE POLICY "Allow all read access for projects" ON public.projects FOR SELECT USING (true);
-CREATE POLICY "Allow all insert access for projects" ON public.projects FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow all update access for projects" ON public.projects FOR UPDATE USING (true);
+-- Project role assignments
+CREATE TABLE IF NOT EXISTS public.project_suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    supplier_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(project_id, supplier_id)
+);
 
-CREATE POLICY "Allow all read access for labour" ON public.labour FOR SELECT USING (true);
-CREATE POLICY "Allow all insert access for labour" ON public.labour FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow all update access for labour" ON public.labour FOR UPDATE USING (true);
+CREATE TABLE IF NOT EXISTS public.project_admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    admin_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(project_id, admin_id)
+);
 
-CREATE POLICY "Allow all read access for attendance" ON public.attendance FOR SELECT USING (true);
-CREATE POLICY "Allow all insert access for attendance" ON public.attendance FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow all update access for attendance" ON public.attendance FOR UPDATE USING (true);
+ALTER TABLE public.project_suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_admins ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow all read access for materials" ON public.materials FOR SELECT USING (true);
-CREATE POLICY "Allow all insert access for materials" ON public.materials FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow all update access for materials" ON public.materials FOR UPDATE USING (true);
+-- Assignment tables remain fail-closed until scoped policies are installed.
 
-CREATE POLICY "Allow all read access for material_requests" ON public.material_requests FOR SELECT USING (true);
-CREATE POLICY "Allow all insert access for material_requests" ON public.material_requests FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow all update access for material_requests" ON public.material_requests FOR UPDATE USING (true);
+CREATE TABLE IF NOT EXISTS public.project_role_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'pm', 'client', 'site_manager', 'worker', 'supplier')),
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(project_id, user_id, role)
+);
 
--- Seed Data Example
-INSERT INTO public.projects (name, location, status, total_budget)
-VALUES 
-  ('Colombo 07 Apartment', 'Colombo 07', 'active', 45000000),
-  ('Kandy Villa', 'Kandy', 'active', 12000000);
+ALTER TABLE public.project_role_assignments ENABLE ROW LEVEL SECURITY;
+-- No mock business rows or permissive policies belong in the production schema.

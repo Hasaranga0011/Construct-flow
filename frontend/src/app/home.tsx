@@ -486,7 +486,7 @@ export default function HomeScreen() {
                 shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
               }}
             >
-              <Text style={{ color: C.muted, fontSize: 22, marginBottom: 8 }}>"</Text>
+                <Text style={{ color: C.muted, fontSize: 22, marginBottom: 8 }}>&quot;</Text>
               <Text style={{ color: C.dark, fontSize: 13, lineHeight: 21, marginBottom: 12 }}>{t.text}</Text>
               <Text style={{ color: C.dark, fontSize: 13, fontWeight: '700' }}>{t.name}</Text>
               <Text style={{ color: C.muted, fontSize: 11 }}>{t.org}</Text>

@@ -8,7 +8,6 @@ const EstimateRow = ({
   date, 
   cost, 
   status,
-  confidence,
   onApprove
 }: { 
   id: number,
@@ -16,7 +15,6 @@ const EstimateRow = ({
   date: string, 
   cost: string, 
   status: 'Approved' | 'Draft' | 'Pending',
-  confidence: number,
   onApprove: (id: number) => void
 }) => {
   let statusBadgeColor = '';
@@ -158,7 +156,6 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
               date={new Date(est.created_at).toLocaleDateString()} 
               cost={formatCurrency(est.estimated_cost)} 
               status={est.status || 'Pending'} 
-              confidence={est.confidence_score || 85}
               onApprove={handleApprove}
             />
           ))

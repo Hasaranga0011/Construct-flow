@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
+import { LogoutConfirmationModal } from '../common/LogoutConfirmationModal';
 
 const roleConfig: Record<string, { color: string; label: string }> = {
   admin: { color: '#F97316', label: 'Administrator' },
@@ -30,6 +31,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
   const { isDark, toggleTheme } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
 
@@ -95,12 +97,16 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
     }
   };
 
-  const handleSignOut = async () => {
+  const completeSignOut = async () => {
     setSigningOut(true);
     try {
       await signOut();
       router.replace('/login' as any);
     } catch { setSigningOut(false); }
+  };
+
+  const handleSignOut = () => {
+    setLogoutModalVisible(true);
   };
 
   const bgTheme = isDark ? '#0F172A' : '#F8F9FB';
@@ -128,7 +134,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 14, fontWeight: '600', color: textTheme }}>{title}</Text>
         <Text style={{ fontSize: 12, color: textSubTheme, marginTop: 1 }}>{subtitle}</Text>
-      </View>>
+      </View>
       <Switch
         value={value}
         onValueChange={onToggle}
@@ -162,6 +168,12 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
 
   return (
     <View style={{ flex: 1, backgroundColor: bgTheme }}>
+      <LogoutConfirmationModal
+        visible={logoutModalVisible}
+        isDark={isDark}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={() => { setLogoutModalVisible(false); void completeSignOut(); }}
+      />
       {/* Toast */}
       {toast && (
         <Animated.View style={{ opacity: toastOpacity, position: 'absolute', bottom: 32, alignSelf: 'center', zIndex: 999 }}>

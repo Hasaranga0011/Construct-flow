@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Text, TextInput } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { CostTimelineChart } from '../../components/dashboard/CostTimelineChart';
@@ -9,8 +9,11 @@ import { RecentAlertsPanel } from '../../components/dashboard/RecentAlertsPanel'
 import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
+import { Ionicons } from '@expo/vector-icons';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function DashboardScreen() {
+  const { isMobile } = useResponsive();
   const [stats, setStats] = useState({
     activeProjects: 0,
     workersOnSite: 0,
@@ -86,11 +89,9 @@ export default function DashboardScreen() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav 
-        title="Dashboard" 
+        title="Admin Dashboard" 
         actionLabel="+ New Project" 
         onActionPress={() => setModalVisible(true)} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
       />
       
       {loading ? (
@@ -99,60 +100,79 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+            <Text className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput 
+                className="flex-1 ml-2 text-sm text-brand-text outline-none"
+                placeholder="Search projects..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
-            <AnimatedCard delay={100} style={{ flex: 1 }}>
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
                 value={stats.activeProjects.toString()} 
                 indicatorText="Live tracking" 
                 indicatorType="success" 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={200} style={{ flex: 1 }}>
+            <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Workers On Site" 
                 value={stats.workersOnSite.toString()} 
                 indicatorText="Currently checked in" 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={300} style={{ flex: 1 }}>
+            <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Low Stock Alerts" 
                 value={stats.lowStockAlerts.toString()} 
                 indicatorText="Requires ordering" 
                 indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"} 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={400} style={{ flex: 1 }}>
+            <AnimatedCard delay={400} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Total Budget" 
                 value={formatCurrency(stats.totalBudget)} 
                 indicatorText="Approved estimates" 
+                fullWidth
               />
             </AnimatedCard>
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className="flex-row mb-6">
+          <View className="flex-col lg:flex-row mb-6 gap-6">
             {/* Main Content Area (Chart) */}
-            <View className="flex-[2] mr-6">
+            <View className="flex-[2] w-full">
               <CostTimelineChart />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className="flex-[1]">
+            <View className="flex-[1] w-full">
               <DelayRiskPanel />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className="flex-row pb-6">
-            <View className="flex-[2] mr-6">
+          <View className="flex-col lg:flex-row pb-6 gap-6">
+            <View className="flex-[2] w-full">
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
-            <View className="flex-[1]">
+            <View className="flex-[1] w-full">
               <RecentAlertsPanel />
             </View>
           </View>

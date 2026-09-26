@@ -11,15 +11,15 @@ CREATE TABLE IF NOT EXISTS public.historical_costs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable Read Access for everyone (or adjust based on your security policies)
+-- Historical costs are internal training data and must stay manager scoped.
 ALTER TABLE public.historical_costs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow read access to historical_costs" 
+CREATE POLICY "Managers read historical_costs"
     ON public.historical_costs
-    FOR SELECT 
-    USING (true);
+    FOR SELECT TO authenticated
+    USING (public.cf_role() IN ('super_admin', 'pm'));
 
-CREATE POLICY "Allow insert access to historical_costs" 
+CREATE POLICY "Admins insert historical_costs"
     ON public.historical_costs
-    FOR INSERT 
-    WITH CHECK (true);
+    FOR INSERT TO authenticated
+    WITH CHECK (public.cf_role() = 'super_admin');

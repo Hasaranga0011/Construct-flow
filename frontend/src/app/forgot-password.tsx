@@ -21,11 +21,11 @@ export default function ForgotPasswordScreen() {
     setErrorMsg('');
     setSuccessMsg('');
 
-    // For web, redirectTo typically uses the origin. 
-    // In a real app, this route would handle resetting the actual password.
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-    });
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/reset-password`
+      : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
     if (error) {
       setErrorMsg(error.message);
@@ -60,7 +60,7 @@ export default function ForgotPasswordScreen() {
             </Pressable>
             <View className="w-full">
               <Text className="text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
-              <Text className="text-gray-500 text-base leading-relaxed">Enter your email address and we'll send you a secure link to reset your password.</Text>
+              <Text className="text-gray-500 text-base leading-relaxed">Enter your email address and we&apos;ll send you a secure link to reset your password.</Text>
             </View>
           </View>
 

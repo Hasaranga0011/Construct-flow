@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView,
 import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
-import toast from 'react-hot-toast';
+import { toast } from '../../lib/toast';
 
 type NewMaterialModalProps = {
   visible: boolean;
@@ -146,7 +146,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                       </Pressable>
                     ))}
                     {dbSuppliers.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">No suppliers found. Run SQL mock script.</Text>
+                       <Text className="text-gray-400 text-sm italic">No suppliers are available for this order.</Text>
                     )}
                   </ScrollView>
                   <TextInput

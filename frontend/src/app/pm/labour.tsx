@@ -42,18 +42,18 @@ export default function PMLabourScreen() {
         let overtimeTotal = 0;
 
         if (activeProjectIds.length > 0) {
-          const [workersReq, attendanceReq] = await Promise.all([
+          const [workersReq, labourReq] = await Promise.all([
             supabase.from('labour').select('id', { count: 'exact', head: true }).in('assigned_project_id', activeProjectIds),
-            supabase.from('attendance')
-              .select('id, status, overtime_hours, projects!inner(pm_id)')
+            supabase.from('labour')
+              .select('id, status, hours_worked')
               .eq('date', today)
-              .eq('projects.pm_id', pmId)
+              .in('assigned_project_id', activeProjectIds)
           ]);
 
           workersCount = workersReq.count || 0;
-          if (attendanceReq.data) {
-            checkedInCount = attendanceReq.data.filter(a => a.status === 'Present').length;
-            overtimeTotal = attendanceReq.data.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
+          if (labourReq.data) {
+            checkedInCount = labourReq.data.filter(a => a.status === 'Present').length;
+            overtimeTotal = labourReq.data.reduce((sum, a) => sum + Math.max(0, (Number(a.hours_worked) || 0) - 8), 0);
           }
         }
 

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from typing import List, Optional
 from ..models import MaterialCreate, MaterialResponse
-from core.database import supabase
+from core.database import get_auth_client, client_for_token
+from core.security import require_manager_or_admin
 
 router = APIRouter(
     prefix="/materials",
@@ -9,31 +10,39 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[MaterialResponse])
-def get_materials(project_id: Optional[str] = Query(None, description="Filter by project ID")):
+def get_materials(request: Request, project_id: Optional[str] = Query(None, description="Filter by project ID")):
     try:
-        query = supabase.table("materials").select("*")
+        query = get_auth_client(request).table("materials").select("*")
         if project_id:
             query = query.eq("project_id", project_id)
             
         response = query.execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=MaterialResponse)
-def create_material(material: MaterialCreate):
+def create_material(material: MaterialCreate, request: Request, current_user: dict = Depends(require_manager_or_admin)):
     try:
-        response = supabase.table("materials").insert(material.model_dump()).execute()
+        response = get_auth_client(request).table("materials").insert(material.model_dump()).execute()
         
         if not response.data:
             raise HTTPException(status_code=400, detail="Failed to add material")
             
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/check-stock")
-def check_low_stock():
+def check_low_stock(current_user: dict = Depends(require_manager_or_admin)):
+    return check_stock(client_for_token(current_user["token"]))
+
+
+def check_stock(supabase):
     try:
         # Check global_stock_quantity < low_stock_threshold
         # Note: in real app, might want to check site_materials too
@@ -55,5 +64,7 @@ def check_low_stock():
             supabase.table("notifications").insert(notifications).execute()
             
         return {"checked": len(res.data), "alerts_sent": len(notifications)}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

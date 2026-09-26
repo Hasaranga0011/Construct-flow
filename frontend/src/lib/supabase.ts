@@ -22,7 +22,7 @@ const ExpoSecureStoreAdapter = {
       window.localStorage.setItem(key, value);
       return;
     }
-    AsyncStorage.setItem(key, value);
+    return AsyncStorage.setItem(key, value);
   },
   removeItem: (key: string) => {
     if (Platform.OS === 'web') {
@@ -30,65 +30,16 @@ const ExpoSecureStoreAdapter = {
       window.localStorage.removeItem(key);
       return;
     }
-    AsyncStorage.removeItem(key);
+    return AsyncStorage.removeItem(key);
   },
 };
 
-const createServerSafeSupabaseStub = () => {
-  const emptyResponse = async () => ({ data: null, error: null });
-
-  const createQueryStub = (): any => {
-    const query: any = {};
-
-    return new Proxy(query, {
-      get(_target, property) {
-        if (property === 'then') return undefined;
-        if (property === 'catch' || property === 'finally') return undefined;
-        if (property === 'select' || property === 'from') return createQueryStub;
-        if (property === 'single' || property === 'maybeSingle') return emptyResponse;
-        if (typeof property === 'string') {
-          return (..._args: any[]) => createQueryStub();
-        }
-        return undefined;
-      },
-    });
-  };
-
-  return {
-    auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
-      getUser: async () => ({ data: { user: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signOut: async () => ({ error: null }),
-      signInWithPassword: emptyResponse,
-      signInWithOAuth: emptyResponse,
-      signUp: emptyResponse,
-      resetPasswordForEmail: emptyResponse,
-    },
-    from: createQueryStub,
-    channel: () => ({
-      on: () => ({
-        subscribe: () => ({ unsubscribe: () => {} })
-      })
-    }),
-    removeChannel: emptyResponse,
-    storage: {
-      from: () => ({
-        upload: emptyResponse,
-        getPublicUrl: () => ({ data: { publicUrl: '' } }),
-        remove: emptyResponse,
-      }),
-    },
-  };
-};
-
-export const supabase = isWebServer
-  ? createServerSafeSupabaseStub()
-  : createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: ExpoSecureStoreAdapter,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-      },
-    });
+// Keep the same client API during SSR, without browser session work.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: ExpoSecureStoreAdapter,
+    autoRefreshToken: !isWebServer,
+    persistSession: !isWebServer,
+    detectSessionInUrl: Platform.OS === 'web' && !isWebServer,
+  },
+});

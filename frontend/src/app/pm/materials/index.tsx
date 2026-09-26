@@ -10,6 +10,7 @@ export default function PMApprovalQueue() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Reject Modal State
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -26,9 +27,9 @@ export default function PMApprovalQueue() {
       if (!sessionData?.session) return;
       const pmId = sessionData.session.user.id;
 
-      // 1. Fetch PM's assigned projects
-      const { data: pmProjects } = await supabase.from('pm_projects').select('project_id').eq('pm_id', pmId);
-      const projectIds = pmProjects?.map(p => p.project_id) || [];
+      // 1. Fetch PM's projects directly (no pm_projects junction table)
+      const { data: pmProjects } = await supabase.from('projects').select('id').eq('pm_id', pmId);
+      const projectIds = pmProjects?.map(p => p.id) || [];
 
       if (projectIds.length === 0) {
         setRequests([]);
@@ -40,7 +41,7 @@ export default function PMApprovalQueue() {
       if (activeTab === 'queue') {
         let query = supabase
           .from('material_requests')
-          .select('*, projects(name), auth_users:requested_by(raw_user_meta_data)')
+          .select('*, projects(name), profiles:requested_by(full_name)')
           .in('project_id', projectIds)
           .order('created_at', { ascending: false });
 
@@ -49,24 +50,17 @@ export default function PMApprovalQueue() {
         if (error && error.code !== '42P01') throw error;
         setRequests(data || []);
       } else {
-        // Fetch sites for these projects
-        const { data: sites } = await supabase.from('sites').select('id, name').in('project_id', projectIds);
-        const siteIds = sites?.map(s => s.id) || [];
-        
-        if (siteIds.length > 0) {
-          let query = supabase
-            .from('site_materials')
-            .select('*, sites(name)')
-            .in('site_id', siteIds)
-            .order('last_updated', { ascending: false });
-            
-          if (searchQuery) query = query.ilike('item_name', `%${searchQuery}%`);
-          const { data, error } = await query;
-          if (error && error.code !== '42P01') throw error;
-          setStockData(data || []);
-        } else {
-          setStockData([]);
-        }
+        // Fetch materials for PM's projects
+        let query = supabase
+          .from('materials')
+          .select('*, projects(name)')
+          .in('project_id', projectIds)
+          .order('created_at', { ascending: false });
+          
+        if (searchQuery) query = query.ilike('item_name', `%${searchQuery}%`);
+        const { data, error } = await query;
+        if (error && error.code !== '42P01') throw error;
+        setStockData(data || []);
       }
     } catch (e) {
       console.error(e);
@@ -201,7 +195,7 @@ export default function PMApprovalQueue() {
                     <View key={req.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <View className="w-1/5">
                         <Text className="font-bold text-brand-text">{req.item_name}</Text>
-                        <Text className="text-xs text-gray-400 mt-1">By: {req.auth_users?.raw_user_meta_data?.full_name || 'Site Manager'}</Text>
+                        <Text className="text-xs text-gray-400 mt-1">By: {req.profiles?.full_name || 'Site Manager'}</Text>
                       </View>
                       <View className="w-1/6">
                         <Text className="text-gray-500 text-sm truncate">{req.projects?.name || 'Unknown'}</Text>
@@ -259,14 +253,14 @@ export default function PMApprovalQueue() {
                         <Text className="font-bold text-brand-text">{stock.item_name}</Text>
                       </View>
                       <View className="w-1/6">
-                        <Text className="text-gray-500 text-sm truncate">{stock.sites?.name || 'Unknown'}</Text>
+                        <Text className="text-gray-500 text-sm truncate">{stock.projects?.name || 'Unknown'}</Text>
                       </View>
                       <View className="w-1/6">
-                        <Text className="text-brand-text font-semibold">{stock.quantity} {stock.unit}</Text>
+                        <Text className="text-brand-text font-semibold">{stock.global_stock_quantity ?? 0} {stock.unit}</Text>
                       </View>
                       <View className="w-1/6">
                         <Text className="text-gray-500 text-xs">
-                          {new Date(stock.last_updated).toLocaleDateString()}
+                          {stock.created_at ? new Date(stock.created_at).toLocaleDateString() : '—'}
                         </Text>
                       </View>
                     </View>

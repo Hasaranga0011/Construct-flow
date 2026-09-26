@@ -9,3 +9,7 @@ backend/models/*.pth
 # Python cache
 __pycache__/
 *.pyc
+# Local validation output
+.validation-db/
+.validation-web/
+.lint-results.json

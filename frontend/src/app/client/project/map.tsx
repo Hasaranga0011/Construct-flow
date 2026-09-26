@@ -1,17 +1,20 @@
+// Modified for Expo Go mobile compatibility
 import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, Platform, ScrollView } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
-
+import { Ionicons } from '@expo/vector-icons';
 export default function ClientProjectMapPage() {
+  const isMobile = Platform.OS !== 'web';
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav title="Client Project Map" showAction={false} />
-      <ScrollView className="flex-1 p-6">
-        <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <Text className="text-xl font-bold text-gray-800">Client Project Map</Text>
-          <Text className="text-gray-500 mt-2">Page stub generated successfully.</Text>
+      <TopNav title="Project Map" showAction={false} />
+      <View className={`flex-1 ${isMobile ? 'p-0' : 'p-6'}`}>
+        <View className="flex-1 bg-gray-200 justify-center items-center rounded-2xl overflow-hidden border border-gray-100">
+          <Ionicons name="map-outline" size={64} color="#9CA3AF" />
+          <Text className="text-xl font-bold text-gray-500 mt-4">Interactive Map View</Text>
+          <Text className="text-gray-400 mt-2">Map integrations will appear here</Text>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }

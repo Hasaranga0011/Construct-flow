@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, Image, TextInput, useWindowDimension
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
+import { getDashboardForRole } from '../utils/auth';
 
 const AnimatedCounter = ({ value, suffix = '', isDecimal = false, triggered }: { value: number, suffix?: string, isDecimal?: boolean, triggered: boolean }) => {
   const [count, setCount] = useState(0);
@@ -37,7 +38,7 @@ const AnimatedCounter = ({ value, suffix = '', isDecimal = false, triggered }: {
 }
 
 export default function LandingPage() {
-  const { session } = useAuth();
+  const { session, role } = useAuth();
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [countersTriggered, setCountersTriggered] = useState(false);
@@ -46,7 +47,8 @@ export default function LandingPage() {
 
   const handleCTA = () => {
     if (session) {
-      router.push('/dashboard');
+      const destination = role ? getDashboardForRole(role) : null;
+      router.push((destination ?? '/') as any);
     } else {
       router.push('/register');
     }
@@ -110,7 +112,7 @@ export default function LandingPage() {
           </View>
           <View>
             {session ? (
-              <Link href="/dashboard" asChild>
+              <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
                 <Pressable className="bg-brand-orange px-6 py-2 rounded-full hover:bg-orange-600 transition-colors">
                   <Text className="text-white font-bold">Go to Dashboard</Text>
                 </Pressable>
@@ -193,13 +195,13 @@ export default function LandingPage() {
               </View>
             </View>
             
-            {/* Right Column: Dashboard Mockup */}
+            {/* Right Column: Dashboard preview */}
             <View className="w-full lg:w-1/2">
               <View className="bg-[#1F2937] rounded-3xl p-6 md:p-8 border border-gray-700 shadow-2xl relative overflow-hidden opacity-95">
                 {/* Background glow effect for card */}
                 <View className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/10 rounded-full blur-3xl -z-10" />
 
-                {/* Mockup Header */}
+                {/* Preview header */}
                 <View className="flex-row items-center border-b border-gray-700 pb-4 mb-6">
                   <View className="flex-row mr-4">
                     <View className="w-3 h-3 rounded-full bg-gray-500 mr-2" />

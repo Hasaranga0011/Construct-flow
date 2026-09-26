@@ -4,6 +4,8 @@ import { api } from '../../lib/api';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 
+import { useResponsive } from '../../hooks/useResponsive';
+
 const ClientCard = ({ 
   initials, 
   colorClass, 
@@ -23,6 +25,42 @@ const ClientCard = ({
   email: string,
   onViewDetails: () => void
 }) => {
+  const { isMobile } = useResponsive();
+
+  if (isMobile) {
+    return (
+      <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12, width: '100%' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <View className={`w-12 h-12 rounded-full items-center justify-center ${colorClass}`}>
+            <Text className="text-white font-bold text-sm">{initials}</Text>
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 2 }}>{clientName}</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 2 }}>{companyName || 'Independent'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="location-outline" size={14} color="#6B7280" />
+              <Text style={{ fontSize: 13, color: '#6B7280' }}>Project: {projectName}</Text>
+            </View>
+          </View>
+          
+          <View style={{ backgroundColor: accessLevel === 'Full Access' ? '#DCFCE7' : '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: accessLevel === 'Full Access' ? '#065F46' : '#6B7280', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>
+              {accessLevel}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable 
+          onPress={onViewDetails}
+          style={{ width: '100%', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
+        >
+          <Text style={{ color: '#374151', fontWeight: '600', fontSize: 14 }}>Send Update</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Avatar */}
@@ -87,30 +125,21 @@ const ClientDetailsModal = ({ client, visible, onClose, onUpdate }: { client: an
   };
 
   const handleDelete = async () => {
-    let confirmed = false;
-    if (typeof window !== 'undefined') {
-      confirmed = window.confirm('Are you sure you want to delete this client profile? This action cannot be undone.');
-    } else {
-      // Fallback for native, though this is primarily a web dashboard
-      confirmed = true; // simplifying for web-first approach
-    }
-    
-    if (confirmed) {
-      setLoading(true);
-      try {
-        await api.delete(`/clients/${client.id}`);
-        onUpdate();
-        onClose();
-      } catch (e: any) {
-        if (typeof window !== 'undefined') {
-          window.alert(e.message || 'Failed to delete client');
-        } else {
+    Alert.alert('Delete Client', 'Are you sure you want to delete this client profile? This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setLoading(true);
+        try {
+          await api.delete(`/clients/${client.id}`);
+          onUpdate();
+          onClose();
+        } catch (e: any) {
           Alert.alert('Error', e.message || 'Failed to delete client');
+        } finally {
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
-      }
-    }
+      } },
+    ]);
   };
   
   return (

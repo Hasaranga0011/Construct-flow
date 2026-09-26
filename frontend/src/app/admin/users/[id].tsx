@@ -85,20 +85,14 @@ export default function AdminUsersEditPage() {
       }
     };
 
-    if (Platform.OS === 'web') {
-      if (window.confirm("Are you sure you want to completely delete this user account? This cannot be undone.")) {
-        doDelete();
-      }
-    } else {
-      Alert.alert(
-        "Delete User",
-        "Are you sure you want to completely delete this user account? This cannot be undone.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: doDelete }
-        ]
-      );
-    }
+    Alert.alert(
+      "Delete User",
+      "Are you sure you want to completely delete this user account? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: doDelete }
+      ]
+    );
   };
 
   const handleSave = async () => {
@@ -109,26 +103,23 @@ export default function AdminUsersEditPage() {
 
     setSaving(true);
     try {
-      const profileUpdate: any = {
-        full_name: fullName,
-        role: selectedRole,
-        contact_number: contactNumber || null,
-      };
-
-      if (selectedRole === 'worker') {
-        profileUpdate.worker_type = workerType;
-        profileUpdate.daily_rate = parseFloat(dailyRate) || 0;
-      } else {
-        profileUpdate.worker_type = null;
-        profileUpdate.daily_rate = null;
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(profileUpdate)
-        .eq('id', id);
+      const { error: profileError } = await supabase.rpc('update_user_role', {
+        target_user_id: id,
+        new_role: selectedRole,
+        new_worker_type: selectedRole === 'worker' ? workerType : null,
+        new_daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
+      });
 
       if (profileError) throw profileError;
+
+      // Also update full_name/contact_number using standard update since those columns have permissions
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          contact_number: contactNumber || null
+        })
+        .eq('id', id);
 
       Alert.alert('Success', 'User profile updated successfully!');
       router.back();

@@ -6,11 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function SMMaterialsPage() {
   const [loading, setLoading] = useState(true);
-  const [sites, setSites] = useState<any[]>([]);
-  const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState<'stock' | 'request'>('stock');
-  const [siteStock, setSiteStock] = useState<any[]>([]);
+  const [projectStock, setProjectStock] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -27,32 +27,31 @@ export default function SMMaterialsPage() {
       const userId = sessionData.session.user.id;
       setCurrentUserId(userId);
 
-      // 1. Fetch SM's assigned sites and their parent projects
-      const { data: smSites } = await supabase
+      // 1. Fetch projects through the site-manager assignment relation
+      const { data: assignments } = await supabase
         .from('site_manager_sites')
-        .select('site_id, sites(name, project_id)')
+        .select('project_id')
         .eq('site_manager_id', userId);
+      const projectIds = assignments?.map((assignment) => assignment.project_id) || [];
+      const { data: projectsData } = projectIds.length
+        ? await supabase.from('projects').select('id, name').in('id', projectIds).eq('status', 'active')
+        : { data: [] };
         
-      const parsedSites = smSites?.map(s => ({ 
-        id: s.site_id, 
-        name: s.sites?.name, 
-        project_id: s.sites?.project_id 
-      })) || [];
-      
-      setSites(parsedSites);
+      const parsedProjects = projectsData || [];
+      setProjects(parsedProjects);
 
-      if (parsedSites.length > 0) {
-        const currentSite = activeSiteId || parsedSites[0].id;
-        if (!activeSiteId) setActiveSiteId(currentSite);
+      if (parsedProjects.length > 0) {
+        const currentProject = activeProjectId || parsedProjects[0].id;
+        if (!activeProjectId) setActiveProjectId(currentProject);
 
-        // 2. Fetch site stock
+        // 2. Fetch materials for the active project
         const { data: stockData } = await supabase
-          .from('site_materials')
+          .from('materials')
           .select('*')
-          .eq('site_id', currentSite)
-          .order('last_updated', { ascending: false });
+          .eq('project_id', currentProject)
+          .order('created_at', { ascending: false });
         
-        setSiteStock(stockData || []);
+        setProjectStock(stockData || []);
 
         // 3. Fetch past requests by this user
         const { data: reqData } = await supabase
@@ -65,7 +64,6 @@ export default function SMMaterialsPage() {
       }
     } catch (error: any) {
       console.error('Error fetching materials data', error);
-      Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
@@ -73,17 +71,11 @@ export default function SMMaterialsPage() {
 
   useEffect(() => {
     fetchMaterialsData();
-  }, [activeSiteId, activeTab]);
+  }, [activeProjectId, activeTab]);
 
   const handleSubmitRequest = async () => {
-    if (!itemName || !quantity || !activeSiteId || !currentUserId) {
+    if (!itemName || !quantity || !activeProjectId || !currentUserId) {
       Alert.alert('Error', 'Please fill in all fields.');
-      return;
-    }
-
-    const activeSite = sites.find(s => s.id === activeSiteId);
-    if (!activeSite?.project_id) {
-      Alert.alert('Error', 'Could not determine the project for this site.');
       return;
     }
 
@@ -92,7 +84,7 @@ export default function SMMaterialsPage() {
       const { error } = await supabase
         .from('material_requests')
         .insert({
-          project_id: activeSite.project_id,
+          project_id: activeProjectId,
           requested_by: currentUserId,
           item_name: itemName,
           quantity: Number(quantity),
@@ -129,17 +121,17 @@ export default function SMMaterialsPage() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="Site Materials" />
       
-      {sites.length > 0 && (
+      {projects.length > 0 && (
         <View className="bg-white px-6 pt-4 border-b border-gray-200">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-            {sites.map(site => (
+            {projects.map(project => (
               <Pressable 
-                key={site.id}
-                onPress={() => setActiveSiteId(site.id)}
-                className={`mr-6 pb-3 border-b-2 ${activeSiteId === site.id ? 'border-brand-orange' : 'border-transparent'}`}
+                key={project.id}
+                onPress={() => setActiveProjectId(project.id)}
+                className={`mr-6 pb-3 border-b-2 ${activeProjectId === project.id ? 'border-brand-orange' : 'border-transparent'}`}
               >
-                <Text className={`font-bold text-base ${activeSiteId === site.id ? 'text-brand-orange' : 'text-gray-500'}`}>
-                  {site.name}
+                <Text className={`font-bold text-base ${activeProjectId === project.id ? 'text-brand-orange' : 'text-gray-500'}`}>
+                  {project.name}
                 </Text>
               </Pressable>
             ))}
@@ -165,44 +157,50 @@ export default function SMMaterialsPage() {
 
       <View className="flex-1 p-8">
         {loading ? (
-          <ActivityIndicator size="large" color="#F97316" className="mt-10" />
-        ) : sites.length === 0 ? (
+          <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 40 }} />
+        ) : projects.length === 0 ? (
           <View className="flex-1 items-center justify-center">
-            <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" className="mb-4" />
-            <Text className="text-gray-400 text-lg font-medium text-center">You have no assigned sites.</Text>
+            <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+            <Text className="text-gray-400 text-lg font-medium text-center mt-4">You have no assigned projects.</Text>
           </View>
         ) : activeTab === 'stock' ? (
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
             <View className="flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
               <Text className="flex-[2] text-xs font-bold text-gray-500 uppercase">Item Name</Text>
-              <Text className="flex-1 text-xs font-bold text-gray-500 uppercase">Quantity</Text>
-              <Text className="flex-1 text-xs font-bold text-gray-500 uppercase">Last Updated</Text>
+              <Text className="flex-1 text-xs font-bold text-gray-500 uppercase">Stock</Text>
+              <Text className="flex-1 text-xs font-bold text-gray-500 uppercase">Status</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {siteStock.length === 0 ? (
+              {projectStock.length === 0 ? (
                 <View className="p-10 items-center justify-center">
                   <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
-                  <Text className="text-gray-400 mt-4">No stock recorded at this site yet.</Text>
+                  <Text className="text-gray-400 mt-4">No materials recorded for this project yet.</Text>
                 </View>
               ) : (
-                siteStock.map(item => (
-                  <View key={item.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                    <View className="flex-[2]">
-                      <Text className="font-bold text-brand-text">{item.item_name}</Text>
+                projectStock.map(item => {
+                  const isLow = (item.global_stock_quantity || 0) < (item.low_stock_threshold || 0);
+                  return (
+                    <View key={item.id} className="flex-row items-center py-4 px-6 border-b border-gray-50">
+                      <View className="flex-[2]">
+                        <Text className="font-bold text-brand-text">{item.item_name}</Text>
+                        <Text className="text-gray-400 text-xs">{item.unit}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className={`font-bold ${isLow ? 'text-red-500' : 'text-brand-text'}`}>
+                          {item.global_stock_quantity ?? 0}
+                        </Text>
+                      </View>
+                      <View className="flex-1">
+                        <View className={`self-start px-2 py-1 rounded ${isLow ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <Text className={`text-xs font-bold ${isLow ? 'text-red-700' : 'text-green-700'}`}>
+                            {isLow ? 'Low Stock' : 'OK'}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold ${item.quantity < 10 ? 'text-red-500' : 'text-brand-text'}`}>
-                        {item.quantity} {item.unit}
-                      </Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 text-xs">
-                        {new Date(item.last_updated).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </ScrollView>
           </View>
@@ -211,8 +209,8 @@ export default function SMMaterialsPage() {
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
               <Text className="text-xl font-bold text-gray-800 mb-6">New Material Request</Text>
               
-              <View className="space-y-4">
-                <View>
+              <View>
+                <View className="mb-4">
                   <Text className="text-sm font-bold text-gray-700 mb-2">Item Name</Text>
                   <TextInput
                     value={itemName}
@@ -222,7 +220,7 @@ export default function SMMaterialsPage() {
                   />
                 </View>
 
-                <View className="flex-row space-x-4 gap-4">
+                <View className="flex-row gap-4 mb-4">
                   <View className="flex-[2]">
                     <Text className="text-sm font-bold text-gray-700 mb-2">Quantity</Text>
                     <TextInput

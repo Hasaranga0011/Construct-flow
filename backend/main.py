@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends
+import os
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from core.config import settings
 from core.security import get_current_user
-from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages
+from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports
 from apscheduler.schedulers.background import BackgroundScheduler
-import httpx
+from supabase import create_client
 import logging
 
 app = FastAPI(
@@ -18,53 +20,90 @@ scheduler = BackgroundScheduler()
 
 def check_overdue_pos():
     try:
-        httpx.post("http://127.0.0.1:8000/api/purchase-orders/check-late")
+        purchase_orders.check_late_orders(create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY))
     except Exception as e:
         logging.error(f"Cron PO check failed: {e}")
 
 def check_low_stock():
     try:
-        httpx.post("http://127.0.0.1:8000/api/materials/check-stock")
+        materials.check_stock(create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY))
     except Exception as e:
         logging.error(f"Cron stock check failed: {e}")
 
 @app.on_event("startup")
 def start_scheduler():
+    # Enable in one designated process only; credentials stay on the server.
+    if not settings.ENABLE_SCHEDULER:
+        return
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("ENABLE_SCHEDULER requires SUPABASE_SERVICE_ROLE_KEY")
     scheduler.add_job(check_overdue_pos, 'interval', hours=1)
     scheduler.add_job(check_low_stock, 'cron', hour=0, minute=0)
     scheduler.start()
 
 @app.on_event("shutdown")
 def stop_scheduler():
-    scheduler.shutdown()
+    if scheduler.running:
+        scheduler.shutdown()
 
-# Configure CORS for React Native frontend access
+# Request Size Limit Middleware
+MAX_REQUEST_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB overall limit
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    try:
+        declared_size = int(content_length) if content_length else 0
+        if declared_size < 0:
+            raise ValueError
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+    if declared_size > MAX_REQUEST_SIZE_BYTES:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large. Maximum allowed size is 15 MB."}
+        )
+    return await call_next(request)
+
+# CORS
+# In development (ENVIRONMENT=development), allow all origins for convenience.
+# In production, restrict to known frontend URLs only.
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+
+if ENVIRONMENT == "development":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update this in production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include Routers (Secured by default)
+# Routers
 secure_dependency = [Depends(get_current_user)]
 
-app.include_router(projects.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(materials.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(labour.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(clients.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(estimations.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(notifications.router, prefix="/api", dependencies=secure_dependency)
+# Secured routers
+app.include_router(projects.router,        prefix="/api", dependencies=secure_dependency)
+app.include_router(materials.router,       prefix="/api", dependencies=secure_dependency)
+app.include_router(labour.router,          prefix="/api", dependencies=secure_dependency)
+app.include_router(clients.router,         prefix="/api", dependencies=secure_dependency)
+app.include_router(estimations.router,     prefix="/api", dependencies=secure_dependency)
+app.include_router(notifications.router,   prefix="/api", dependencies=secure_dependency)
 app.include_router(purchase_orders.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(reports.router, prefix="/api", dependencies=secure_dependency)
-app.include_router(messages.router, prefix="/api", dependencies=secure_dependency)
+app.include_router(reports.router,         prefix="/api", dependencies=secure_dependency)
+app.include_router(messages.router,        prefix="/api", dependencies=secure_dependency)
+app.include_router(site_reports.router,    prefix="/api", dependencies=secure_dependency)
 
-# Unsecured for testing demo without sending JWT headers, but typically secured.
-app.include_router(ai.router, prefix="/api")
-app.include_router(documents.router, prefix="/api")
-app.include_router(media.router, prefix="/api")  # Cloudinary upload endpoint
+# Previously unsecured — now protected with auth dependency
+app.include_router(ai.router,        prefix="/api", dependencies=secure_dependency)
+app.include_router(documents.router, prefix="/api", dependencies=secure_dependency)
+app.include_router(media.router,     prefix="/api", dependencies=secure_dependency)
 
+# Health
 @app.get("/")
 def read_root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API"}

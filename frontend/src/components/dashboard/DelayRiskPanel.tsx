@@ -37,21 +37,11 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
         if (!res.ok) throw new Error('insights endpoint unavailable');
         const data = await res.json();
 
-        // Generate synthetic per-project delay risks from market_trends + feature_importance
-        if (isMounted && data.market_trends) {
-          // Build synthetic project risk items from trend momentum
-          const trend = data.market_trends as Array<{month: string, avg_cost_sqft: number}>;
-          const lastTwo = trend.slice(-2);
-          const momentum = lastTwo.length === 2 
-            ? ((lastTwo[1].avg_cost_sqft - lastTwo[0].avg_cost_sqft) / lastTwo[0].avg_cost_sqft) * 100
-            : 0;
-
-          const syntheticRisks = [
-            { project_name: 'Rising Material Costs', delay_risk: Math.min(90, Math.abs(momentum * 5) + 30), recommendation: `Market costs trending ${momentum > 0 ? 'up' : 'down'} ${Math.abs(momentum).toFixed(1)}% — plan procurement early.` },
-            { project_name: 'Labour Availability', delay_risk: 42, recommendation: 'Minor labour gaps detected in current cycle.' },
-            { project_name: 'Supply Chain Lead Times', delay_risk: 25, recommendation: 'On track. No critical delays forecasted.' },
-          ];
-          setRisks(syntheticRisks);
+        // Use real per-project delay risks from the backend
+        if (isMounted && data.projects && data.projects.length > 0) {
+          // Sort by highest risk first, take top 3
+          const sorted = [...data.projects].sort((a: any, b: any) => b.delay_risk - a.delay_risk);
+          setRisks(sorted.slice(0, 3));
         }
       } catch (error) {
         console.warn('Delay risk insights unavailable — backend may be offline:', error);

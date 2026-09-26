@@ -1,16 +1,233 @@
-import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+// Modified for Expo Go mobile compatibility
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+
+type Project = {
+  id: string;
+  name: string;
+  location?: string | null;
+  status?: string | null;
+  total_budget?: number | null;
+  spent_cost?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  completion_percentage?: number | null;
+};
+
+type Milestone = {
+  id: string;
+  project_id: string;
+  title: string;
+  status?: string | null;
+  completion_percentage?: number | null;
+  due_date?: string | null;
+};
+
+const formatCurrency = (amount: number) => {
+  if (amount >= 1000000) return `Rs. ${(amount / 1000000).toFixed(1)}M`;
+  if (amount >= 1000) return `Rs. ${(amount / 1000).toFixed(1)}K`;
+  return `Rs. ${amount.toLocaleString('en-LK')}`;
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return 'Not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return date.toLocaleDateString('en-GB');
+};
+
+const getProgressWidthClass = (progress: number) => {
+  if (progress <= 0) return 'w-0';
+  if (progress < 25) return 'w-1/4';
+  if (progress < 50) return 'w-1/2';
+  if (progress < 75) return 'w-3/4';
+  return 'w-full';
+};
+
+const SkeletonCard = () => (
+  <View className="flex-1 min-w-[45%] bg-gray-100 rounded-2xl p-5 h-28 animate-pulse" />
+);
 
 export default function ClientDashboardPage() {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [spentCosts, setSpentCosts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isMounted = true;
+    const loadDashboard = async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('id, name, location, status, total_budget, spent_cost, start_date, end_date, completion_percentage')
+          .eq('client_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (projectError) throw projectError;
+
+        const clientProjects = (projectData || []) as Project[];
+        const projectIds = clientProjects.map(project => project.id);
+
+        if (projectIds.length === 0) {
+          if (isMounted) {
+            setProjects([]);
+            setMilestones([]);
+            setSpentCosts({});
+          }
+          return;
+        }
+
+        const [milestoneResponse, expenseResponse] = await Promise.all([
+          supabase
+            .from('milestones')
+            .select('id, project_id, title, status, completion_percentage, due_date')
+            .in('project_id', projectIds)
+            .order('due_date', { ascending: true }),
+          supabase
+            .from('project_expenses')
+            .select('project_id, amount')
+            .in('project_id', projectIds),
+        ]);
+
+        if (milestoneResponse.error) throw milestoneResponse.error;
+
+        const expenseTotals = (expenseResponse.data || []).reduce<Record<string, number>>((totals, expense) => {
+          totals[expense.project_id] = (totals[expense.project_id] || 0) + Number(expense.amount || 0);
+          return totals;
+        }, {});
+
+        if (isMounted) {
+          setProjects(clientProjects);
+          setMilestones((milestoneResponse.data || []) as Milestone[]);
+          setSpentCosts(expenseTotals);
+        }
+      } catch (loadError: any) {
+        if (isMounted) setError(loadError.message || 'Failed to load your project dashboard.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadDashboard();
+
+    const channel = supabase
+      .channel(`client-dashboard:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `client_id=eq.${user.id}` }, loadDashboard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, loadDashboard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_expenses' }, loadDashboard)
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user, retryKey]);
+
+  const totalBudget = projects.reduce((total, project) => total + Number(project.total_budget || 0), 0);
+  const totalSpent = projects.reduce((total, project) => total + Number(project.spent_cost || spentCosts[project.id] || 0), 0);
+  const completedMilestones = milestones.filter(milestone => milestone.status === 'Completed').length;
+  const averageProgress = projects.length > 0
+    ? Math.round(projects.reduce((total, project) => total + Number(project.completion_percentage || 0), 0) / projects.length)
+    : 0;
+
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Client Dashboard" showAction={false} />
-      <ScrollView className="flex-1 p-6">
-        <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <Text className="text-xl font-bold text-gray-800">Client Dashboard</Text>
-          <Text className="text-gray-500 mt-2">Page stub generated successfully.</Text>
+      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <View className="mb-6">
+          <Text className="text-2xl font-bold text-brand-text">Your Projects</Text>
+          <Text className="text-gray-500 mt-1">Live progress, budget, and milestone updates.</Text>
         </View>
+
+        {loading ? (
+          <>
+            <View className="flex-row flex-wrap gap-4 mb-6">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </View>
+            <View className="bg-gray-100 rounded-2xl h-48 animate-pulse" />
+          </>
+        ) : error ? (
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-6 items-center">
+            <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
+            <Text className="text-red-700 font-semibold text-center mt-3">{error}</Text>
+            <Pressable onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4">
+              <Text className="text-white font-bold">Retry</Text>
+            </Pressable>
+          </View>
+        ) : projects.length === 0 ? (
+          <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center">
+            <Ionicons name="business-outline" size={48} color="#D1D5DB" />
+            <Text className="text-gray-700 font-bold text-lg mt-4">No projects assigned yet</Text>
+            <Text className="text-gray-500 text-center mt-2">Your project information will appear here once an administrator assigns a project to your account.</Text>
+          </View>
+        ) : (
+          <>
+            <View className="flex-row flex-wrap gap-4 mb-6">
+              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <Text className="text-gray-500 text-xs font-semibold uppercase">Projects</Text>
+                <Text className="text-3xl font-bold text-brand-text mt-2">{projects.length}</Text>
+              </View>
+              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <Text className="text-gray-500 text-xs font-semibold uppercase">Progress</Text>
+                <Text className="text-3xl font-bold text-brand-orange mt-2">{averageProgress}%</Text>
+              </View>
+              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <Text className="text-gray-500 text-xs font-semibold uppercase">Budget</Text>
+                <Text className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalBudget)}</Text>
+              </View>
+              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <Text className="text-gray-500 text-xs font-semibold uppercase">Spent</Text>
+                <Text className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalSpent)}</Text>
+              </View>
+            </View>
+
+            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+              <Text className="text-lg font-bold text-brand-text mb-4">Project Progress</Text>
+              {projects.map(project => {
+                const projectMilestones = milestones.filter(milestone => milestone.project_id === project.id);
+                const projectProgress = Number(project.completion_percentage || 0);
+                return (
+                  <View key={project.id} className="border-b border-gray-100 py-4 last:border-b-0">
+                    <View className="flex-row justify-between items-center">
+                      <View className="flex-1 pr-4">
+                        <Text className="text-brand-text font-bold">{project.name}</Text>
+                        <Text className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
+                      </View>
+                      <Text className="text-brand-orange font-bold">{projectProgress}%</Text>
+                    </View>
+                    <View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
+                      <View className={`h-full bg-brand-orange rounded-full ${getProgressWidthClass(projectProgress)}`} />
+                    </View>
+                    <Text className="text-gray-400 text-xs mt-2">{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'} · Target end {formatDate(project.end_date)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+              <Text className="text-lg font-bold text-brand-text mb-4">Milestone Summary</Text>
+              <Text className="text-gray-600">{completedMilestones} of {milestones.length} milestones completed.</Text>
+              {milestones.length === 0 && <Text className="text-gray-400 mt-3">No milestones have been created for your projects yet.</Text>}
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );

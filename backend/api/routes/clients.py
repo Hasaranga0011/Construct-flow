@@ -1,38 +1,44 @@
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from typing import List, Optional
-import random
+import secrets
 import string
 import resend
 from core.config import settings
 from ..models import ClientCreate, ClientResponse
-from core.database import supabase
+from core.database import get_auth_client
+from supabase import create_client as new_supabase_client, ClientOptions
+from core.security import require_manager_or_admin
 
 router = APIRouter(
     prefix="/clients",
-    tags=["Clients"]
+    tags=["Clients"], dependencies=[Depends(require_manager_or_admin)]
 )
 
 @router.get("/", response_model=List[ClientResponse])
-def get_clients(project_id: Optional[str] = Query(None, description="Filter by project ID")):
+def get_clients(request: Request, project_id: Optional[str] = Query(None, description="Filter by project ID")):
     try:
-        query = supabase.table("clients").select("*")
+        query = get_auth_client(request).table("clients").select("*")
         if project_id:
             query = query.eq("project_id", project_id)
             
         response = query.execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=ClientResponse)
-def create_client(client: ClientCreate):
+def create_client(client: ClientCreate, request: Request):
     try:
-        response = supabase.table("clients").insert(client.model_dump()).execute()
+        response = get_auth_client(request).table("clients").insert(client.model_dump()).execute()
         
         if not response.data:
             raise HTTPException(status_code=400, detail="Failed to create client")
             
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -53,11 +59,12 @@ def invite_client(req: InviteClientRequest, request: Request):
         admin_client = get_auth_client(request)
         
         # 1. Generate temp password
-        temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=12)) + "!"
+        temp_password = secrets.token_urlsafe(24)
         
         # 2. Sign up the user (this uses the anon key client to not disrupt admin's session if this was frontend, but backend is fine)
         # Note: the trigger will auto-create a profile
-        auth_res = supabase.auth.sign_up({"email": req.email, "password": temp_password})
+        signup_client = new_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_KEY, options=ClientOptions(persist_session=False, auto_refresh_token=False))
+        auth_res = signup_client.auth.sign_up({"email": req.email, "password": temp_password})
         
         if not auth_res.user:
             raise HTTPException(status_code=400, detail="Could not create user account")
@@ -94,6 +101,8 @@ def invite_client(req: InviteClientRequest, request: Request):
             })
 
         return {"message": "Client invited successfully", "user_id": new_user_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -115,6 +124,8 @@ def update_client(client_id: str, req: ClientUpdateRequest, request: Request):
             
         res = admin_client.rpc("admin_update_client", updates).execute()
         return {"message": "Client updated successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -128,6 +139,8 @@ def delete_client(client_id: str, request: Request):
         # (Admin API would be required to fully delete auth.user)
         admin_client.rpc("admin_delete_client", {"p_client_id": client_id}).execute()
         return {"message": "Client deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

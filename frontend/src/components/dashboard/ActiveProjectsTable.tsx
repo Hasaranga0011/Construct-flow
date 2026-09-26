@@ -3,8 +3,46 @@ import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { EditProjectModal } from './EditProjectModal';
 
+import { useResponsive } from '../../hooks/useResponsive';
+import { Ionicons } from '@expo/vector-icons';
+
 const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) => void }) => {
   const { name, location, completion_percentage: progress, status } = project;
+  const { isMobile } = useResponsive();
+
+  if (isMobile) {
+    return (
+      <View className="flex-col py-4 border-b border-gray-100 mb-2 bg-white rounded-lg p-4 shadow-sm">
+        <View className="flex-row justify-between items-start mb-2">
+          <View className="flex-row items-center flex-1">
+            <View className="w-10 h-10 bg-orange-50 rounded-lg items-center justify-center mr-3">
+              <Ionicons name="business" size={20} color="#EA580C" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-brand-text font-bold text-sm" numberOfLines={1}>{name}</Text>
+              <Text className="text-gray-500 text-xs" numberOfLines={1}>{location}</Text>
+            </View>
+          </View>
+          <View className={`${status === 'active' ? 'bg-green-50' : 'bg-gray-100'} px-2 py-1 rounded`}>
+            <Text className={`${status === 'active' ? 'text-green-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>{status}</Text>
+          </View>
+        </View>
+        <View className="w-full mb-3">
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-gray-500 text-xs">Progress</Text>
+            <Text className="text-brand-text text-xs font-bold">{progress}%</Text>
+          </View>
+          <View className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
+            <View className="h-full bg-brand-orange rounded-full" style={{ width: `${progress}%` }} />
+          </View>
+        </View>
+        <Pressable onPress={() => onManage(project)} className="w-full py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors items-center">
+          <Text className="text-brand-text text-xs font-bold uppercase tracking-wider">Manage</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Thumbnail */}

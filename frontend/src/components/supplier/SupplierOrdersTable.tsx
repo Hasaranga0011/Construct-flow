@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Modal, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
+import { useResponsive } from '../../hooks/useResponsive';
+import { useAuth } from '../../context/AuthContext';
 
 const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
   const [qty, setQty] = useState('');
@@ -65,20 +67,110 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
   );
 };
 
-const OrderRow = ({ order, onApprove, onReject, onSuggestClick }: any) => {
+const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMobile }: any) => {
   const projectName = order.projects?.name || 'Unknown Project';
   const isPending = order.status === 'Pending Delivery';
   const isConfirmed = order.status === 'Confirmed';
   const isRejected = order.status === 'Rejected';
   const isSuggested = order.status === 'Suggested';
-  
+  const isDelivered = order.status === 'Delivered';
+  const isReceived = order.status === 'Received';
+
   const getStatusColor = () => {
     if (isPending) return 'bg-orange-100 text-brand-warning';
     if (isConfirmed) return 'bg-blue-100 text-blue-600';
     if (isRejected) return 'bg-red-100 text-red-600';
     if (isSuggested) return 'bg-yellow-100 text-yellow-700';
+    if (isDelivered) return 'bg-purple-100 text-purple-700';
+    if (isReceived) return 'bg-green-100 text-green-700';
     return 'bg-green-100 text-green-600';
   };
+
+  if (isMobile) {
+    return (
+      <View style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 16 }}>{order.po_number}</Text>
+            <Text style={{ color: '#6B7280', fontSize: 12 }}>{projectName}</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <View className={`px-2 py-1 rounded ${getStatusColor().split(' ')[0]}`}>
+              <Text className={`text-[10px] font-bold uppercase ${getStatusColor().split(' ')[1]}`}>{order.status}</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Items</Text>
+            <Text style={{ color: '#374151', fontWeight: '600' }} numberOfLines={2}>
+              {order.items || `Material ID: ${order.material_id}`}
+            </Text>
+            {isSuggested && order.supplier_notes && (
+              <Text style={{ color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }} numberOfLines={1}>Note: {order.supplier_notes}</Text>
+            )}
+          </View>
+          <View style={{ alignItems: 'flex-end', paddingLeft: 8 }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Quantity / Cost</Text>
+            {isSuggested ? (
+               <Text style={{ color: '#9CA3AF', fontSize: 14, fontWeight: '500', textDecorationLine: 'line-through' }}>{order.quantity_ordered}</Text>
+            ) : (
+               <Text style={{ color: '#111827', fontSize: 14, fontWeight: 'bold' }}>{order.quantity_ordered}</Text>
+            )}
+            {isSuggested && (
+               <Text style={{ color: '#A16207', fontSize: 14, fontWeight: 'bold' }}>{order.suggested_quantity}</Text>
+            )}
+            <Text style={{ color: '#6B7280', fontSize: 12 }}>Rs. {order.total_price}</Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View>
+            <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Expected By</Text>
+            {isSuggested ? (
+               <Text style={{ color: '#9CA3AF', fontSize: 14, fontWeight: '500', textDecorationLine: 'line-through' }}>{order.expected_date}</Text>
+            ) : (
+               <Text style={{ color: '#111827', fontSize: 14, fontWeight: 'bold' }}>{order.expected_date}</Text>
+            )}
+            {isSuggested && (
+               <Text style={{ color: '#A16207', fontSize: 14, fontWeight: 'bold' }}>{order.suggested_date}</Text>
+            )}
+          </View>
+        </View>
+        
+        {isPending ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+            <Pressable onPress={() => onApprove(order.id)} style={{ flex: 1, backgroundColor: '#22C55E', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Approve</Text>
+            </Pressable>
+            <Pressable onPress={() => onSuggestClick(order)} style={{ flex: 1, backgroundColor: '#EAB308', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Suggest</Text>
+            </Pressable>
+            <Pressable onPress={() => onReject(order.id)} style={{ flex: 1, backgroundColor: '#EF4444', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Reject</Text>
+            </Pressable>
+          </View>
+        ) : isConfirmed ? (
+          <Pressable onPress={() => onDeliver(order.id)} style={{ backgroundColor: '#8B5CF6', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Mark Delivered</Text>
+          </Pressable>
+        ) : isDelivered ? (
+          <View style={{ backgroundColor: '#EDE9FE', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#7C3AED', fontSize: 12, fontWeight: 'bold' }}>Awaiting Receipt Confirmation</Text>
+          </View>
+        ) : isReceived ? (
+          <View style={{ backgroundColor: '#DCFCE7', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#16A34A', fontSize: 12, fontWeight: 'bold' }}>✓ Goods Received &amp; Confirmed</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: '#F3F4F6', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: 'bold' }}>No Action Available</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
@@ -140,6 +232,14 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick }: any) => {
               <Text className="text-white text-[11px] font-bold">Reject</Text>
             </Pressable>
           </View>
+        ) : isConfirmed ? (
+          <Pressable onPress={() => onDeliver(order.id)} className="bg-purple-500 px-2 py-1.5 rounded shadow-sm">
+            <Text className="text-white text-[11px] font-bold">Mark Delivered</Text>
+          </Pressable>
+        ) : isDelivered ? (
+          <Text className="text-purple-600 text-[11px] font-bold text-right pr-2">Awaiting Receipt</Text>
+        ) : isReceived ? (
+          <Text className="text-green-600 text-[11px] font-bold text-right pr-2">✓ Confirmed</Text>
         ) : (
           <Text className="text-gray-400 text-xs text-right pr-2">No Action</Text>
         )}
@@ -148,7 +248,10 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick }: any) => {
   );
 };
 
+
 export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { refreshTrigger?: number, onOrderAction: () => void }) => {
+  const { isMobile } = useResponsive();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -161,7 +264,7 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
     const loadOrders = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) {
+        if (!sessionData?.session || !user) {
           if (isMounted) setLoading(false);
           return;
         }
@@ -173,11 +276,12 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
             suggested_quantity, suggested_date, supplier_notes,
             projects!inner(name)
           `)
-          .in('status', ['Pending Delivery', 'Confirmed', 'Rejected', 'Suggested'])
+          .eq('supplier_id', user.id)
+          .in('status', ['Pending Delivery', 'Confirmed', 'Delivered', 'Received', 'Rejected', 'Suggested'])
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        
+
         if (isMounted) setOrders(data || []);
       } catch (error) {
         console.warn('Failed to load supplier orders:', error);
@@ -185,11 +289,28 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadOrders();
-    
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+
+    // Realtime: live order updates for this supplier.
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (user) {
+      channel = supabase
+        .channel(`supplier-orders-table:${user.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `supplier_id=eq.${user.id}`,
+        }, () => { loadOrders(); })
+        .subscribe();
+    }
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [refreshTrigger, user]);
 
   const handleApprove = async (id: string) => {
     try {
@@ -209,6 +330,17 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
       onOrderAction();
     } catch (e: any) {
       Alert.alert('Error', 'Failed to reject order');
+      setLoading(false);
+    }
+  };
+
+  const handleDeliver = async (id: string) => {
+    try {
+      setLoading(true);
+      await api.purchaseOrders.deliver(id);
+      onOrderAction();
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to mark as delivered');
       setLoading(false);
     }
   };
@@ -236,14 +368,16 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
         <Text className="text-brand-text-muted text-xs">Manage and approve material requests</Text>
       </View>
 
-      <View className="flex-row py-3 border-b border-gray-200 pr-2">
-        <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO / Project</Text>
-        <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Items</Text>
-        <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Quantity / Cost</Text>
-        <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Expected By</Text>
-        <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
-        <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
-      </View>
+      {!isMobile && (
+        <View className="flex-row py-3 border-b border-gray-200 pr-2">
+          <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO / Project</Text>
+          <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Items</Text>
+          <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Quantity / Cost</Text>
+          <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Expected By</Text>
+          <Text className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+          <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {loading ? (
@@ -256,11 +390,13 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
           </View>
         ) : (
           orders.map(order => (
-            <OrderRow 
+            <OrderRow
               key={order.id}
-              order={order} 
+              order={order}
+              isMobile={isMobile}
               onApprove={handleApprove}
               onReject={handleReject}
+              onDeliver={handleDeliver}
               onSuggestClick={(o: any) => { setSelectedOrder(o); setSuggestModalVisible(true); }}
             />
           ))

@@ -1,32 +1,37 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
+import { useResponsive } from '../../hooks/useResponsive';
+
 export type IndicatorType = 'success' | 'warning' | 'danger' | 'neutral';
 
 interface StatCardProps {
   label: string;
   value: string | number;
-  indicatorText: string;
+  indicatorText?: string;
   indicatorType?: IndicatorType;
   icon?: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export const StatCard = ({ label, value, indicatorText, indicatorType = 'neutral', icon }: StatCardProps) => {
+export const StatCard = ({ label, value, indicatorText, indicatorType = 'neutral', icon, fullWidth }: StatCardProps) => {
+  const { isPhone } = useResponsive();
+
   const getIndicatorColor = () => {
     switch (indicatorType) {
       case 'success':
-        return 'text-brand-success';
+        return 'text-green-600';
       case 'warning':
-        return 'text-brand-warning';
+        return 'text-yellow-600';
       case 'danger':
-        return 'text-brand-danger';
+        return 'text-red-600';
       default:
-        return 'text-brand-text-muted';
+        return 'text-gray-500';
     }
   };
 
   return (
-    <View className="bg-white rounded-lg p-5 flex-1 mx-2 shadow-sm border border-gray-100">
+    <View className={`bg-white rounded-lg p-4 md:p-5 shadow-sm border border-gray-100 ${fullWidth ? 'w-full h-full' : isPhone ? 'w-full mb-3' : 'flex-1 mx-1 md:mx-2 mb-3 md:mb-0'}`}>
       <View className="flex-row justify-between items-start mb-2">
         <Text className="text-brand-text-muted text-xs font-semibold uppercase">{label}</Text>
         {icon ? (
@@ -36,7 +41,7 @@ export const StatCard = ({ label, value, indicatorText, indicatorType = 'neutral
         )}
       </View>
       
-      <Text className="text-3xl font-bold text-brand-text mb-2">{value}</Text>
+      <Text className="text-2xl md:text-3xl font-bold text-brand-text mb-2" numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       
       <View className="flex-row items-center mt-auto">
         <Text className={`text-xs font-medium ${getIndicatorColor()}`}>

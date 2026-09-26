@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
+import { ProjectAssignmentDropdown } from '../../../components/common/ProjectAssignmentDropdown';
 
 export default function AdminProjectsCreatePage() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function AdminProjectsCreatePage() {
   const [clients, setClients] = useState<any[]>([]);
   const [siteManagers, setSiteManagers] = useState<any[]>([]);
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -24,6 +27,8 @@ export default function AdminProjectsCreatePage() {
     client_id: '',
     site_managers: [] as string[],
     workers: [] as string[],
+    suppliers: [] as string[],
+    admins: [] as string[],
     latitude: '',
     longitude: ''
   });
@@ -33,16 +38,20 @@ export default function AdminProjectsCreatePage() {
     
     const fetchUsers = async () => {
       try {
-        const { data: pmData } = await supabase.from('profiles').select('*').eq('role', 'pm');
-        const { data: clientData } = await supabase.from('profiles').select('*').eq('role', 'client');
-        const { data: smData } = await supabase.from('profiles').select('*').eq('role', 'site_manager');
-        const { data: workerData } = await supabase.from('profiles').select('*').eq('role', 'worker');
+        const { data: pmData } = await supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']);
+        const { data: clientData } = await supabase.from('profiles').select('*').in('role', ['client', 'Client']);
+        const { data: smData } = await supabase.from('profiles').select('*').in('role', ['site_manager', 'Site Manager', 'site manager']);
+        const { data: workerData } = await supabase.from('profiles').select('*').in('role', ['worker', 'Worker']);
+        const { data: supplierData } = await supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']);
+        const { data: adminData } = await supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']);
         
         if (isMounted) {
           if (pmData) setPms(pmData);
           if (clientData) setClients(clientData);
           if (smData) setSiteManagers(smData);
           if (workerData) setAvailableWorkers(workerData);
+          if (supplierData) setSuppliers(supplierData);
+          if (adminData) setAdmins(adminData);
         }
       } catch (err) {
         console.error("Failed to fetch users", err);
@@ -72,6 +81,8 @@ export default function AdminProjectsCreatePage() {
         client_id: formData.client_id || null,
         site_managers: formData.site_managers,
         workers: formData.workers,
+        suppliers: formData.suppliers,
+        admins: formData.admins,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
       };
@@ -90,10 +101,12 @@ export default function AdminProjectsCreatePage() {
         throw new Error(err.detail || 'Failed to create project');
       }
       
-      alert('Project created successfully!');
-      router.push('/admin/dashboard');
+      const newProject = await response.json();
+      
+      Alert.alert('Success', 'Project created successfully!');
+      router.push(`/admin/projects/${newProject.id}`);
     } catch (err: any) {
-      alert(err.message || 'Error creating project');
+      Alert.alert('Error', err.message || 'Error creating project');
     } finally {
       setLoading(false);
     }
@@ -160,96 +173,12 @@ export default function AdminProjectsCreatePage() {
           </View>
 
           <Text className="text-xl font-bold text-gray-800 mb-6 mt-4">Assignments</Text>
-          
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Assign Project Manager</Text>
-            <View className="flex-row flex-wrap space-x-2">
-              {pms.map(pm => (
-                <TouchableOpacity 
-                  key={pm.id}
-                  onPress={() => setFormData({...formData, pm_id: pm.id})}
-                  className={`px-4 py-2 rounded-full mb-2 ${formData.pm_id === pm.id ? 'bg-brand-orange' : 'bg-gray-100'}`}
-                >
-                  <Text className={formData.pm_id === pm.id ? 'text-white' : 'text-gray-700'}>
-                    {pm.full_name || pm.email}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {pms.length === 0 && <Text className="text-gray-500 italic">No PMs available</Text>}
-            </View>
-          </View>
-
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Assign Client</Text>
-            <View className="flex-row flex-wrap space-x-2">
-              {clients.map(client => (
-                <TouchableOpacity 
-                  key={client.id}
-                  onPress={() => setFormData({...formData, client_id: client.id})}
-                  className={`px-4 py-2 rounded-full mb-2 ${formData.client_id === client.id ? 'bg-brand-blue' : 'bg-gray-100'}`}
-                >
-                  <Text className={formData.client_id === client.id ? 'text-white' : 'text-gray-700'}>
-                    {client.full_name || client.email}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {clients.length === 0 && <Text className="text-gray-500 italic">No Clients available</Text>}
-            </View>
-          </View>
-
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Assign Site Managers (Multiple)</Text>
-            <View className="flex-row flex-wrap space-x-2">
-              {siteManagers.map(sm => {
-                const isSelected = formData.site_managers.includes(sm.id);
-                return (
-                  <TouchableOpacity 
-                    key={sm.id}
-                    onPress={() => {
-                      if (isSelected) {
-                        setFormData({...formData, site_managers: formData.site_managers.filter(id => id !== sm.id)});
-                      } else {
-                        setFormData({...formData, site_managers: [...formData.site_managers, sm.id]});
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-full mb-2 ${isSelected ? 'bg-emerald-500' : 'bg-gray-100'}`}
-                  >
-                    <Text className={isSelected ? 'text-white' : 'text-gray-700'}>
-                      {sm.full_name || sm.email}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              {siteManagers.length === 0 && <Text className="text-gray-500 italic">No Site Managers available</Text>}
-            </View>
-          </View>
-
-          <View className="mb-8">
-            <Text className="text-gray-700 font-medium mb-2">Assign Workers (Multiple)</Text>
-            <View className="flex-row flex-wrap space-x-2">
-              {availableWorkers.map(w => {
-                const isSelected = formData.workers.includes(w.id);
-                return (
-                  <TouchableOpacity 
-                    key={w.id}
-                    onPress={() => {
-                      if (isSelected) {
-                        setFormData({...formData, workers: formData.workers.filter(id => id !== w.id)});
-                      } else {
-                        setFormData({...formData, workers: [...formData.workers, w.id]});
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-full mb-2 ${isSelected ? 'bg-indigo-500' : 'bg-gray-100'}`}
-                  >
-                    <Text className={isSelected ? 'text-white' : 'text-gray-700'}>
-                      {w.full_name || w.email}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              {availableWorkers.length === 0 && <Text className="text-gray-500 italic">No Workers available</Text>}
-            </View>
-          </View>
+          <ProjectAssignmentDropdown label="Assign Administrators" users={admins} multiple selectedIds={formData.admins} onChange={(admins) => setFormData({ ...formData, admins })} />
+          <ProjectAssignmentDropdown label="Assign Project Manager" users={pms} selectedIds={formData.pm_id ? [formData.pm_id] : []} onChange={(ids) => setFormData({ ...formData, pm_id: ids[0] || '' })} />
+          <ProjectAssignmentDropdown label="Assign Client" users={clients} selectedIds={formData.client_id ? [formData.client_id] : []} onChange={(ids) => setFormData({ ...formData, client_id: ids[0] || '' })} />
+          <ProjectAssignmentDropdown label="Assign Site Managers" users={siteManagers} multiple selectedIds={formData.site_managers} onChange={(site_managers) => setFormData({ ...formData, site_managers })} />
+          <ProjectAssignmentDropdown label="Assign Workers" users={availableWorkers} multiple selectedIds={formData.workers} onChange={(workers) => setFormData({ ...formData, workers })} />
+          <ProjectAssignmentDropdown label="Assign Suppliers" users={suppliers} multiple selectedIds={formData.suppliers} onChange={(suppliers) => setFormData({ ...formData, suppliers })} />
 
           <TouchableOpacity 
             onPress={handleSubmit}

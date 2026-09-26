@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator } from 'react-native';
+import { View, ScrollView, ActivityIndicator, TextInput, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { ClientAccountsPanel } from '../../components/client/ClientAccountsPanel';
@@ -9,16 +9,20 @@ import { InviteClientModal } from '../../components/client/InviteClientModal';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 
+import { useResponsive } from '../../hooks/useResponsive';
+
 export default function ClientPortalScreen() {
   const [stats, setStats] = useState({
     activeClients: 0,
     sharedProjects: 0,
+    pendingInvoices: 0,
   });
   const [loading, setLoading] = useState(true);
   
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     let isMounted = true;
@@ -28,15 +32,17 @@ export default function ClientPortalScreen() {
         if (!sessionData?.session) return;
 
         // Fetch counts
-        const [clientsReq, projectsReq] = await Promise.all([
+        const [clientsReq, projectsReq, invoicesReq] = await Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'client'),
-          supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active')
+          supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('invoices').select('id', { count: 'exact', head: true }).in('status', ['Unpaid', 'Overdue'])
         ]);
 
         if (isMounted) {
           setStats({
             activeClients: clientsReq.count || 0,
             sharedProjects: projectsReq.count || 0,
+            pendingInvoices: invoicesReq.count || 0,
           });
         }
       } catch (error) {
@@ -61,8 +67,6 @@ export default function ClientPortalScreen() {
         title="Client Updates" 
         actionLabel="+ Invite Client" 
         onActionPress={() => setModalVisible(true)} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
       />
       
       {loading ? (
@@ -70,9 +74,25 @@ export default function ClientPortalScreen() {
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+          
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+            <Text className="text-2xl font-bold text-brand-text">All Clients</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput 
+                className="flex-1 ml-2 text-sm text-brand-text outline-none"
+                placeholder="Search clients..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
             <StatCard 
               label="Active Clients" 
               value={stats.activeClients.toString()} 
@@ -87,7 +107,7 @@ export default function ClientPortalScreen() {
             />
             <StatCard 
               label="Pending Invoices" 
-              value="0" // Mocked
+              value={stats.pendingInvoices.toString()}
               indicatorText="Requires client sign-off" 
               indicatorType="warning"
               icon={<Ionicons name="time" size={16} color="#F97316" />}
@@ -95,14 +115,14 @@ export default function ClientPortalScreen() {
           </View>
 
           {/* Main Content Layout */}
-          <View className="flex-row">
+          <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Client Accounts) */}
-            <View className="flex-[2] mr-6">
+            <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
               <ClientAccountsPanel refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
             {/* Side Panel (Activity & Documents) */}
-            <View className="flex-[1] flex-col">
+            <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
               <RecentClientActivity />
               <SharedDocuments />
             </View>

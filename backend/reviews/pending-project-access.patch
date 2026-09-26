@@ -1,0 +1,149 @@
+--- a/backend/api/routes/projects.py
++++ b/backend/api/routes/projects.py
+@@ -1,7 +1,8 @@
+-from fastapi import APIRouter, HTTPException, Request
++from fastapi import APIRouter, HTTPException, Request, Depends
+ from typing import List, Optional
+ from ..models import ProjectCreate, ProjectUpdate, ProjectResponse
+-from core.database import supabase
++from core.database import client_for_token
++from core.security import get_current_user
+ from supabase import create_client
+ from core.config import settings
+ import os
+@@ -18,6 +19,8 @@
+         client = get_auth_client(request)
+         response = client.table("projects").select("*").execute()
+         return response.data
++    except HTTPException:
++        raise
+     except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+ 
+@@ -111,13 +114,34 @@
+ 
+ from pydantic import BaseModel
+ 
++def authorized_project_client(project_id, user, *, write):
++    if write and user["role"] not in {"super_admin", "pm", "site_manager"}:
++        raise HTTPException(status_code=403, detail="Not enough privileges")
++    client = client_for_token(user["token"])
++    response = client.table("projects").select("id, pm_id, client_id").eq("id", project_id).execute()
++    if not response.data:
++        raise HTTPException(status_code=404, detail="Project not found")
++    project = response.data[0]
++    if user["role"] == "super_admin":
++        return client
++    if user["role"] == "pm" and project.get("pm_id") == user["id"]:
++        return client
++    if not write and user["role"] == "client" and project.get("client_id") == user["id"]:
++        return client
++    result = client.table("project_role_assignments").select("user_id").eq("project_id", project_id).eq("user_id", user["id"]).eq("role", user["role"]).execute()
++    if not result.data:
++        raise HTTPException(status_code=403, detail="Access denied: not your project")
++    return client
++
++
+ class MilestoneCreate(BaseModel):
+     title: str
+     description: str
+     due_date: str
+ 
+ @router.post("/{project_id}/milestones")
+-def create_milestone(project_id: str, payload: MilestoneCreate):
++def create_milestone(project_id: str, payload: MilestoneCreate, current_user: dict = Depends(get_current_user)):
++    supabase = authorized_project_client(project_id, current_user, write=True)
+     try:
+         res = supabase.table("milestones").insert({
+             "project_id": project_id,
+@@ -128,6 +152,8 @@
+             "status": "Pending"
+         }).execute()
+         return res.data[0]
++    except HTTPException:
++        raise
+     except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+ 
+@@ -136,11 +162,15 @@
+     media_urls: Optional[List[str]] = None
+ 
+ @router.patch("/{project_id}/milestones/{milestone_id}")
+-def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdate):
++def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdate, current_user: dict = Depends(get_current_user)):
++    supabase = authorized_project_client(project_id, current_user, write=True)
+     try:
+         # Update milestone status
+-        res = supabase.table("milestones").update({"status": payload.status}).eq("id", milestone_id).execute()
++        res = supabase.table("milestones").update({"status": payload.status}).eq("id", milestone_id).eq("project_id", project_id).execute()
+         
++        if not res.data:
++            raise HTTPException(status_code=404, detail="Milestone not found")
++
+         # Insert any new media
+         if payload.media_urls:
+             media_inserts = [{"milestone_id": milestone_id, "url": url} for url in payload.media_urls]
+@@ -155,13 +185,16 @@
+             supabase.table("projects").update({"completion_percentage": percentage}).eq("id", project_id).execute()
+ 
+         return res.data[0]
++    except HTTPException:
++        raise
+     except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+ 
+ @router.delete("/{project_id}/milestones/{milestone_id}")
+-def delete_milestone(project_id: str, milestone_id: str):
+-    try:
+-        res = supabase.table("milestones").delete().eq("id", milestone_id).execute()
++def delete_milestone(project_id: str, milestone_id: str, current_user: dict = Depends(get_current_user)):
++    supabase = authorized_project_client(project_id, current_user, write=True)
++    try:
++        res = supabase.table("milestones").delete().eq("id", milestone_id).eq("project_id", project_id).execute()
+         
+         # Recalculate project completion percentage
+         all_ms = supabase.table("milestones").select("status").eq("project_id", project_id).execute()
+@@ -174,22 +207,30 @@
+             supabase.table("projects").update({"completion_percentage": 0}).eq("id", project_id).execute()
+             
+         return {"success": True}
++    except HTTPException:
++        raise
+     except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+ 
+ from ..models import ExpenseCreate, ExpenseResponse
+ 
+ @router.get("/{project_id}/expenses", response_model=List[ExpenseResponse])
+-def get_project_expenses(project_id: str):
++def get_project_expenses(project_id: str, current_user: dict = Depends(get_current_user)):
++    supabase = authorized_project_client(project_id, current_user, write=False)
+     try:
+         res = supabase.table("project_expenses").select("*").eq("project_id", project_id).order("expense_date", desc=True).execute()
+         return res.data
++    except HTTPException:
++        raise
+     except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+ 
+ @router.post("/{project_id}/expenses", response_model=ExpenseResponse)
+-def add_project_expense(project_id: str, expense: ExpenseCreate):
+-    try:
++def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
++    supabase = authorized_project_client(project_id, current_user, write=True)
++    try:
++        if expense.project_id != project_id:
++            raise HTTPException(status_code=400, detail="Expense project does not match URL")
+         expense_data = expense.model_dump()
+         if expense_data.get('expense_date'):
+             expense_data['expense_date'] = expense_data['expense_date'].isoformat()
+@@ -207,5 +248,7 @@
+         supabase.table("projects").update({"spent_cost": total_spent}).eq("id", project_id).execute()
+ 
+         return res.data[0]
+-    except Exception as e:
+-        raise HTTPException(status_code=500, detail=str(e))
++    except HTTPException:
++        raise
++    except Exception as e:
++        raise HTTPException(status_code=500, detail=str(e))

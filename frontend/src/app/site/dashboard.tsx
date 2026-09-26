@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, ActivityIndicator } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
@@ -9,6 +9,7 @@ import { RecentAlertsPanel } from '../../components/dashboard/RecentAlertsPanel'
 import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
+import { useRealtimeStats } from '../../hooks/useRealtimeStats';
 
 export default function DashboardScreen() {
   const [stats, setStats] = useState({
@@ -23,44 +24,44 @@ export default function DashboardScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadStats = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) return;
+  const loadStats = useCallback(async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return;
 
-        // Fetch counts from various tables
-        const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
-          supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('labour').select('*', { count: 'exact', head: true }).eq('status', 'Present'),
-          supabase.from('materials').select('*', { count: 'exact', head: true }).eq('status', 'Low Stock'),
-          supabase.from('estimations').select('estimated_cost').eq('status', 'Approved')
-        ]);
+      const today = new Date().toISOString().split('T')[0];
+      const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
+        supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('labour').select('*', { count: 'exact', head: true }).eq('status', 'Present').eq('date', today),
+        supabase.from('materials').select('global_stock_quantity, low_stock_threshold'),
+        supabase.from('projects').select('total_budget').eq('status', 'active')
+      ]);
 
-        let totalBudget = 0;
-        if (budgetReq.data) {
-          totalBudget = budgetReq.data.reduce((sum, item) => sum + (Number(item.estimated_cost) || 0), 0);
-        }
-
-        if (isMounted) {
-          setStats({
-            activeProjects: projectsReq.count || 0,
-            workersOnSite: labourReq.count || 0,
-            lowStockAlerts: materialsReq.count || 0,
-            totalBudget: totalBudget,
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to load dashboard stats:', error);
-      } finally {
-        if (isMounted) setLoading(false);
+      let lowStockCount = 0;
+      if (materialsReq.data) {
+        lowStockCount = materialsReq.data.filter(m => (m.global_stock_quantity || 0) < (m.low_stock_threshold || 0)).length;
       }
-    };
 
-    loadStats();
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+      let totalBudget = 0;
+      if (budgetReq.data) {
+        totalBudget = budgetReq.data.reduce((sum, item) => sum + (Number(item.total_budget) || 0), 0);
+      }
+
+      setStats({
+        activeProjects: projectsReq.count || 0,
+        workersOnSite: labourReq.count || 0,
+        lowStockAlerts: lowStockCount,
+        totalBudget: totalBudget,
+      });
+    } catch (error) {
+      console.warn('Failed to load dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats, refreshTrigger]);
+  useRealtimeStats(loadStats);
 
   const handleProjectCreated = () => {
     setModalVisible(false);
@@ -91,7 +92,7 @@ export default function DashboardScreen() {
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           {/* Top Stat Cards Row */}
-          <View className="flex-row justify-between mb-6 -mx-2">
+          <View className="flex-col md:flex-row gap-4 mb-6">
             <AnimatedCard delay={100} style={{ flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
@@ -125,25 +126,25 @@ export default function DashboardScreen() {
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className="flex-row mb-6">
+          <View className="flex-col md:flex-row gap-6 mb-6">
             {/* Main Content Area (Chart) */}
-            <View className="flex-[2] mr-6">
+            <View className="flex-[2] w-full">
               <CostTimelineChart />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className="flex-[1]">
+            <View className="flex-[1] w-full">
               <DelayRiskPanel />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className="flex-row pb-6">
-            <View className="flex-[2] mr-6">
+          <View className="flex-col md:flex-row gap-6 pb-6">
+            <View className="flex-[2] w-full">
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
-            <View className="flex-[1]">
+            <View className="flex-[1] w-full">
               <RecentAlertsPanel />
             </View>
           </View>

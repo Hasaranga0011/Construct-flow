@@ -9,6 +9,8 @@ class ProjectBase(BaseModel):
     location: str
     status: str = "Planning"
     completion_percentage: int = Field(default=0, ge=0, le=100)
+    total_budget: float = Field(default=0, ge=0, allow_inf_nan=False)
+    spent_cost: float = 0.0
     start_date: date
     end_date: date
     client_id: Optional[str] = None
@@ -20,12 +22,16 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     site_managers: Optional[list[str]] = None
     workers: Optional[list[str]] = None
+    suppliers: Optional[list[str]] = None
+    admins: Optional[list[str]] = None
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     location: Optional[str] = None
     status: Optional[str] = None
     completion_percentage: Optional[int] = Field(default=None, ge=0, le=100)
+    total_budget: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    spent_cost: Optional[float] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     client_id: Optional[str] = None
@@ -35,6 +41,8 @@ class ProjectUpdate(BaseModel):
     address: Optional[str] = None
     site_managers: Optional[list[str]] = None
     workers: Optional[list[str]] = None
+    suppliers: Optional[list[str]] = None
+    admins: Optional[list[str]] = None
 
 class ProjectResponse(ProjectBase):
     id: str
@@ -127,6 +135,24 @@ class NotificationCreate(NotificationBase):
     pass
 
 class NotificationResponse(NotificationBase):
+    id: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+# --- Expenses ---
+
+class ExpenseBase(BaseModel):
+    project_id: str
+    title: str
+    description: Optional[str] = None
+    amount: float = Field(..., ge=0)
+    expense_date: Optional[date] = None
+
+class ExpenseCreate(ExpenseBase):
+    pass
+
+class ExpenseResponse(ExpenseBase):
     id: str
     created_at: datetime
 

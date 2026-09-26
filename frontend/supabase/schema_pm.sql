@@ -39,6 +39,5 @@ ALTER TABLE public.milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- Permissive Policies (FOR DEVELOPMENT MVP ONLY)
-CREATE POLICY "Allow all access for payroll" ON public.payroll FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access for milestones" ON public.milestones FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access for notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+-- Payroll policies are installed by the canonical hardening migration.
+-- Milestone and notification policies are installed by the canonical hardening migration.

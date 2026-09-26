@@ -4,9 +4,11 @@ import { TopNav } from '@/components/common/TopNav';
 import { NotificationCard } from '../../components/notifications/NotificationCard';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function NotificationsScreen() {
   const { notifications, loading, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { isMobile } = useResponsive();
 
   const getIconProps = (action: string) => {
     if (action.toLowerCase().includes('download')) return { iconFamily: FontAwesome5, iconName: 'download', iconColor: '#3B82F6' };
@@ -32,14 +34,12 @@ export default function NotificationsScreen() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="Notifications" showAction={false} />
       
-      <ScrollView className="flex-1 px-8 py-6 max-w-4xl mx-auto w-full" showsVerticalScrollIndicator={false}>
+      <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6 max-w-4xl mx-auto w-full'}`} showsVerticalScrollIndicator={false}>
         
         {/* Header Controls */}
-        <View className="flex-row justify-between items-end mb-8">
-          <View>
-            <Text className="text-gray-500 text-sm mt-1">Stay updated on project alerts and activity</Text>
-          </View>
-          <View className="flex-row items-center">
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+          <Text className="text-2xl font-bold text-brand-text">All Notifications</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', width: isMobile ? '100%' : undefined, justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
             <Pressable className="mr-6" onPress={markAllAsRead}>
               <Text className="text-brand-orange text-sm font-semibold">Mark all as read</Text>
             </Pressable>
@@ -61,7 +61,7 @@ export default function NotificationsScreen() {
             </View>
           ) : (
             notifications.map((n) => {
-              const props = getIconProps(n.action || n.title || '');
+              const props = getIconProps(n.title || '');
               return (
                 <Pressable key={n.id} onPress={() => !n.is_read && markAsRead(n.id)}>
                   <NotificationCard 

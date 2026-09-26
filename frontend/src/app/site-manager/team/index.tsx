@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { QRScanner } from '../../../components/worker/QRScanner';
 
 export default function SMTeamPage() {
   const [loading, setLoading] = useState(true);
   const [sites, setSites] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
-  const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Assignment Modal
@@ -26,10 +26,10 @@ export default function SMTeamPage() {
       // 1. Fetch SM's assigned sites
       const { data: smSites } = await supabase
         .from('site_manager_sites')
-        .select('site_id, sites(name, location)')
+        .select('project_id, projects(name, location)')
         .eq('site_manager_id', userId);
         
-      const parsedSites = smSites?.map(s => ({ id: s.site_id, name: s.sites?.name, location: s.sites?.location })) || [];
+      const parsedSites = smSites?.map(s => { const project = Array.isArray(s.projects) ? s.projects[0] : s.projects; return { id: s.project_id, name: project?.name, location: project?.location }; }) || [];
       setSites(parsedSites);
 
       if (parsedSites.length > 0) {
@@ -39,18 +39,10 @@ export default function SMTeamPage() {
         const { data: assignData, error: assignErr } = await supabase
           .from('site_workers')
           .select('*, profiles:worker_id(id, full_name)')
-          .in('site_id', siteIds);
+          .in('project_id', siteIds);
         if (assignErr) throw assignErr;
         setWorkers(assignData || []);
       }
-
-      // 3. Fetch all workers in the system (Mock QR Scanner Database)
-      const { data: workerProfiles, error: workerErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .eq('role', 'worker');
-      if (workerErr) throw workerErr;
-      setAvailableWorkers(workerProfiles || []);
 
     } catch (error: any) {
       console.error('Error fetching team data', error);
@@ -64,14 +56,22 @@ export default function SMTeamPage() {
     fetchTeamData();
   }, []);
 
-  const handleMockScanQR = async (workerId: string) => {
+  const handleScanQR = async (qrCode: string) => {
     if (!selectedSiteId || !currentUserId) return;
     try {
+      const { data: worker, error: workerError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'worker')
+        .eq('qr_code', qrCode)
+        .single();
+      if (workerError) throw workerError;
+
       const { error } = await supabase
         .from('site_workers')
         .insert({
           site_id: selectedSiteId,
-          worker_id: workerId,
+          worker_id: worker.id,
           site_manager_id: currentUserId
         });
 
@@ -82,7 +82,7 @@ export default function SMTeamPage() {
           throw error;
         }
       } else {
-        Alert.alert('Success', 'Worker scanned and assigned successfully!');
+        Alert.alert('Success', `${worker.full_name || 'Worker'} assigned successfully!`);
         setIsAssigning(false);
         setSelectedSiteId(null);
         fetchTeamData();
@@ -153,7 +153,7 @@ export default function SMTeamPage() {
 
                     {siteWorkers.length === 0 ? (
                       <View className="py-8 items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <Ionicons name="hard-hat-outline" size={32} color="#9CA3AF" />
+                        <Ionicons name="construct-outline" size={32} color="#9CA3AF" />
                         <Text className="text-gray-400 mt-2 text-sm">No workers currently assigned to this site.</Text>
                       </View>
                     ) : (
@@ -193,54 +193,7 @@ export default function SMTeamPage() {
         </ScrollView>
       )}
 
-      {/* Mock QR Scanner Modal */}
-      <Modal visible={isAssigning} transparent animationType="slide">
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white w-full rounded-t-3xl overflow-hidden shadow-2xl h-3/4">
-            <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
-              <View className="flex-row items-center">
-                <Ionicons name="qr-code-outline" size={24} color="#F97316" />
-                <Text className="text-xl font-bold text-gray-800 ml-3">Simulate QR Scan</Text>
-              </View>
-              <Pressable onPress={() => setIsAssigning(false)} className="p-2 bg-gray-200 rounded-full">
-                <Ionicons name="close" size={20} color="#4B5563" />
-              </Pressable>
-            </View>
-            
-            <View className="p-8 flex-1">
-              <Text className="text-gray-600 mb-6 text-center">
-                In a real application, this would open the device camera to scan the Worker's unique QR code. 
-                For this simulator, please select a worker from the database to assign them.
-              </Text>
-
-              {availableWorkers.length === 0 ? (
-                <Text className="text-gray-400 italic text-center">No Workers found in the database.</Text>
-              ) : (
-                <ScrollView className="flex-1 border border-gray-200 rounded-xl bg-gray-50 p-2">
-                  {availableWorkers.map((worker) => (
-                    <Pressable 
-                      key={worker.id} 
-                      onPress={() => handleMockScanQR(worker.id)}
-                      className="flex-row justify-between items-center p-4 border-b border-gray-200 bg-white rounded-lg mb-2 shadow-sm active:bg-orange-50"
-                    >
-                      <View className="flex-row items-center">
-                        <Ionicons name="id-card-outline" size={24} color="#6B7280" className="mr-3" />
-                        <View>
-                          <Text className="text-gray-800 font-bold text-base">{worker.full_name || 'Unnamed Worker'}</Text>
-                          <Text className="text-gray-400 text-xs">UUID: {worker.id.slice(0, 13)}...</Text>
-                        </View>
-                      </View>
-                      <View className="bg-brand-orange px-3 py-1.5 rounded-full">
-                        <Text className="text-white text-xs font-bold">Assign</Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {isAssigning && <QRScanner onScan={handleScanQR} onClose={() => setIsAssigning(false)} />}
 
     </View>
   );

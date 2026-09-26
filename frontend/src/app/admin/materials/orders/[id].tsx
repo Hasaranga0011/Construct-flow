@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { api } from '../../../../services/api';
 
 export default function AdminMaterialsOrdersIdPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,35 +40,26 @@ export default function AdminMaterialsOrdersIdPage() {
     fetchOrder();
   }, [id]);
 
-  const handleUpdateStatus = async (newStatus: string) => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`Are you sure you want to mark this order as ${newStatus}?`);
-      if (!confirmed) return;
-    } else {
-      // For native, we would use Alert.alert with buttons, but let's keep it simple
-      // or we can just proceed if it's not web (since native might not have window.confirm)
-      // We will implement native alert properly
-      const proceed = await new Promise((resolve) => {
-        Alert.alert(
-          'Confirm Action',
-          `Are you sure you want to mark this order as ${newStatus}?`,
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Yes', onPress: () => resolve(true) }
-          ]
-        );
-      });
-      if (!proceed) return;
-    }
+  const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received') => {
+    const proceed = await new Promise((resolve) => {
+      Alert.alert(
+        'Confirm Action',
+        `Are you sure you want to mark this order as ${newStatus}?`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Yes', onPress: () => resolve(true) }
+        ]
+      );
+    });
+    if (!proceed) return;
 
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
+      if (!id) throw new Error('Order id is required');
+      if (newStatus === 'Confirmed') await api.purchaseOrders.approve(id);
+      if (newStatus === 'Rejected') await api.purchaseOrders.reject(id);
+      if (newStatus === 'Delivered') await api.purchaseOrders.deliver(id);
+      if (newStatus === 'Received') await api.purchaseOrders.receive(id);
       
       if (Platform.OS === 'web') window.alert(`Order marked as ${newStatus}!`);
       else Alert.alert('Success', `Order marked as ${newStatus}!`);
@@ -114,7 +106,7 @@ export default function AdminMaterialsOrdersIdPage() {
     }
   };
 
-  const isCompleted = order.status === 'Delivered' || order.status === 'Rejected' || order.status === 'Cancelled';
+  const isCompleted = order.status === 'Received' || order.status === 'Rejected' || order.status === 'Cancelled';
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -203,22 +195,35 @@ export default function AdminMaterialsOrdersIdPage() {
               </View>
               
               <View className="flex-row gap-3">
-                <Pressable 
+                {order.status === 'Delivered' ? <Pressable
+                  disabled={actionLoading}
+                  onPress={() => handleUpdateStatus('Received')}
+                  className="bg-brand-success px-6 py-3 rounded-lg"
+                >
+                  <Text className="text-white font-bold">Confirm Receipt</Text>
+                </Pressable> : <Pressable
                   disabled={actionLoading}
                   onPress={() => handleUpdateStatus('Rejected')}
                   className="bg-red-50 border border-red-200 px-6 py-3 rounded-lg"
                 >
                   <Text className="text-red-600 font-bold">Reject Order</Text>
-                </Pressable>
+                </Pressable>}
                 
-                <Pressable 
+                {order.status === 'Confirmed' ? <Pressable
+                  disabled={actionLoading}
+                  onPress={() => handleUpdateStatus('Delivered')}
+                  className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                >
+                  {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                  <Text className="text-white font-bold">Mark Delivered</Text>
+                </Pressable> : order.status !== 'Delivered' ? <Pressable
                   disabled={actionLoading}
                   onPress={() => handleUpdateStatus('Confirmed')}
                   className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
                 >
                   {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
                   <Text className="text-white font-bold">Confirm Order</Text>
-                </Pressable>
+                </Pressable> : null}
               </View>
             </View>
           )}

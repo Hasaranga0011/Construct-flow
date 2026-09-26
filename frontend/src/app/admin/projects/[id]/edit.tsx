@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator,
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
+import { ProjectAssignmentDropdown } from '../../../../components/common/ProjectAssignmentDropdown';
 
 export default function AdminProjectEditPage() {
   const { id } = useLocalSearchParams();
@@ -14,6 +15,8 @@ export default function AdminProjectEditPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [siteManagers, setSiteManagers] = useState<any[]>([]);
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -25,6 +28,8 @@ export default function AdminProjectEditPage() {
     client_id: '',
     site_managers: [] as string[],
     workers: [] as string[]
+    , suppliers: [] as string[]
+    , admins: [] as string[]
   });
 
   const projectId = Array.isArray(id) ? id[0] : id;
@@ -32,24 +37,33 @@ export default function AdminProjectEditPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [projRes, pmData, clientData, smData, workerData, pmProjRes, smSitesRes, workersRes] = await Promise.all([
+        const [projRes, pmData, clientData, smData, workerData, supplierData, adminData, pmProjRes, roleAssignmentsRes] = await Promise.all([
           supabase.from('projects').select('*').eq('id', projectId).single(),
-          supabase.from('profiles').select('*').eq('role', 'pm'),
-          supabase.from('profiles').select('*').eq('role', 'client'),
-          supabase.from('profiles').select('*').eq('role', 'site_manager'),
-          supabase.from('profiles').select('*').eq('role', 'worker'),
+          supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']),
+          supabase.from('profiles').select('*').in('role', ['client', 'Client']),
+          supabase.from('profiles').select('*').in('role', ['site_manager', 'Site Manager', 'site manager']),
+          supabase.from('profiles').select('*').in('role', ['worker', 'Worker']),
+          supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']),
+          supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']),
           supabase.from('pm_projects').select('pm_id').eq('project_id', projectId),
-          supabase.from('site_manager_sites').select('site_manager_id').eq('project_id', projectId),
-          supabase.from('site_workers').select('worker_id').eq('project_id', projectId)
+          supabase.from('project_role_assignments').select('user_id, role').eq('project_id', projectId)
         ]);
           
         if (projRes.error) throw projRes.error;
         const data = projRes.data;
+        const assignmentByRole: Record<string, string[]> = { admin: [], site_manager: [], worker: [], supplier: [] };
+        for (const assignment of roleAssignmentsRes.data || []) {
+          const role = assignment.role;
+          if (!assignmentByRole[role]) assignmentByRole[role] = [];
+          assignmentByRole[role].push(assignment.user_id);
+        }
         
         if (pmData.data) setPms(pmData.data);
         if (clientData.data) setClients(clientData.data);
         if (smData.data) setSiteManagers(smData.data);
         if (workerData.data) setAvailableWorkers(workerData.data);
+        if (supplierData.data) setSuppliers(supplierData.data);
+        if (adminData.data) setAdmins(adminData.data);
         
         setFormData({
           name: data.name || '',
@@ -59,8 +73,10 @@ export default function AdminProjectEditPage() {
           status: data.status || 'Planning',
           pm_id: pmProjRes.data?.[0]?.pm_id || '',
           client_id: data.client_id || '',
-          site_managers: smSitesRes.data?.map((s: any) => s.site_manager_id) || [],
-          workers: workersRes.data?.map((w: any) => w.worker_id) || []
+          site_managers: assignmentByRole.site_manager || [],
+          workers: assignmentByRole.worker || [],
+          suppliers: assignmentByRole.supplier || [],
+          admins: assignmentByRole.admin || []
         });
       } catch (err: any) {
         Alert.alert("Error", err.message);
@@ -90,6 +106,8 @@ export default function AdminProjectEditPage() {
         client_id: formData.client_id || null,
         site_managers: formData.site_managers,
         workers: formData.workers
+        , suppliers: formData.suppliers
+        , admins: formData.admins
       };
       
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/projects/${projectId}`, {
@@ -106,10 +124,10 @@ export default function AdminProjectEditPage() {
         throw new Error(err.detail || 'Failed to update project');
       }
       
-      alert("Project updated successfully!");
+      Alert.alert('Success', "Project updated successfully!");
       router.push(`/admin/projects/${projectId}`);
     } catch (err: any) {
-      alert(`Error saving project: ${err.message}`);
+      Alert.alert('Error', `Error saving project: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -176,7 +194,7 @@ export default function AdminProjectEditPage() {
                   <TouchableOpacity 
                     key={status}
                     onPress={() => setFormData({...formData, status})}
-                    className={`px-4 py-2 rounded-full mr-2 mb-2 ${formData.status === status ? 'bg-brand-blue' : 'bg-gray-100'}`}
+                    className={`px-4 py-2 rounded-full mr-2 mb-2 ${formData.status === status ? 'bg-blue-600' : 'bg-gray-100'}`}
                   >
                     <Text className={formData.status === status ? 'text-white font-bold' : 'text-gray-600'}>{status}</Text>
                   </TouchableOpacity>
@@ -185,96 +203,12 @@ export default function AdminProjectEditPage() {
             </View>
 
             <Text className="text-xl font-bold text-gray-800 mb-6 mt-4 border-t border-gray-100 pt-6">Assignments</Text>
-          
-            <View className="mb-4">
-              <Text className="text-gray-700 font-medium mb-2">Assign Project Manager</Text>
-              <View className="flex-row flex-wrap space-x-2">
-                {pms.map(pm => (
-                  <TouchableOpacity 
-                    key={pm.id}
-                    onPress={() => setFormData({...formData, pm_id: pm.id})}
-                    className={`px-4 py-2 rounded-full mb-2 ${formData.pm_id === pm.id ? 'bg-brand-orange' : 'bg-gray-100'}`}
-                  >
-                    <Text className={formData.pm_id === pm.id ? 'text-white' : 'text-gray-700'}>
-                      {pm.full_name || pm.email}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {pms.length === 0 && <Text className="text-gray-500 italic">No PMs available</Text>}
-              </View>
-            </View>
-
-            <View className="mb-4">
-              <Text className="text-gray-700 font-medium mb-2">Assign Client</Text>
-              <View className="flex-row flex-wrap space-x-2">
-                {clients.map(client => (
-                  <TouchableOpacity 
-                    key={client.id}
-                    onPress={() => setFormData({...formData, client_id: client.id})}
-                    className={`px-4 py-2 rounded-full mb-2 ${formData.client_id === client.id ? 'bg-brand-blue' : 'bg-gray-100'}`}
-                  >
-                    <Text className={formData.client_id === client.id ? 'text-white' : 'text-gray-700'}>
-                      {client.full_name || client.email}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {clients.length === 0 && <Text className="text-gray-500 italic">No Clients available</Text>}
-              </View>
-            </View>
-
-            <View className="mb-4">
-              <Text className="text-gray-700 font-medium mb-2">Assign Site Managers (Multiple)</Text>
-              <View className="flex-row flex-wrap space-x-2">
-                {siteManagers.map(sm => {
-                  const isSelected = formData.site_managers.includes(sm.id);
-                  return (
-                    <TouchableOpacity 
-                      key={sm.id}
-                      onPress={() => {
-                        if (isSelected) {
-                          setFormData({...formData, site_managers: formData.site_managers.filter(id => id !== sm.id)});
-                        } else {
-                          setFormData({...formData, site_managers: [...formData.site_managers, sm.id]});
-                        }
-                      }}
-                      className={`px-4 py-2 rounded-full mb-2 ${isSelected ? 'bg-emerald-500' : 'bg-gray-100'}`}
-                    >
-                      <Text className={isSelected ? 'text-white' : 'text-gray-700'}>
-                        {sm.full_name || sm.email}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {siteManagers.length === 0 && <Text className="text-gray-500 italic">No Site Managers available</Text>}
-              </View>
-            </View>
-
-            <View className="mb-8">
-              <Text className="text-gray-700 font-medium mb-2">Assign Workers (Multiple)</Text>
-              <View className="flex-row flex-wrap space-x-2">
-                {availableWorkers.map(w => {
-                  const isSelected = formData.workers.includes(w.id);
-                  return (
-                    <TouchableOpacity 
-                      key={w.id}
-                      onPress={() => {
-                        if (isSelected) {
-                          setFormData({...formData, workers: formData.workers.filter(id => id !== w.id)});
-                        } else {
-                          setFormData({...formData, workers: [...formData.workers, w.id]});
-                        }
-                      }}
-                      className={`px-4 py-2 rounded-full mb-2 ${isSelected ? 'bg-indigo-500' : 'bg-gray-100'}`}
-                    >
-                      <Text className={isSelected ? 'text-white' : 'text-gray-700'}>
-                        {w.full_name || w.email}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {availableWorkers.length === 0 && <Text className="text-gray-500 italic">No Workers available</Text>}
-              </View>
-            </View>
+            <ProjectAssignmentDropdown label="Assign Administrators" users={admins} multiple selectedIds={formData.admins} onChange={(admins) => setFormData({ ...formData, admins })} />
+            <ProjectAssignmentDropdown label="Assign Project Manager" users={pms} selectedIds={formData.pm_id ? [formData.pm_id] : []} onChange={(ids) => setFormData({ ...formData, pm_id: ids[0] || '' })} />
+            <ProjectAssignmentDropdown label="Assign Client" users={clients} selectedIds={formData.client_id ? [formData.client_id] : []} onChange={(ids) => setFormData({ ...formData, client_id: ids[0] || '' })} />
+            <ProjectAssignmentDropdown label="Assign Site Managers" users={siteManagers} multiple selectedIds={formData.site_managers} onChange={(site_managers) => setFormData({ ...formData, site_managers })} />
+            <ProjectAssignmentDropdown label="Assign Workers" users={availableWorkers} multiple selectedIds={formData.workers} onChange={(workers) => setFormData({ ...formData, workers })} />
+            <ProjectAssignmentDropdown label="Assign Suppliers" users={suppliers} multiple selectedIds={formData.suppliers} onChange={(suppliers) => setFormData({ ...formData, suppliers })} />
 
             <View className="flex-row space-x-4 mt-4">
               <TouchableOpacity 

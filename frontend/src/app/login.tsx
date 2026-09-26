@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDashboardForRole } from '../utils/auth';
+
+const REMEMBER_EMAIL_KEY = 'cf_remember_email';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -10,7 +14,24 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+
+  // On mount: restore saved email if present
+  useEffect(() => {
+    const restoreEmail = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (saved) {
+          setEmail(saved);
+          setRememberMe(true);
+        }
+      } catch {
+        // ignore restore failures
+      }
+    };
+    restoreEmail();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -21,15 +42,43 @@ export default function LoginScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setErrorMsg(error.message);
       setLoading(false);
-    } else {
+      return;
+    }
+
+    // Handle Remember Me persistence
+    try {
+      if (rememberMe) {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, email);
+      } else {
+        await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
+      }
+    } catch {
+      // ignore persistence issues and continue with login routing
+    }
+
+    // Determine role and redirect to the matching dashboard
+    try {
+      const signedInUser = data.user;
+      let role = signedInUser?.user_metadata?.role as string | undefined;
+
+      if (!role) {
+        // Fallback: query profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', signedInUser?.id)
+          .single();
+        role = profile?.role;
+      }
+
+      const destination = getDashboardForRole(role);
+      router.replace((destination ?? '/') as any);
+    } catch {
       router.replace('/');
     }
   };
@@ -89,6 +138,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              returnKeyType="next"
             />
           </View>
 
@@ -106,6 +156,8 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer">
                 <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
@@ -113,10 +165,27 @@ export default function LoginScreen() {
             </View>
           </View>
           
-          <View className="flex-row items-center mb-8">
-            <View className="w-5 h-5 border border-gray-300 rounded mr-3 items-center justify-center bg-gray-50" />
+          {/* Remember Me — now functional */}
+          <Pressable
+            onPress={() => setRememberMe(prev => !prev)}
+            className="flex-row items-center mb-8"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberMe }}
+          >
+            <View
+              style={{
+                width: 20, height: 20, borderRadius: 5,
+                borderWidth: 1.5,
+                borderColor: rememberMe ? '#F97316' : '#D1D5DB',
+                backgroundColor: rememberMe ? '#F97316' : '#F9FAFB',
+                alignItems: 'center', justifyContent: 'center',
+                marginRight: 10,
+              }}
+            >
+              {rememberMe && <Ionicons name="checkmark" size={13} color="#fff" />}
+            </View>
             <Text className="text-gray-600 text-sm">Remember me</Text>
-          </View>
+          </Pressable>
 
           <Pressable 
             onPress={handleLogin}
@@ -148,7 +217,7 @@ export default function LoginScreen() {
           </View>
 
           <View className="flex-row justify-center">
-            <Text className="text-gray-500">Don't have an account? </Text>
+            <Text className="text-gray-500">Don&apos;t have an account? </Text>
             <Link href="/register" asChild>
               <Pressable>
                 <Text className="text-brand-orange font-bold hover:underline">Register Now</Text>
@@ -177,7 +246,7 @@ export default function LoginScreen() {
           <Text className="text-white font-extrabold text-5xl leading-tight mb-6">Effortlessly manage your team and operations.</Text>
           <Text className="text-gray-400 text-lg leading-relaxed mb-12">Log in to access your CRM, manage your team, track materials, and oversee active projects across all your sites in real-time.</Text>
           
-          {/* Decorative Mockup */}
+          {/* Decorative preview */}
           <View className="bg-white/10 p-6 rounded-3xl border border-white/20 backdrop-blur-md shadow-2xl">
             <View className="flex-row items-center border-b border-white/10 pb-4 mb-4">
                <View className="w-3 h-3 rounded-full bg-red-400 mr-2" />
@@ -201,3 +270,4 @@ export default function LoginScreen() {
     </View>
   );
 }
+

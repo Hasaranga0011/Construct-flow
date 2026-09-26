@@ -12,6 +12,48 @@
   - **Clients** (`client`): Track their project milestones, media, and invoices.
   - **Workers** (`worker`): Check in via QR, view attendance history and salary slips.
 
+  ## 1.1 End-to-End Workflows
+
+  ### Project lifecycle
+
+  1. An admin creates a project and assigns a project manager and client.
+  2. The PM sees only assigned projects, reviews budget/progress, coordinates clients, materials, suppliers, labour, payroll, and estimates.
+  3. A site manager operates assigned sites, assigns workers, records attendance, requests materials, uploads progress media, and reports issues.
+  4. Suppliers receive purchase orders, confirm/reject/suggest changes, and mark confirmed orders delivered.
+  5. Clients see their own project progress, milestones, media, financial records, documents, estimates, notifications, and PM conversations.
+  6. Workers see only their profile, QR identity, attendance records, payroll, and salary slips.
+
+  ### Materials and procurement
+
+  1. Admins and permitted PMs choose a project, material, supplier, quantity, price, and expected date.
+  2. The purchase order is stored with a lifecycle status: `Pending Delivery`, `Confirmed`, `Delivered`, `Cancelled`, `Rejected`, or `Suggested`.
+  3. Suppliers act on orders assigned to their account; admins retain global oversight.
+  4. Site managers monitor stock and submit material requests for assigned sites.
+  5. Low-stock and late-order checks feed dashboard alerts and notifications.
+
+  ### Workforce and payroll
+
+  1. Workers are assigned to sites through site-manager workflows or administrative assignment tools.
+  2. Attendance is recorded through QR scanning or permitted manual entry and stores status, check-in/out, hours, date, project/site, and worker identity.
+  3. PMs and admins review scoped attendance and payroll summaries.
+  4. Salary generation creates salary slips using the project rule of Rs. 3,500 per day plus 1.5x overtime treatment.
+  5. Workers can review their own attendance and salary slips but cannot access another worker's records.
+
+  ### Client communication and progress
+
+  1. Client projects are selected from `projects.client_id = auth user id`.
+  2. Milestones are ordered by due date and display status, completion percentage, descriptions, and media.
+  3. Client messages are scoped by project and sender/receiver identity, with Supabase Realtime updates.
+  4. Shared documents, project photos, notifications, invoices/financial records, and estimates are filtered to the client's projects.
+
+  ### Authentication and navigation
+
+  1. Supabase Auth establishes the session and `AuthContext` resolves the normalized role from metadata or `profiles`.
+  2. The root layout waits for session/role resolution before redirecting protected routes.
+  3. Role dashboards are selected from the normalized role map.
+  4. Sidebar links use suffix-only hrefs and role `basePath` values. Nested routes remain highlighted without duplicating prefixes.
+  5. The shared `TopNav` provides the responsive menu trigger, role-aware notification route, avatar, search/action hooks, and optional back navigation.
+
 ## 2. Tech Stack
 - **Frontend**: React Native with Expo (v50+) and Expo Router (file-based routing).
 - **Backend**: Python 3.10+, FastAPI (Asynchronous REST API).
@@ -24,11 +66,11 @@
 ## 3. Project Structure
 - **`/frontend/src/app/`**: Expo Router pages, segregated by role (`/admin`, `/client`, `/pm`, `/site`, `/supplier`, `/worker`).
   - `_layout.tsx`: Root layouts handling global context and auth guards.
-  - `admin/materials/`: Purchase orders and site stock inventory tables, detailed `[id]` PO view, intelligent create forms.
+  - `admin/materials/`: Material creation/detail, purchase orders, site stock inventory, detailed order views, and intelligent create forms.
   - `admin/labour/`, `admin/attendance/`, `admin/payroll/`: Unified workforce suite for checking in workers, viewing site logs, and auto-calculating wages.
   - `admin/users/`: Directory and CRUD forms for platform users.
 - **`/frontend/src/components/`**: Shared and domain-specific UI components.
-  - `common/`: `TopNav`, `Sidebar`, `StatCard`, `AnimatedCard`.
+  - `common/`: `TopNav`, `Sidebar`, `MobileSidebar`, `StatCard`, `AnimatedCard`, notification and toast surfaces.
   - `materials/`: `InventoryTable`, `NewMaterialModal`, `PendingOrders`.
   - `labour/`: `AttendanceTable`, `PayrollSummary`, `LabourDistributionChart`, `CheckInWorkerModal`.
 - **`/frontend/src/lib/`**: Core utilities.
@@ -41,37 +83,41 @@
   - `core/security.py`: JWT validation utilizing Supabase JWTs.
 - **`/frontend/supabase/`**: Database migrations and SQL schema definition files.
 
+### Current portal route map
+
+| Portal | Representative routes | Scope |
+| --- | --- | --- |
+| Admin | `/admin/dashboard`, `/admin/projects`, `/admin/users`, `/admin/materials`, `/admin/labour`, `/admin/payroll`, `/admin/reports`, `/admin/insights` | Global platform operations and oversight |
+| PM | `/pm/dashboard`, `/pm/projects`, `/pm/materials`, `/pm/labour`, `/pm/payroll`, `/pm/clients`, `/pm/suppliers`, `/pm/team`, `/pm/ai-estimator` | Assigned-project operations |
+| Site manager | `/site-manager/dashboard`, `/site-manager/attendance`, `/site-manager/labour`, `/site-manager/materials`, `/site-manager/issues`, `/site-manager/team`, `/site-manager/milestones` | Assigned-site operations |
+| Supplier | `/supplier/dashboard`, `/supplier/orders`, `/supplier/deliveries`, `/supplier/profile` | Supplier-owned procurement and delivery |
+| Client | `/client/dashboard`, `/client/project`, `/client/media`, `/client/messages`, `/client/invoices`, `/client/documents`, `/client/project/estimates` | Client-owned project visibility and communication |
+| Worker | `/worker/dashboard`, `/worker/attendance`, `/worker/payroll`, `/worker/profile` | Personal workforce records |
+
+The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/site-manager` for new work. Route aliases should preserve the same role boundary as the canonical route and must not expose the admin-wide implementation accidentally.
+
 ## 4. Current State & Progress
-- **COMPLETE & Working**:
-  - Global authentication and role-based routing (6 role dashboards).
-  - Cross-role Realtime Notifications (via WebSockets).
-  - User Directory and CRUD management (`/admin/users`), with automatic syncing to Supabase Auth.
-  - Materials & Inventory: Site stock tables (`/admin/materials/stock`), Purchase Order creation forms with dynamic dropdowns (bypassing manual entry), and detailed Order views with Confirm/Reject logic.
-  - Labour Force Dashboard: Real-time dashboard (`/admin/labour`) summarizing `profiles` and `labour` table attendance.
-  - Check-In System: Admins can manually add worker attendance for a site.
-  - Attendance Logs: Site-specific worker presence logs (`/admin/attendance/[id]`).
-  - Automated Payroll: Real-time wage calculation (`/admin/payroll`) based on `labour` table base hours and overtime rules.
-  - Supplier / Purchase Order workflow (Create, Approve, Reject, Suggest, Deliver).
-  - Admin Project Creation mapping PMs and Clients.
-  - Project milestone tracking (Creation by Admin, Updating by PM, Viewing by Client).
-  - Full Client Portal (Dashboard, Milestone timeline viewer, Real-time Chat with PM, AI Cost Estimator Form).
-  - AI Estimator integration and ML Delay Risk cron jobs.
-  - Direct Cloudinary integration for site photos.
-  - Email notifications (Resend API hooked into material request flows).
-  - Background Cron Jobs (APScheduler running inside FastAPI).
+
+**2026-09-26 completion brief:** Phases 1 through 7 have been fully implemented and their schema migrations applied to staging. Phase 8 (Final Integration Testing) is actively in progress.
+- **IMPLEMENTED (Phases 1-7)**:
+  - Phase 1: Hardened core RLS and replaced anonymous grants. Scoped attendance and legacy queries.
+  - Phase 2: Fully connected Daily-Operations workflow with Supabase Realtime subscriptions on Dashboards (PM, Supplier, Site Manager). Integrated 'Confirm Receipt' for purchase orders. QR scan worker detail card.
+  - Phase 3: 3-Way Multichannel Chat. client_messages upgraded to support PM, Admin, and Site Manager channels with live Realtime updates.
+  - Phase 4: Payroll Notification Automation. Resend emails and in-app notifications automatically fire upon salary generation.
+  - Phase 5 & 6: Project Finances. client_payment_schedule and ariation_orders added. GET /api/projects/{id}/financials calculates committed vs actual spend with budget overrun alerts.
+  - Phase 7: Daily Site Reports. Mobile-first daily report creation UI for Site Managers and backend integration.
 - **IN PROGRESS**:
-  - Wiring up remaining UI stubs (e.g. Master Reporting).
-- **PLANNED**:
-  - Site Manager Issue Reporting.
-  - Supplier Delivery Tracking dashboard.
-  - Admin Master Reporting (react-native-chart-kit).
-  - WhatsApp Business API notifications.
+  - Phase 8: Final Integration Testing (running tests against the active local stack).
 - **KNOWN BUGS / ISSUES**:
-  - Occasional Expo Router Metro bundler file import pathing issues due to deeply nested scaffolded folders. Must ensure `../../` depth is accurate.
+  - Occasional Expo Router Metro bundler file import pathing issues can occur in deeply nested folders; verify relative import depth.
+  - See KNOWN_LIMITATIONS.md for deferred features.
 
 ## 5. Architecture & Key Design Decisions
 - **Client-Server Split**: The frontend handles UI, local state, and direct Supabase Realtime subscriptions (for WebSockets). The backend handles complex business logic (e.g., fulfilling orders, generating alerts, integrations, ML processing, salary generation).
 - **Routing**: Strict role-based URL namespacing (`/admin/dashboard`, `/supplier/dashboard`). If a user logs in, their role from `public.profiles` dictates where they are pushed. Web navigation relies on Expo Router's `<Link asChild>` for stability.
+- **Navigation contract**: Role layouts use suffix-only nav hrefs such as `/dashboard` and provide the role prefix through `basePath`. Sidebar builders defensively avoid duplicate prefixes.
+- **Responsive contract**: `useResponsive()` and role layouts use a 1024px compact breakpoint. Below that width, the mobile drawer is used; content uses responsive padding and stacks dashboard/form columns.
+- **Role boundaries**: Admin screens are global. PM, site-manager, supplier, client, and worker screens must filter data to the signed-in user's assignments or identity and must not reuse admin-wide mutations without a role check.
 - **State Management**: React local state (`useState`, `useEffect`) and optimistic UI updates upon API success. The application relies on `refreshTrigger` integer increments passed to components to re-trigger `useEffect` data fetches instead of a complex Redux store.
 - **API Design**: The frontend fetches basic read-only or realtime data directly from Supabase via the JS SDK. Complex mutations (like Bulk Payroll or QR Scans) are routed through the FastAPI backend to ensure atomicity.
 
@@ -79,9 +125,10 @@
 - **`profiles`**: Links to `auth.users`. Contains `role` (`super_admin`, `pm`, `site_manager`, `client`, `worker`, `supplier`), `full_name`, `email`, and `qr_code`.
 - **`projects`**: The core entity. Belongs to a PM (`pm_id`) and Client (`client_id`). Includes `latitude` and `longitude`.
 - **`materials`**: Site inventory stock catalog. Requires a `project_id`.
-- **`purchase_orders`**: Formal orders assigned to a `supplier_id`. 
-  - Statuses: `Pending Delivery`, `Confirmed`, `Delivered`, `Cancelled`, `Rejected`, `Suggested`.
-- **`labour`**: Acts as the unified attendance log and daily timesheet. Tracks `worker_name`, `check_in_time`, `hours_worked`, `status` (Present/Absent/On Leave), and `date`. (No separate `attendance` table is used).
+- **`purchase_orders`**: Formal orders assigned to a `supplier_id`.
+  - Statuses: `Pending Delivery`, `Confirmed`, `Delivered`, `Received`, `Cancelled`, `Rejected`, `Suggested`.
+  - `Delivered` means the supplier reported delivery; `Received` means the assigned PM/site manager/admin confirmed receipt and stock was incremented once.
+- **`attendance`**: Canonical daily attendance/timesheet target. `attendance.worker_id` references `workers.id`, and `workers.user_id` links to the authenticated profile. Legacy `labour` reads remain in several screens and must be converted after the staging identity export; names must never be used as identity keys.
 - **`notifications`**: Generic alert table. Fields: `target_user_id`, `target_role`, `type`, `message`, `is_read`.
 - **`salary_slips`**: Auto-generated objects capturing total days, overtime hours, and total payouts.
 - **`milestones` & `milestone_media`**: Defines project phases and tracks Cloudinary progress images.
@@ -91,6 +138,7 @@
 - **FastAPI Endpoints**: Secured via `Depends(get_current_user)`.
   - `POST /api/purchase-orders`: Create PO.
   - `PATCH /api/purchase-orders/{id}/(approve|reject|suggest|deliver)`: Supplier/Admin actions.
+  - `PATCH /api/purchase-orders/{id}/receive`: PM/site-manager/admin goods-received confirmation and stock update.
   - `POST /api/purchase-orders/check-late`: Scans for overdue POs.
   - `POST /api/projects`: Full project creation.
   - `POST /api/projects/{id}/milestones`: Create milestones.
@@ -118,11 +166,10 @@
   2. Frontend: `cd frontend`, `npm install`, `npm run web`.
 
 ## 9. Current Blockers / Open Questions
-- **Strict RLS Testing**: Frontend data fetching needs testing against the active RLS policies to ensure tenant isolation works as expected for non-admin accounts. Attempting to seed dummy data via Python anon scripts often fails due to RLS; direct SQL via Supabase Editor is the preferred workaround.
-- **Stubs Remaining**: There are still some UI pages that show "Page stub generated successfully" (e.g., specific Reports pages).
+- **Integration Testing**: We are currently executing the Phase 8 integration test plan.
 
 ## 10. Next Steps
-- **Immediate Task**: Prioritize building out the remaining stubs for Site Manager Incident Reporting, Supplier Delivery Tracking, and Admin Reports.
+- **Immediate Task**: Walk through the test suite manually with each of the 6 core roles using Expo Go. Verify that real-time syncs function correctly and Role-Level Security (RLS) properly isolates each tenant.
 - **Long-term**: Production deployment preparation (Supabase custom domain, Vercel for backend/frontend hosting, configuring real WebSockets via Pusher or Supabase Realtime).
 
 ## 11. Important Notes for AI Collaboration
@@ -135,6 +182,28 @@
 - **Pathing Warning**: Pay extreme attention to relative import depth (e.g., `../../../components/common/TopNav`) when scaffolding or modifying nested pages. Incorrect depth will crash the Metro Bundler.
 
 ## 12. Changelog
+- [2026-09-26] (Phase 1 RLS hardening prepared)
+  - Added schema and foreign-key preflight guards to the core RLS migration.
+  - Replaced broad staging-policy assumptions with exhaustive policy replacement across 24 covered tables.
+  - Added role and project/site boundaries for projects, workers, attendance, materials, procurement, payroll, milestones, chat, documents, issues, expenses, and notifications.
+  - Fixed a recursive worker-policy path found by local PostgreSQL role testing.
+  - Corrected QR attendance to send `site_id` and map profile identity to `workers.id` before inserting attendance.
+  - Removed all unconditional true policies and mock project seeds from repository SQL.
+  - Scoped legacy labour API reads/writes to the authenticated role and managed projects while canonical attendance migration remains pending.
+  - Verified 37 backend tests, 14 workflow database checks, 8 notification checks, TypeScript, and 12 local authenticated RLS isolation assertions.
+  - Staging migration and six real-account acceptance remain pending the updated identity export.
+
+- [2026-09-25] (Goods-received workflow staged)
+  - Added `backend/migrations/20260925_goods_received.sql` with delivery/receipt metadata and a `Received` status.
+  - Supplier delivery no longer increments stock; assigned PM/site-manager/admin receipt performs the single transactional stock increment.
+  - Added `PATCH /api/purchase-orders/{id}/receive`, frontend API support, delivery/receipt notifications, and regression coverage.
+  - Live application is intentionally pending until the Phase 1 schema audit and authenticated staging RLS tests are accepted.
+
+- [2026-09-25] (Full completion brief: Phase 1 in progress)
+  - Applied caller-scoped milestone and expense permissions, including project/milestone matching and finance role checks.
+  - Corrected targeted-notification filtering so another user with the same role cannot receive it through the shared filter.
+  - Added project permission regression tests, notification checks, and a read-only staging schema audit.
+  - No live migrations or six-role acceptance tests have run; later phases remain pending.
 - [2026-07-30] (Initial Phase)
   - Fixed `Ionicons` import crash on Admin Labour page.
   - Replaced Web navigation `router.push` with `Link` for stability in Admin and PM Projects pages.

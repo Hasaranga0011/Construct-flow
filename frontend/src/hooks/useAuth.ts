@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
+import { normalizeRole } from '../utils/auth';
 
 export function useAuth() {
   const [user, setUser] = useState<any>(null);
@@ -8,6 +9,33 @@ export function useAuth() {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const handleRoleRedirect = useCallback((userRole: string | null) => {
+    if (!userRole) return;
+
+    switch (userRole) {
+      case 'admin':
+        router.replace('/admin/dashboard');
+        break;
+      case 'pm':
+        router.replace('/pm/dashboard');
+        break;
+      case 'site_manager':
+        router.replace('/site-manager/dashboard');
+        break;
+      case 'client':
+        router.replace('/client/dashboard');
+        break;
+      case 'worker':
+        router.replace('/worker/dashboard');
+        break;
+      case 'supplier':
+        router.replace('/supplier/dashboard');
+        break;
+      default:
+        break;
+    }
+  }, [router]);
 
   useEffect(() => {
     let mounted = true;
@@ -27,7 +55,7 @@ export function useAuth() {
             
           if (data && mounted) {
             setProfile(data);
-            setRole(data.role);
+            setRole(normalizeRole(data.role));
           }
         }
       } catch (error) {
@@ -50,9 +78,10 @@ export function useAuth() {
           .single();
           
         if (data && mounted) {
+          const normalizedRole = normalizeRole(data.role);
           setProfile(data);
-          setRole(data.role);
-          handleRoleRedirect(data.role);
+          setRole(normalizedRole);
+          handleRoleRedirect(normalizedRole);
         }
       } else {
         if (mounted) {
@@ -68,32 +97,7 @@ export function useAuth() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
-
-  const handleRoleRedirect = (userRole: string) => {
-    switch (userRole) {
-      case 'super_admin':
-        router.replace('/admin/dashboard');
-        break;
-      case 'pm':
-        router.replace('/pm/dashboard');
-        break;
-      case 'site_manager':
-        router.replace('/site/dashboard');
-        break;
-      case 'client':
-        router.replace('/client/dashboard');
-        break;
-      case 'worker':
-        router.replace('/worker/dashboard');
-        break;
-      case 'supplier':
-        router.replace('/supplier/dashboard');
-        break;
-      default:
-        router.replace('/login');
-    }
-  };
+  }, [handleRoleRedirect, router]);
 
   return { user, profile, role, loading, handleRoleRedirect };
 }

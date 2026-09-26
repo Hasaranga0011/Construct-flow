@@ -92,9 +92,10 @@ export default function PmAiEstimatorPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="AI Cost Estimator" showAction={false} />
+      <Text className="px-6 py-3 text-sm text-amber-800 bg-amber-50">Prototype estimates use synthetic data. Accuracy is not validated; confirm costs before budgeting.</Text>
 
-      <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
-        <View className="flex-row gap-8">
+      <ScrollView className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
+        <View className="flex-col lg:flex-row gap-6 lg:gap-8">
 
           {/* Left: Form */}
           <View className="flex-[1.2]">
@@ -176,7 +177,7 @@ export default function PmAiEstimatorPage() {
                 <View className="flex-row justify-between">
                   <View>
                     <Text className="text-white opacity-70 text-xs">Confidence Score</Text>
-                    <Text className="text-white font-bold mt-1 text-lg">{result.confidence_score}%</Text>
+                    <Text className="text-white font-bold mt-1 text-lg">{result.confidence_score == null ? 'Not validated' : `${result.confidence_score}%`}</Text>
                   </View>
                   <View>
                     <Text className="text-white opacity-70 text-xs">Area</Text>
@@ -212,7 +213,7 @@ export default function PmAiEstimatorPage() {
                     <Text className="font-bold text-gray-800 text-sm">{item.project_name}</Text>
                     <Text className="text-brand-orange font-bold mt-1">{formatCurrency(item.estimated_cost)}</Text>
                     <View className="flex-row justify-between mt-1">
-                      <Text className="text-gray-400 text-xs">Confidence: {item.confidence_score}%</Text>
+                      <Text className="text-gray-400 text-xs">Confidence: {item.confidence_score == null ? 'Not validated' : `${item.confidence_score}%`}</Text>
                       <Text className="text-gray-400 text-xs">{new Date(item.created_at).toLocaleDateString()}</Text>
                     </View>
                   </View>

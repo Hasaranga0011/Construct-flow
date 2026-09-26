@@ -39,7 +39,7 @@ export default function EstimatorScreen() {
       
       <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         {/* Top Stat Cards Row */}
-        <View className="flex-row justify-between mb-6 -mx-2">
+        <View className="flex-row flex-wrap justify-between mb-6 -mx-1 md:-mx-2">
           <StatCard 
             label="Total Estimates" 
             value={stats.total.toString()} 
@@ -62,12 +62,12 @@ export default function EstimatorScreen() {
         <QuotationForm onEstimateCreated={() => setRefreshTrigger(prev => prev + 1)} />
 
         {/* Bottom Section Layout */}
-        <View className="flex-row pb-6">
-          <View className="flex-[4]">
+        <View className="flex-col lg:flex-row gap-6 pb-6">
+          <View className="flex-[4] w-full">
             <CostBreakdown refreshTrigger={refreshTrigger} />
           </View>
           
-          <View className="flex-[5]">
+          <View className="flex-[5] w-full">
             <RecentEstimates refreshTrigger={refreshTrigger} />
           </View>
         </View>

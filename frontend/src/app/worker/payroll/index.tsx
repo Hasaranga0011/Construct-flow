@@ -19,16 +19,25 @@ export default function WorkerPayrollPage() {
         if (!sessionData?.session) return;
         const userId = sessionData.session.user.id;
 
-        const [profileReq, payrollReq, attendanceReq] = await Promise.all([
-          supabase.from('profiles').select('*, labour(daily_wage, id)').eq('id', userId).single(),
-          supabase.from('payroll').select('*').eq('worker_id', userId).order('created_at', { ascending: false }),
-          supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('worker_id', userId).eq('status', 'Present'),
-        ]);
+        const profileReq = await supabase.from('profiles').select('*').eq('id', userId).single();
+        const workerName = profileReq.data?.full_name;
+
+        let presentCount = 0;
+        let salarySlips: any[] = [];
+
+        if (workerName) {
+          const [attendanceReq, payrollReq] = await Promise.all([
+            supabase.from('labour').select('id', { count: 'exact', head: true }).eq('worker_name', workerName).eq('status', 'Present'),
+            supabase.from('salary_slips').select('*').eq('worker_id', userId).order('created_at', { ascending: false }),
+          ]);
+          presentCount = attendanceReq.count || 0;
+          salarySlips = payrollReq.data || [];
+        }
 
         if (isMounted) {
           setProfile(profileReq.data);
-          setPayrollRecords(payrollReq.data || []);
-          setAttendanceSummary({ present: attendanceReq.count || 0 });
+          setPayrollRecords(salarySlips);
+          setAttendanceSummary({ present: presentCount });
         }
       } catch (error) {
         console.error('Worker payroll error:', error);
@@ -41,7 +50,7 @@ export default function WorkerPayrollPage() {
     return () => { isMounted = false; };
   }, []);
 
-  const dailyWage = profile?.labour?.[0]?.daily_wage || 0;
+  const dailyWage = 3500; // Base daily rate (Rs. 3,500 as per payroll system)
   const estimatedEarnings = dailyWage * attendanceSummary.present;
 
   const formatCurrency = (amount: number) => `LKR ${amount.toLocaleString('en-LK')}`;
@@ -55,7 +64,7 @@ export default function WorkerPayrollPage() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
 
           {/* Earnings Summary Banner */}
           <View className="bg-gradient-to-r from-brand-orange to-orange-400 rounded-2xl p-8 mb-6 shadow-md bg-brand-orange">
@@ -104,15 +113,15 @@ export default function WorkerPayrollPage() {
                   <View className="p-5 flex-row justify-between">
                     <View>
                       <Text className="text-gray-500 text-xs">Days Worked</Text>
-                      <Text className="font-bold text-gray-800 mt-1">{record.days_worked}</Text>
+                      <Text className="font-bold text-gray-800 mt-1">{record.total_days || 0}</Text>
                     </View>
                     <View>
-                      <Text className="text-gray-500 text-xs">Daily Rate</Text>
-                      <Text className="font-bold text-gray-800 mt-1">{formatCurrency(record.daily_rate || 0)}</Text>
+                      <Text className="text-gray-500 text-xs">Overtime Hrs</Text>
+                      <Text className="font-bold text-gray-800 mt-1">{record.overtime_hours || 0} hrs</Text>
                     </View>
                     <View>
-                      <Text className="text-gray-500 text-xs">Gross Pay</Text>
-                      <Text className="font-bold text-brand-orange mt-1 text-lg">{formatCurrency(record.gross_pay || 0)}</Text>
+                      <Text className="text-gray-500 text-xs">Total Payout</Text>
+                      <Text className="font-bold text-brand-orange mt-1 text-lg">{formatCurrency(record.total_payout || 0)}</Text>
                     </View>
                   </View>
                 </View>

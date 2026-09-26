@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+// Modified for Expo Go mobile compatibility
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { supabase } from '../../lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import { useRealtimeStats } from '../../hooks/useRealtimeStats';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function SiteManagerDashboard() {
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     assignedSites: 0,
@@ -15,64 +18,71 @@ export default function SiteManagerDashboard() {
     activeIssues: 0,
   });
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) return;
       const userId = sessionData.session.user.id;
 
-      // 1. Fetch sites assigned to this Site Manager
+      // 1. Fetch the site-manager's assignments (both project IDs and site assignment IDs).
       const { data: assignments } = await supabase
         .from('site_manager_sites')
-        .select('site_id')
+        .select('project_id, id')
         .eq('site_manager_id', userId);
 
-      const siteIds = assignments?.map(a => a.site_id) || [];
-      
+      const assignedProjectIds = assignments?.map((a) => a.project_id) || [];
+      // site_manager_sites.id is the site assignment row ID used as site_id in attendance.
+      const siteAssignmentIds = assignments?.map((a) => a.id) || [];
+
+      const { data: projectsData } = assignedProjectIds.length
+        ? await supabase.from('projects').select('id').in('id', assignedProjectIds).eq('status', 'active')
+        : { data: [] };
+
+      const projectIds = projectsData?.map(p => p.id) || [];
+
       let workersPresent = 0;
       let pendingMaterials = 0;
       let activeIssues = 0;
 
-      if (siteIds.length > 0) {
-        // Fetch workers present today
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const attendanceReq = await supabase
+      if (siteAssignmentIds.length > 0) {
+        // 2. Count workers checked in today via canonical attendance table.
+        //    attendance.site_id maps to the site_manager_sites assignment ID.
+        const today = new Date().toISOString().split('T')[0];
+        const attReq = await supabase
           .from('attendance')
-          .select('id', { count: 'exact' })
-          .in('site_id', siteIds)
-          .eq('status', 'Present')
-          .gte('date', startOfDay.toISOString());
+          .select('id', { count: 'exact', head: true })
+          .in('site_id', siteAssignmentIds)
+          .eq('date', today)
+          .not('check_in_time', 'is', null)
+          .is('check_out_time', null);
 
-        workersPresent = attendanceReq.count || 0;
-
-        // Fetch pending material requests for these sites
-        // Note: material_requests are linked to projects, not sites in the current schema. 
-        // We might need to join sites -> projects -> material_requests OR site_materials.
-        // For now, since material_requests doesn't have site_id directly in the current schema, 
-        // we count alerts from site_materials low stock if applicable, or we use a custom query.
-        // Let's count site_materials running low (quantity < 10) for this SM's sites
-        const materialsReq = await supabase
-          .from('site_materials')
-          .select('id', { count: 'exact' })
-          .in('site_id', siteIds)
-          .lt('quantity', 10);
-
-        pendingMaterials = materialsReq.count || 0;
-
-        // Fetch active issues
-        const issuesReq = await supabase
-          .from('issues')
-          .select('id', { count: 'exact' })
-          .in('site_id', siteIds)
-          .eq('status', 'Open');
-
-        activeIssues = issuesReq.count || 0;
+        workersPresent = attReq.count || 0;
       }
 
+      if (projectIds.length > 0) {
+        // 3. Count materials with current_stock below minimum_threshold (per design system: danger <30, warning <60).
+        const materialsReq = await supabase
+          .from('materials')
+          .select('id, current_stock, minimum_threshold')
+          .in('project_id', projectIds);
+
+        if (materialsReq.data) {
+          pendingMaterials = materialsReq.data.filter(
+            m => (m.current_stock ?? 0) < (m.minimum_threshold ?? 0)
+          ).length;
+        }
+      }
+
+      // 4. Count open issues reported by this site manager.
+      const issuesReq = await supabase
+        .from('issues')
+        .select('id', { count: 'exact', head: true })
+        .eq('reported_by', userId)
+        .neq('status', 'Resolved');
+      activeIssues = issuesReq.count || 0;
+
       setStats({
-        assignedSites: siteIds.length,
+        assignedSites: projectIds.length,
         workersPresent,
         pendingMaterials,
         activeIssues,
@@ -83,11 +93,11 @@ export default function SiteManagerDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadStats();
   }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+  // Realtime: re-fetch when attendance or materials change
+  useRealtimeStats(loadStats, true);
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -100,8 +110,8 @@ export default function SiteManagerDashboard() {
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           
-          <View className="flex-row justify-between mb-6 -mx-2">
-            <AnimatedCard delay={100} style={{ flex: 1 }}>
+          <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Assigned Sites" 
                 value={stats.assignedSites.toString()} 
@@ -109,7 +119,7 @@ export default function SiteManagerDashboard() {
               />
             </AnimatedCard>
             
-            <AnimatedCard delay={200} style={{ flex: 1 }}>
+            <AnimatedCard delay={200} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Workers Present" 
                 value={stats.workersPresent.toString()} 
@@ -118,16 +128,16 @@ export default function SiteManagerDashboard() {
               />
             </AnimatedCard>
             
-            <AnimatedCard delay={300} style={{ flex: 1 }}>
+            <AnimatedCard delay={300} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Low Stock Alerts" 
                 value={stats.pendingMaterials.toString()} 
-                indicatorText="Items < 10 units" 
+                indicatorText="Items below threshold" 
                 indicatorType={stats.pendingMaterials > 0 ? "danger" : "success"}
               />
             </AnimatedCard>
             
-            <AnimatedCard delay={400} style={{ flex: 1 }}>
+            <AnimatedCard delay={400} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Active Issues" 
                 value={stats.activeIssues.toString()} 
@@ -137,9 +147,21 @@ export default function SiteManagerDashboard() {
             </AnimatedCard>
           </View>
 
-          <View className="flex-1 items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-100">
-            <Ionicons name="construct-outline" size={64} color="#D1D5DB" className="mb-4" />
-            <Text className="text-gray-400 text-lg font-medium">Detailed widgets coming soon...</Text>
+          <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <Text className="text-lg font-bold text-brand-text">Live Site Signals</Text>
+            <Text className="text-gray-500 text-sm mt-2">
+              Attendance, stock, and issue counts update from your assigned site data in real time.
+            </Text>
+            <View className="flex-row flex-wrap mt-5 gap-4">
+              <View className="flex-1 min-w-[45%] bg-gray-50 rounded-lg p-4">
+                <Text className="text-gray-500 text-xs uppercase font-semibold">Workers present</Text>
+                <Text className="text-2xl font-bold text-brand-text mt-1">{stats.workersPresent}</Text>
+              </View>
+              <View className="flex-1 min-w-[45%] bg-gray-50 rounded-lg p-4">
+                <Text className="text-gray-500 text-xs uppercase font-semibold">Open issues</Text>
+                <Text className="text-2xl font-bold text-brand-text mt-1">{stats.activeIssues}</Text>
+              </View>
+            </View>
           </View>
 
         </ScrollView>

@@ -9,7 +9,6 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Super Admin' | 'Project Manager' | 'Site Manager' | 'Client' | 'Worker' | 'Supplier'>('Client');
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -30,7 +29,7 @@ export default function RegisterScreen() {
       options: {
         data: {
           full_name: fullName,
-          role: role,
+          role: 'client',
         }
       }
     });
@@ -41,7 +40,7 @@ export default function RegisterScreen() {
       if (typeof displayError === 'object' || displayError === '{}' || !displayError) {
         displayError = JSON.stringify(error);
       }
-      setErrorMsg(`DEBUG ERROR: ${displayError}`);
+      setErrorMsg(displayError);
       setLoading(false);
     } else {
       // Sign out immediately to prevent auto-login
@@ -132,6 +131,8 @@ export default function RegisterScreen() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
                 />
                 <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer">
                   <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
@@ -139,20 +140,7 @@ export default function RegisterScreen() {
               </View>
             </View>
 
-            <View className="mb-8">
-              <Text className="text-sm font-semibold text-gray-700 mb-2">Select Role</Text>
-              <View className="flex-row gap-2 flex-wrap">
-                {['Super Admin', 'Project Manager', 'Site Manager', 'Client', 'Worker', 'Supplier'].map((r) => (
-                  <Pressable
-                    key={r}
-                    onPress={() => setRole(r as any)}
-                    className={`w-[48%] mb-2 py-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center transition-colors`}
-                  >
-                    <Text className={`text-sm font-semibold ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>{r}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+            <Text className="text-sm text-gray-500 mb-8">New accounts start as clients. An administrator assigns team roles.</Text>
 
             <Pressable 
               onPress={handleRegister}

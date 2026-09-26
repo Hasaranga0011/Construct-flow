@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Ionicons } from '@expo/vector-icons';
 
 const AttendanceRow = ({ 
   name, 
@@ -17,6 +19,57 @@ const AttendanceRow = ({
   hours: string | number, 
   status: 'Present' | 'Absent' | 'On Leave' 
 }) => {
+  const { isMobile } = useResponsive();
+
+  if (isMobile) {
+    const getMobileStatusColor = () => {
+      if (status === 'Present') return { bg: '#D1FAE5', text: '#065F46' };
+      if (status === 'Absent') return { bg: '#FEE2E2', text: '#991B1B' };
+      return { bg: '#FEF9C3', text: '#A16207' };
+    };
+    const mobileStatus = getMobileStatusColor();
+    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?';
+
+    return (
+      <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: '#1D4ED8', fontWeight: 'bold', fontSize: 16 }}>{initials}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }} numberOfLines={1} ellipsizeMode="tail">
+              {name}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }} numberOfLines={1} ellipsizeMode="tail">
+              {role}
+            </Text>
+          </View>
+          <View style={{ backgroundColor: mobileStatus.bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: mobileStatus.text, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>
+              {status}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text style={{ fontSize: 13, color: '#6B7280' }}>{project}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="log-in-outline" size={14} color="#6B7280" />
+              <Text style={{ fontSize: 13, color: '#6B7280' }}>{checkIn}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="time-outline" size={14} color="#6B7280" />
+              <Text style={{ fontSize: 13, color: '#6B7280' }}>{hours}h</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
   
   let statusBadgeColor = '';
   let statusTextColor = '';
@@ -60,11 +113,9 @@ const AttendanceRow = ({
       </View>
 
       {/* Status Badge */}
-      <View className="w-1/6 items-end pr-2">
-        <View className={`px-2 py-1 rounded ${statusBadgeColor}`}>
-          <Text className={`text-xs font-semibold ${statusTextColor}`}>
-            {status}
-          </Text>
+      <View className="flex-1 flex-row justify-end">
+        <View className={`${statusBadgeColor} px-2 py-1 rounded`}>
+          <Text className={`${statusTextColor} text-xs font-semibold`}>{status}</Text>
         </View>
       </View>
     </View>
@@ -72,6 +123,7 @@ const AttendanceRow = ({
 };
 
 export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: { refreshTrigger?: number, searchQuery?: string, pmId?: string }) => {
+  const { isMobile } = useResponsive();
   const [labour, setLabour] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,13 +191,15 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
       </View>
 
       {/* Table Header */}
-      <View className="flex-row py-3 border-b border-gray-200">
-        <Text className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Worker</Text>
-        <Text className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Project / Site</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Check-in</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Hours</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right pr-2">Status</Text>
-      </View>
+      {!isMobile && (
+        <View className="flex-row py-3 border-b border-gray-200">
+          <Text className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Worker</Text>
+          <Text className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Project / Site</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Check-in</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Hours</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right pr-2">Status</Text>
+        </View>
+      )}
 
       {loading ? (
         <View className="flex-1 items-center justify-center py-10">

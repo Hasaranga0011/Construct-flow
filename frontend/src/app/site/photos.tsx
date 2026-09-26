@@ -5,9 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function SitePhotos() {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState<any[]>([]);
   
@@ -227,7 +229,7 @@ export default function SitePhotos() {
           ) : (
             <View className="flex-row flex-wrap justify-between">
               {photos.map(photo => (
-                <View key={photo.id} className="w-[48%] bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <View key={photo.id} style={{ width: isMobile ? '100%' : '48%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6' }}>
                   <Image 
                     source={{ uri: photo.photo_url }} 
                     style={{ width: '100%', height: 200 }} 

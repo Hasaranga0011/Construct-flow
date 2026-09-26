@@ -1,9 +1,8 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from typing import List, Optional
 from ..models import ProjectCreate, ProjectUpdate, ProjectResponse
-from core.database import supabase
-from supabase import create_client
-from core.config import settings
+from core.database import client_for_token, get_auth_client
+from core.security import get_current_user
 import os
 import requests
 
@@ -13,10 +12,13 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[ProjectResponse])
-def get_projects():
+def get_projects(request: Request):
     try:
-        response = supabase.table("projects").select("*").execute()
+        client = get_auth_client(request)
+        response = client.table("projects").select("*").execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -25,7 +27,7 @@ def send_client_assignment_email(email: str, project_name: str):
     FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ConstructFlow <noreply@constructflow.lk>")
     if not RESEND_API_KEY:
         return
-    
+
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #F97316; padding: 24px; border-radius: 12px 12px 0 0;">
@@ -59,120 +61,89 @@ def send_client_assignment_email(email: str, project_name: str):
     except Exception as e:
         print("Failed to send email:", e)
 
-from supabase import create_client, ClientOptions
 
-def get_auth_client(request: Request):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    options = ClientOptions(headers={"Authorization": f"Bearer {token}"}) if token else ClientOptions()
-    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY, options=options)
-    return client
+def save_project(client, data, project_id=None):
+    # Defined in migrations/20260925_workflow_integrity.sql. A failed assignment
+    # rolls back the project change as part of the same database transaction.
+    result = client.rpc("save_project_with_assignments", {
+        "p_project_id": project_id, "p_data": data,
+    }).execute()
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Failed to save project")
+    return result.data
+
+
+def notify_assigned_client(client, project):
+    if not project.get("client_id"):
+        return
+    try:
+        profile = client.table("profiles").select("email").eq("id", project["client_id"]).execute()
+        if profile.data and profile.data[0].get("email"):
+            send_client_assignment_email(profile.data[0]["email"], project["name"])
+    except Exception:
+        import logging
+        logging.exception("Project saved, but client notification failed")
+
 
 @router.post("/", response_model=ProjectResponse)
 def create_project(project: ProjectCreate, request: Request):
-    try:
-        client = get_auth_client(request)
-        # Convert dates to ISO format strings for Supabase
-        project_data = project.model_dump()
-        project_data['start_date'] = project_data['start_date'].isoformat()
-        project_data['end_date'] = project_data['end_date'].isoformat()
-        
-        site_managers = project_data.pop('site_managers', []) or []
-        workers = project_data.pop('workers', []) or []
-        
-        response = client.table("projects").insert(project_data).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=400, detail="Failed to create project")
-            
-        new_project = response.data[0]
-        project_id = new_project['id']
-        
-        # Link PM if assigned
-        if new_project.get('pm_id'):
-            client.table("pm_projects").insert({
-                "pm_id": new_project['pm_id'],
-                "project_id": project_id
-            }).execute()
-            
-        # Link Site Managers
-        if site_managers:
-            sm_inserts = [{"site_manager_id": sm_id, "project_id": project_id} for sm_id in site_managers]
-            client.table("site_manager_sites").insert(sm_inserts).execute()
-            
-        # Link Workers
-        if workers:
-            worker_inserts = [{"worker_id": w_id, "project_id": project_id} for w_id in workers]
-            client.table("site_workers").insert(worker_inserts).execute()
+    client = get_auth_client(request)
+    saved = save_project(client, project.model_dump(mode="json", exclude_none=True))
+    # Notify both PM and client about the new project.
+    notifications = []
+    if saved.get("pm_id"):
+        notifications.append({
+            "project_id": saved["id"],
+            "target_user_id": saved["pm_id"],
+            "target_role": "pm",
+            "title": "New Project Assigned",
+            "message": f"You have been assigned as Project Manager for: {saved['name']}",
+            "type": "info",
+            "is_read": False,
+        })
+    if notifications:
+        try:
+            client.table("notifications").insert(notifications).execute()
+        except Exception:
+            import logging
+            logging.exception("Project created but PM notification failed")
+    notify_assigned_client(client, saved)
+    return saved
 
-        # Send email to Client if assigned
-        if new_project.get('client_id'):
-            client_res = client.table("profiles").select("email").eq("id", new_project['client_id']).execute()
-            if client_res.data and client_res.data[0].get('email'):
-                send_client_assignment_email(client_res.data[0]['email'], new_project['name'])
-            
-        return new_project
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: str, project: ProjectUpdate, request: Request):
-    try:
-        client = get_auth_client(request)
-        project_data = project.model_dump(exclude_unset=True)
-        if 'start_date' in project_data and project_data['start_date']:
-            project_data['start_date'] = project_data['start_date'].isoformat()
-        if 'end_date' in project_data and project_data['end_date']:
-            project_data['end_date'] = project_data['end_date'].isoformat()
-            
-        site_managers = project_data.pop('site_managers', None)
-        workers = project_data.pop('workers', None)
-        
-        # Determine if PM/Client is changed
-        current_project_res = client.table("projects").select("pm_id, client_id, name").eq("id", project_id).execute()
-        current_project = current_project_res.data[0] if current_project_res.data else None
-        
-        response = client.table("projects").update(project_data).eq("id", project_id).execute()
-        if not response.data:
-            raise HTTPException(status_code=400, detail="Failed to update project")
-            
-        updated_project = response.data[0]
-        
-        # Handle PM Update
-        if 'pm_id' in project_data and (not current_project or project_data['pm_id'] != current_project.get('pm_id')):
-            client.table("pm_projects").delete().eq("project_id", project_id).execute()
-            if project_data['pm_id']:
-                client.table("pm_projects").insert({
-                    "pm_id": project_data['pm_id'],
-                    "project_id": project_id
-                }).execute()
-                
-        # Handle Client Update (send email if it's a new client)
-        if 'client_id' in project_data and project_data['client_id']:
-            if not current_project or project_data['client_id'] != current_project.get('client_id'):
-                client_res = client.table("profiles").select("email").eq("id", project_data['client_id']).execute()
-                if client_res.data and client_res.data[0].get('email'):
-                    send_client_assignment_email(client_res.data[0]['email'], updated_project['name'])
-                    
-        # Link Site Managers
-        if site_managers is not None:
-            client.table("site_manager_sites").delete().eq("project_id", project_id).execute()
-            if site_managers:
-                sm_inserts = [{"site_manager_id": sm_id, "project_id": project_id} for sm_id in site_managers]
-                client.table("site_manager_sites").insert(sm_inserts).execute()
-                
-        # Replace Workers
-        if workers is not None:
-            client.table("site_workers").delete().eq("project_id", project_id).execute()
-            if workers:
-                worker_inserts = [{"worker_id": w_id, "project_id": project_id} for w_id in workers]
-                client.table("site_workers").insert(worker_inserts).execute()
-
-        return updated_project
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    client = get_auth_client(request)
+    data = project.model_dump(mode="json", exclude_unset=True)
+    saved = save_project(client, data, project_id)
+    if data.get("client_id"):
+        notify_assigned_client(client, saved)
+    return saved
 
 
 from pydantic import BaseModel
+
+def authorized_project_client(project_id, user, *, write):
+    if not write and user["role"] not in {"super_admin", "pm", "client"}:
+        raise HTTPException(status_code=403, detail="Not enough privileges")
+    if write and user["role"] not in {"super_admin", "pm", "site_manager"}:
+        raise HTTPException(status_code=403, detail="Not enough privileges")
+    client = client_for_token(user["token"])
+    response = client.table("projects").select("id, pm_id, client_id").eq("id", project_id).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = response.data[0]
+    if user["role"] == "super_admin":
+        return client
+    if user["role"] == "pm" and project.get("pm_id") == user["id"]:
+        return client
+    if not write and user["role"] == "client" and project.get("client_id") == user["id"]:
+        return client
+    result = client.table("project_role_assignments").select("user_id").eq("project_id", project_id).eq("user_id", user["id"]).eq("role", user["role"]).execute()
+    if not result.data:
+        raise HTTPException(status_code=403, detail="Access denied: not your project")
+    return client
+
 
 class MilestoneCreate(BaseModel):
     title: str
@@ -180,7 +151,8 @@ class MilestoneCreate(BaseModel):
     due_date: str
 
 @router.post("/{project_id}/milestones")
-def create_milestone(project_id: str, payload: MilestoneCreate):
+def create_milestone(project_id: str, payload: MilestoneCreate, current_user: dict = Depends(get_current_user)):
+    supabase = authorized_project_client(project_id, current_user, write=True)
     try:
         res = supabase.table("milestones").insert({
             "project_id": project_id,
@@ -191,6 +163,8 @@ def create_milestone(project_id: str, payload: MilestoneCreate):
             "status": "Pending"
         }).execute()
         return res.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -199,16 +173,215 @@ class MilestoneUpdate(BaseModel):
     media_urls: Optional[List[str]] = None
 
 @router.patch("/{project_id}/milestones/{milestone_id}")
-def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdate):
+def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdate, current_user: dict = Depends(get_current_user)):
+    supabase = authorized_project_client(project_id, current_user, write=True)
     try:
         # Update milestone status
-        res = supabase.table("milestones").update({"status": payload.status}).eq("id", milestone_id).execute()
-        
+        res = supabase.table("milestones").update({"status": payload.status}).eq("id", milestone_id).eq("project_id", project_id).execute()
+
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Milestone not found")
+
         # Insert any new media
         if payload.media_urls:
             media_inserts = [{"milestone_id": milestone_id, "url": url} for url in payload.media_urls]
             supabase.table("milestone_media").insert(media_inserts).execute()
-            
+
+        # Recalculate project completion percentage
+        all_ms = supabase.table("milestones").select("status").eq("project_id", project_id).execute()
+        if all_ms.data:
+            total = len(all_ms.data)
+            completed = sum(1 for ms in all_ms.data if ms.get("status") == "Completed")
+            percentage = int((completed / total) * 100)
+            supabase.table("projects").update({"completion_percentage": percentage}).eq("id", project_id).execute()
+
+        # Notify the client about the milestone update.
+        try:
+            proj = supabase.table("projects").select("client_id, name").eq("id", project_id).execute()
+            if proj.data and proj.data[0].get("client_id"):
+                supabase.table("notifications").insert({
+                    "project_id": project_id,
+                    "target_user_id": proj.data[0]["client_id"],
+                    "target_role": "client",
+                    "title": "Milestone Updated",
+                    "message": f"A milestone has been updated to '{payload.status}' on your project '{proj.data[0].get('name', '')}'.",
+                    "type": "info",
+                    "is_read": False,
+                }).execute()
+        except Exception:
+            import logging
+            logging.exception("Milestone updated but client notification failed")
+
         return res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{project_id}/milestones/{milestone_id}")
+def delete_milestone(project_id: str, milestone_id: str, current_user: dict = Depends(get_current_user)):
+    supabase = authorized_project_client(project_id, current_user, write=True)
+    try:
+        res = supabase.table("milestones").delete().eq("id", milestone_id).eq("project_id", project_id).execute()
+
+        # Recalculate project completion percentage
+        all_ms = supabase.table("milestones").select("status").eq("project_id", project_id).execute()
+        if all_ms.data:
+            total = len(all_ms.data)
+            completed = sum(1 for ms in all_ms.data if ms.get("status") == "Completed")
+            percentage = int((completed / total) * 100)
+            supabase.table("projects").update({"completion_percentage": percentage}).eq("id", project_id).execute()
+        else:
+            supabase.table("projects").update({"completion_percentage": 0}).eq("id", project_id).execute()
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+from ..models import ExpenseCreate, ExpenseResponse
+
+@router.get("/{project_id}/financials")
+def get_project_financials(project_id: str, current_user: dict = Depends(get_current_user)):
+    """Returns committed cost, actual spend, remaining budget, and total budget for a project.
+    Committed = POs in Pending Delivery / Confirmed.
+    Actual = POs in Delivered / Received + salary slips paid out.
+    Fires budget-overrun notifications at 90% and 100% thresholds.
+    """
+    supabase = authorized_project_client(project_id, current_user, write=False)
+    try:
+        # Fetch project budget
+        proj = supabase.table("projects").select("total_budget, name, pm_id, client_id").eq("id", project_id).execute()
+        if not proj.data:
+            raise HTTPException(status_code=404, detail="Project not found")
+        total_budget = float(proj.data[0].get("total_budget") or 0)
+        pm_id = proj.data[0].get("pm_id")
+        project_name = proj.data[0].get("name", "")
+
+        # Committed: POs not yet delivered
+        committed_res = supabase.table("purchase_orders") \
+            .select("total_price") \
+            .eq("project_id", project_id) \
+            .in_("status", ["Pending Delivery", "Confirmed"]) \
+            .execute()
+        committed_cost = sum(float(r.get("total_price") or 0) for r in (committed_res.data or []))
+
+        # Actual: delivered/received POs
+        actual_po_res = supabase.table("purchase_orders") \
+            .select("total_price") \
+            .eq("project_id", project_id) \
+            .in_("status", ["Delivered", "Received"]) \
+            .execute()
+        actual_po = sum(float(r.get("total_price") or 0) for r in (actual_po_res.data or []))
+
+        # Actual: salary slips (via workers on this project's sites)
+        salary_res = supabase.table("salary_slips") \
+            .select("total_amount, site_id") \
+            .execute()
+        # Filter salary slips to project's sites
+        site_res = supabase.table("site_manager_sites").select("id").eq("project_id", project_id).execute()
+        project_site_ids = {r["id"] for r in (site_res.data or [])}
+        actual_payroll = sum(
+            float(r.get("total_amount") or 0)
+            for r in (salary_res.data or [])
+            if r.get("site_id") in project_site_ids
+        )
+
+        actual_spend = actual_po + actual_payroll
+        remaining_budget = total_budget - committed_cost - actual_spend
+
+        result = {
+            "project_id": project_id,
+            "total_budget": total_budget,
+            "committed_cost": committed_cost,
+            "actual_spend": actual_spend,
+            "actual_po": actual_po,
+            "actual_payroll": actual_payroll,
+            "remaining_budget": remaining_budget,
+        }
+
+        # Budget overrun notifications (90% and 100% thresholds)
+        if total_budget > 0:
+            utilisation = (committed_cost + actual_spend) / total_budget
+            if utilisation >= 1.0:
+                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 100)
+            elif utilisation >= 0.9:
+                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 90)
+
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_id, threshold_pct: int):
+    """Insert a budget-overrun warning notification for PM and admin."""
+    import logging
+    try:
+        notifications = [
+            {
+                "project_id": project_id,
+                "target_role": "super_admin",
+                "title": f"Budget {threshold_pct}% Exceeded",
+                "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
+                "type": "error" if threshold_pct >= 100 else "warning",
+                "is_read": False,
+            }
+        ]
+        if pm_id:
+            notifications.append({
+                "project_id": project_id,
+                "target_user_id": pm_id,
+                "target_role": "pm",
+                "title": f"Budget {threshold_pct}% Exceeded",
+                "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
+                "type": "error" if threshold_pct >= 100 else "warning",
+                "is_read": False,
+            })
+        supabase.table("notifications").insert(notifications).execute()
+    except Exception:
+        logging.exception("Failed to insert budget overrun notifications")
+
+
+@router.get("/{project_id}/expenses", response_model=List[ExpenseResponse])
+def get_project_expenses(project_id: str, current_user: dict = Depends(get_current_user)):
+    supabase = authorized_project_client(project_id, current_user, write=False)
+    try:
+        res = supabase.table("project_expenses").select("*").eq("project_id", project_id).order("expense_date", desc=True).execute()
+        return res.data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{project_id}/expenses", response_model=ExpenseResponse)
+def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in {"super_admin", "pm"}:
+        raise HTTPException(status_code=403, detail="Not enough privileges")
+    supabase = authorized_project_client(project_id, current_user, write=True)
+    try:
+        if expense.project_id != project_id:
+            raise HTTPException(status_code=400, detail="Expense project does not match URL")
+        expense_data = expense.model_dump()
+        if expense_data.get('expense_date'):
+            expense_data['expense_date'] = expense_data['expense_date'].isoformat()
+        else:
+            del expense_data['expense_date']
+
+        res = supabase.table("project_expenses").insert(expense_data).execute()
+        if not res.data:
+            raise HTTPException(status_code=400, detail="Failed to create expense")
+
+        # Recalculate spent_cost
+        all_exp = supabase.table("project_expenses").select("amount").eq("project_id", project_id).execute()
+        total_spent = sum(float(e.get("amount", 0)) for e in all_exp.data) if all_exp.data else 0.0
+
+        supabase.table("projects").update({"spent_cost": total_spent}).eq("id", project_id).execute()
+
+        return res.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

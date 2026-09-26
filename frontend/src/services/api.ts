@@ -26,50 +26,72 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  attendance: {
-    checkIn: (workerId: string, siteId: string) => fetchWithAuth('/attendance/checkin', { method: 'POST', body: JSON.stringify({ worker_id: workerId, site_id: siteId }) }),
-    checkOut: (workerId: string) => fetchWithAuth('/attendance/checkout', { method: 'POST', body: JSON.stringify({ worker_id: workerId }) }),
-    getToday: (siteId?: string) => fetchWithAuth(`/attendance/today${siteId ? `?site_id=${siteId}` : ''}`),
-    getWorkerHistory: (workerId: string) => fetchWithAuth(`/attendance/worker/${workerId}`)
-  },
-  workers: {
-    getAll: () => fetchWithAuth('/workers'),
-    create: (data: any) => fetchWithAuth('/workers', { method: 'POST', body: JSON.stringify(data) }),
-    generateQR: (workerId: string) => fetchWithAuth(`/workers/${workerId}/qr`, { method: 'POST' })
-  },
-  estimations: {
-    generate: (data: any) => fetchWithAuth('/estimations', { method: 'POST', body: JSON.stringify(data) }),
-    getAll: () => fetchWithAuth('/estimations'),
-    sendToClient: (id: string) => fetchWithAuth(`/estimations/${id}/send`, { method: 'POST' })
+  projects: {
+    getAll: () => fetchWithAuth('/projects/'),
+    create: (data: any) => fetchWithAuth('/projects/', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => fetchWithAuth(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    createMilestone: (projectId: string, data: any) => fetchWithAuth(`/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify(data) }),
+    updateMilestone: (projectId: string, milestoneId: string, data: any) => fetchWithAuth(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    financials: (projectId: string) => fetchWithAuth(`/projects/${projectId}/financials`),
   },
   materials: {
-    getAll: () => fetchWithAuth('/materials'),
-    getLowStock: () => fetchWithAuth('/materials/low-stock'),
-    createRequest: (data: any) => fetchWithAuth('/materials/requests', { method: 'POST', body: JSON.stringify(data) }),
-    updateRequest: (id: string, status: string) => fetchWithAuth(`/materials/requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+    getAll: (projectId?: string) => fetchWithAuth(`/materials/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
+    create: (data: any) => fetchWithAuth('/materials/', { method: 'POST', body: JSON.stringify(data) }),
+    checkStock: () => fetchWithAuth('/materials/check-stock', { method: 'POST' }),
+  },
+  labour: {
+    getAll: (projectId?: string) => fetchWithAuth(`/labour/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
+    create: (data: any) => fetchWithAuth('/labour/', { method: 'POST', body: JSON.stringify(data) }),
+    getPayroll: () => fetchWithAuth('/labour/payroll'),
+    scan: (data: { qr_code: string; site_id: string }) => fetchWithAuth('/labour/scan', { method: 'POST', body: JSON.stringify(data) }),
+    generateSalary: (data: { start_date: string; end_date: string; site_id: string }) => fetchWithAuth('/labour/salary/generate', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  clients: {
+    getAll: (projectId?: string) => fetchWithAuth(`/clients/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
+    create: (data: any) => fetchWithAuth('/clients/', { method: 'POST', body: JSON.stringify(data) }),
+    invite: (data: any) => fetchWithAuth('/clients/invite', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => fetchWithAuth(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchWithAuth(`/clients/${id}`, { method: 'DELETE' }),
+  },
+  estimations: {
+    generate: (data: any) => fetchWithAuth('/estimations/', { method: 'POST', body: JSON.stringify(data) }),
+    getAll: () => fetchWithAuth('/estimations/'),
+    predict: (data: any) => fetchWithAuth('/estimations/predict', { method: 'POST', body: JSON.stringify(data) }),
   },
   purchaseOrders: {
-    getAll: () => fetchWithAuth('/purchase-orders'),
     create: (data: any) => fetchWithAuth('/purchase-orders', { method: 'POST', body: JSON.stringify(data) }),
     approve: (id: string) => fetchWithAuth(`/purchase-orders/${id}/approve`, { method: 'PATCH' }),
     reject: (id: string) => fetchWithAuth(`/purchase-orders/${id}/reject`, { method: 'PATCH' }),
     suggest: (id: string, data: any) => fetchWithAuth(`/purchase-orders/${id}/suggest`, { method: 'PATCH', body: JSON.stringify(data) }),
     deliver: (id: string) => fetchWithAuth(`/purchase-orders/${id}/deliver`, { method: 'PATCH' }),
+    receive: (id: string) => fetchWithAuth(`/purchase-orders/${id}/receive`, { method: 'PATCH' }),
     checkLate: () => fetchWithAuth(`/purchase-orders/check-late`, { method: 'POST' }),
     uploadInvoice: (id: string, url: string) => fetchWithAuth(`/purchase-orders/${id}/invoice`, { method: 'POST', body: JSON.stringify({ invoice_url: url }) })
   },
+  reports: {
+    projects: () => fetchWithAuth('/reports/projects'),
+    materials: () => fetchWithAuth('/reports/materials'),
+    payroll: () => fetchWithAuth('/reports/payroll'),
+  },
+  messages: {
+    /** Send a message. Provide sender_role and receiver_role for multichannel routing. */
+    send: (data: {
+      project_id: string;
+      sender_id: string;
+      receiver_id: string;
+      content: string;
+      sender_role?: string;
+      receiver_role?: string;
+    }) => fetchWithAuth('/messages/', { method: 'POST', body: JSON.stringify(data) }),
+    getByProject: (projectId: string, channel?: { senderRole?: string; receiverRole?: string }) =>
+      fetchWithAuth(`/messages/${projectId}${channel ? `?sender_role=${channel.senderRole || ''}&receiver_role=${channel.receiverRole || ''}` : ''}`),
+  },
+  siteReports: {
+    create: (data: any) => fetchWithAuth('/site-reports/', { method: 'POST', body: JSON.stringify(data) }),
+    getByProject: (projectId: string) => fetchWithAuth(`/site-reports/${projectId}`),
+  },
   notifications: {
-    getAll: () => fetchWithAuth('/notifications'),
-    markAllRead: () => fetchWithAuth('/notifications/read-all', { method: 'PATCH' }),
-    markRead: (id: string) => fetchWithAuth(`/notifications/${id}/read`, { method: 'PATCH' })
-  },
-  insights: {
-    get: () => fetchWithAuth('/insights')
-  },
-  payroll: {
-    getAll: () => fetchWithAuth('/payroll'),
-    generate: (month: number, year: number) => fetchWithAuth('/payroll/generate', { method: 'POST', body: JSON.stringify({ month, year }) }),
-    approve: (id: string) => fetchWithAuth(`/payroll/${id}/approve`, { method: 'PATCH' }),
-    markPaid: (id: string) => fetchWithAuth(`/payroll/${id}/paid`, { method: 'PATCH' })
+    sendEmail: (data: any) => fetchWithAuth('/notifications/email/send', { method: 'POST', body: JSON.stringify(data) }),
+    emailHealth: () => fetchWithAuth('/notifications/email/health'),
   }
 };

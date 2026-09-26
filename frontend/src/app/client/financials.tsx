@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,21 +18,14 @@ export default function ClientFinancialsScreen() {
 
         if (error && error.code !== '42P01') throw error;
         setInvoices(data || []);
-      } catch (e) {
-        setInvoices([
-          { id: 'INV-004', amount: 1500000, description: 'Milestone 4: Roofing Completion', due_date: '2023-11-15', status: 'Unpaid' },
-          { id: 'INV-003', amount: 2000000, description: 'Milestone 3: Ground Floor Slabs', due_date: '2023-10-01', status: 'Paid', paid_date: '2023-09-28' },
-        ]);
+      } catch {
+        setInvoices([]);
       } finally {
         setLoading(false);
       }
     };
     fetchInvoices();
   }, []);
-
-  const handlePay = (id: string) => {
-    Alert.alert("Payment Portal", "Simulating secure payment gateway...");
-  };
 
   const formatCurr = (val: number) => `Rs. ${val.toLocaleString()}`;
 
@@ -60,9 +53,7 @@ export default function ClientFinancialsScreen() {
               <View className="items-end">
                 <Text className="text-2xl font-extrabold text-brand-text mb-3">{formatCurr(inv.amount)}</Text>
                 {inv.status === 'Unpaid' ? (
-                  <Pressable onPress={() => handlePay(inv.id)} className="bg-brand-primary px-8 py-3 rounded-full hover:-translate-y-1 shadow-md transition-all">
-                    <Text className="text-white font-bold tracking-wide">Pay Now</Text>
-                  </Pressable>
+                  <Text className="text-orange-600 text-xs font-semibold">Payment pending</Text>
                 ) : (
                   <View className="flex-row items-center">
                     <Ionicons name="checkmark-circle" size={18} color="#10B981" />

@@ -1,11 +1,15 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
+import { useSidebar } from '../../context/SidebarContext';
+import { useWindowDimensions } from 'react-native';
+import { LogoutConfirmationModal } from './LogoutConfirmationModal';
+import { buildNotificationFilter } from '../../utils/notifications';
 
 export type NavItem = {
   label: string;
@@ -20,10 +24,18 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
   const { user, role } = useAuth();
   const router = useRouter();
   const { isDark } = useTheme();
+  const { isOpen, setIsOpen } = useSidebar();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 1024;
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  const handleLogout = async () => {
+  const completeLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/login');
+  };
+
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
   };
 
   const getInitials = (email?: string) => {
@@ -41,7 +53,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('is_read', false)
-        .or(`user_id.eq.${user.id},target_role.eq.All`);
+        .or(buildNotificationFilter(user.id, role));
       if (count !== null) setUnreadCount(count);
     };
     fetchUnread();
@@ -59,10 +71,21 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
       .subscribe();
       
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [user, role]);
+
+  if (isMobile && !isOpen) {
+    return null;
+  }
 
   return (
-    <View className={`w-[240px] h-full py-6 flex-col border-r ${isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100'}`}>
+    <>
+      {isMobile && isOpen && (
+        <Pressable 
+          className="absolute inset-0 z-40 bg-black/50"
+          onPress={() => setIsOpen(false)}
+        />
+      )}
+      <View className={`w-[240px] h-full py-6 flex-col border-r ${isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100'} ${isMobile ? 'absolute z-50 left-0' : 'relative'}`}>
       {/* Logo Area */}
       <View className="px-4 mb-8">
         <Text className={`font-bold text-xl ${isDark ? 'text-white' : 'text-brand-text'}`}>Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>
@@ -70,15 +93,20 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
       </View>
 
       {/* Navigation */}
-      <View className="flex-1 px-3">
+      <ScrollView className="flex-1 min-h-0 px-3" contentContainerStyle={{ paddingBottom: 12 }}>
         {navItems.map((item) => {
           // Normalise paths for matching
-          const fullHref = `${basePath}${item.href}`;
-          const isActive = pathname === fullHref || (pathname === basePath && item.href === '/dashboard');
+          const fullHref = item.href.startsWith(`${basePath}/`)
+            ? item.href
+            : `${basePath}${item.href}`;
+          const isDashboard = item.href === '/dashboard';
+          const isActive = isDashboard
+            ? pathname === fullHref
+            : pathname === fullHref || pathname.startsWith(`${fullHref}/`);
           const IconFamily = item.IconFamily;
           
           return (
-            <Link key={item.label} href={fullHref as any} asChild>
+            <Link key={item.label} href={fullHref as any} asChild onPress={() => setIsOpen(false)}>
               <Pressable className={`flex-row items-center py-3 px-3 rounded-lg mb-1 ${isActive ? (isDark ? 'bg-gray-800' : 'bg-brand-orange bg-opacity-10') : 'hover:bg-gray-50 hover:bg-opacity-10'}`}>
                 <IconFamily 
                   name={item.iconName as any} 
@@ -103,10 +131,10 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
             </Link>
           );
         })}
-      </View>
+      </ScrollView>
 
       {/* User Profile */}
-      <View className="px-4 mt-auto">
+      <View className="px-4 mt-4 flex-shrink-0">
         <View className={`flex-row items-center justify-between pt-4 border-t ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
           <View className="flex-row items-center flex-1">
             <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
@@ -122,6 +150,13 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
           </Pressable>
         </View>
       </View>
-    </View>
+      </View>
+      <LogoutConfirmationModal
+        visible={logoutModalVisible}
+        isDark={isDark}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={() => { setLogoutModalVisible(false); void completeLogout(); }}
+      />
+    </>
   );
 };

@@ -3,13 +3,15 @@ import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert 
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 const ROLES = [
-  { label: 'Admin', value: 'admin' },
+  { label: 'Admin', value: 'super_admin' },
   { label: 'Project Manager', value: 'pm' },
   { label: 'Site Manager', value: 'site_manager' },
   { label: 'Client', value: 'client' },
   { label: 'Worker', value: 'worker' },
+  { label: 'Supplier', value: 'supplier' },
 ];
 
 const WORKER_TYPES = ['Mason', 'Carpenter', 'Electrician', 'Plumber', 'General Laborer'];
@@ -39,13 +41,17 @@ export default function AdminUsersCreatePage() {
     setLoading(true);
     try {
       // Step 1: Create auth user via Supabase Admin
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Sign-up must not replace the administrator's session.
+      const signupClient = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL!, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const { data: authData, error: authError } = await signupClient.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            role: selectedRole,
+            role: 'client',
           }
         }
       });
@@ -53,25 +59,24 @@ export default function AdminUsersCreatePage() {
       if (authError) throw authError;
       if (!authData || !authData.user) throw new Error('User creation failed.');
 
-      // Step 2: Update profiles table
-      const profileUpdate: any = {
-        full_name: fullName,
-        email,
-        role: selectedRole,
-        contact_number: contactNumber || null,
-      };
-
-      if (selectedRole === 'worker') {
-        profileUpdate.worker_type = workerType;
-        profileUpdate.daily_rate = parseFloat(dailyRate) || 0;
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(profileUpdate)
-        .eq('id', authData.user.id);
+      const { error: profileError } = await supabase.rpc('update_user_role', {
+        target_user_id: authData.user.id,
+        new_role: selectedRole,
+        new_worker_type: selectedRole === 'worker' ? workerType : null,
+        new_daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
+      });
 
       if (profileError) throw profileError;
+
+      // Update remaining non-restricted columns
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          email,
+          contact_number: contactNumber || null
+        })
+        .eq('id', authData.user.id);
 
       Alert.alert('Success', `${fullName} account created successfully!`);
       router.back();

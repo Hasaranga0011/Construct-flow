@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { normalizeRole } from '../utils/auth';
 
 type AuthContextType = {
   session: Session | null;
@@ -25,58 +26,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
-      } else {
-        setIsLoading(false);
+    let mounted = true;
+    let roleRequest = 0;
+    let receivedAuthEvent = false;
+    let prevUserId: string | null = null;
+
+    const resolveSession = async (nextSession: Session | null) => {
+      const requestId = ++roleRequest;
+
+      if (!mounted) return;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (!nextSession?.user) {
+        prevUserId = null;
+        if (mounted && requestId === roleRequest) {
+          setRole(null);
+          setIsLoading(false);
+        }
+        return;
       }
-    });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
-      } else {
-        setRole(null);
-        setIsLoading(false);
+      // Only show loading screen if the user has actually changed.
+      // This prevents the app from unmounting and losing local form state 
+      // when Supabase triggers a session refresh on window refocus.
+      if (prevUserId !== nextSession.user.id) {
+        setIsLoading(true);
       }
-    });
+      prevUserId = nextSession.user.id;
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchRole = async (userId: string) => {
-    try {
-      // First try to check if it's in the user's JWT metadata (which we set during sign up)
-      const { data: authData } = await supabase.auth.getUser();
-      const metaRole = authData.user?.user_metadata?.role;
-      
-      if (metaRole) {
-        setRole(metaRole);
-      } else {
-        // Fallback to querying the profiles table
-        const { data, error } = await supabase
+      try {
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', userId)
+          .eq('id', nextSession.user.id)
           .single();
-          
-        if (data && !error) {
-          setRole(data.role);
-        }
+        const profileRole = !profileError ? normalizeRole(profile?.role) : null;
+        const resolvedRole = profileRole;
+
+        if (mounted && requestId === roleRequest) setRole(resolvedRole);
+      } catch (error) {
+        console.error('Error fetching role:', error);
+        if (mounted && requestId === roleRequest) setRole(null);
+      } finally {
+        if (mounted && requestId === roleRequest) setIsLoading(false);
       }
-    } catch (e) {
-      console.error('Error fetching role:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      receivedAuthEvent = true;
+      // Release the auth lock before querying the database.
+      setTimeout(() => { if (mounted) void resolveSession(nextSession); }, 0);
+    });
+
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (!receivedAuthEvent) void resolveSession(currentSession);
+    }).catch((error) => {
+      console.error('Could not restore session:', error);
+      if (mounted && !receivedAuthEvent) void resolveSession(null);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();

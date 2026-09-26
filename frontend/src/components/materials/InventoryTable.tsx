@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useResponsive } from '../../hooks/useResponsive';
 
 const InventoryRow = ({ 
   material, 
@@ -19,6 +20,8 @@ const InventoryRow = ({
   status: string, 
   time: string 
 }) => {
+  const { isMobile } = useResponsive();
+
   const getBarColor = () => {
     if (stockLevel < 30) return 'bg-brand-danger'; // red
     if (stockLevel < 60) return 'bg-brand-warning'; // orange
@@ -30,6 +33,38 @@ const InventoryRow = ({
     if (status === 'Low Stock') return 'bg-orange-100 text-brand-warning';
     return 'bg-gray-100 text-gray-600';
   };
+
+  if (isMobile) {
+    const getMobileStatusStyle = () => {
+      if (status === 'Out of Stock') return { bg: '#FEE2E2', text: '#991B1B' };
+      if (status === 'Low Stock') return { bg: '#FEF3C7', text: '#92400E' };
+      return { bg: '#D1FAE5', text: '#065F46' };
+    };
+    const mobileStatus = getMobileStatusStyle();
+    return (
+      <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+            {material}
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
+            {quantity} {unit}
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+            Project: {project}
+          </Text>
+          <View style={{ backgroundColor: mobileStatus.bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: mobileStatus.text, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>
+              {status}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const statusStyle = getStatusColor();
 
@@ -58,26 +93,26 @@ const InventoryRow = ({
             style={{ width: `${Math.max(0, Math.min(100, stockLevel))}%` }} 
           />
         </View>
+        <Text className="text-gray-400 text-[10px] mt-1">{Math.round(stockLevel)}%</Text>
       </View>
 
-      {/* Status Badge */}
+      {/* Status */}
       <View className="w-1/6">
         <View className={`px-2 py-1 rounded self-start ${statusStyle.split(' ')[0]}`}>
-          <Text className={`text-xs font-semibold ${statusStyle.split(' ')[1]}`}>
-            {status}
-          </Text>
+          <Text className={`text-[10px] font-bold uppercase ${statusStyle.split(' ')[1]}`}>{status}</Text>
         </View>
       </View>
 
-      {/* Last Updated */}
-      <View className="w-1/6 flex-row justify-end">
-        <Text className="text-gray-400 text-xs text-right truncate" numberOfLines={1}>{time}</Text>
+      {/* Time */}
+      <View className="flex-1 flex-row justify-end">
+        <Text className="text-gray-400 text-xs">{time}</Text>
       </View>
     </View>
   );
 };
 
 export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refreshTrigger?: number, searchQuery?: string }) => {
+  const { isMobile } = useResponsive();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -130,14 +165,16 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refre
       </View>
 
       {/* Table Header */}
-      <View className="flex-row py-3 border-b border-gray-200">
-        <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</Text>
-        <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</Text>
-        <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</Text>
-      </View>
+      {!isMobile && (
+        <View className="flex-row py-3 border-b border-gray-200">
+          <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</Text>
+          <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</Text>
+          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</Text>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {loading ? (

@@ -37,6 +37,12 @@ export default function AdminMaterialsOrdersCreatePage() {
     let isMounted = true;
     const fetchData = async () => {
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData.session?.user.id;
+        const { data: currentProfile } = currentUserId
+          ? await supabase.from('profiles').select('role').eq('id', currentUserId).maybeSingle()
+          : { data: null };
+
         // Fetch Suppliers
         const { data: supData, error: supErr } = await supabase
           .from('profiles')
@@ -46,10 +52,14 @@ export default function AdminMaterialsOrdersCreatePage() {
         if (supErr) throw supErr;
 
         // Fetch Projects
-        const { data: projData, error: projErr } = await supabase
+        let projectQuery = supabase
           .from('projects')
           .select('id, name')
           .order('name');
+        if (currentProfile?.role === 'pm' && currentUserId) {
+          projectQuery = projectQuery.eq('pm_id', currentUserId);
+        }
+        const { data: projData, error: projErr } = await projectQuery;
         if (projErr) throw projErr;
 
         // Fetch Materials

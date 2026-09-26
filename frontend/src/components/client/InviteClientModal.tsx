@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView 
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
 import { Ionicons } from '@expo/vector-icons';
-import toast from 'react-hot-toast';
+import { toast } from '../../lib/toast';
 
 type InviteClientModalProps = {
   visible: boolean;

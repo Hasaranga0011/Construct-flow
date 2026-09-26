@@ -1,11 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
 import os
-import httpx
 import hashlib
-import hmac
 import time
-import base64
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from core.security import get_current_user
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +16,10 @@ router = APIRouter(
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+
+# Allowed MIME types and maximum file size
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def generate_cloudinary_signature(params: dict, api_secret: str) -> str:
@@ -32,13 +34,37 @@ async def upload_site_photo(
     file: UploadFile = File(...),
     project_id: str = Form(...),
     site_id: str = Form(None),
-    caption: str = Form("")
+    caption: str = Form(""),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Upload a site photo to Cloudinary and return the URL."""
+    """Upload a site photo to Cloudinary and return the secure URL."""
+
+    # ── File type validation ────────────────────────────────────────────────
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported file type '{file.content_type}'. "
+                "Only image/jpeg, image/png, and image/webp are allowed."
+            )
+        )
+
+    # ── Read file and enforce size limit ────────────────────────────────────
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum allowed size is 10 MB (received {len(file_bytes) // (1024*1024)} MB)."
+        )
+
+    # ── Cloudinary credentials check ────────────────────────────────────────
     if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail="Cloudinary credentials not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend .env"
+            detail=(
+                "Cloudinary credentials not configured. "
+                "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend .env"
+            )
         )
 
     try:
@@ -49,10 +75,7 @@ async def upload_site_photo(
             "folder": folder,
             "timestamp": timestamp,
         }
-
         signature = generate_cloudinary_signature(params, CLOUDINARY_API_SECRET)
-
-        file_bytes = await file.read()
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -69,7 +92,10 @@ async def upload_site_photo(
             )
 
         if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {response.text}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Cloudinary upload failed: {response.text}"
+            )
 
         result = response.json()
 
@@ -83,6 +109,8 @@ async def upload_site_photo(
             "height": result.get("height"),
         }
 
+    except HTTPException:
+        raise
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Cloudinary upload timed out.")
     except Exception as e:
@@ -90,7 +118,7 @@ async def upload_site_photo(
 
 
 @router.get("/health")
-def media_health():
+def media_health(current_user: dict = Depends(get_current_user)):
     """Check if Cloudinary credentials are configured."""
     configured = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
     return {

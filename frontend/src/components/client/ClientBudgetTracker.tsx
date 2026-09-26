@@ -7,7 +7,7 @@ export const ClientBudgetTracker = () => {
   const contingency = 1000000;
   const remaining = total - spent - contingency;
 
-  const getPercent = (value: number) => `${(value / total) * 100}%`;
+  const getPercent = (value: number): `${number}%` => `${(value / total) * 100}%`;
 
   return (
     <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">

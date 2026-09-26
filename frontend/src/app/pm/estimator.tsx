@@ -1,1 +1,1 @@
-export { default } from '../admin/estimator';
+export { default } from './ai-estimator';
