@@ -9,6 +9,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState('worker');
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -29,7 +30,7 @@ export default function RegisterScreen() {
       options: {
         data: {
           full_name: fullName,
-          role: 'client',
+          role: role,
         }
       }
     });
@@ -48,7 +49,7 @@ export default function RegisterScreen() {
         await supabase.auth.signOut();
       }
       // Force them to the login screen
-      router.replace('/login');
+      router.replace('/team-login');
     }
   };
 
@@ -89,7 +90,7 @@ export default function RegisterScreen() {
                 </Text>
               </Pressable>
               <View className="w-full">
-                <Text className="text-4xl font-extrabold text-brand-text mb-2">Create Account</Text>
+                <Text className="text-4xl font-extrabold text-brand-text mb-2">Team Registration</Text>
                 <Text className="text-gray-500 text-base">Join ConstructAi today to manage your team.</Text>
               </View>
             </View>
@@ -140,7 +141,24 @@ export default function RegisterScreen() {
               </View>
             </View>
 
-            <Text className="text-sm text-gray-500 mb-8">New accounts start as clients. An administrator assigns team roles.</Text>
+            
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 mb-2">Role</Text>
+              <View className="flex-row gap-2">
+                {['worker', 'site_manager', 'pm'].map((r) => (
+                  <Pressable 
+                    key={r}
+                    onPress={() => setRole(r)}
+                    className={`flex-1 p-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center`}
+                  >
+                    <Text className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
+                      {r.replace('_', ' ')}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
 
             <Pressable 
               onPress={handleRegister}

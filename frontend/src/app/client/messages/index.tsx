@@ -7,15 +7,16 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 
 type Project = { id: string; name: string; pm_id?: string | null };
-type Message = { id: string; project_id: string; message?: string | null; content?: string | null; created_at: string; sender_id: string };
+type Message = { id: string; project_id: string; message?: string | null; created_at: string; sender_id: string; sender_role?: string; receiver_role?: string };
 
 export default function ClientMessagesPage() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [latestMessages, setLatestMessages] = useState<Record<string, Message>>({});
+  const [latestMessages, setLatestMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [activeChannel, setActiveChannel] = useState<'pm' | 'super_admin' | 'site_manager'>('pm');
 
   useEffect(() => {
     if (!user) return;
@@ -39,21 +40,16 @@ export default function ClientMessagesPage() {
         if (projectIds.length > 0) {
           const { data, error: messageError } = await supabase
             .from('client_messages')
-            .select('id, project_id, message, content, created_at, sender_id')
+            .select('id, project_id, message, created_at, sender_id, sender_role, receiver_role')
             .in('project_id', projectIds)
             .order('created_at', { ascending: false });
           if (messageError) throw messageError;
           messageData = (data || []) as Message[];
         }
 
-        const latest = messageData.reduce<Record<string, Message>>((result, message) => {
-          if (!result[message.project_id]) result[message.project_id] = message;
-          return result;
-        }, {});
-
         if (isMounted) {
           setProjects(clientProjects);
-          setLatestMessages(latest);
+          setLatestMessages(messageData);
         }
       } catch (loadError: any) {
         if (isMounted) setError(loadError.message || 'Failed to load conversations.');
@@ -77,6 +73,24 @@ export default function ClientMessagesPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Client Messages" showAction={false} />
+      <View className="bg-white border-b border-gray-100 flex-row px-4">
+        {[
+          { key: 'pm', label: 'Project Manager' },
+          { key: 'super_admin', label: 'Admin' },
+          { key: 'site_manager', label: 'Site Manager' }
+        ].map(ch => (
+          <Pressable
+            key={ch.key}
+            onPress={() => setActiveChannel(ch.key as any)}
+            className={`mr-6 py-3 border-b-2 ${activeChannel === ch.key ? 'border-brand-orange' : 'border-transparent'}`}
+          >
+            <Text className={`text-sm font-semibold ${activeChannel === ch.key ? 'text-brand-orange' : 'text-gray-400'}`}>
+              {ch.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <Text className="text-2xl font-bold text-brand-text mb-6">Project Conversations</Text>
         {loading ? (
@@ -98,10 +112,14 @@ export default function ClientMessagesPage() {
           </View>
         ) : (
           projects.map(project => {
-            const message = latestMessages[project.id];
-            const preview = message?.message || message?.content || 'No messages yet';
+            const message = latestMessages.find(m => 
+              m.project_id === project.id && 
+              ((m.sender_role === 'client' && m.receiver_role === activeChannel) ||
+               (m.sender_role === activeChannel && m.receiver_role === 'client'))
+            );
+            const preview = message?.message || 'No messages yet';
             return (
-              <Link key={project.id} href={`/client/messages/${project.id}`} asChild>
+              <Link key={project.id} href={`/client/messages/${project.id}?channel=${activeChannel}`} asChild>
                 <Pressable className="bg-white rounded-2xl border border-gray-100 p-5 mb-3 flex-row items-center">
                   <View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-4">
                     <Ionicons name="chatbubble-ellipses-outline" size={22} color="#F97316" />

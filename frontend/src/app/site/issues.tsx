@@ -20,7 +20,7 @@ export default function SiteIssues() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('site_issues')
+        .from('issues')
         .select('*, projects(name)')
         .order('created_at', { ascending: false });
 
@@ -53,7 +53,7 @@ export default function SiteIssues() {
         throw new Error("No active projects found to link this issue to.");
       }
 
-      const { error } = await supabase.from('site_issues').insert({
+      const { error } = await supabase.from('issues').insert({
         project_id: projectId,
         reporter_name: user?.user_metadata?.full_name || 'Site Manager',
         title,

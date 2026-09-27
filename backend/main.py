@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from core.config import settings
 from core.security import get_current_user
-from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports
+from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports, admin
 from apscheduler.schedulers.background import BackgroundScheduler
 from supabase import create_client
 import logging
@@ -18,17 +18,43 @@ app = FastAPI(
 # Setup Background Scheduler
 scheduler = BackgroundScheduler()
 
-def check_overdue_pos():
+from datetime import datetime, timezone
+
+def _log_job_run(client, job_name: str, func):
+    # Insert started record
     try:
-        purchase_orders.check_late_orders(create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY))
+        res = client.table("job_runs").insert({
+            "job_name": job_name,
+            "status": "Running"
+        }).execute()
+        job_id = res.data[0]["id"]
+    except Exception:
+        job_id = None
+
+    try:
+        func(client)
+        # Mark completed
+        if job_id:
+            client.table("job_runs").update({
+                "status": "Success",
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", job_id).execute()
     except Exception as e:
-        logging.error(f"Cron PO check failed: {e}")
+        logging.error(f"Cron {job_name} failed: {e}")
+        if job_id:
+            client.table("job_runs").update({
+                "status": "Failed",
+                "error_message": str(e),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", job_id).execute()
+
+def check_overdue_pos():
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    _log_job_run(client, "check_overdue_pos", purchase_orders.check_late_orders)
 
 def check_low_stock():
-    try:
-        materials.check_stock(create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY))
-    except Exception as e:
-        logging.error(f"Cron stock check failed: {e}")
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    _log_job_run(client, "check_low_stock", materials.check_stock)
 
 @app.on_event("startup")
 def start_scheduler():
@@ -97,6 +123,7 @@ app.include_router(purchase_orders.router, prefix="/api", dependencies=secure_de
 app.include_router(reports.router,         prefix="/api", dependencies=secure_dependency)
 app.include_router(messages.router,        prefix="/api", dependencies=secure_dependency)
 app.include_router(site_reports.router,    prefix="/api", dependencies=secure_dependency)
+app.include_router(admin.router,           prefix="/api", dependencies=secure_dependency)
 
 # Previously unsecured — now protected with auth dependency
 app.include_router(ai.router,        prefix="/api", dependencies=secure_dependency)

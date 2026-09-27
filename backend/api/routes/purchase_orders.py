@@ -262,14 +262,55 @@ def deliver_po(po_id: str, current_user: dict = Depends(get_current_user)):
 
 @router.patch("/{po_id}/receive")
 def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
-    """Confirm goods at the project/site and perform the single stock increment."""
+    """Confirm goods at the project/site and perform the single stock increment in Python."""
     if current_user["role"] not in {"super_admin", "pm", "site_manager"}:
         raise HTTPException(status_code=403, detail="Only the project team can receive goods")
     client = client_for_token(current_user["token"])
     order = check_order_access(client, po_id, current_user)
-    result = client.rpc("receive_purchase_order", {"p_order_id": po_id}).execute()
+    
+    if order.get("status") == "Received":
+        return order
 
-    # Notify PM that goods have been confirmed received.
+    if order.get("status") not in ["Delivered", "Pending Delivery"]:
+        raise HTTPException(status_code=400, detail="Order must be delivered or pending delivery before receipt confirmation")
+
+    # Handle material_id
+    material_id = order.get("material_id")
+    # if it's empty string or None, we need to create it
+    if not material_id or str(material_id).strip() == "":
+        mat_res = client.table("materials").insert({
+            "project_id": order.get("project_id"),
+            "name": order.get("items", f"Material for {order.get('po_number')}"),
+            "unit": order.get("unit", "Units"),
+            "global_stock_quantity": 0,
+            "low_stock_threshold": 10
+        }).execute()
+        if mat_res.data:
+            material_id = mat_res.data[0]["id"]
+            # We must update the material_id on the PO
+            client.table("purchase_orders").update({"material_id": material_id}).eq("id", po_id).execute()
+
+    if not material_id:
+        raise HTTPException(status_code=400, detail="Failed to resolve material for this order")
+
+    # Safely increment stock
+    qty = order.get("quantity_ordered") or 0
+    if qty > 0:
+        mat_res = client.table("materials").select("global_stock_quantity").eq("id", material_id).execute()
+        if mat_res.data:
+            curr_qty = mat_res.data[0].get("global_stock_quantity") or 0
+            new_qty = curr_qty + qty
+            client.table("materials").update({"global_stock_quantity": new_qty}).eq("id", material_id).execute()
+
+    # Finalize status update
+    res = client.table("purchase_orders").update({
+        "status": "Received",
+        "received_at": datetime.now().isoformat()
+    }).eq("id", po_id).execute()
+
+    order = res.data[0] if res.data else order
+
+    # Notify PM
     try:
         project_id = order.get("project_id")
         proj = client.table("projects").select("pm_id, name").eq("id", project_id).execute()
@@ -287,7 +328,7 @@ def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
         import logging
         logging.exception("Goods-received notification failed")
 
-    return result.data
+    return order
 
 
 @router.post("/check-late")

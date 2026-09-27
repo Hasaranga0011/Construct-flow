@@ -8,11 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { useRouter } from 'expo-router';
+import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { useAssignedSites } from '@/hooks/useAssignedSites';
+import { useAuth } from '@/context/AuthContext';
 
 type Project = { id: string; name: string; siteId: string };
 
 export default function CreateSiteReportPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { assignedProjectIds, assignments, loading: sitesLoading } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -30,31 +35,23 @@ export default function CreateSiteReportPage() {
 
   useEffect(() => {
     const loadProjects = async () => {
+      if (!user?.id || sitesLoading) return;
+
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) return;
-        const userId = sessionData.session.user.id;
-
-        const { data: assignments } = await supabase
-          .from('site_manager_sites')
-          .select('id, project_id')
-          .eq('site_manager_id', userId);
-
-        if (!assignments?.length) {
+        if (!assignedProjectIds.length) {
           setProjectsLoading(false);
           return;
         }
 
-        const projectIds = assignments.map(a => a.project_id);
         const { data: projectsData } = await supabase
           .from('projects')
           .select('id, name')
-          .in('id', projectIds)
+          .in('id', assignedProjectIds)
           .eq('status', 'active');
 
-        const parsed: Project[] = (projectsData || []).map(p => {
-          const assignment = assignments.find(a => a.project_id === p.id);
-          return { id: p.id, name: p.name, siteId: assignment?.id || '' };
+        const parsed: Project[] = (projectsData || []).map((p: any) => {
+          const assignment = assignments.find((a: any) => a.projectId === p.id);
+          return { id: p.id, name: p.name, siteId: assignment?.assignmentId || '' };
         });
         setProjects(parsed);
         if (parsed.length > 0) setSelectedProjectId(parsed[0].id);
@@ -65,7 +62,7 @@ export default function CreateSiteReportPage() {
       }
     };
     loadProjects();
-  }, []);
+  }, [user?.id, sitesLoading, assignedProjectIds, assignments]);
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -138,15 +135,12 @@ export default function CreateSiteReportPage() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="New Site Report" showAction={false} />
 
-      {projectsLoading ? (
+      {projectsLoading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
-      ) : projects.length === 0 ? (
-        <View className="flex-1 items-center justify-center p-8">
-          <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
-          <Text className="text-gray-400 text-lg font-medium text-center mt-4">No assigned projects.</Text>
-        </View>
+      ) : assignedProjectIds.length === 0 ? (
+        <NoAssignedSites />
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">

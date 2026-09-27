@@ -66,11 +66,14 @@ export default function PmAiEstimatorPage() {
         }),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `API error: ${response.status}`);
+      }
       const data = await response.json();
       setResult(data);
 
-      // Save estimation to Supabase
+      // Save estimation to Supabase (store feature_contributions as JSON)
       await supabase.from('estimations').insert({
         project_name: `${projectType} in ${location}`,
         estimated_cost: data.estimated_cost,
@@ -171,27 +174,44 @@ export default function PmAiEstimatorPage() {
             {/* Result Card */}
             {result && (
               <View className="bg-brand-orange rounded-2xl p-8 shadow-md">
-                <Text className="text-white text-sm font-semibold mb-1 opacity-80">Estimated Project Cost</Text>
-                <Text className="text-white text-4xl font-bold mb-4">{formatCurrency(result.estimated_cost)}</Text>
+                <Text className="text-white text-xs font-semibold mb-1 opacity-70 uppercase">Estimated Project Cost</Text>
+                <Text className="text-white text-4xl font-bold mb-1">{formatCurrency(result.estimated_cost)}</Text>
+                <Text className="text-white opacity-60 text-xs mb-4">
+                  Estimate only — not a financial commitment. Confirm with a quantity surveyor.
+                </Text>
 
-                <View className="flex-row justify-between">
-                  <View>
-                    <Text className="text-white opacity-70 text-xs">Confidence Score</Text>
-                    <Text className="text-white font-bold mt-1 text-lg">{result.confidence_score == null ? 'Not validated' : `${result.confidence_score}%`}</Text>
-                  </View>
-                  <View>
-                    <Text className="text-white opacity-70 text-xs">Area</Text>
-                    <Text className="text-white font-bold mt-1">{result.features_used?.sq_ft} sq.ft</Text>
-                  </View>
-                  <View>
-                    <Text className="text-white opacity-70 text-xs">Type</Text>
-                    <Text className="text-white font-bold mt-1">{result.features_used?.type}</Text>
-                  </View>
-                  <View>
-                    <Text className="text-white opacity-70 text-xs">Quality</Text>
-                    <Text className="text-white font-bold mt-1">{result.features_used?.quality}</Text>
-                  </View>
+                <View className="flex-row flex-wrap gap-4">
+                  {[
+                    { label: 'Confidence', value: result.confidence_score != null ? `${Math.round(result.confidence_score)}%` : 'N/A' },
+                    { label: 'Area', value: `${result.features_used?.sq_ft} sq.ft` },
+                    { label: 'Type', value: result.features_used?.type },
+                    { label: 'Quality', value: result.features_used?.quality },
+                    { label: 'Model', value: result.model_source || 'RandomForest' },
+                    { label: 'Trained', value: result.model_trained_on ? new Date(result.model_trained_on).toLocaleDateString() : '—' },
+                  ].map(stat => (
+                    <View key={stat.label} style={{ minWidth: '44%' }}>
+                      <Text className="text-white opacity-70 text-xs">{stat.label}</Text>
+                      <Text className="text-white font-bold mt-0.5">{stat.value}</Text>
+                    </View>
+                  ))}
                 </View>
+
+                {result.feature_contributions?.length > 0 && (
+                  <View className="mt-5 pt-4 border-t border-white border-opacity-30">
+                    <Text className="text-white opacity-70 text-xs font-semibold uppercase mb-3">Top Feature Contributions</Text>
+                    {result.feature_contributions.slice(0, 4).map((fc: any) => (
+                      <View key={fc.name} className="mb-2">
+                        <View className="flex-row justify-between mb-1">
+                          <Text className="text-white text-xs opacity-90">{fc.name}</Text>
+                          <Text className="text-white text-xs font-bold">{fc.value}%</Text>
+                        </View>
+                        <View className="w-full h-1.5 bg-white bg-opacity-20 rounded-full overflow-hidden">
+                          <View style={{ width: `${fc.value}%`, height: '100%', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 4 }} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -223,17 +243,20 @@ export default function PmAiEstimatorPage() {
 
             {/* Model Info Card */}
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-6">
-              <Text className="font-bold text-gray-800 mb-4">ML Model Info</Text>
-              <View className="space-y-3">
+              <Text className="font-bold text-gray-800 mb-1">ML Model Info</Text>
+              <Text className="text-gray-400 text-xs mb-4">
+                Live metadata from the deployed model artifact
+              </Text>
+              <View>
                 {[
-                  { label: 'Algorithm', value: 'RandomForest' },
-                  { label: 'Training Samples', value: '1,000' },
-                  { label: 'Features', value: '4 (Area, Location, Type, Quality)' },
-                  { label: 'Accuracy', value: '~92.4%' },
+                  { label: 'Algorithm', value: result?.model_source || 'RandomForestRegressor' },
+                  { label: 'Training Samples', value: result?.training_samples ? result.training_samples.toLocaleString() : '—' },
+                  { label: 'Features', value: 'Area, Workers, Materials, Labour, Completion' },
+                  { label: 'Last Trained', value: result?.model_trained_on ? new Date(result.model_trained_on).toLocaleDateString() : '—' },
                 ].map(item => (
                   <View key={item.label} className="flex-row justify-between py-2 border-b border-gray-50">
                     <Text className="text-gray-500 text-sm">{item.label}</Text>
-                    <Text className="text-gray-800 font-semibold text-sm">{item.value}</Text>
+                    <Text className="text-gray-800 font-semibold text-sm text-right flex-1 ml-4" numberOfLines={1}>{item.value}</Text>
                   </View>
                 ))}
               </View>

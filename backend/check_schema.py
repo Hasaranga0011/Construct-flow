@@ -1,7 +1,4 @@
-from core.database import supabase
-
-try:
-    res = supabase.table('milestones').select('*').limit(1).execute()
-    print("Columns:", list(res.data[0].keys()) if res.data else "No rows. Need to check via POST or insert.")
-except Exception as e:
-    print("Error:", e)
+import requests
+url = "https://zcrhiuajkxxfxanaajiz.supabase.co/rest/v1/?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjcmhpdWFqa3h4ZnhhbmFhaml6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MzM5OTAsImV4cCI6MjA5NzEwOTk5MH0.lZOf_3tb69ns37gg1xoXCjNu3mywElqaVc-0Nb10dB4"
+res = requests.get(url)
+print(res.status_code)

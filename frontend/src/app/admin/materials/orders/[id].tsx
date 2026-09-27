@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { api } from '../../../../services/api';
+import { ChatWidget } from '../../../../components/shared/ChatWidget';
 
 export default function AdminMaterialsOrdersIdPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,6 +15,8 @@ export default function AdminMaterialsOrdersIdPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+  useEffect(() => { supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); }, []);
 
   const fetchOrder = async () => {
     try {

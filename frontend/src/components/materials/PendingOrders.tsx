@@ -21,12 +21,11 @@ const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) =>
         <Text className="text-gray-500 text-xs truncate" numberOfLines={1}>{order.po_number} - {projectName}</Text>
       </View>
       
-      {/* Action */}
       <Pressable 
         onPress={() => onDeliver(order.id)}
-        className="bg-brand-orange px-3 py-1.5 rounded-md"
+        className="bg-brand-success px-3 py-1.5 rounded-md"
       >
-        <Text className="text-white text-xs font-bold">Deliver</Text>
+        <Text className="text-white text-xs font-bold">Confirm Received</Text>
       </Pressable>
     </View>
   );
@@ -75,10 +74,11 @@ export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refresh
   const handleDeliver = async (id: string) => {
     try {
       setLoading(true);
-      await api.purchaseOrders.deliver(id);
+      await api.purchaseOrders.receive(id); // Fixed Bug 16: Admin confirms receipt
       onRefreshNeeded();
     } catch (e: any) {
-      Alert.alert('Error', 'Failed to mark as delivered');
+      console.error("Confirm Received failed:", e);
+      Alert.alert('Error', e.message || e.detail || 'Failed to confirm received');
       setLoading(false);
     }
   };

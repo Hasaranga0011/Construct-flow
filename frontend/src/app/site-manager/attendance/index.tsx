@@ -1,9 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
-import { QRScanner } from '../../../components/worker/QRScanner';
+import { QRScanner } from '@/components/worker/QRScanner';
+import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { useAssignedSites } from '@/hooks/useAssignedSites';
+import { useAuth } from '@/context/AuthContext';
 
 type AttendanceRecord = {
   id: string;
@@ -26,6 +29,9 @@ type ScanResult = {
 };
 
 export default function SMAttendancePage() {
+  const { user } = useAuth();
+  const { assignedProjectIds, siteAssignmentIds, assignments, loading: sitesLoading } = useAssignedSites(user?.id);
+  
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -35,33 +41,28 @@ export default function SMAttendancePage() {
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
 
-  // Scanner State
+  // Scanner & Modal State
   const [isScanning, setIsScanning] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualWorkerId, setManualWorkerId] = useState<string | null>(null);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  
   const isMounted = useRef(true);
 
   const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
-  const fetchAttendanceData = async (skipLoadingState = false) => {
+  const fetchAttendanceData = useCallback(async (skipLoadingState = false) => {
     try {
       if (!skipLoadingState) setLoading(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session || !isMounted.current) return;
-      const userId = sessionData.session.user.id;
+      if (!user?.id || sitesLoading || !isMounted.current) return;
 
-      // 1. Fetch projects through site-manager assignment relation (id = site assignment row id)
-      const { data: assignments } = await supabase
-        .from('site_manager_sites')
-        .select('id, project_id')
-        .eq('site_manager_id', userId);
-
-      const projectIds = assignments?.map((a) => a.project_id) || [];
       const siteMap = Object.fromEntries(
-        (assignments || []).map((a) => [a.project_id, a.id]),
+        assignments.map((a: any) => [a.projectId, a.assignmentId]),
       );
       if (isMounted.current) setSiteByProject(siteMap);
 
-      const { data: projectsData } = projectIds.length
-        ? await supabase.from('projects').select('id, name, location').in('id', projectIds).eq('status', 'active')
+      const { data: projectsData } = assignedProjectIds.length
+        ? await supabase.from('projects').select('id, name, location').in('id', assignedProjectIds).eq('status', 'active')
         : { data: [] };
 
       const parsedProjects = projectsData || [];
@@ -87,14 +88,14 @@ export default function SMAttendancePage() {
         // 3. Fetch workers assigned to this project's site via site_workers
         const { data: siteWorkers } = await supabase
           .from('site_workers')
-          .select('worker_id, workers!inner(id, user_id, profiles!inner(id, full_name, qr_code, avatar_url))')
+          .select('worker_id, profiles!inner(id, full_name, qr_code, avatar_url)')
           .eq('project_id', currentProject);
 
         if (isMounted.current) {
           const workerProfiles: WorkerProfile[] = (siteWorkers || []).map((sw: any) => {
-            const profile = Array.isArray(sw.workers?.profiles) ? sw.workers.profiles[0] : sw.workers?.profiles;
+            const profile = Array.isArray(sw.profiles) ? sw.profiles[0] : sw.profiles;
             return {
-              id: sw.workers?.id || sw.worker_id,
+              id: sw.worker_id,
               full_name: profile?.full_name || null,
               qr_code: profile?.qr_code || null,
               avatar_url: profile?.avatar_url || null,
@@ -108,14 +109,13 @@ export default function SMAttendancePage() {
     } finally {
       if (isMounted.current && !skipLoadingState) setLoading(false);
     }
-  };
+  }, [user?.id, sitesLoading, assignedProjectIds, assignments, activeProjectId]);
 
   useEffect(() => {
     isMounted.current = true;
     fetchAttendanceData();
     return () => { isMounted.current = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProjectId]);
+  }, [fetchAttendanceData]);
 
   // Realtime subscription: refresh attendance list when any attendance row changes.
   useEffect(() => {
@@ -179,26 +179,74 @@ export default function SMAttendancePage() {
     }
   };
 
+  const handleManualCheckIn = async () => {
+    if (!manualWorkerId || !activeProjectId) return;
+    const siteId = siteByProject[activeProjectId];
+    if (!siteId) return;
+
+    setManualSubmitting(true);
+    try {
+      const todayStr = getTodayDateString();
+      const existing = todayAttendance.find(a => a.worker_id === manualWorkerId);
+      
+      const now = new Date();
+      const timeStr = now.toISOString();
+
+      if (existing && !existing.check_out_time) {
+        // Check out
+        const { error } = await supabase
+          .from('attendance')
+          .update({ check_out_time: timeStr })
+          .eq('id', existing.id);
+        if (error) throw error;
+        toast('Checked out successfully');
+      } else if (!existing) {
+        // Check in
+        const { error } = await supabase
+          .from('attendance')
+          .insert({
+            worker_id: manualWorkerId,
+            site_id: siteId,
+            date: todayStr,
+            status: 'Present',
+            check_in_time: timeStr
+          });
+        if (error) throw error;
+        toast('Checked in successfully');
+      }
+      
+      setShowManualModal(false);
+      setManualWorkerId(null);
+      // Realtime will update the list
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
   const getAttendanceForWorker = (workerId: string) => {
     return todayAttendance.find(a => a.worker_id === workerId) || null;
+  };
+
+  // Helper for web alert
+  const toast = (msg: string) => {
+    if (Platform.OS === 'web') window.alert(msg);
+    else Alert.alert('Success', msg);
   };
 
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Daily Attendance" />
 
-      {loading ? (
+      {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
+      ) : assignedProjectIds.length === 0 ? (
+        <NoAssignedSites />
       ) : (
         <View className="flex-1">
-          {projects.length === 0 ? (
-            <View className="flex-1 items-center justify-center p-8">
-              <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
-              <Text className="text-gray-400 text-lg font-medium text-center mt-4">You have no assigned projects.</Text>
-            </View>
-          ) : (
             <>
               {/* Project Selector Tabs */}
               <View className="bg-white px-6 pt-4 border-b border-gray-200">
@@ -247,13 +295,22 @@ export default function SMAttendancePage() {
                     <Text className="text-gray-500">{new Date().toDateString()}</Text>
                   </View>
 
-                  <Pressable
-                    onPress={() => setIsScanning(true)}
-                    className="bg-brand-orange px-5 py-3 rounded-xl flex-row items-center shadow-sm"
-                  >
-                    <Ionicons name="qr-code-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text className="text-white font-bold text-base">Scan QR</Text>
-                  </Pressable>
+                  <View className="flex-row gap-3">
+                    <Pressable
+                      onPress={() => setShowManualModal(true)}
+                      className="bg-white border border-gray-200 px-5 py-3 rounded-xl flex-row items-center shadow-sm"
+                    >
+                      <Ionicons name="create-outline" size={20} color="#4B5563" style={{ marginRight: 8 }} />
+                      <Text className="text-gray-700 font-bold text-base">Manual</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setIsScanning(true)}
+                      className="bg-brand-orange px-5 py-3 rounded-xl flex-row items-center shadow-sm"
+                    >
+                      <Ionicons name="qr-code-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                      <Text className="text-white font-bold text-base">Scan QR</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -317,7 +374,53 @@ export default function SMAttendancePage() {
                 </View>
               </ScrollView>
             </>
-          )}
+        </View>
+      )}
+
+      {/* Manual Check-in Modal */}
+      {showManualModal && (
+        <View className="absolute inset-0 bg-black/50 items-center justify-center p-4 z-50">
+          <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-xl font-bold text-brand-text">Manual Attendance</Text>
+              <Pressable onPress={() => setShowManualModal(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </Pressable>
+            </View>
+
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-gray-700 mb-2">Select Worker</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 pb-2">
+                {projectWorkers.map(w => {
+                  const att = getAttendanceForWorker(w.id);
+                  const isCheckedIn = att?.check_in_time && !att?.check_out_time;
+                  return (
+                    <Pressable
+                      key={w.id}
+                      onPress={() => setManualWorkerId(w.id)}
+                      className={`px-4 py-3 rounded-xl border ${manualWorkerId === w.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
+                    >
+                      <Text className={`text-sm font-semibold ${manualWorkerId === w.id ? 'text-white' : 'text-gray-600'}`}>
+                        {w.full_name || 'Unknown'} {isCheckedIn ? '(Active)' : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Pressable
+              onPress={handleManualCheckIn}
+              disabled={!manualWorkerId || manualSubmitting}
+              className={`w-full py-4 rounded-xl items-center justify-center ${!manualWorkerId ? 'bg-gray-300' : 'bg-brand-orange'}`}
+            >
+              {manualSubmitting ? <ActivityIndicator color="white" /> : (
+                <Text className="text-white font-bold text-base">
+                  {manualWorkerId && getAttendanceForWorker(manualWorkerId)?.check_in_time && !getAttendanceForWorker(manualWorkerId)?.check_out_time ? 'Check Out' : 'Check In'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       )}
 

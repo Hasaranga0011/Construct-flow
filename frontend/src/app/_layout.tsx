@@ -10,6 +10,8 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { ToastProvider } from '../components/common/ToastProvider';
 
 import { normalizeRole } from '../utils/auth';
+import { supabase } from '../lib/supabase';
+
 
 const DASHBOARD_MAP: Record<string, string> = {
   admin: '/admin/dashboard',
@@ -20,7 +22,7 @@ const DASHBOARD_MAP: Record<string, string> = {
   supplier: '/supplier/dashboard',
 };
 
-const AUTH_PAGES = ['login', 'register', 'forgot-password', 'reset-password'];
+const AUTH_PAGES = ['team-login', 'team-register', 'partner-login', 'partner-register', 'admin-login', 'forgot-password', 'reset-password'];
 const ROLE_PORTALS = ['admin', 'pm', 'site-manager', 'client', 'worker', 'supplier', 'site'];
 
 function InitialLayout() {
@@ -41,15 +43,44 @@ function InitialLayout() {
     const inLanding = firstSegment === '';
 
     if (!session && inRolePortal) {
-      router.replace('/login');
+      router.replace('/team-login');
       return;
     }
 
-    if (session && inAuthPage && firstSegment !== 'reset-password') {
-      const dest = DASHBOARD_MAP[normalizeRole(role) ?? ''];
-      if (dest) router.replace(dest as any);
+    // Session exists — need to route to dashboard.
+    // Use role from AuthContext; if it's null, fetch it ourselves as fallback.
+    // Exception: never redirect away from reset-password.
+    if (session && (inAuthPage || inLanding) && firstSegment !== 'reset-password') {
+      
+      const routeWithRole = (resolvedRole: string | null) => {
+        const normalized = normalizeRole(resolvedRole);
+        // Just route to dashboard based on role, regardless of which login page was used
+        const dest = DASHBOARD_MAP[normalized ?? ''];
+        if (dest) {
+          router.replace(dest as any);
+        }
+      };
+
+      if (role) {
+        // Role already resolved in AuthContext
+        routeWithRole(role);
+        return;
+      }
+
+      // Role is null — fetch from profiles table directly as a fallback
+      supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+        .then(({ data: profile }) => {
+          const resolvedRole = profile?.role ?? session.user.user_metadata?.role ?? null;
+          routeWithRole(resolvedRole);
+        });
       return;
     }
+
+
 
     if (session && inRolePortal && role) {
       const portalRole = firstSegment === 'site' ? 'site-manager' : firstSegment;
@@ -61,13 +92,8 @@ function InitialLayout() {
       }
     }
 
-    if (session && inLanding) {
-      const dest = DASHBOARD_MAP[normalizeRole(role) ?? ''];
-      if (dest) router.replace(dest as any);
-      return;
-    }
-
   }, [session, role, isLoading, segments, rootNavigationState, router]);
+
 
   if (isLoading) {
     return (

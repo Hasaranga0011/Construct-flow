@@ -1,0 +1,15 @@
+{
+  "model_type": "RandomForestClassifier",
+  "trained_at": "2026-09-27T01:00:47Z",
+  "dataset_size": 50000,
+  "features": [
+    "worker_count",
+    "material_usage",
+    "task_progress",
+    "safety_incidents",
+    "equipment_utilization_rate",
+    "material_shortage_alert"
+  ],
+  "validation_accuracy": 0.5225,
+  "n_estimators": 150
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -46,14 +46,19 @@ export default function AdminProjectDetailsPage() {
             projData.client = clientData;
         }
 
-        const { data: roleData } = await supabase
+        const { data: roleData, error: roleError } = await supabase
           .from('project_role_assignments')
-          .select('user_id, assigned_role, profiles (full_name, email, role)')
+          .select('user_id, role, profiles (full_name, email, role)')
           .eq('project_id', id);
+          
+        if (roleError) console.error("Error fetching assignments:", roleError);
         
         if (isMounted) {
             setProject(projData);
-            if (roleData) setAssignments(roleData);
+            if (roleData) {
+              const otherStaff = roleData.filter((a: any) => a.role !== 'pm' && a.role !== 'client');
+              setAssignments(otherStaff);
+            }
         }
       } catch (err: any) {
         console.error('Error fetching project details', err);
@@ -77,6 +82,29 @@ export default function AdminProjectDetailsPage() {
       supabase.removeChannel(channel);
     };
   }, [id]);
+
+  const handleDeleteProject = async () => {
+    Alert.alert(
+      "Delete Project",
+      "Are you sure you want to delete this project? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: async () => {
+          setLoading(true);
+          try {
+            const { error } = await supabase.from('projects').delete().eq('id', id);
+            if (error) throw error;
+            Alert.alert("Success", "Project deleted successfully");
+            router.replace('/admin/projects' as any);
+          } catch (err: any) {
+            console.error("Failed to delete project", err);
+            Alert.alert("Error", err.message || "Failed to delete project");
+            setLoading(false);
+          }
+        }}
+      ]
+    );
+  };
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -173,7 +201,7 @@ export default function AdminProjectDetailsPage() {
                         </View>
                         <View>
                           <Text className="text-gray-800 text-sm font-medium">{a.profiles?.full_name || 'Unknown User'}</Text>
-                          <Text className="text-xs text-gray-400 capitalize">{a.assigned_role.replace('_', ' ')}</Text>
+                          <Text className="text-xs text-gray-400 capitalize">{a.role.replace('_', ' ')}</Text>
                         </View>
                       </View>
                     ))}
@@ -219,6 +247,18 @@ export default function AdminProjectDetailsPage() {
                       <Text className="text-xs text-gray-500">Update budget & details</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                 </TouchableOpacity>
+
+                 <TouchableOpacity 
+                    onPress={handleDeleteProject}
+                    className="flex-row items-center p-3 bg-red-50 rounded-xl border border-red-200 mt-2"
+                 >
+                    <Ionicons name="trash" size={20} color="#EF4444" className="mr-3" />
+                    <View className="flex-1">
+                      <Text className="font-bold text-red-700">Delete Project</Text>
+                      <Text className="text-xs text-red-500">Permanently remove this project</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#EF4444" />
                  </TouchableOpacity>
               </View>
             </View>

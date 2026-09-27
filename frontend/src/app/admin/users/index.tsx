@@ -154,7 +154,7 @@ export default function AdminUsersList() {
                     </View>
                     <Pressable 
                       // @ts-ignore
-                      onPress={() => router.push(`/admin/users/${u.id}/edit`)} 
+                      onPress={() => router.push(`/admin/users/${u.id}`)} 
                       className="bg-gray-50 border border-gray-200 py-2.5 rounded-lg items-center"
                     >
                       <Text className="text-gray-700 text-sm font-semibold">Edit User</Text>
@@ -176,8 +176,8 @@ export default function AdminUsersList() {
                   </View>
                   
                   <View className="w-[20%] pr-2">
-                    <View className="bg-gray-100 px-2 py-1 rounded self-start">
-                      <Text className="text-gray-600 text-xs font-bold">{formatRoleDisplay(u.role)}</Text>
+                    <View className={`px-2 py-1 rounded self-start ${getRoleColor(u.role).bg}`}>
+                      <Text className={`text-xs font-bold ${getRoleColor(u.role).text}`}>{formatRoleDisplay(u.role)}</Text>
                     </View>
                   </View>
                   

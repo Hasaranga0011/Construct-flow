@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
@@ -7,6 +8,7 @@ import { TopNav } from '@/components/common/TopNav';
 
 export default function PMApprovalQueue() {
   const { user } = useAuth();
+  const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
@@ -17,8 +19,9 @@ export default function PMApprovalQueue() {
   const [rejectReason, setRejectReason] = useState('');
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'queue' | 'stock'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'stock' | 'orders'>('queue');
   const [stockData, setStockData] = useState<any[]>([]);
+  const [ordersData, setOrdersData] = useState<any[]>([]);
 
   const loadRequests = async () => {
     setLoading(true);
@@ -49,7 +52,7 @@ export default function PMApprovalQueue() {
         const { data, error } = await query;
         if (error && error.code !== '42P01') throw error;
         setRequests(data || []);
-      } else {
+      } else if (activeTab === 'stock') {
         // Fetch materials for PM's projects
         let query = supabase
           .from('materials')
@@ -61,6 +64,17 @@ export default function PMApprovalQueue() {
         const { data, error } = await query;
         if (error && error.code !== '42P01') throw error;
         setStockData(data || []);
+      } else if (activeTab === 'orders') {
+        let query = supabase
+          .from('purchase_orders')
+          .select('*, projects(name), suppliers(full_name)')
+          .in('project_id', projectIds)
+          .order('created_at', { ascending: false });
+
+        if (searchQuery) query = query.ilike('po_number', `%${searchQuery}%`);
+        const { data, error } = await query;
+        if (error && error.code !== '42P01') throw error;
+        setOrdersData(data || []);
       }
     } catch (e) {
       console.error(e);
@@ -164,9 +178,15 @@ export default function PMApprovalQueue() {
         </Pressable>
         <Pressable 
           onPress={() => setActiveTab('stock')}
-          className={`pb-3 border-b-2 ${activeTab === 'stock' ? 'border-brand-orange' : 'border-transparent'}`}
+          className={`pb-3 mr-8 border-b-2 ${activeTab === 'stock' ? 'border-brand-orange' : 'border-transparent'}`}
         >
           <Text className={`font-bold text-base ${activeTab === 'stock' ? 'text-brand-orange' : 'text-gray-500'}`}>Site Stock</Text>
+        </Pressable>
+        <Pressable 
+          onPress={() => setActiveTab('orders')}
+          className={`pb-3 border-b-2 ${activeTab === 'orders' ? 'border-brand-orange' : 'border-transparent'}`}
+        >
+          <Text className={`font-bold text-base ${activeTab === 'orders' ? 'text-brand-orange' : 'text-gray-500'}`}>Purchase Orders</Text>
         </Pressable>
       </View>
 
@@ -240,7 +260,7 @@ export default function PMApprovalQueue() {
                     </View>
                   ))
                 )
-              ) : (
+              ) : activeTab === 'stock' ? (
                 stockData.length === 0 ? (
                   <View className="p-10 items-center justify-center">
                     <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
@@ -266,6 +286,48 @@ export default function PMApprovalQueue() {
                     </View>
                   ))
                 )
+              ) : (
+                <View>
+                  <View className="flex-row justify-between items-center mb-4 mt-2 px-6">
+                    <Text className="text-sm font-semibold text-gray-500">All Purchase Orders</Text>
+                    <Pressable 
+                      onPress={() => router.push('/pm/materials/orders/create' as any)}
+                      className="bg-brand-orange px-4 py-2 rounded-lg flex-row items-center"
+                    >
+                      <Ionicons name="add" size={16} color="white" />
+                      <Text className="text-white font-bold text-xs ml-1">Create PO</Text>
+                    </Pressable>
+                  </View>
+                  {ordersData.length === 0 ? (
+                    <View className="p-10 items-center justify-center">
+                      <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+                      <Text className="text-gray-400 mt-4">No purchase orders found.</Text>
+                    </View>
+                  ) : (
+                    ordersData.map(order => (
+                    <View key={order.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <View className="w-1/5">
+                        <Text className="font-bold text-brand-text">{order.po_number}</Text>
+                        <Text className="text-xs text-gray-400 mt-1">Total: {order.total_price}</Text>
+                      </View>
+                      <View className="w-1/6">
+                        <Text className="text-gray-500 text-sm truncate">{order.projects?.name || 'Unknown'}</Text>
+                      </View>
+                      <View className="w-1/6">
+                        <Text className="text-brand-text font-semibold">{order.suppliers?.full_name || 'Supplier'}</Text>
+                      </View>
+                      <View className="w-1/6">
+                        <View className={`self-start px-2.5 py-1 rounded-md ${getStatusColor(order.status).split(' ')[0]}`}>
+                          <Text className={`text-xs font-bold ${getStatusColor(order.status).split(' ')[1]}`}>{order.status}</Text>
+                        </View>
+                        {order.actual_delivery && (
+                          <Text className="text-xs text-gray-400 mt-1">Del: {order.actual_delivery}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))
+                )}
+                </View>
               )}
             </ScrollView>
           </View>

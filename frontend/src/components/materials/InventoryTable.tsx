@@ -111,7 +111,7 @@ const InventoryRow = ({
   );
 };
 
-export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refreshTrigger?: number, searchQuery?: string }) => {
+export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId = '' }: { refreshTrigger?: number, searchQuery?: string, projectId?: string }) => {
   const { isMobile } = useResponsive();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,16 +128,22 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refre
         }
 
         let query = supabase
-          .from('material_requests')
+          .from('materials')
           .select(`
-            id, item_name, quantity, unit, status, updated_at,
-            projects!inner(name),
-            materials(global_stock_quantity, low_stock_threshold)
+            id, name, unit, global_stock_quantity, low_stock_threshold, updated_at, project_id,
+            projects!inner(name, status)
           `)
           .order('updated_at', { ascending: false });
 
+        if (projectId) {
+          query = query.eq('project_id', projectId);
+        } else {
+          // Scope to active projects if no specific project is selected
+          query = query.eq('projects.status', 'active');
+        }
+
         if (searchQuery) {
-          query = query.ilike('item_name', `%${searchQuery}%`);
+          query = query.ilike('name', `%${searchQuery}%`);
         }
 
         const { data, error } = await query;
@@ -155,7 +161,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refre
     loadMaterials();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, searchQuery]);
+  }, [refreshTrigger, searchQuery, projectId]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">
@@ -188,27 +194,26 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '' }: { refre
         ) : (
           materials.map((m: any) => {
             const projectName = m.projects?.name || 'Unknown';
-            const materialData = Array.isArray(m.materials) ? m.materials[0] : m.materials;
             
-            const globalStock = materialData?.global_stock_quantity || 0;
-            const threshold = materialData?.low_stock_threshold || 1;
+            const globalStock = m.global_stock_quantity || 0;
+            const threshold = m.low_stock_threshold || 1;
             
             const pct = Math.min(100, (globalStock / threshold) * 100);
             
             let badgeStatus = 'In Stock';
-            if (m.quantity === 0 || globalStock === 0) badgeStatus = 'Out of Stock';
+            if (globalStock === 0) badgeStatus = 'Out of Stock';
             else if (globalStock < threshold) badgeStatus = 'Low Stock';
             
             return (
               <InventoryRow 
                 key={m.id}
-                material={m.item_name} 
+                material={m.name} 
                 project={projectName} 
-                quantity={`${m.quantity}`}
+                quantity={`${globalStock}`}
                 unit={m.unit || ''}
                 stockLevel={pct} 
                 status={badgeStatus} 
-                time={new Date(m.updated_at).toLocaleDateString()} 
+                time={m.updated_at ? new Date(m.updated_at).toLocaleDateString() : 'N/A'} 
               />
             );
           })

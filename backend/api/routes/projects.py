@@ -22,6 +22,11 @@ def get_projects(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/debug_schema")
+def debug_schema(request: Request):
+    client = get_auth_client(request)
+    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}).execute().data
+
 def send_client_assignment_email(email: str, project_name: str):
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
     FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ConstructFlow <noreply@constructflow.lk>")
@@ -101,12 +106,43 @@ def create_project(project: ProjectCreate, request: Request):
             "type": "info",
             "is_read": False,
         })
+    # Notify super_admin (Bug 11 fix)
+    notifications.append({
+        "project_id": saved["id"],
+        "target_user_id": None,
+        "target_role": "super_admin",
+        "title": "New Project Created",
+        "message": f"Project '{saved['name']}' has been created successfully.",
+        "type": "Success",
+        "is_read": False,
+    })
+    
     if notifications:
         try:
             client.table("notifications").insert(notifications).execute()
         except Exception:
             import logging
             logging.exception("Project created but PM notification failed")
+    
+    # Sync site_manager_sites and site_workers
+    try:
+        if project.site_managers is not None:
+            client.table("site_manager_sites").delete().eq("project_id", saved["id"]).execute()
+            if project.site_managers:
+                import uuid
+                sm_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "site_manager_id": sm_id} for sm_id in project.site_managers]
+                client.table("site_manager_sites").insert(sm_inserts).execute()
+        
+        if project.workers is not None:
+            client.table("site_workers").delete().eq("project_id", saved["id"]).execute()
+            if project.workers:
+                import uuid
+                w_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "worker_id": w_id} for w_id in project.workers]
+                client.table("site_workers").insert(w_inserts).execute()
+    except Exception:
+        import logging
+        logging.exception("Failed to sync site_manager_sites or site_workers")
+
     notify_assigned_client(client, saved)
     return saved
 
@@ -116,6 +152,26 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request):
     client = get_auth_client(request)
     data = project.model_dump(mode="json", exclude_unset=True)
     saved = save_project(client, data, project_id)
+    
+    # Sync site_manager_sites and site_workers
+    try:
+        if project.site_managers is not None:
+            client.table("site_manager_sites").delete().eq("project_id", project_id).execute()
+            if project.site_managers:
+                import uuid
+                sm_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "site_manager_id": sm_id} for sm_id in project.site_managers]
+                client.table("site_manager_sites").insert(sm_inserts).execute()
+        
+        if project.workers is not None:
+            client.table("site_workers").delete().eq("project_id", project_id).execute()
+            if project.workers:
+                import uuid
+                w_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "worker_id": w_id} for w_id in project.workers]
+                client.table("site_workers").insert(w_inserts).execute()
+    except Exception:
+        import logging
+        logging.exception("Failed to sync site_manager_sites or site_workers")
+
     if data.get("client_id"):
         notify_assigned_client(client, saved)
     return saved

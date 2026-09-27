@@ -6,6 +6,9 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
+import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { useAssignedSites } from '@/hooks/useAssignedSites';
+import { useAuth } from '@/context/AuthContext';
 
 type SiteReport = {
   id: string;
@@ -22,26 +25,20 @@ type Project = { id: string; name: string };
 
 export default function SiteManagerReportsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { assignedProjectIds, loading: sitesLoading } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [reports, setReports] = useState<SiteReport[]>([]);
 
   const loadData = useCallback(async () => {
+    if (!user?.id || sitesLoading) return;
+
     try {
       setLoading(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-      const userId = sessionData.session.user.id;
 
-      // Get assigned projects
-      const { data: assignments } = await supabase
-        .from('site_manager_sites')
-        .select('project_id')
-        .eq('site_manager_id', userId);
-      const projectIds = assignments?.map(a => a.project_id) || [];
-
-      if (!projectIds.length) {
+      if (!assignedProjectIds.length) {
         setLoading(false);
         return;
       }
@@ -49,7 +46,7 @@ export default function SiteManagerReportsPage() {
       const { data: projectsData } = await supabase
         .from('projects')
         .select('id, name')
-        .in('id', projectIds)
+        .in('id', assignedProjectIds)
         .eq('status', 'active');
 
       const parsedProjects = projectsData || [];
@@ -63,7 +60,7 @@ export default function SiteManagerReportsPage() {
           .from('site_reports')
           .select('id, project_id, date, work_completed, workers_present_count, blockers, photos, created_at')
           .eq('project_id', activeId)
-          .eq('site_manager_id', userId)
+          .eq('site_manager_id', user.id)
           .order('date', { ascending: false });
         setReports((reportsData || []) as SiteReport[]);
       }
@@ -72,7 +69,7 @@ export default function SiteManagerReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, user?.id, sitesLoading, assignedProjectIds]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -99,18 +96,15 @@ export default function SiteManagerReportsPage() {
       <TopNav
         title="Site Reports"
         actionLabel="+ New Report"
-        onActionPress={() => router.push('./create')}
+        onActionPress={() => router.push('/site-manager/reports/create')}
       />
 
-      {loading ? (
+      {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
-      ) : projects.length === 0 ? (
-        <View className="flex-1 items-center justify-center p-8">
-          <Ionicons name="document-outline" size={48} color="#D1D5DB" />
-          <Text className="text-gray-400 text-lg font-medium text-center mt-4">No assigned projects.</Text>
-        </View>
+      ) : assignedProjectIds.length === 0 ? (
+        <NoAssignedSites />
       ) : (
         <View className="flex-1">
           {/* Project tab strip */}
@@ -134,7 +128,7 @@ export default function SiteManagerReportsPage() {
             <View className="flex-row justify-between items-center mb-6">
               <Text className="text-2xl font-bold text-gray-800">Daily Reports</Text>
               <Pressable
-                onPress={() => router.push('./create')}
+                onPress={() => router.push('/site-manager/reports/create')}
                 className="bg-brand-orange px-5 py-3 rounded-xl flex-row items-center shadow-sm"
               >
                 <Ionicons name="add" size={18} color="white" style={{ marginRight: 6 }} />
@@ -147,7 +141,7 @@ export default function SiteManagerReportsPage() {
                 <Ionicons name="document-text-outline" size={48} color="#E5E7EB" />
                 <Text className="text-gray-400 mt-4 font-medium">No reports yet for this project.</Text>
                 <Pressable
-                  onPress={() => router.push('./create')}
+                  onPress={() => router.push('/site-manager/reports/create')}
                   className="mt-6 bg-brand-orange px-6 py-3 rounded-lg"
                 >
                   <Text className="text-white font-bold">Submit First Report</Text>

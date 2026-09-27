@@ -3,6 +3,10 @@ import { View, ScrollView, ActivityIndicator, Text, TextInput } from 'react-nati
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { CostTimelineChart } from '../../components/dashboard/CostTimelineChart';
+import { BudgetUtilizationChart } from '../../components/dashboard/BudgetUtilizationChart';
+import { MaterialsStockChart } from '../../components/dashboard/MaterialsStockChart';
+import { PurchaseOrderPipelineChart } from '../../components/dashboard/PurchaseOrderPipelineChart';
+import { MonthlyAttendanceChart } from '../../components/dashboard/MonthlyAttendanceChart';
 import { DelayRiskPanel } from '../../components/dashboard/DelayRiskPanel';
 import { ActiveProjectsTable } from '../../components/dashboard/ActiveProjectsTable';
 import { RecentAlertsPanel } from '../../components/dashboard/RecentAlertsPanel';
@@ -37,7 +41,7 @@ export default function DashboardScreen() {
         const today = new Date().toISOString().split('T')[0];
         const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
+          supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present').is('check_out_time', null),
           // Assuming materials has global_stock_quantity and low_stock_threshold. Since we can't do raw sql in select, we can fetch them.
           // Wait, the prompt said: .lt('global_stock_quantity', supabase.raw('low_stock_threshold')) - supabase.raw doesn't exist in JS client.
           // A better way is to fetch all and filter in JS if there's no SQL function, or call an RPC. For now, fetch all materials and filter:
@@ -71,7 +75,18 @@ export default function DashboardScreen() {
     };
 
     loadStats();
-    return () => { isMounted = false; };
+    
+    // Realtime subscription for Bug 9
+    const channel = supabase
+      .channel('admin-dashboard-stats')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => setRefreshTrigger(prev => prev + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => setRefreshTrigger(prev => prev + 1))
+      .subscribe();
+
+    return () => { 
+      isMounted = false; 
+      supabase.removeChannel(channel);
+    };
   }, [refreshTrigger]);
 
   const handleProjectCreated = () => {
@@ -163,6 +178,26 @@ export default function DashboardScreen() {
             {/* Side Panel (Delay Risk) */}
             <View className="flex-[1] w-full">
               <DelayRiskPanel />
+            </View>
+          </View>
+
+          {/* New Charts Grid Row 1 */}
+          <View className="flex-col lg:flex-row mb-6 gap-6">
+            <View className="flex-1 w-full">
+              <BudgetUtilizationChart />
+            </View>
+            <View className="flex-1 w-full">
+              <MaterialsStockChart />
+            </View>
+          </View>
+
+          {/* New Charts Grid Row 2 */}
+          <View className="flex-col lg:flex-row mb-6 gap-6">
+            <View className="flex-1 w-full">
+              <PurchaseOrderPipelineChart />
+            </View>
+            <View className="flex-1 w-full">
+              <MonthlyAttendanceChart />
             </View>
           </View>
 

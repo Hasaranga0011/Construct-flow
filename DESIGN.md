@@ -358,7 +358,7 @@ All role layouts use a `Slot` beside a shared sidebar. At 1024px and above the d
 
 ### Site manager `/site-manager` and legacy `/site`
 
-- `/site-manager` navigation: Dashboard, Attendance, Labour, Materials, Milestones, Issues, Team, Notifications, Profile, Settings.
+- `/site-manager` navigation: Dashboard, Attendance, Reports, Materials, Milestones, Issues, Team, Notifications, Profile, Settings.
 - Legacy `/site` navigation: Dashboard, Labour Check-in, Material Usage, Site Photos, Report Issues, Settings.
 - Header: concise title, no unnecessary global actions; attendance and material screens may expose one primary action.
 - Dashboard: assigned sites, workers present, low stock, active issues; current site-manager dashboard still has a detailed-widgets placeholder.

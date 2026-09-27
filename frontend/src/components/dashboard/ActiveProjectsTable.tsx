@@ -105,33 +105,40 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
           .order('created_at', { ascending: false });
           
         if (pmId) {
-          // Fetch assignments first
-          const { data: assignments } = await supabase
-            .from('pm_projects')
-            .select('project_id')
-            .eq('pm_id', pmId);
-            
-          const projectIds = assignments?.map(a => a.project_id) || [];
-          
-          if (projectIds.length === 0) {
-            if (isMounted) {
-              setProjects([]);
-              setLoading(false);
-            }
-            return;
-          }
-          query = query.in('id', projectIds);
+          query = query.eq('pm_id', pmId);
         }
           
         if (searchQuery) {
           query = query.ilike('name', `%${searchQuery}%`);
         }
 
-        const { data, error } = await query;
-
+        const { data: projectsData, error } = await query;
         if (error) throw error;
         
-        if (isMounted) setProjects(data || []);
+        let finalProjects = projectsData || [];
+        
+        // Fetch milestones to calculate progress
+        if (finalProjects.length > 0) {
+           const projectIds = finalProjects.map(p => p.id);
+           const { data: milestonesData } = await supabase
+             .from('milestones')
+             .select('project_id, completion_percentage')
+             .in('project_id', projectIds);
+             
+           if (milestonesData) {
+             finalProjects = finalProjects.map(p => {
+               const p_mils = milestonesData.filter(m => m.project_id === p.id);
+               let progress = 0;
+               if (p_mils.length > 0) {
+                 const total = p_mils.reduce((sum, m) => sum + (m.completion_percentage || 0), 0);
+                 progress = Math.round(total / p_mils.length);
+               }
+               return { ...p, completion_percentage: progress };
+             });
+           }
+        }
+        
+        if (isMounted) setProjects(finalProjects);
       } catch (error) {
         console.warn('Failed to load projects:', error);
       } finally {

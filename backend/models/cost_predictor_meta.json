@@ -1,0 +1,15 @@
+{
+  "model_type": "RandomForestRegressor",
+  "trained_at": "2026-09-27T01:00:47Z",
+  "dataset_size": 50000,
+  "features": [
+    "square_footage",
+    "num_workers",
+    "materials_cost",
+    "labour_cost",
+    "completion_percentage"
+  ],
+  "validation_r2": 0.2688,
+  "validation_mae": 86128636.38,
+  "n_estimators": 150
+}

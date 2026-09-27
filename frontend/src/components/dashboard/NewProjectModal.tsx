@@ -290,12 +290,14 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         await supabase.from('milestones').insert(msInserts);
       }
 
-      const notifications: { project_id: string; target_role?: string; target_user_id?: string; title: string; message: string }[] = [
+      const notifications: { project_id: string; target_role?: string; target_user_id?: string; title: string; message: string; type: string; is_read: boolean; }[] = [
         {
           project_id: newProject.id,
           target_role: 'Project Manager',
           title: 'New Project Created',
           message: `Admin has created a new project: ${name}. Please review the details.`,
+          type: 'info',
+          is_read: false,
         },
       ];
 
@@ -305,6 +307,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           target_user_id: resolvedClientId,
           title: 'New Project Assigned',
           message: `You have been assigned as the client for ${name}.`,
+          type: 'info',
+          is_read: false,
         });
       }
 
@@ -336,12 +340,16 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
             `,
           }),
         });
+      }
+
       selectedSiteManagers.forEach((id: string) => {
         notifications.push({
           project_id: newProject.id,
           target_user_id: id,
           title: 'New Project Assignment',
           message: `You have been assigned as a Site Manager for ${name}.`,
+          type: 'info',
+          is_read: false,
         });
       });
 
@@ -351,6 +359,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           target_user_id: id,
           title: 'New Project Assignment',
           message: `You have been assigned as a Worker for ${name}.`,
+          type: 'info',
+          is_read: false,
         });
       });
 
@@ -360,6 +370,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           target_user_id: id,
           title: 'New Project Assignment',
           message: `You have been assigned as a Supplier for ${name}.`,
+          type: 'info',
+          is_read: false,
         });
       });
 
@@ -369,6 +381,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           target_user_id: id,
           title: 'New Project Assignment',
           message: `You have been assigned as an Admin for ${name}.`,
+          type: 'info',
+          is_read: false,
         });
       });
 

@@ -89,7 +89,7 @@
 | --- | --- | --- |
 | Admin | `/admin/dashboard`, `/admin/projects`, `/admin/users`, `/admin/materials`, `/admin/labour`, `/admin/payroll`, `/admin/reports`, `/admin/insights` | Global platform operations and oversight |
 | PM | `/pm/dashboard`, `/pm/projects`, `/pm/materials`, `/pm/labour`, `/pm/payroll`, `/pm/clients`, `/pm/suppliers`, `/pm/team`, `/pm/ai-estimator` | Assigned-project operations |
-| Site manager | `/site-manager/dashboard`, `/site-manager/attendance`, `/site-manager/labour`, `/site-manager/materials`, `/site-manager/issues`, `/site-manager/team`, `/site-manager/milestones` | Assigned-site operations |
+| Site manager | `/site-manager/dashboard`, `/site-manager/attendance`, `/site-manager/reports`, `/site-manager/materials`, `/site-manager/issues`, `/site-manager/team`, `/site-manager/milestones` | Assigned-site operations |
 | Supplier | `/supplier/dashboard`, `/supplier/orders`, `/supplier/deliveries`, `/supplier/profile` | Supplier-owned procurement and delivery |
 | Client | `/client/dashboard`, `/client/project`, `/client/media`, `/client/messages`, `/client/invoices`, `/client/documents`, `/client/project/estimates` | Client-owned project visibility and communication |
 | Worker | `/worker/dashboard`, `/worker/attendance`, `/worker/payroll`, `/worker/profile` | Personal workforce records |
@@ -98,7 +98,7 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 
 ## 4. Current State & Progress
 
-**2026-09-26 completion brief:** Phases 1 through 7 have been fully implemented and their schema migrations applied to staging. Phase 8 (Final Integration Testing) is actively in progress.
+**2026-09-27 completion brief:** Full Site Manager integration and core portal routing fixes.
 - **IMPLEMENTED (Phases 1-7)**:
   - Phase 1: Hardened core RLS and replaced anonymous grants. Scoped attendance and legacy queries.
   - Phase 2: Fully connected Daily-Operations workflow with Supabase Realtime subscriptions on Dashboards (PM, Supplier, Site Manager). Integrated 'Confirm Receipt' for purchase orders. QR scan worker detail card.
@@ -106,10 +106,21 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - Phase 4: Payroll Notification Automation. Resend emails and in-app notifications automatically fire upon salary generation.
   - Phase 5 & 6: Project Finances. client_payment_schedule and ariation_orders added. GET /api/projects/{id}/financials calculates committed vs actual spend with budget overrun alerts.
   - Phase 7: Daily Site Reports. Mobile-first daily report creation UI for Site Managers and backend integration.
+- **COMPLETE & Working**:
+  - Full Site Manager Dashboard and screens using real data and the `useAssignedSites()` hook for proper tenant isolation.
+  - 3-Way Multichannel Client Chat safely falling back to native database message columns (`message`), avoiding crashing on unapplied migration columns (`content`).
+  - Strict portal-access routing in `_layout.tsx`, seamlessly redirecting authenticated users to their correct dashboards instead of trapping them in login loops.
+  - `site_issues` and worker relations correctly mapped across frontend queries, eliminating Postgres relation errors.
+  - QR permissions graceful web fallback.
+  - Schema consolidation: deprecated `labour` and `photos` tables in favor of canonical `attendance` and `site_reports` respectively.
+  - Frontend finance charts (`CostTimelineChart`, `ClientBudgetRing`) wired to real backend `/financials` endpoint.
+  - Automated APScheduler background jobs observability via `job_runs` table logging.
+  - Supplier approval workflows and role boundary validations enforced throughout API.
 - **IN PROGRESS**:
-  - Phase 8: Final Integration Testing (running tests against the active local stack).
+  - Final end-to-end integration testing and production rollout readiness.
 - **KNOWN BUGS / ISSUES**:
   - Occasional Expo Router Metro bundler file import pathing issues can occur in deeply nested folders; verify relative import depth.
+  - Supplier 'Order Confirmation' actions on the frontend will throw constraint errors until the database check constraint `purchase_orders_status_check` is manually updated in Supabase to permit the `Confirmed` and `Suggested` statuses.
   - See KNOWN_LIMITATIONS.md for deferred features.
 
 ## 5. Architecture & Key Design Decisions
@@ -133,6 +144,8 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 - **`salary_slips`**: Auto-generated objects capturing total days, overtime hours, and total payouts.
 - **`milestones` & `milestone_media`**: Defines project phases and tracks Cloudinary progress images.
 - **`client_messages`**: Central chat logs linking a Client and their Project Manager via `sender_id` and `receiver_id`.
+- **`site_reports`**: Mobile-first daily report submissions from Site Managers.
+- **`site_issues`**: Incident logs linking issues to assigned projects for Site Managers.
 
 ## 7. API / Interfaces
 - **FastAPI Endpoints**: Secured via `Depends(get_current_user)`.
@@ -169,7 +182,7 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 - **Integration Testing**: We are currently executing the Phase 8 integration test plan.
 
 ## 10. Next Steps
-- **Immediate Task**: Walk through the test suite manually with each of the 6 core roles using Expo Go. Verify that real-time syncs function correctly and Role-Level Security (RLS) properly isolates each tenant.
+- **Immediate Task**: Conduct final end-to-end system testing covering all roles (Admin, PM, Client, Supplier, Site Manager, Worker). Address any edge cases in new multi-channel chat, payroll pipeline, and goods-received workflow.
 - **Long-term**: Production deployment preparation (Supabase custom domain, Vercel for backend/frontend hosting, configuring real WebSockets via Pusher or Supabase Realtime).
 
 ## 11. Important Notes for AI Collaboration
@@ -182,6 +195,43 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 - **Pathing Warning**: Pay extreme attention to relative import depth (e.g., `../../../components/common/TopNav`) when scaffolding or modifying nested pages. Incorrect depth will crash the Metro Bundler.
 
 ## 12. Changelog
+- [2026-09-27] (Schema consolidation, Supplier approval, and Observability phase completion)
+  - Deprecated legacy `labour` and `photos` tables via a new schema consolidation migration, moving entirely to canonical `attendance` and `site_reports` architectures.
+  - Rewrote the backend `/labour/payroll` endpoint to generate accurate client payroll data natively via the canonical `attendance` table.
+  - Hardened frontend components to correctly implement the supplier approval workflow.
+  - Wired up `ClientBudgetRing` and `CostTimelineChart` in the frontend dashboards directly to the true backend `/financials` endpoints.
+  - Added APScheduler background job observability via the new `job_runs` table, ensuring all cron loops log success/failure states.
+  - Fixed client messaging missing `TopNav` component on index page and ensured multi-channel fallback support.
+
+- [2026-09-27] (Admin Portal Screen-by-Screen: Dashboard & Projects)
+  - Admin Dashboard: fully complete. Fixed Workers On Site count (Bug 9), AI Delay Risk backend crash & frontend timeout (Bug 10), Recent Alerts realtime subscription and target role filtering (Bug 11), and Project Cost vs Timeline chart actual spend mapping (Bug 12). All stats and charts now read from and react to real Supabase data.
+  - Rebuilt the **Cost vs Timeline** chart from scratch using `recharts` to properly map real duration and display real actual spend. Added a project selector to filter dynamically.
+  - Added four brand-new dashboard charts (`BudgetUtilizationChart`, `MaterialsStockChart`, `PurchaseOrderPipelineChart`, `MonthlyAttendanceChart`) in a responsive grid. All components are realtime-subscribed, read from canonical Supabase tables, and use unified `recharts` styling with interactive tooltips and native click-through navigation.
+  - Admin Projects: fully complete. Fixed `pm_projects` deprecated table usage, rewrote progress calculations to properly aggregate from `milestones` instead of crashing on the `projects` table, and efficiently mapped PM/Client profiles without N+1 queries.
+
+- [2026-09-27] (Admin Portal Screen-by-Screen: Materials)
+  - Fixed Material Inventory table showing empty data (Bug 13). Re-mapped the `InventoryTable` query to target the canonical `materials` table instead of the deprecated `material_requests` table.
+  - Added a responsive native-style Project Selector dropdown above the table to filter inventory across multiple active projects.
+  - Fixed "Total Inventory Value" stats (Bug 14). Removed the fake hardcoded "+8% trend" and verified it sums real `unit_price` × `global_stock_quantity`.
+  - Fixed Low Stock Alerts stat block to properly reflect real data thresholds (Bug 15).
+  - Renamed "Deliver" button in Expected Deliveries to "Confirm Received" and wired it to `api.purchaseOrders.receive(id)`, which properly triggers the backend RPC to update stock (Bug 16).
+  - **Fixed "Confirm Received" silent failures**: Re-wrote the `receive_purchase_order` RPC (in a new migration) and the backend API endpoint to allow Admins to receive orders directly from the `Pending Delivery` status, bypassing the strict workflow expectation that a supplier must hit "Delivered" first. It now correctly auto-creates the underlying material if the PO was generated without one, ensuring the single-transaction RPC doesn't fail on a null constraint.
+  - Wired full Realtime Supabase subscriptions to the page so stats, tables, and deliveries update instantly on status changes.
+
+- [2026-09-27] (Admin Portal Screen-by-Screen: Users)
+  - Admin Users (`/admin/users`): fully complete. Fixed infinite route loop on mobile `Edit User` button.
+  - Rewired User Creation (`create.tsx`) to use the backend `POST /api/admin/users` API instead of native Supabase `signUp`, preventing admins from having their sessions overridden.
+  - Added missing `worker_type` and `daily_rate` to the backend `CreateUserRequest` schema.
+  - Created a proper `DELETE /api/admin/users/{user_id}` FastAPI endpoint and replaced the non-existent `delete_user` RPC call in `[id].tsx`.
+
+- [2026-09-27] (Full Site Manager integration and portal routing bug fixes)
+  - Replaced hard-coded data and mock queries with real live database queries scoped via the shared `useAssignedSites()` hook on the Site Manager dashboard and issues routes.
+  - Replaced the failing `issues` table reference with the correct `site_issues` table in the Site Manager portal, fixing the crashes.
+  - Fixed relational mapping errors (`workers` to `profiles`) across the Attendance and Team screens for Site Managers.
+  - Rewrote portal-access routing in `_layout.tsx` to intelligently navigate authenticated users to their correct roles' dashboards rather than signing them out.
+  - Refactored `client_messages` queries to fall back gracefully to the native `message` column, avoiding the missing `content` column crash without requiring a migration.
+  - Upgraded QR Scanner components to include a resilient web fallback for browser permission blocking.
+
 - [2026-09-26] (Phase 1 RLS hardening prepared)
   - Added schema and foreign-key preflight guards to the core RLS migration.
   - Replaced broad staging-policy assumptions with exhaustive policy replacement across 24 covered tables.

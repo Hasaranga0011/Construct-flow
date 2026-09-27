@@ -4,6 +4,8 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { api } from '../../services/api';
+import { ClientBudgetRing } from '../../components/client/ClientBudgetRing';
 import { useAuth } from '../../context/AuthContext';
 
 type Project = {
@@ -91,22 +93,25 @@ export default function ClientDashboardPage() {
           return;
         }
 
-        const [milestoneResponse, expenseResponse] = await Promise.all([
+        const [milestoneResponse] = await Promise.all([
           supabase
             .from('milestones')
             .select('id, project_id, title, status, completion_percentage, due_date')
             .in('project_id', projectIds)
-            .order('due_date', { ascending: true }),
-          supabase
-            .from('project_expenses')
-            .select('project_id, amount')
-            .in('project_id', projectIds),
+            .order('due_date', { ascending: true })
         ]);
 
         if (milestoneResponse.error) throw milestoneResponse.error;
 
-        const expenseTotals = (expenseResponse.data || []).reduce<Record<string, number>>((totals, expense) => {
-          totals[expense.project_id] = (totals[expense.project_id] || 0) + Number(expense.amount || 0);
+        // Fetch financials for all projects
+        const financialsList = await Promise.all(
+          projectIds.map(id => api.projects.financials(id).catch(() => null))
+        );
+
+        const expenseTotals = financialsList.reduce<Record<string, number>>((totals, fin) => {
+          if (fin) {
+            totals[fin.project_id] = fin.actual_spend || 0;
+          }
           return totals;
         }, {});
 
@@ -210,7 +215,10 @@ export default function ClientDashboardPage() {
                         <Text className="text-brand-text font-bold">{project.name}</Text>
                         <Text className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
                       </View>
-                      <Text className="text-brand-orange font-bold">{projectProgress}%</Text>
+                      <ClientBudgetRing 
+                        spent={spentCosts[project.id] || 0} 
+                        total={Number(project.total_budget || 1)} 
+                      />
                     </View>
                     <View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
                       <View className={`h-full bg-brand-orange rounded-full ${getProgressWidthClass(projectProgress)}`} />

@@ -50,7 +50,7 @@ export default function LandingPage() {
       const destination = role ? getDashboardForRole(role) : null;
       router.push((destination ?? '/') as any);
     } else {
-      router.push('/register');
+      router.push('/team-register');
     }
   };
 
@@ -119,14 +119,14 @@ export default function LandingPage() {
               </Link>
             ) : (
               <View className="flex-row items-center">
-                <Link href="/login" asChild>
+                <Link href="/partner-login" asChild>
                   <Pressable className="mr-6">
-                    <Text className="text-white font-bold hover:text-gray-200">Log In</Text>
+                    <Text className="text-gray-300 font-bold hover:text-white">Partner Portal</Text>
                   </Pressable>
                 </Link>
-                <Link href="/register" asChild>
+                <Link href="/team-login" asChild>
                   <Pressable className="bg-brand-orange px-6 py-2 rounded-full hover:bg-orange-600 transition-colors">
-                    <Text className="text-white font-bold">Get Started</Text>
+                    <Text className="text-white font-bold">Team Portal</Text>
                   </Pressable>
                 </Link>
               </View>
@@ -167,14 +167,16 @@ export default function LandingPage() {
               </Text>
               
               <View className="flex-row flex-wrap items-center mb-16">
-                <Pressable onPress={handleCTA} className="bg-brand-orange px-8 py-4 rounded-full shadow-lg hover:bg-orange-600 transition-colors mr-4 mb-4 flex-row items-center">
-                  <Text className="text-white font-bold text-lg mr-2">Start Free Today</Text>
-                  <Ionicons name="arrow-forward" size={20} color="white" />
-                </Pressable>
+                <Link href="/team-login" asChild>
+                  <Pressable className="bg-brand-orange px-8 py-4 rounded-full shadow-lg hover:bg-orange-600 transition-colors mr-4 mb-4 flex-row items-center">
+                    <Text className="text-white font-bold text-lg mr-2">Team Portal</Text>
+                    <Ionicons name="arrow-forward" size={20} color="white" />
+                  </Pressable>
+                </Link>
                 
-                <Link href="/login" asChild>
+                <Link href="/partner-login" asChild>
                   <Pressable className="bg-transparent px-8 py-4 rounded-full border border-gray-500 hover:border-white transition-colors mb-4">
-                    <Text className="text-white font-bold text-lg">Sign In</Text>
+                    <Text className="text-white font-bold text-lg">Partner Portal</Text>
                   </Pressable>
                 </Link>
               </View>

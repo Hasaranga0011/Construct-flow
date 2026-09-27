@@ -66,22 +66,38 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
 
         report = res.data[0]
 
-        # Notify PM about the new report.
+        # Notify PM and client about the new report.
         try:
-            proj = supabase.table("projects").select("pm_id, name").eq("id", payload.project_id).execute()
-            if proj.data and proj.data[0].get("pm_id"):
-                supabase.table("notifications").insert({
-                    "project_id": payload.project_id,
-                    "target_user_id": proj.data[0]["pm_id"],
-                    "target_role": "pm",
-                    "title": "New Site Report",
-                    "message": f"A new daily site report has been submitted for '{proj.data[0].get('name', 'your project')}' on {payload.date}.",
-                    "type": "info",
-                    "is_read": False,
-                }).execute()
+            proj = supabase.table("projects").select("pm_id, client_id, name").eq("id", payload.project_id).execute()
+            if proj.data:
+                project = proj.data[0]
+                project_name = project.get("name", "your project")
+                notifications_to_add = []
+                if project.get("pm_id"):
+                    notifications_to_add.append({
+                        "project_id": payload.project_id,
+                        "target_user_id": project["pm_id"],
+                        "target_role": "pm",
+                        "title": "New Site Report",
+                        "message": f"A new daily site report has been submitted for '{project_name}' on {payload.date}.",
+                        "type": "info",
+                        "is_read": False,
+                    })
+                if project.get("client_id"):
+                    notifications_to_add.append({
+                        "project_id": payload.project_id,
+                        "target_user_id": project["client_id"],
+                        "target_role": "client",
+                        "title": "Site Update Available",
+                        "message": f"Your site manager has submitted a progress report for '{project_name}' on {payload.date}.",
+                        "type": "info",
+                        "is_read": False,
+                    })
+                if notifications_to_add:
+                    supabase.table("notifications").insert(notifications_to_add).execute()
         except Exception:
             import logging
-            logging.exception("Site report PM notification failed")
+            logging.exception("Site report notification failed")
 
         return report
     except HTTPException:

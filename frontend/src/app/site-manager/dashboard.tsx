@@ -7,9 +7,14 @@ import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { supabase } from '../../lib/supabase';
 import { useRealtimeStats } from '../../hooks/useRealtimeStats';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAssignedSites } from '../../hooks/useAssignedSites';
+import { useAuth } from '../../context/AuthContext';
+import { NoAssignedSites } from '../../components/common/NoAssignedSites';
 
 export default function SiteManagerDashboard() {
   const { isMobile } = useResponsive();
+  const { user } = useAuth();
+  const { assignedProjectIds, siteAssignmentIds, loading: sitesLoading } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     assignedSites: 0,
@@ -19,20 +24,10 @@ export default function SiteManagerDashboard() {
   });
 
   const loadStats = useCallback(async () => {
+    if (!user?.id || sitesLoading) return;
+
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-      const userId = sessionData.session.user.id;
-
-      // 1. Fetch the site-manager's assignments (both project IDs and site assignment IDs).
-      const { data: assignments } = await supabase
-        .from('site_manager_sites')
-        .select('project_id, id')
-        .eq('site_manager_id', userId);
-
-      const assignedProjectIds = assignments?.map((a) => a.project_id) || [];
-      // site_manager_sites.id is the site assignment row ID used as site_id in attendance.
-      const siteAssignmentIds = assignments?.map((a) => a.id) || [];
+      setLoading(true);
 
       const { data: projectsData } = assignedProjectIds.length
         ? await supabase.from('projects').select('id').in('id', assignedProjectIds).eq('status', 'active')
@@ -75,9 +70,9 @@ export default function SiteManagerDashboard() {
 
       // 4. Count open issues reported by this site manager.
       const issuesReq = await supabase
-        .from('issues')
+        .from('site_issues')
         .select('id', { count: 'exact', head: true })
-        .eq('reported_by', userId)
+        .in('project_id', projectIds)
         .neq('status', 'Resolved');
       activeIssues = issuesReq.count || 0;
 
@@ -93,7 +88,7 @@ export default function SiteManagerDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id, assignedProjectIds, siteAssignmentIds, sitesLoading]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
   // Realtime: re-fetch when attendance or materials change
@@ -103,10 +98,12 @@ export default function SiteManagerDashboard() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="Site Manager Dashboard" showAction={false} />
       
-      {loading ? (
+      {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
+      ) : assignedProjectIds.length === 0 ? (
+        <NoAssignedSites />
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           

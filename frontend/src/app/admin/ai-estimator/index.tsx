@@ -101,7 +101,10 @@ export default function AdminAiEstimatorPage() {
         }),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `API error: ${response.status}`);
+      }
       const data = await response.json();
       setResult(data);
 
@@ -144,8 +147,27 @@ export default function AdminAiEstimatorPage() {
           >
             {[
               { label: 'Active Model', value: insights.active_model, icon: 'cpu-outline' },
-              { label: 'Model Accuracy', value: insights.accuracy_score, icon: 'trending-up-outline' },
-              { label: 'Training Data', value: `${insights.total_training_samples?.toLocaleString()} records`, icon: 'server-outline' },
+              {
+                label: 'R² Score',
+                value: insights.accuracy_score != null && insights.accuracy_score !== 'Not validated'
+                  ? `${insights.accuracy_score}`
+                  : 'Not validated',
+                icon: 'trending-up-outline',
+              },
+              {
+                label: 'Training Data',
+                value: insights.total_training_samples
+                  ? `${insights.total_training_samples.toLocaleString()} records`
+                  : 'No data',
+                icon: 'server-outline',
+              },
+              {
+                label: 'Last Trained',
+                value: insights.model_info?.cost_model?.trained_at
+                  ? new Date(insights.model_info.cost_model.trained_at).toLocaleDateString()
+                  : '—',
+                icon: 'calendar-outline',
+              },
             ].map(item => (
               <View
                 key={item.label}
@@ -298,25 +320,50 @@ export default function AdminAiEstimatorPage() {
                   padding: isMobile ? 20 : 28,
                 }}
               >
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 }}>
                   Estimated Project Cost
                 </Text>
-                <Text style={{ color: '#fff', fontSize: isMobile ? 28 : 36, fontWeight: 'bold', marginBottom: 16 }}>
+                <Text style={{ color: '#fff', fontSize: isMobile ? 28 : 36, fontWeight: 'bold', marginBottom: 4 }}>
                   {formatCurrency(result.estimated_cost)}
                 </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 16 }}>
+                  Estimate only — not a financial commitment. Confirm with a quantity surveyor.
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
                   {[
-                    { label: 'Confidence', value: `${result.confidence_score == null ? 'Not validated' : `${result.confidence_score}%`}` },
+                    { label: 'Confidence', value: result.confidence_score != null ? `${Math.round(result.confidence_score)}%` : 'N/A' },
                     { label: 'Location', value: result.features_used?.location },
                     { label: 'Type', value: result.features_used?.type },
                     { label: 'Quality', value: result.features_used?.quality },
+                    { label: 'Model', value: result.model_source || 'RandomForest' },
+                    { label: 'Trained', value: result.model_trained_on ? new Date(result.model_trained_on).toLocaleDateString() : '—' },
                   ].map(stat => (
                     <View key={stat.label} style={{ minWidth: '40%' }}>
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{stat.label}</Text>
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 2 }}>{stat.value}</Text>
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>{stat.value}</Text>
                     </View>
                   ))}
                 </View>
+
+                {/* Per-prediction feature contributions */}
+                {result.feature_contributions?.length > 0 && (
+                  <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.25)' }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 12 }}>
+                      Top Feature Contributions
+                    </Text>
+                    {result.feature_contributions.slice(0, 4).map((fc: any) => (
+                      <View key={fc.name} style={{ marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>{fc.name}</Text>
+                          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>{fc.value}%</Text>
+                        </View>
+                        <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' }}>
+                          <View style={{ width: `${fc.value}%`, height: '100%', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 3 }} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
           </View>

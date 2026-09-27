@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 type AssignmentUser = {
@@ -40,7 +40,7 @@ export const ProjectAssignmentDropdown = ({
   };
 
   return (
-    <View className="mb-4">
+    <View className="mb-4" style={{ zIndex: open ? 50 : 1 }}>
       <Text className="text-gray-700 font-medium mb-2">{label}</Text>
       <Pressable
         onPress={() => setOpen(true)}
@@ -52,35 +52,65 @@ export const ProjectAssignmentDropdown = ({
         <Ionicons name="chevron-down" size={18} color="#6B7280" />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable className="flex-1 justify-center bg-black/40 px-6" onPress={() => setOpen(false)}>
-          <Pressable className="max-h-[70%] w-full max-w-[600px] mx-auto rounded-2xl bg-white p-5 shadow-xl" onPress={(event) => event.stopPropagation()}>
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-gray-800">{label}</Text>
+      {Platform.OS === 'web' ? (
+        open && (
+          <View className="absolute left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden" style={{ top: 80, maxHeight: 300, zIndex: 100 }}>
+            <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <Text className="font-bold text-gray-800">{label}</Text>
               <Pressable onPress={() => setOpen(false)} className="p-1">
-                <Ionicons name="close" size={22} color="#6B7280" />
+                <Ionicons name="close" size={18} color="#6B7280" />
               </Pressable>
             </View>
-            <ScrollView>
+            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
               {users.length ? users.map((user) => {
                 const selected = selectedIds.includes(user.id);
                 return (
                   <Pressable
                     key={user.id}
                     onPress={() => toggleUser(user.id)}
-                    className={`mb-2 rounded-lg border px-4 py-3 ${selected ? 'border-brand-orange bg-brand-orange' : 'border-gray-200 bg-gray-50'}`}
+                    className={`border-b border-gray-50 px-4 py-3 flex-row items-center justify-between hover:bg-gray-50 ${selected ? 'bg-orange-50' : ''}`}
                   >
-                    <Text className={`${selected ? 'font-semibold text-white' : 'text-gray-700'}`}>
+                    <Text className={`${selected ? 'font-semibold text-brand-orange' : 'text-gray-700'}`}>
                       {user.full_name || user.email}
                     </Text>
+                    {selected && <Ionicons name="checkmark" size={18} color="#F97316" />}
                   </Pressable>
                 );
-              }) : <Text className="py-4 text-gray-500">No users available</Text>}
+              }) : <Text className="py-4 px-4 text-gray-500">No users available</Text>}
             </ScrollView>
-            <Pressable onPress={() => setOpen(false)} className="mt-3 items-center rounded-lg bg-brand-orange py-3"><Text className="font-semibold text-white">Done</Text></Pressable>
+          </View>
+        )
+      ) : (
+        <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+          <Pressable className="flex-1 justify-center bg-black/40 px-6" onPress={() => setOpen(false)}>
+            <Pressable className="max-h-[70%] w-full max-w-[600px] mx-auto rounded-2xl bg-white p-5 shadow-xl" onPress={(event) => event.stopPropagation()}>
+              <View className="mb-4 flex-row items-center justify-between">
+                <Text className="text-lg font-bold text-gray-800">{label}</Text>
+                <Pressable onPress={() => setOpen(false)} className="p-1">
+                  <Ionicons name="close" size={22} color="#6B7280" />
+                </Pressable>
+              </View>
+              <ScrollView>
+                {users.length ? users.map((user) => {
+                  const selected = selectedIds.includes(user.id);
+                  return (
+                    <Pressable
+                      key={user.id}
+                      onPress={() => toggleUser(user.id)}
+                      className={`mb-2 rounded-lg border px-4 py-3 ${selected ? 'border-brand-orange bg-brand-orange' : 'border-gray-200 bg-gray-50'}`}
+                    >
+                      <Text className={`${selected ? 'font-semibold text-white' : 'text-gray-700'}`}>
+                        {user.full_name || user.email}
+                      </Text>
+                    </Pressable>
+                  );
+                }) : <Text className="py-4 text-gray-500">No users available</Text>}
+              </ScrollView>
+              <Pressable onPress={() => setOpen(false)} className="mt-3 items-center rounded-lg bg-brand-orange py-3"><Text className="font-semibold text-white">Done</Text></Pressable>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 };

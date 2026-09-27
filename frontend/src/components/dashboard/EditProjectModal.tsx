@@ -9,7 +9,6 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
     name: '',
     location: '',
     status: 'active',
-    completion_percentage: '0',
     total_budget: '0'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +19,6 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
         name: project.name || '',
         location: project.location || '',
         status: project.status || 'active',
-        completion_percentage: (project.completion_percentage || 0).toString(),
         total_budget: (project.total_budget || 0).toString()
       });
     }
@@ -40,7 +38,6 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
           name: form.name,
           location: form.location,
           status: form.status,
-          completion_percentage: Number(form.completion_percentage),
           total_budget: Number(form.total_budget)
         })
         .eq('id', project.id);
@@ -91,35 +88,22 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
               />
             </View>
 
-            <View className="mb-4 flex-row gap-4">
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-gray-700 mb-1">Status</Text>
-                {/* Simplified dropdown/picker for web/native */}
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  style={{
-                    width: '100%', backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB',
-                    borderRadius: '8px', padding: '12px 16px', outline: 'none',
-                    color: '#1A1A1A', fontSize: '14px'
-                  }}
-                >
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                  <option value="on_hold">On Hold</option>
-                </select>
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-gray-700 mb-1">Completion %</Text>
-                <TextInput
-                  value={form.completion_percentage}
-                  onChangeText={txt => setForm({ ...form, completion_percentage: txt })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-brand-text outline-none focus:border-brand-orange transition-colors"
-                  placeholder="0"
-                  keyboardType="numeric"
-                  style={{ outlineStyle: 'none' } as any}
-                />
-              </View>
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 mb-1">Status</Text>
+              {/* Simplified dropdown/picker for web/native */}
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                style={{
+                  width: '100%', backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB',
+                  borderRadius: '8px', padding: '12px 16px', outline: 'none',
+                  color: '#1A1A1A', fontSize: '14px'
+                }}
+              >
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="on_hold">On Hold</option>
+              </select>
             </View>
 
             <View className="mb-6">

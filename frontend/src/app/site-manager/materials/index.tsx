@@ -3,16 +3,21 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, TextInput 
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { useAssignedSites } from '@/hooks/useAssignedSites';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SMMaterialsPage() {
+  const { user } = useAuth();
+  const { assignedProjectIds, loading: sitesLoading } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'stock' | 'request'>('stock');
+  const [activeTab, setActiveTab] = useState<'stock' | 'request' | 'deliveries'>('stock');
   const [projectStock, setProjectStock] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
 
   // Form State
   const [itemName, setItemName] = useState('');
@@ -20,21 +25,13 @@ export default function SMMaterialsPage() {
   const [unit, setUnit] = useState('units');
 
   const fetchMaterialsData = async () => {
+    if (!user?.id || sitesLoading) return;
+
     try {
       setLoading(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-      const userId = sessionData.session.user.id;
-      setCurrentUserId(userId);
 
-      // 1. Fetch projects through the site-manager assignment relation
-      const { data: assignments } = await supabase
-        .from('site_manager_sites')
-        .select('project_id')
-        .eq('site_manager_id', userId);
-      const projectIds = assignments?.map((assignment) => assignment.project_id) || [];
-      const { data: projectsData } = projectIds.length
-        ? await supabase.from('projects').select('id, name').in('id', projectIds).eq('status', 'active')
+      const { data: projectsData } = assignedProjectIds.length
+        ? await supabase.from('projects').select('id, name').in('id', assignedProjectIds).eq('status', 'active')
         : { data: [] };
         
       const parsedProjects = projectsData || [];
@@ -57,10 +54,20 @@ export default function SMMaterialsPage() {
         const { data: reqData } = await supabase
           .from('material_requests')
           .select('*, projects(name)')
-          .eq('requested_by', userId)
+          .eq('requested_by', user.id)
           .order('created_at', { ascending: false });
 
         setMyRequests(reqData || []);
+
+        // 4. Fetch incoming deliveries for this project
+        const { data: delData } = await supabase
+          .from('purchase_orders')
+          .select('*, materials(item_name, unit)')
+          .eq('project_id', currentProject)
+          .eq('status', 'Delivered')
+          .order('actual_delivery', { ascending: false });
+          
+        setDeliveries(delData || []);
       }
     } catch (error: any) {
       console.error('Error fetching materials data', error);
@@ -71,10 +78,10 @@ export default function SMMaterialsPage() {
 
   useEffect(() => {
     fetchMaterialsData();
-  }, [activeProjectId, activeTab]);
+  }, [activeProjectId, activeTab, user?.id, sitesLoading, assignedProjectIds]);
 
   const handleSubmitRequest = async () => {
-    if (!itemName || !quantity || !activeProjectId || !currentUserId) {
+    if (!itemName || !quantity || !activeProjectId || !user?.id) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
     }
@@ -85,7 +92,7 @@ export default function SMMaterialsPage() {
         .from('material_requests')
         .insert({
           project_id: activeProjectId,
-          requested_by: currentUserId,
+          requested_by: user.id,
           item_name: itemName,
           quantity: Number(quantity),
           unit: unit,
@@ -101,6 +108,26 @@ export default function SMMaterialsPage() {
       fetchMaterialsData();
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReceiveDelivery = async (poId: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api'}/purchase-orders/${poId}/receive`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to receive delivery');
+      Alert.alert('Success', 'Goods received and stock updated!');
+      fetchMaterialsData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
     }
@@ -149,20 +176,23 @@ export default function SMMaterialsPage() {
         </Pressable>
         <Pressable 
           onPress={() => setActiveTab('request')}
-          className={`pb-3 border-b-2 ${activeTab === 'request' ? 'border-brand-text' : 'border-transparent'}`}
+          className={`pb-3 mr-8 border-b-2 ${activeTab === 'request' ? 'border-brand-text' : 'border-transparent'}`}
         >
           <Text className={`font-bold text-base ${activeTab === 'request' ? 'text-brand-text' : 'text-gray-500'}`}>Request Materials</Text>
+        </Pressable>
+        <Pressable 
+          onPress={() => setActiveTab('deliveries')}
+          className={`pb-3 border-b-2 ${activeTab === 'deliveries' ? 'border-brand-text' : 'border-transparent'}`}
+        >
+          <Text className={`font-bold text-base ${activeTab === 'deliveries' ? 'text-brand-text' : 'text-gray-500'}`}>Incoming Deliveries</Text>
         </Pressable>
       </View>
 
       <View className="flex-1 p-8">
-        {loading ? (
+        {loading || sitesLoading ? (
           <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 40 }} />
-        ) : projects.length === 0 ? (
-          <View className="flex-1 items-center justify-center">
-            <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
-            <Text className="text-gray-400 text-lg font-medium text-center mt-4">You have no assigned projects.</Text>
-          </View>
+        ) : assignedProjectIds.length === 0 ? (
+          <NoAssignedSites />
         ) : activeTab === 'stock' ? (
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
             <View className="flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
@@ -204,7 +234,7 @@ export default function SMMaterialsPage() {
               )}
             </ScrollView>
           </View>
-        ) : (
+        ) : activeTab === 'request' ? (
           <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
               <Text className="text-xl font-bold text-gray-800 mb-6">New Material Request</Text>
@@ -264,6 +294,32 @@ export default function SMMaterialsPage() {
                 </View>
               </View>
             ))}
+          </ScrollView>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+            <Text className="text-xl font-bold text-brand-text mb-6">Incoming Deliveries</Text>
+            {deliveries.length === 0 ? (
+              <View className="p-10 items-center justify-center bg-white rounded-2xl border border-gray-100">
+                <Ionicons name="checkmark-done-circle-outline" size={48} color="#D1D5DB" />
+                <Text className="text-gray-400 mt-4 font-medium">No pending deliveries for this project.</Text>
+              </View>
+            ) : (
+              deliveries.map(del => (
+                <View key={del.id} className="bg-white p-6 rounded-2xl border border-gray-200 mb-4 flex-row items-center justify-between shadow-sm">
+                  <View className="flex-1">
+                    <Text className="font-bold text-lg text-brand-text">{del.po_number}</Text>
+                    <Text className="text-gray-500 text-sm mt-1">{del.materials?.item_name} • {del.quantity_ordered} {del.materials?.unit}</Text>
+                    <Text className="text-gray-400 text-xs mt-1">Dispatched: {del.actual_delivery}</Text>
+                  </View>
+                  <Pressable 
+                    onPress={() => handleReceiveDelivery(del.id)}
+                    className="bg-brand-success px-4 py-2 rounded-lg"
+                  >
+                    <Text className="text-white font-bold">Confirm Receipt</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
           </ScrollView>
         )}
       </View>

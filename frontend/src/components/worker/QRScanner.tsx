@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -26,8 +26,19 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
         <Text className="text-white text-center mb-6 text-lg font-bold">
           We need your permission to show the camera
         </Text>
+        {Platform.OS === 'web' && (
+          <Text className="text-orange-400 text-center mb-6 text-sm px-4">
+            Note: Camera access on Web requires HTTPS or a secure localhost context. If clicking 'Grant' does nothing, check your browser permissions.
+          </Text>
+        )}
         <Pressable 
-          onPress={requestPermission}
+          onPress={async () => {
+            try {
+              await requestPermission();
+            } catch (err: any) {
+              if (Platform.OS === 'web') window.alert("Browser blocked camera access.");
+            }
+          }}
           className="bg-brand-orange px-6 py-3 rounded-xl"
         >
           <Text className="text-white font-bold">Grant Permission</Text>

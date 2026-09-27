@@ -25,6 +25,31 @@ export default function AdminProjectsList() {
         }
         const { data, error } = await query;
         if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Collect unique user IDs for PMs and Clients
+          const userIds = new Set<string>();
+          data.forEach(p => {
+            if (p.pm_id) userIds.add(p.pm_id);
+            if (p.client_id) userIds.add(p.client_id);
+          });
+          
+          if (userIds.size > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, full_name')
+              .in('id', Array.from(userIds));
+              
+            if (profilesData) {
+              const profileMap = Object.fromEntries(profilesData.map(p => [p.id, p.full_name]));
+              data.forEach(p => {
+                if (p.pm_id) p.pm_name = profileMap[p.pm_id];
+                if (p.client_id) p.client_name = profileMap[p.client_id];
+              });
+            }
+          }
+        }
+        
         if (isMounted) setProjects(data || []);
       } catch (err) {
         console.error('Error fetching projects', err);
@@ -34,7 +59,18 @@ export default function AdminProjectsList() {
     };
     
     fetchProjects();
-    return () => { isMounted = false; };
+
+    const channel = supabase
+      .channel('admin-projects-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+        fetchProjects();
+      })
+      .subscribe();
+
+    return () => { 
+      isMounted = false; 
+      supabase.removeChannel(channel);
+    };
   }, [search]);
 
   return (
@@ -61,8 +97,9 @@ export default function AdminProjectsList() {
           <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>
             {!isMobile && (
               <View className="flex-row py-3 border-b border-gray-200 pr-2">
-                <Text className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Project Name</Text>
-                <Text className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Location</Text>
+                <Text className="w-[25%] text-xs font-semibold text-gray-500 uppercase">Project Name</Text>
+                <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Location</Text>
+                <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Personnel</Text>
                 <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Budget</Text>
                 <Text className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
                 <Text className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
@@ -101,6 +138,10 @@ export default function AdminProjectsList() {
                       </Text>
                     </View>
                   </View>
+                  <View className="flex-col mb-4 pl-[52px]">
+                    <Text className="text-xs text-gray-500 mb-1"><Text className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'Unassigned'}</Text>
+                    <Text className="text-xs text-gray-500"><Text className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'Unassigned'}</Text>
+                  </View>
                   <Link href={`/admin/projects/${p.id}` as any} asChild>
                     <Pressable className="bg-brand-orange py-3 rounded-lg items-center">
                       <Text className="text-white text-sm font-bold">View Details</Text>
@@ -111,7 +152,7 @@ export default function AdminProjectsList() {
             ) : (
               projects.map(p => (
                 <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">
-                  <View className="w-[30%] flex-row items-center pr-4">
+                  <View className="w-[25%] flex-row items-center pr-4">
                     <View className="w-8 h-8 bg-orange-100 rounded items-center justify-center mr-3">
                       <Text className="text-brand-orange font-bold text-xs">{p.name.charAt(0)}</Text>
                     </View>
@@ -121,8 +162,13 @@ export default function AdminProjectsList() {
                     </View>
                   </View>
                   
-                  <View className="w-[20%] pr-2">
+                  <View className="w-[15%] pr-2">
                     <Text className="text-gray-600 text-sm truncate">{p.location || 'N/A'}</Text>
+                  </View>
+
+                  <View className="w-[15%] pr-2 flex-col justify-center">
+                    <Text className="text-xs text-gray-500 truncate"><Text className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'None'}</Text>
+                    <Text className="text-xs text-gray-500 truncate"><Text className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'None'}</Text>
                   </View>
                   
                   <View className="w-[15%]">

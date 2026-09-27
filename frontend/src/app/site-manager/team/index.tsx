@@ -3,43 +3,45 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'rea
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
-import { QRScanner } from '../../../components/worker/QRScanner';
+import { QRScanner } from '@/components/worker/QRScanner';
+import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { useAssignedSites } from '@/hooks/useAssignedSites';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SMTeamPage() {
+  const { user } = useAuth();
+  const { assignedProjectIds, assignments, loading: sitesLoading } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(true);
   const [sites, setSites] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Assignment Modal
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
 
   const fetchTeamData = async () => {
+    if (!user?.id || sitesLoading) return;
+
     try {
       setLoading(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-      const userId = sessionData.session.user.id;
-      setCurrentUserId(userId);
 
-      // 1. Fetch SM's assigned sites
-      const { data: smSites } = await supabase
-        .from('site_manager_sites')
-        .select('project_id, projects(name, location)')
-        .eq('site_manager_id', userId);
-        
-      const parsedSites = smSites?.map(s => { const project = Array.isArray(s.projects) ? s.projects[0] : s.projects; return { id: s.project_id, name: project?.name, location: project?.location }; }) || [];
-      setSites(parsedSites);
+      if (assignedProjectIds.length > 0) {
+        const { data: projectsData } = await supabase
+          .from('projects')
+          .select('id, name, location')
+          .in('id', assignedProjectIds);
 
-      if (parsedSites.length > 0) {
-        const siteIds = parsedSites.map(s => s.id);
+        const parsedSites = projectsData?.map((p: any) => {
+          const assignment = assignments.find((a: any) => a.projectId === p.id);
+          return { id: p.id, siteId: assignment?.assignmentId, name: p.name, location: p.location };
+        }) || [];
+        setSites(parsedSites);
         
-        // 2. Fetch workers assigned to these sites
+        // 2. Fetch workers assigned to these projects
         const { data: assignData, error: assignErr } = await supabase
           .from('site_workers')
-          .select('*, profiles:worker_id(id, full_name)')
-          .in('project_id', siteIds);
+          .select('*, profiles!inner(id, full_name)')
+          .in('project_id', assignedProjectIds);
         if (assignErr) throw assignErr;
         setWorkers(assignData || []);
       }
@@ -54,10 +56,10 @@ export default function SMTeamPage() {
 
   useEffect(() => {
     fetchTeamData();
-  }, []);
+  }, [user?.id, sitesLoading, assignedProjectIds, assignments]);
 
   const handleScanQR = async (qrCode: string) => {
-    if (!selectedSiteId || !currentUserId) return;
+    if (!selectedSiteId || !user?.id) return;
     try {
       const { data: worker, error: workerError } = await supabase
         .from('profiles')
@@ -70,9 +72,9 @@ export default function SMTeamPage() {
       const { error } = await supabase
         .from('site_workers')
         .insert({
-          site_id: selectedSiteId,
+          project_id: selectedSiteId,
           worker_id: worker.id,
-          site_manager_id: currentUserId
+          site_manager_id: user.id
         });
 
       if (error) {
@@ -109,10 +111,12 @@ export default function SMTeamPage() {
     <View className="flex-1 bg-gray-50">
       <TopNav title="Worker Management" />
       
-      {loading ? (
+      {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
+      ) : assignedProjectIds.length === 0 ? (
+        <NoAssignedSites />
       ) : (
         <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
           
@@ -127,9 +131,9 @@ export default function SMTeamPage() {
               <Text className="text-gray-400 text-sm mt-2 text-center">Please contact your Project Manager for site assignments.</Text>
             </View>
           ) : (
-            <View className="space-y-6">
+          <View className="space-y-6">
               {sites.map(site => {
-                const siteWorkers = workers.filter(w => w.site_id === site.id);
+                const siteWorkers = workers.filter(w => w.project_id === site.id);
 
                 return (
                   <View key={site.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">

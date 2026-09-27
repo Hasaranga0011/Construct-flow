@@ -67,8 +67,16 @@ export default function AdminUsersEditPage() {
     const doDelete = async () => {
       setIsDeleting(true);
       try {
-        const { error } = await supabase.rpc('delete_user', { target_user_id: id });
-        if (error) throw error;
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/admin/users/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Failed to delete user');
+        }
         
         if (Platform.OS === 'web') {
           window.alert('User has been removed successfully.');

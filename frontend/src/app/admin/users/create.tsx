@@ -40,45 +40,42 @@ export default function AdminUsersCreatePage() {
 
     setLoading(true);
     try {
-      // Step 1: Create auth user via Supabase Admin
-      // Sign-up must not replace the administrator's session.
-      const signupClient = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL!, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      const { data: authData, error: authError } = await signupClient.auth.signUp({
-        email,
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      
+      const payload = {
+        email: email.trim(),
+        full_name: fullName.trim(),
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: 'client',
-          }
-        }
+        role: selectedRole,
+        send_email: true,
+        worker_type: selectedRole === 'worker' ? workerType : null,
+        daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
+      };
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
 
-      if (authError) throw authError;
-      if (!authData || !authData.user) throw new Error('User creation failed.');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to create user');
+      }
 
-      const { error: profileError } = await supabase.rpc('update_user_role', {
-        target_user_id: authData.user.id,
-        new_role: selectedRole,
-        new_worker_type: selectedRole === 'worker' ? workerType : null,
-        new_daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
-      });
+      // Also update contact number since it's not in the main payload
+      const responseData = await response.json();
+      if (contactNumber) {
+        await supabase
+          .from('profiles')
+          .update({ contact_number: contactNumber })
+          .eq('id', responseData.id);
+      }
 
-      if (profileError) throw profileError;
-
-      // Update remaining non-restricted columns
-      await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName,
-          email,
-          contact_number: contactNumber || null
-        })
-        .eq('id', authData.user.id);
-
-      Alert.alert('Success', `${fullName} account created successfully!`);
+      Alert.alert('Success', `${fullName} account created successfully! Credentials emailed.`);
       router.back();
 
     } catch (err: any) {

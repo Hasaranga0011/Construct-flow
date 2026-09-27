@@ -1,22 +1,19 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { Ionicons } from '@expo/vector-icons';
+import { useResponsive } from '../../hooks/useResponsive';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Returns the last N month labels and their numeric month index (0-based) */
-function getLastNMonths(n: number) {
-  const now = new Date();
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
-    return { label: MONTHS[d.getMonth()], monthIdx: d.getMonth(), year: d.getFullYear() };
-  });
-}
-
 export const CostTimelineChart = () => {
-  const [chartData, setChartData] = useState<any[]>([]);
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
-  const [maxVal, setMaxVal] = useState(1); // in millions
+  const [projects, setProjects] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('ALL');
   const [showForecast, setShowForecast] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -24,70 +21,38 @@ export const CostTimelineChart = () => {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) { setLoading(false); return; }
 
-      const periods = getLastNMonths(7);
-
-      // 1. Fetch all active projects (budget)
-      const { data: projects, error: pErr } = await supabase
+      // 1. Fetch active projects
+      const { data: projData, error: pErr } = await supabase
         .from('projects')
-        .select('id, total_budget, created_at')
+        .select('id, name, total_budget, start_date, end_date')
         .eq('status', 'active');
-
       if (pErr) throw pErr;
+      
+      const pList = projData || [];
+      setProjects(pList);
 
-      // 2. Fetch delivered purchase orders (actual spend) for those projects
-      const projectIds = (projects || []).map((p: any) => p.id);
-
-      let orders: any[] = [];
-      if (projectIds.length > 0) {
-        const { data: ord, error: oErr } = await supabase
-          .from('purchase_orders')
-          .select('project_id, total_amount, created_at')
-          .in('project_id', projectIds)
-          .eq('status', 'Delivered')
-          .order('created_at', { ascending: true });
-        if (!oErr && ord) orders = ord;
+      if (pList.length === 0) {
+        setLoading(false);
+        return;
       }
+      
+      const projectIds = pList.map(p => p.id);
 
-      // 3. Aggregate into monthly buckets
-      const aggregated = periods.map(({ label, monthIdx, year }) => {
-        // Actual spend: sum delivered PO amounts in this month/year
-        const actualSpend = orders
-          .filter((o: any) => {
-            const d = new Date(o.created_at);
-            return d.getMonth() === monthIdx && d.getFullYear() === year;
-          })
-          .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0) / 1_000_000;
+      // 2. Fetch expenses
+      const { data: expData } = await supabase
+        .from('project_expenses')
+        .select('project_id, amount, expense_date')
+        .in('project_id', projectIds);
 
-        // Budget: sum project total_budget whose created_at falls in this month/year
-        const budgetAlloc = (projects || [])
-          .filter((p: any) => {
-            const d = new Date(p.created_at);
-            return d.getMonth() === monthIdx && d.getFullYear() === year;
-          })
-          .reduce((sum: number, p: any) => sum + (Number(p.total_budget) || 0), 0) / 1_000_000;
+      // 3. Fetch purchase orders
+      const { data: poData } = await supabase
+        .from('purchase_orders')
+        .select('project_id, total_price, created_at')
+        .in('project_id', projectIds)
+        .in('status', ['Delivered', 'Received']);
 
-        return { month: label, actual: actualSpend, forecast: budgetAlloc };
-      });
-
-      // 4. If no per-month budget data, distribute total budget evenly as forecast
-      const totalBudget = (projects || [])
-        .reduce((s: number, p: any) => s + (Number(p.total_budget) || 0), 0) / 1_000_000;
-
-      const hasForecast = aggregated.some(a => a.forecast > 0);
-      if (!hasForecast && totalBudget > 0) {
-        const perMonth = totalBudget / 7;
-        aggregated.forEach(a => { a.forecast = perMonth; });
-      }
-
-      // 5. Determine chart scale
-      const maxFound = Math.max(
-        1,
-        ...aggregated.map(a => Math.max(a.actual, a.forecast))
-      );
-      const roundedMax = Math.ceil(maxFound / 10) * 10 || 10;
-
-      setChartData(aggregated);
-      setMaxVal(roundedMax);
+      setExpenses(expData || []);
+      setPurchaseOrders(poData || []);
     } catch (err) {
       console.warn('CostTimelineChart: failed to load data', err);
     } finally {
@@ -95,38 +60,126 @@ export const CostTimelineChart = () => {
     }
   }, []);
 
-  // Initial load
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Realtime: re-draw when invoices or projects change
   useEffect(() => {
     const trigger = () => loadData();
-
-    const ordersChannel = supabase
-      .channel('chart-purchase-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, trigger)
-      .subscribe();
-
-    const projectsChannel = supabase
-      .channel('chart-projects')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(projectsChannel);
-    };
+    const chan1 = supabase.channel('ctc-po').on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, trigger).subscribe();
+    const chan2 = supabase.channel('ctc-proj').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger).subscribe();
+    const chan3 = supabase.channel('ctc-exp').on('postgres_changes', { event: '*', schema: 'public', table: 'project_expenses' }, trigger).subscribe();
+    return () => { supabase.removeChannel(chan1); supabase.removeChannel(chan2); supabase.removeChannel(chan3); };
   }, [loadData]);
 
+  const chartData = useMemo(() => {
+    if (projects.length === 0) return [];
+    
+    // Filter projects based on selection
+    const activeProjects = selectedProjectId === 'ALL' 
+      ? projects 
+      : projects.filter(p => p.id === selectedProjectId);
+
+    if (activeProjects.length === 0) return [];
+
+    // Find min start date and max end date
+    let minDate = new Date();
+    let maxDate = new Date();
+    let isFirst = true;
+
+    activeProjects.forEach(p => {
+      const start = p.start_date ? new Date(p.start_date) : new Date();
+      const end = p.end_date ? new Date(p.end_date) : new Date();
+      if (isFirst) { minDate = start; maxDate = end; isFirst = false; }
+      else {
+        if (start < minDate) minDate = start;
+        if (end > maxDate) maxDate = end;
+      }
+    });
+
+    // Generate month buckets
+    const startYear = minDate.getFullYear();
+    const startMonth = minDate.getMonth();
+    const endYear = maxDate.getFullYear();
+    const endMonth = maxDate.getMonth();
+
+    const monthsDiff = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+    const bucketCount = Math.max(1, monthsDiff);
+    
+    const buckets = [];
+    for (let i = 0; i < bucketCount; i++) {
+      const d = new Date(startYear, startMonth + i, 1);
+      buckets.push({
+        label: `${MONTHS[d.getMonth()]} '${d.getFullYear().toString().slice(2)}`,
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        actual: 0,
+        forecast: 0
+      });
+    }
+
+    // Allocate forecast (linear spread per project)
+    activeProjects.forEach(p => {
+      const pStart = p.start_date ? new Date(p.start_date) : new Date();
+      const pEnd = p.end_date ? new Date(p.end_date) : new Date();
+      const pStartM = pStart.getFullYear() * 12 + pStart.getMonth();
+      const pEndM = pEnd.getFullYear() * 12 + pEnd.getMonth();
+      const pDuration = Math.max(1, pEndM - pStartM + 1);
+      const monthlyAlloc = (Number(p.total_budget) || 0) / pDuration / 1_000_000;
+
+      buckets.forEach(b => {
+        const bM = b.year * 12 + b.month;
+        if (bM >= pStartM && bM <= pEndM) {
+          b.forecast += monthlyAlloc;
+        }
+      });
+    });
+
+    // Allocate actuals
+    const relevantExpenses = selectedProjectId === 'ALL' ? expenses : expenses.filter(e => e.project_id === selectedProjectId);
+    const relevantPOs = selectedProjectId === 'ALL' ? purchaseOrders : purchaseOrders.filter(po => po.project_id === selectedProjectId);
+
+    relevantExpenses.forEach(e => {
+      if (!e.expense_date) return;
+      const d = new Date(e.expense_date);
+      const b = buckets.find(b => b.year === d.getFullYear() && b.month === d.getMonth());
+      if (b) b.actual += (Number(e.amount) || 0) / 1_000_000;
+    });
+
+    relevantPOs.forEach(po => {
+      if (!po.created_at) return;
+      const d = new Date(po.created_at);
+      const b = buckets.find(b => b.year === d.getFullYear() && b.month === d.getMonth());
+      if (b) b.actual += (Number(po.total_price) || 0) / 1_000_000;
+    });
+
+    return buckets;
+  }, [projects, expenses, purchaseOrders, selectedProjectId]);
+
+  if (loading) {
+    return (
+      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+        <ActivityIndicator color="#F97316" size="large" />
+      </View>
+    );
+  }
+
+  if (projects.length === 0) {
+    return (
+      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+        <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
+        <Text className="text-gray-400 mt-2">No active projects data available.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
-      <View className="flex-row justify-between items-start mb-6">
-        <View>
-          <Text className="text-lg font-bold text-brand-text mb-1">Project Cost vs Timeline (in Millions)</Text>
-          <Text className="text-brand-text-muted text-xs">Budget consumption across active projects</Text>
+    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">
+      <View className="flex-row justify-between items-start mb-4">
+        <View className="flex-1">
+          <Text className="text-lg font-bold text-brand-text mb-1">Project Cost vs Timeline</Text>
+          <Text className="text-gray-500 text-xs">Values in Millions (LKR)</Text>
         </View>
         <Pressable 
-          className={`flex-row items-center border ${showForecast ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-white'} px-3 py-1.5 rounded-full`}
+          className={`flex-row items-center border ${showForecast ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-white'} px-3 py-1.5 rounded-full ml-4`}
           onPress={() => setShowForecast(!showForecast)}
         >
           <View className={`w-3 h-3 rounded-full mr-1.5 ${showForecast ? 'bg-brand-orange' : 'bg-gray-300'}`} />
@@ -134,80 +187,51 @@ export const CostTimelineChart = () => {
         </Pressable>
       </View>
 
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#F97316" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 max-h-[40px]">
+        <View className="flex-row items-center gap-2 pr-4">
+          <Pressable 
+            onPress={() => setSelectedProjectId('ALL')}
+            className={`px-4 py-1.5 rounded-full border ${selectedProjectId === 'ALL' ? 'bg-brand-dark border-brand-dark' : 'bg-gray-50 border-gray-200'}`}
+          >
+            <Text className={`text-xs font-semibold ${selectedProjectId === 'ALL' ? 'text-white' : 'text-gray-600'}`}>All Projects (Combined)</Text>
+          </Pressable>
+          {projects.map(p => (
+            <Pressable 
+              key={p.id}
+              onPress={() => setSelectedProjectId(p.id)}
+              className={`px-4 py-1.5 rounded-full border ${selectedProjectId === p.id ? 'bg-brand-dark border-brand-dark' : 'bg-gray-50 border-gray-200'}`}
+            >
+              <Text className={`text-xs font-semibold ${selectedProjectId === p.id ? 'text-white' : 'text-gray-600'}`}>{p.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+
+      {chartData.length === 0 ? (
+        <View className="flex-1 items-center justify-center min-h-[250px]">
+          <Text className="text-gray-400">Timeline calculation failed.</Text>
         </View>
       ) : (
-        <>
-          {/* Chart Area */}
-          <View className="flex-1 mt-4">
-            {/* Y-axis labels */}
-            <View className="absolute left-0 top-0 bottom-6 justify-between items-end pr-2 w-10">
-              <Text className="text-gray-400 text-[10px]">{maxVal}M</Text>
-              <Text className="text-gray-400 text-[10px]">{(maxVal * 0.75).toFixed(0)}M</Text>
-              <Text className="text-gray-400 text-[10px]">{(maxVal * 0.5).toFixed(0)}M</Text>
-              <Text className="text-gray-400 text-[10px]">{(maxVal * 0.25).toFixed(0)}M</Text>
-              <Text className="text-gray-400 text-[10px]">0</Text>
-            </View>
-            
-            {/* Grid lines */}
-            <View className="ml-10 flex-1 justify-between pb-6">
-              <View className="border-b border-gray-100 w-full" />
-              <View className="border-b border-gray-100 w-full" />
-              <View className="border-b border-gray-100 w-full" />
-              <View className="border-b border-gray-100 w-full" />
-              <View className="border-b border-gray-300 w-full" />
-            </View>
-
-            {/* Bars Container */}
-            <View className="absolute left-10 right-0 top-0 bottom-6 flex-row justify-around items-end pt-2">
-              {chartData.map((item, index) => (
-                <View key={index} className="flex-row items-end h-full gap-[2px]">
-                  {/* Actual spend bar */}
-                  {item.actual > 0 ? (
-                    <View 
-                      className="w-4 bg-brand-dark rounded-t-sm" 
-                      style={{ height: `${Math.min(100, (item.actual / maxVal) * 100)}%` }}
-                    />
-                  ) : (
-                    <View className="w-4" />
-                  )}
-                  {/* Budget / forecast bar */}
-                  {showForecast && item.forecast > 0 && (
-                    <View 
-                      className="w-4 bg-brand-orange rounded-t-sm opacity-70" 
-                      style={{ height: `${Math.min(100, (item.forecast / maxVal) * 100)}%` }}
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
-
-            {/* X-axis labels */}
-            <View className="ml-10 flex-row justify-around mt-2">
-              {chartData.map((item, index) => (
-                <Text key={index} className="text-gray-400 text-[10px] w-8 text-center">
-                  {item.month}
-                </Text>
-              ))}
-            </View>
-          </View>
-          
-          {/* Legend */}
-          <View className="flex-row justify-center mt-4 gap-6">
-            <View className="flex-row items-center">
-              <View className="w-3 h-3 bg-brand-dark rounded-sm mr-2" />
-              <Text className="text-xs text-gray-500">Actual Spend (Invoices)</Text>
-            </View>
-            <View className="flex-row items-center">
-              <View className="w-3 h-3 bg-brand-orange opacity-70 rounded-sm mr-2" />
-              <Text className="text-xs text-gray-500">Planned Budget</Text>
-            </View>
-          </View>
-        </>
+        <View className="flex-1 min-h-[250px]">
+          {/* @ts-ignore */}
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(val) => `${val}M`} />
+              <Tooltip 
+                cursor={{ fill: '#f9fafb' }} 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => [`Rs. ${(value).toFixed(2)}M`, '']}
+              />
+              {showForecast && (
+                <Bar dataKey="forecast" name="Planned Budget" fill="#fed7aa" radius={[4, 4, 0, 0]} />
+              )}
+              <Bar dataKey="actual" name="Actual Spend" fill="#1e293b" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </View>
       )}
     </View>
   );
 };
-

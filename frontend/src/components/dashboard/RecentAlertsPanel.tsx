@@ -28,9 +28,16 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
   useEffect(() => {
     let isMounted = true;
     
-    const loadAlerts = async () => {
+    let currentUserId: string | null = null;
+
+    const setup = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      currentUserId = sessionData?.session?.user?.id || null;
+      loadAlerts(sessionData);
+    };
+
+    const loadAlerts = async (sessionData: any) => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) {
           if (isMounted) setLoading(false);
           return;
@@ -43,7 +50,11 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
           .limit(4);
           
         if (pmId) {
-          query = query.or(`target_user_id.eq.${pmId},target_role.eq.Manager`);
+          query = query.or(`target_user_id.eq.${pmId},target_role.eq.pm`);
+        } else {
+          // If no pmId, assume admin dashboard
+          // Since we don't have role here natively, we hardcode super_admin aliases or just fetch it
+          query = query.or(`target_user_id.eq.${currentUserId},and(target_user_id.is.null,or(target_role.eq.All,target_role.eq.super_admin))`);
         }
 
         const { data, error } = await query;
@@ -58,7 +69,7 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
       }
     };
     
-    loadAlerts();
+    setup();
 
     // Supabase Realtime subscribe
     const channel = supabase
@@ -69,7 +80,16 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
         table: 'notifications'
       }, (payload) => {
         if (isMounted) {
-          setAlerts(prev => [payload.new, ...prev].slice(0, 4));
+          const targetUser = payload.new.target_user_id;
+          const targetRole = payload.new.target_role;
+          
+          const isForMe = pmId 
+            ? (targetUser === pmId || targetRole === 'pm')
+            : (targetUser === currentUserId || targetRole === 'super_admin');
+            
+          if (isForMe) {
+            setAlerts(prev => [payload.new, ...prev].slice(0, 4));
+          }
         }
       })
       .subscribe();

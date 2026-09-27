@@ -48,25 +48,35 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
     try:
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
-        query = client.table("labour").select("project_id, worker_name, hours_worked, date").eq("status", "Present")
-        if allowed_projects is not None:
-            if not allowed_projects:
-                return []
-            query = query.in_("project_id", allowed_projects)
+        query = client.table("attendance").select(
+            "hours_worked, date, status, "
+            "sites!inner(project_id), "
+            "workers!inner(profiles!inner(full_name))"
+        ).eq("status", "Present")
+        
+        # Filter allowed projects after fetching because .in_ doesn't cleanly support joined columns
+        if allowed_projects is not None and not allowed_projects:
+            return []
+            
         response = query.execute()
         
         # Aggregate logic
         payroll_data = {}
-        for row in response.data:
-            key = f"{row['project_id']}_{row['worker_name']}"
+        for row in (response.data or []):
+            proj_id = row.get("sites", {}).get("project_id")
+            if allowed_projects is not None and proj_id not in allowed_projects:
+                continue
+            worker_name = row.get("workers", {}).get("profiles", {}).get("full_name", "Unknown Worker")
+            hours = row.get("hours_worked") or 0
+            key = f"{proj_id}_{worker_name}"
             if key not in payroll_data:
                 payroll_data[key] = {
-                    "project_id": row["project_id"],
-                    "worker_name": row["worker_name"],
+                    "project_id": proj_id,
+                    "worker_name": worker_name,
                     "total_hours": 0,
                     "days_present": 0
                 }
-            payroll_data[key]["total_hours"] += (row["hours_worked"] or 0)
+            payroll_data[key]["total_hours"] += hours
             payroll_data[key]["days_present"] += 1
             
         return list(payroll_data.values())
