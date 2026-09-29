@@ -19,9 +19,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
              raise HTTPException(status_code=401, detail="Invalid authentication credentials")
              
         try:
-            # Fetch the user's role from the profiles table
-            profile_response = client_for_token(token).table("profiles").select("role").eq("id", user_response.user.id).single().execute()
-            role = normalize_role(profile_response.data.get("role") if profile_response.data else None)
+            # First try to get the role from user_metadata (which reflects their selected role during registration)
+            meta_role = user_response.user.user_metadata.get("role") if user_response.user.user_metadata else None
+            if meta_role:
+                role = normalize_role(meta_role)
+            else:
+                # Fallback to the profiles table
+                profile_response = client_for_token(token).table("profiles").select("role").eq("id", user_response.user.id).single().execute()
+                role = normalize_role(profile_response.data.get("role") if profile_response.data else None)
         except Exception as profile_err:
             raise HTTPException(status_code=403, detail="An authorized profile is required") from profile_err
         if role not in {"super_admin", "pm", "site_manager", "worker", "client", "supplier"}:

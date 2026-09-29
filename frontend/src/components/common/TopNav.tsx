@@ -80,7 +80,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
             accessibilityLabel="Open account details"
             className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center"
           >
-            <Text className="text-brand-orange font-bold text-sm">{getInitials(user?.email)}</Text>
+            <Text className="text-brand-orange font-bold text-sm">{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
           </Pressable>
 
           {/* Action Button */}
@@ -109,9 +109,12 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
           style={{ zIndex: 20, elevation: 8 }}
         >
           <Text className={`text-sm font-bold ${isDark ? 'text-white' : 'text-brand-text'}`} numberOfLines={1}>
-            {user?.email || 'User'}
+            {user?.user_metadata?.full_name || user?.email || 'User'}
           </Text>
           <Text className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            {user?.email || ''}
+          </Text>
+          <Text className={`text-xs mt-1 ${isDark ? 'text-brand-orange' : 'text-brand-orange'}`}>
             {userRole || 'User'}
           </Text>
           <View className={`h-px my-3 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />

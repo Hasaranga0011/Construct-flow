@@ -42,7 +42,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
           .from('purchase_orders')
           .select(`
             id, items, status, 
-            actual_delivery, updated_at,
+            actual_delivery, created_at,
             projects!inner(name)
           `)
           .eq('status', 'Delivered')
@@ -88,7 +88,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
                 key={d.id}
                 title={`${itemsStr} delivered`} 
                 project={projectName} 
-                time={d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.updated_at).toLocaleDateString()} 
+                time={d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()} 
               />
             );
           })

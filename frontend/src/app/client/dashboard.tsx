@@ -64,6 +64,26 @@ export default function ClientDashboardPage() {
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    // Setup Realtime subscriptions
+    if (!user) return;
+    
+    const subProjects = supabase.channel('client-dashboard-projects')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `client_id=eq.${user.id}` }, () => {
+        setRetryKey(prev => prev + 1);
+      }).subscribe();
+      
+    const subMilestones = supabase.channel('client-dashboard-milestones')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, () => {
+        setRetryKey(prev => prev + 1);
+      }).subscribe();
+
+    return () => {
+      supabase.removeChannel(subProjects);
+      supabase.removeChannel(subMilestones);
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (!user) return;
 
     let isMounted = true;

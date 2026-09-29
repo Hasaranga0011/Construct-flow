@@ -209,7 +209,7 @@ export default function SMMaterialsPage() {
                 </View>
               ) : (
                 projectStock.map(item => {
-                  const isLow = (item.global_stock_quantity || 0) < (item.low_stock_threshold || 0);
+                  const isLow = (item.current_stock || 0) < (item.minimum_threshold || 0);
                   return (
                     <View key={item.id} className="flex-row items-center py-4 px-6 border-b border-gray-50">
                       <View className="flex-[2]">
@@ -218,7 +218,7 @@ export default function SMMaterialsPage() {
                       </View>
                       <View className="flex-1">
                         <Text className={`font-bold ${isLow ? 'text-red-500' : 'text-brand-text'}`}>
-                          {item.global_stock_quantity ?? 0}
+                          {item.current_stock ?? 0}
                         </Text>
                       </View>
                       <View className="flex-1">

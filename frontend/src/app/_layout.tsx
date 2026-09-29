@@ -74,7 +74,9 @@ function InitialLayout() {
         .eq('id', session.user.id)
         .single()
         .then(({ data: profile }) => {
-          const resolvedRole = profile?.role ?? session.user.user_metadata?.role ?? null;
+          const metaRole = session.user.user_metadata?.role;
+          const profileRole = profile?.role;
+          const resolvedRole = metaRole ?? profileRole ?? null;
           routeWithRole(resolvedRole);
         });
       return;

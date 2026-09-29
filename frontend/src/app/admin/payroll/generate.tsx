@@ -17,7 +17,7 @@ export default function AdminPayrollGeneratePage() {
 
   useEffect(() => {
     const fetchSites = async () => {
-      const { data } = await supabase.from('sites').select('*');
+      const { data } = await supabase.from('projects').select('id, name');
       if (data) setSites(data);
     };
     fetchSites();

@@ -36,17 +36,27 @@ export default function LabourForceScreen() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        const [workersReq, checkinsReq] = await Promise.all([
+        const [workersReq, checkinsReq, sitesReq, labourReq] = await Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker'),
-          supabase.from('attendance').select('user_id', { count: 'exact', head: true }).eq('date', today)
+          supabase.from('labour').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
+          supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('labour').select('hours_worked').eq('date', today).eq('status', 'Present')
         ]);
+        
+        let overtimeHrs = 0;
+        if (labourReq.data) {
+          labourReq.data.forEach((r: any) => {
+             const hrs = Number(r.hours_worked) || 0;
+             if (hrs > 8) overtimeHrs += (hrs - 8);
+          });
+        }
 
         if (isMounted) {
           setStats({
             totalWorkers: workersReq.count || 0,
             checkedInToday: checkinsReq.count || 0,
-            activeSites: 4, 
-            pendingPayroll: 12, 
+            activeSites: sitesReq.count || 0, 
+            pendingPayroll: Math.round(overtimeHrs), 
           });
         }
       } catch (error) {

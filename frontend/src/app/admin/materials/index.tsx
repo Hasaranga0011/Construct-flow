@@ -39,7 +39,7 @@ export default function MaterialsScreen() {
         if (!sessionData?.session) return;
 
         const [materialsReq, ordersReq, projectsReq] = await Promise.all([
-          supabase.from('materials').select('global_stock_quantity, low_stock_threshold, unit_price'),
+          supabase.from('materials').select('current_stock, minimum_threshold, unit_price'),
           supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).in('status', ['Pending Delivery', 'Confirmed']),
           supabase.from('projects').select('id, name').eq('status', 'active').order('name')
         ]);
@@ -50,8 +50,8 @@ export default function MaterialsScreen() {
 
         if (materialsReq.data) {
           totalMaterials = materialsReq.data.length;
-          lowStockAlerts = materialsReq.data.filter(m => (m.global_stock_quantity || 0) < (m.low_stock_threshold || 1)).length;
-          totalValue = materialsReq.data.reduce((sum, m) => sum + ((m.global_stock_quantity || 0) * (m.unit_price || 0)), 0);
+          lowStockAlerts = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 1)).length;
+          totalValue = materialsReq.data.reduce((sum, m) => sum + ((m.current_stock || 0) * (m.unit_price || 0)), 0);
         }
 
         if (isMounted) {

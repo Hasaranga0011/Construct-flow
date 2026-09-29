@@ -14,7 +14,7 @@ export const MaterialsStockChart = () => {
     try {
       const { data: matData, error } = await supabase
         .from('materials')
-        .select('global_stock_quantity, low_stock_threshold');
+        .select('current_stock, minimum_threshold');
 
       if (error) throw error;
       
@@ -23,8 +23,8 @@ export const MaterialsStockChart = () => {
       let outOfStock = 0;
 
       (matData || []).forEach(m => {
-        const qty = m.global_stock_quantity || 0;
-        const threshold = m.low_stock_threshold || 1;
+        const qty = m.current_stock || 0;
+        const threshold = m.minimum_threshold || 1;
         if (qty === 0) {
           outOfStock++;
         } else if (qty < threshold) {

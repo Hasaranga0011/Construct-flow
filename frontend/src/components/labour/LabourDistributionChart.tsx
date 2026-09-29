@@ -36,7 +36,7 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
         }
 
         // Fetch all active projects
-        let query = supabase.from('projects').select('id, name').eq('status', 'Active');
+        let query = supabase.from('projects').select('id, name').eq('status', 'active');
         if (pmId) {
           query = query.eq('pm_id', pmId);
         }

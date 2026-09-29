@@ -15,12 +15,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
             
         user = user_response.user
         
-        # Fetch role from profiles table
-        profile_res = supabase_db.table('profiles').select('role').eq('id', user.id).execute()
+        # The database trigger incorrectly defaults everyone to 'client'. 
+        # We must prioritize the role stored in user_metadata during signup.
+        raw_meta = user.user_metadata or {}
+        role = raw_meta.get('role')
         
-        role = 'client' # Default fallback
-        if profile_res.data and len(profile_res.data) > 0:
-            role = profile_res.data[0].get('role', 'client')
+        if not role:
+            # Fetch role from profiles table as fallback
+            profile_res = supabase_db.table('profiles').select('role').eq('id', user.id).execute()
+            role = 'client' # Default fallback
+            if profile_res.data and len(profile_res.data) > 0:
+                role = profile_res.data[0].get('role', 'client')
             
         return {
             "id": user.id,

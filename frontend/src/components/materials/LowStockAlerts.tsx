@@ -34,7 +34,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
         .select(`
           id, item_name, unit,
           projects(name),
-          materials(global_stock_quantity, low_stock_threshold)
+          materials(current_stock, minimum_threshold)
         `)
         .order('updated_at', { ascending: false });
 
@@ -45,7 +45,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
         lowStock = data.filter((req: any) => {
           const m = Array.isArray(req.materials) ? req.materials[0] : req.materials;
           if (!m) return false;
-          return (m.global_stock_quantity || 0) < (m.low_stock_threshold || 1);
+          return (m.current_stock || 0) < (m.minimum_threshold || 1);
         }).slice(0, 5);
       }
 
@@ -83,7 +83,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
           alerts.map(a => {
             const projectName = a.projects?.name || 'Unknown';
             const m = Array.isArray(a.materials) ? a.materials[0] : a.materials;
-            const remaining = m ? `${m.global_stock_quantity} ${a.unit || ''}` : '0';
+            const remaining = m ? `${m.current_stock} ${a.unit || ''}` : '0';
 
             return (
               <AlertRow 

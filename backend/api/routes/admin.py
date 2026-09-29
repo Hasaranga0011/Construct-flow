@@ -47,10 +47,30 @@ def _admin_supabase():
 def list_users(current_user: dict = Depends(get_current_user)) -> List[Dict]:
     _require_admin(current_user)
     db = _admin_supabase()
+    
+    # 1. Fetch profiles
     res = db.table("profiles").select(
-        "id, email, full_name, role, is_approved, created_at"
+        "id, email, full_name, role, is_approved, created_at, company_name, contact_number, bio, avatar_url, worker_type"
     ).order("created_at", desc=True).execute()
-    return res.data or []
+    profiles = res.data or []
+    
+    # 2. Fetch auth users to get the raw_user_meta_data (which bypasses the trigger issue)
+    auth_users_res = db.auth.admin.list_users()
+    auth_users = auth_users_res.users if auth_users_res else []
+    
+    auth_meta_map = {u.id: u.user_metadata or {} for u in auth_users}
+    
+    # 3. Merge metadata into profiles
+    for p in profiles:
+        uid = p["id"]
+        meta = auth_meta_map.get(uid, {})
+        # Prioritize meta role/name over profiles (since trigger forces 'client')
+        if meta.get("role"):
+            p["role"] = meta.get("role")
+        if meta.get("full_name"):
+            p["full_name"] = meta.get("full_name")
+            
+    return profiles
 
 
 # -----------------------------------------------------------------------

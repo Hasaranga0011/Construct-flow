@@ -42,16 +42,16 @@ export default function DashboardScreen() {
         const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
           supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present').is('check_out_time', null),
-          // Assuming materials has global_stock_quantity and low_stock_threshold. Since we can't do raw sql in select, we can fetch them.
-          // Wait, the prompt said: .lt('global_stock_quantity', supabase.raw('low_stock_threshold')) - supabase.raw doesn't exist in JS client.
+          // Assuming materials has current_stock and minimum_threshold. Since we can't do raw sql in select, we can fetch them.
+          // Wait, the prompt said: .lt('current_stock', supabase.raw('minimum_threshold')) - supabase.raw doesn't exist in JS client.
           // A better way is to fetch all and filter in JS if there's no SQL function, or call an RPC. For now, fetch all materials and filter:
-          supabase.from('materials').select('global_stock_quantity, low_stock_threshold'),
+          supabase.from('materials').select('current_stock, minimum_threshold'),
           supabase.from('projects').select('total_budget').eq('status', 'active')
         ]);
 
         let lowStockCount = 0;
         if (materialsReq.data) {
-          lowStockCount = materialsReq.data.filter(m => (m.global_stock_quantity || 0) < (m.low_stock_threshold || 0)).length;
+          lowStockCount = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 0)).length;
         }
 
         let totalBudget = 0;

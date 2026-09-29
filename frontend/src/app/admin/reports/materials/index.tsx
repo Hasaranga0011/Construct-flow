@@ -5,7 +5,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { api } from '../../../../services/api';
 import { supabase } from '../../../../lib/supabase';
 
-type Material = { id: string; global_stock_quantity?: number | null; low_stock_threshold?: number | null };
+type Material = { id: string; current_stock?: number | null; minimum_threshold?: number | null };
 type PurchaseOrder = { id: string; status?: string | null };
 type MaterialReport = { total_materials?: number; data?: Material[] };
 
@@ -61,7 +61,7 @@ export default function AdminMaterialsReportsPage() {
 		};
 	}, [refreshTrigger]);
 
-	const lowStockCount = materials.filter(material => Number(material.global_stock_quantity || 0) < Number(material.low_stock_threshold || 0)).length;
+	const lowStockCount = materials.filter(material => Number(material.current_stock || 0) < Number(material.minimum_threshold || 0)).length;
 	const statusCounts = useMemo(() => orders.reduce<Record<string, number>>((counts, order) => {
 		const status = order.status || 'Unknown';
 		counts[status] = (counts[status] || 0) + 1;

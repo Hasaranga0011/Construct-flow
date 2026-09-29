@@ -25,6 +25,30 @@ export default function ClientPortalScreen() {
   const { isMobile } = useResponsive();
 
   useEffect(() => {
+    // Setup Realtime subscriptions
+    const subProfiles = supabase.channel('admin-client-profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        setRefreshTrigger(prev => prev + 1);
+      }).subscribe();
+      
+    const subProjects = supabase.channel('admin-client-projects')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+        setRefreshTrigger(prev => prev + 1);
+      }).subscribe();
+      
+    const subInvoices = supabase.channel('admin-client-invoices')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        setRefreshTrigger(prev => prev + 1);
+      }).subscribe();
+
+    return () => {
+      supabase.removeChannel(subProfiles);
+      supabase.removeChannel(subProjects);
+      supabase.removeChannel(subInvoices);
+    };
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
     const loadStats = async () => {
       try {

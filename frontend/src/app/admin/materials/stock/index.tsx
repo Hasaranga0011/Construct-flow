@@ -24,14 +24,22 @@ export default function AdminStockLevels() {
           project:projects(name)
         `).order('last_updated', { ascending: false });
         
-        if (statusFilter !== 'All') {
-          query = query.eq('status', statusFilter);
-        }
-
         const { data, error } = await query;
         if (error) throw error;
         
         let filteredData = data || [];
+        
+        if (statusFilter !== 'All') {
+          filteredData = filteredData.filter(m => {
+            const currentStock = m.current_stock || 0;
+            const minThreshold = m.minimum_threshold || 1;
+            let calcStatus = 'In Stock';
+            if (currentStock === 0) calcStatus = 'Out of Stock';
+            else if (currentStock < minThreshold) calcStatus = 'Low Stock';
+            return calcStatus === statusFilter;
+          });
+        }
+
         if (search) {
           filteredData = filteredData.filter(m => 
             m.name?.toLowerCase().includes(search.toLowerCase()) || 
@@ -129,8 +137,15 @@ export default function AdminStockLevels() {
               <Text className="text-gray-400 text-lg font-medium">No materials found.</Text>
             </View>
           ) : (
-            materials.map(m => (
-              isMobile ? (
+            materials.map(m => {
+              const currentStock = m.current_stock || 0;
+              const minThreshold = m.minimum_threshold || 1;
+              const pct = Math.min(100, Math.round((currentStock / minThreshold) * 100));
+              let calcStatus = 'In Stock';
+              if (currentStock === 0) calcStatus = 'Out of Stock';
+              else if (currentStock < minThreshold) calcStatus = 'Low Stock';
+
+              return isMobile ? (
                 <View key={m.id} style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                     <View style={{ flex: 1 }}>
@@ -138,8 +153,8 @@ export default function AdminStockLevels() {
                       <Text style={{ color: '#6B7280', fontSize: 12 }}>Project: {m.project?.name || 'Unassigned Site'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <View className={`px-2 py-1 rounded ${getStatusColor(m.status)}`}>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>{m.status}</Text>
+                      <View className={`px-2 py-1 rounded ${getStatusColor(calcStatus)}`}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>{calcStatus}</Text>
                       </View>
                     </View>
                   </View>
@@ -147,13 +162,13 @@ export default function AdminStockLevels() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                     <View>
                       <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Quantity</Text>
-                      <Text style={{ color: '#374151', fontWeight: 'bold', fontSize: 14 }}>{m.quantity}</Text>
+                      <Text style={{ color: '#374151', fontWeight: 'bold', fontSize: 14 }}>{currentStock} {m.unit || 'units'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', width: '40%' }}>
-                      <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Stock Level: {m.stock_level}%</Text>
+                      <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Stock Level: {pct}%</Text>
                       <View style={{ width: '100%', height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
                         <View 
-                          style={{ height: '100%', width: `${m.stock_level}%`, backgroundColor: m.stock_level < 25 ? '#EF4444' : m.stock_level < 50 ? '#FACC15' : '#22C55E' }} 
+                          style={{ height: '100%', width: `${pct}%`, backgroundColor: pct < 25 ? '#EF4444' : pct < 50 ? '#FACC15' : '#22C55E' }} 
                         />
                       </View>
                     </View>
@@ -171,29 +186,29 @@ export default function AdminStockLevels() {
                   </View>
   
                   <View className="w-[15%] pr-2">
-                    <Text className="text-gray-800 text-sm font-bold">{m.quantity}</Text>
+                    <Text className="text-gray-800 text-sm font-bold">{currentStock} {m.unit || 'units'}</Text>
                   </View>
                   
                   <View className="w-[20%] pr-4">
                     <View className="flex-row items-center">
                       <View className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden mr-3">
                         <View 
-                          className={`h-full ${m.stock_level < 25 ? 'bg-red-500' : m.stock_level < 50 ? 'bg-yellow-400' : 'bg-green-500'}`} 
-                          style={{ width: `${m.stock_level}%` }}
+                          className={`h-full ${pct < 25 ? 'bg-red-500' : pct < 50 ? 'bg-yellow-400' : 'bg-green-500'}`} 
+                          style={{ width: `${pct}%` }}
                         />
                       </View>
-                      <Text className="text-gray-600 text-xs font-bold w-8 text-right">{m.stock_level}%</Text>
+                      <Text className="text-gray-600 text-xs font-bold w-8 text-right">{pct}%</Text>
                     </View>
                   </View>
                   
                   <View className="w-[15%] pr-6 items-end">
-                    <View className={`px-2 py-1 rounded ${getStatusColor(m.status)}`}>
-                      <Text className="text-[10px] font-bold uppercase">{m.status}</Text>
+                    <View className={`px-2 py-1 rounded ${getStatusColor(calcStatus)}`}>
+                      <Text className="text-[10px] font-bold uppercase">{calcStatus}</Text>
                     </View>
                   </View>
                 </View>
-              )
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>

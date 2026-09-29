@@ -130,10 +130,10 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
         let query = supabase
           .from('materials')
           .select(`
-            id, name, unit, global_stock_quantity, low_stock_threshold, updated_at, project_id,
+            id, name, unit, current_stock, minimum_threshold, last_updated, project_id,
             projects!inner(name, status)
           `)
-          .order('updated_at', { ascending: false });
+          .order('last_updated', { ascending: false });
 
         if (projectId) {
           query = query.eq('project_id', projectId);
@@ -195,8 +195,8 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
           materials.map((m: any) => {
             const projectName = m.projects?.name || 'Unknown';
             
-            const globalStock = m.global_stock_quantity || 0;
-            const threshold = m.low_stock_threshold || 1;
+            const globalStock = m.current_stock || 0;
+            const threshold = m.minimum_threshold || 1;
             
             const pct = Math.min(100, (globalStock / threshold) * 100);
             
@@ -213,7 +213,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
                 unit={m.unit || ''}
                 stockLevel={pct} 
                 status={badgeStatus} 
-                time={m.updated_at ? new Date(m.updated_at).toLocaleDateString() : 'N/A'} 
+                time={m.last_updated ? new Date(m.last_updated).toLocaleDateString() : 'N/A'} 
               />
             );
           })

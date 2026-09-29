@@ -282,8 +282,8 @@ def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
             "project_id": order.get("project_id"),
             "name": order.get("items", f"Material for {order.get('po_number')}"),
             "unit": order.get("unit", "Units"),
-            "global_stock_quantity": 0,
-            "low_stock_threshold": 10
+            "current_stock": 0,
+            "minimum_threshold": 10
         }).execute()
         if mat_res.data:
             material_id = mat_res.data[0]["id"]
@@ -296,16 +296,15 @@ def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
     # Safely increment stock
     qty = order.get("quantity_ordered") or 0
     if qty > 0:
-        mat_res = client.table("materials").select("global_stock_quantity").eq("id", material_id).execute()
+        mat_res = client.table("materials").select("current_stock").eq("id", material_id).execute()
         if mat_res.data:
-            curr_qty = mat_res.data[0].get("global_stock_quantity") or 0
+            curr_qty = mat_res.data[0].get("current_stock") or 0
             new_qty = curr_qty + qty
-            client.table("materials").update({"global_stock_quantity": new_qty}).eq("id", material_id).execute()
+            client.table("materials").update({"current_stock": new_qty}).eq("id", material_id).execute()
 
     # Finalize status update
     res = client.table("purchase_orders").update({
-        "status": "Received",
-        "received_at": datetime.now().isoformat()
+        "status": "Received"
     }).eq("id", po_id).execute()
 
     order = res.data[0] if res.data else order

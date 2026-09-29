@@ -90,15 +90,27 @@ def invite_client(req: InviteClientRequest, request: Request):
             "client_id": new_user_id
         }).execute()
         
+        # 5b. Notify the client
+        admin_client.table("notifications").insert({
+            "user_id": new_user_id,
+            "title": "Welcome to ConstructFlow",
+            "message": f"You have been invited to ConstructFlow. Your account is ready.",
+            "type": "info",
+            "project_id": req.project_id
+        }).execute()
+        
         # 6. Send Email using Resend
         if settings.RESEND_API_KEY:
-            resend.api_key = settings.RESEND_API_KEY
-            resend.Emails.send({
-                "from": settings.RESEND_FROM_EMAIL,
-                "to": [req.email],
-                "subject": "You have been invited to ConstructFlow",
-                "html": f"<p>Hello {req.name},</p><p>You've been invited to view your project updates.</p><p>Your temporary password is: <b>{temp_password}</b></p><p>Please login to the portal and change your password.</p>"
-            })
+            try:
+                resend.api_key = settings.RESEND_API_KEY
+                resend.Emails.send({
+                    "from": settings.RESEND_FROM_EMAIL,
+                    "to": [req.email],
+                    "subject": "You have been invited to ConstructFlow",
+                    "html": f"<p>Hello {req.name},</p><p>You've been invited to view your project updates.</p><p>Your temporary password is: <b>{temp_password}</b></p><p>Please login to the portal and change your password.</p>"
+                })
+            except Exception as e:
+                print(f"Failed to send email: {e}")
 
         return {"message": "Client invited successfully", "user_id": new_user_id}
     except HTTPException:

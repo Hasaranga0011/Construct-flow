@@ -182,7 +182,7 @@ export default function ProfileScreen() {
   };
 
   const rc = roleConfig[role || 'admin'] || roleConfig.admin;
-  const displayName = profile?.full_name || form.full_name || 'Your Name';
+  const displayName = profile?.full_name || form.full_name || user?.user_metadata?.full_name || 'Your Name';
   const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })

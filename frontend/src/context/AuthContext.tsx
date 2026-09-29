@@ -56,13 +56,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       prevUserId = nextSession.user.id;
 
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', nextSession.user.id)
-          .single();
-        const profileRole = !profileError ? normalizeRole(profile?.role) : null;
-        const resolvedRole = profileRole;
+        const metaRole = nextSession.user.user_metadata?.role;
+        let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
+        
+        if (!resolvedRole) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', nextSession.user.id)
+            .single();
+          resolvedRole = !profileError ? normalizeRole(profile?.role) : null;
+        }
 
         if (mounted && requestId === roleRequest) setRole(resolvedRole);
       } catch (error) {

@@ -276,7 +276,7 @@ export default function PMApprovalQueue() {
                         <Text className="text-gray-500 text-sm truncate">{stock.projects?.name || 'Unknown'}</Text>
                       </View>
                       <View className="w-1/6">
-                        <Text className="text-brand-text font-semibold">{stock.global_stock_quantity ?? 0} {stock.unit}</Text>
+                        <Text className="text-brand-text font-semibold">{stock.current_stock ?? 0} {stock.unit}</Text>
                       </View>
                       <View className="w-1/6">
                         <Text className="text-gray-500 text-xs">

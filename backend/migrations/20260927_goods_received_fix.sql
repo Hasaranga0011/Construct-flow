@@ -43,7 +43,7 @@ BEGIN
   -- Handle missing material_id gracefully by auto-creating it
   v_material_id := v_order.material_id;
   IF v_material_id IS NULL THEN
-    INSERT INTO public.materials (project_id, name, unit, global_stock_quantity, low_stock_threshold)
+    INSERT INTO public.materials (project_id, name, unit, current_stock, minimum_threshold)
     VALUES (v_order.project_id, coalesce(v_order.items, 'Material from PO'), 'Units', 0, 10)
     RETURNING id INTO v_material_id;
 
@@ -54,7 +54,7 @@ BEGIN
 
   -- Atomic update of materials stock
   UPDATE public.materials
-  SET global_stock_quantity = coalesce(global_stock_quantity, 0) + v_order.quantity_ordered
+  SET current_stock = coalesce(current_stock, 0) + v_order.quantity_ordered
   WHERE id = v_material_id;
   
   IF NOT FOUND THEN RAISE EXCEPTION 'Material not found for stock update'; END IF;

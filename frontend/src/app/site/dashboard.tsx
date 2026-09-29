@@ -33,13 +33,13 @@ export default function DashboardScreen() {
       const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
         supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('labour').select('*', { count: 'exact', head: true }).eq('status', 'Present').eq('date', today),
-        supabase.from('materials').select('global_stock_quantity, low_stock_threshold'),
+        supabase.from('materials').select('current_stock, minimum_threshold'),
         supabase.from('projects').select('total_budget').eq('status', 'active')
       ]);
 
       let lowStockCount = 0;
       if (materialsReq.data) {
-        lowStockCount = materialsReq.data.filter(m => (m.global_stock_quantity || 0) < (m.low_stock_threshold || 0)).length;
+        lowStockCount = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 0)).length;
       }
 
       let totalBudget = 0;

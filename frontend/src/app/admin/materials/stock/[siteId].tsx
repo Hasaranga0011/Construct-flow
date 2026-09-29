@@ -10,10 +10,8 @@ type Material = {
   name?: string | null;
   item_name?: string | null;
   unit?: string | null;
-  quantity?: number | null;
-  global_stock_quantity?: number | null;
-  min_quantity?: number | null;
-  low_stock_threshold?: number | null;
+  current_stock?: number | null;
+  minimum_threshold?: number | null;
 };
 
 export default function AdminSiteStockPage() {
@@ -35,7 +33,7 @@ export default function AdminSiteStockPage() {
         const { data, error: queryError } = await supabase
           .from('materials')
           .select('*')
-          .eq('site_id', siteId)
+          .eq('project_id', siteId)
           .order('name');
         
         if (queryError) throw queryError;
@@ -50,7 +48,7 @@ export default function AdminSiteStockPage() {
     loadStock();
 
     const channel = supabase.channel(`admin-site-stock:${siteId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials', filter: `site_id=eq.${siteId}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials', filter: `project_id=eq.${siteId}` }, () => {
         setRefreshTrigger(value => value + 1);
       })
       .subscribe();
@@ -98,8 +96,8 @@ export default function AdminSiteStockPage() {
 
               {/* Table Rows */}
               {materials.map((material) => {
-                const current = Number(material.quantity ?? material.global_stock_quantity ?? 0);
-                const minimum = Number(material.min_quantity ?? material.low_stock_threshold ?? 0);
+                const current = Number(material.current_stock ?? 0);
+                const minimum = Number(material.minimum_threshold ?? 1);
                 const isLow = current < minimum;
                 
                 return (

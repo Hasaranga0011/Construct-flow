@@ -152,10 +152,10 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
         <View className={`flex-row items-center justify-between pt-4 border-t ${isMobile || isDark ? 'border-gray-800' : 'border-gray-100'}`}>
           <View className="flex-row items-center flex-1">
             <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${isMobile || isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
-              <Text className={`text-xs font-bold ${isMobile || isDark ? 'text-white' : 'text-brand-text'}`}>{getInitials(user?.email)}</Text>
+              <Text className={`text-xs font-bold ${isMobile || isDark ? 'text-white' : 'text-brand-text'}`}>{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
             </View>
             <View className="flex-1 pr-2">
-              <Text className={`text-sm font-semibold truncate ${isMobile || isDark ? 'text-white' : 'text-brand-text'}`} numberOfLines={1}>{user?.email || 'User'}</Text>
+              <Text className={`text-sm font-semibold truncate ${isMobile || isDark ? 'text-white' : 'text-brand-text'}`} numberOfLines={1}>{user?.user_metadata?.full_name || user?.email || 'User'}</Text>
               <Text className={`text-xs ${isMobile || isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
             </View>
           </View>

@@ -79,7 +79,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
   }, [user]);
 
   const rc = roleConfig[role || 'admin'] || roleConfig.admin;
-  const initials = (profile?.full_name || user?.email || 'U')
+  const initials = (profile?.full_name || user?.user_metadata?.full_name || user?.email || 'U')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
   const handlePasswordReset = async () => {
@@ -218,7 +218,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{profile?.full_name || 'Your Name'}</Text>
+                <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
                 <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>{profile?.email || user?.email}</Text>
                 <View style={{
                   alignSelf: 'flex-start', marginTop: 8, borderRadius: 10,
