@@ -23,8 +23,8 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
               <Text className="text-gray-500 text-xs" numberOfLines={1}>{location}</Text>
             </View>
           </View>
-          <View className={`${status === 'active' ? 'bg-green-50' : 'bg-gray-100'} px-2 py-1 rounded`}>
-            <Text className={`${status === 'active' ? 'text-green-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>{status}</Text>
+          <View className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-green-50' : 'bg-gray-100'} px-2 py-1 rounded`}>
+            <Text className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-green-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>{status}</Text>
           </View>
         </View>
         <View className="w-full mb-3">
@@ -57,8 +57,8 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
       </View>
       
       {/* Status Badge */}
-      <View className={`${status === 'active' ? 'bg-[#DCFCE7]' : 'bg-gray-100'} px-2 py-1 rounded mr-6`}>
-        <Text className={`${status === 'active' ? 'text-brand-success' : 'text-gray-500'} text-xs font-semibold`}>{status}</Text>
+      <View className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-[#DCFCE7]' : 'bg-gray-100'} px-2 py-1 rounded mr-6`}>
+        <Text className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-brand-success' : 'text-gray-500'} text-xs font-semibold`}>{status}</Text>
       </View>
       
       {/* Progress */}
@@ -101,7 +101,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
         let query = supabase
           .from('projects')
           .select('*')
-          .eq('status', 'active')
+          .in('status', ['active', 'Active', 'In Progress', 'in progress'])
           .order('created_at', { ascending: false });
           
         if (pmId) {

@@ -40,13 +40,13 @@ export default function DashboardScreen() {
         // Fetch counts from various tables
         const today = new Date().toISOString().split('T')[0];
         const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
-          supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['active', 'Active', 'In Progress', 'in progress']),
           supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present').is('check_out_time', null),
           // Assuming materials has current_stock and minimum_threshold. Since we can't do raw sql in select, we can fetch them.
           // Wait, the prompt said: .lt('current_stock', supabase.raw('minimum_threshold')) - supabase.raw doesn't exist in JS client.
           // A better way is to fetch all and filter in JS if there's no SQL function, or call an RPC. For now, fetch all materials and filter:
           supabase.from('materials').select('current_stock, minimum_threshold'),
-          supabase.from('projects').select('total_budget').eq('status', 'active')
+          supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress'])
         ]);
 
         let lowStockCount = 0;
