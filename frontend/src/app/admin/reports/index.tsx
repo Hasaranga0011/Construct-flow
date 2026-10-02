@@ -3,10 +3,12 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../services/api';
+import { useRouter } from 'expo-router';
 
 type ReportState = { total: number; data: any[] };
 
 export default function AdminReportsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ReportState>({ total: 0, data: [] });
   const [materials, setMaterials] = useState<ReportState>({ total: 0, data: [] });
   const [payroll, setPayroll] = useState<ReportState>({ total: 0, data: [] });
@@ -53,9 +55,59 @@ export default function AdminReportsPage() {
           <View className="bg-red-50 border border-red-200 rounded-2xl p-6 items-center"><Text className="text-red-700 text-center">{error}</Text><Pressable onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4"><Text className="text-white font-bold">Retry</Text></Pressable></View>
         ) : (
           <View className="gap-4">
-            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><View className="flex-row items-center"><View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-4"><Ionicons name="business-outline" size={22} color="#F97316" /></View><View><Text className="text-gray-500 text-xs font-semibold uppercase">Projects</Text><Text className="text-3xl font-bold text-brand-text mt-1">{projects.total}</Text></View></View>{projects.data.length === 0 && <Text className="text-gray-400 mt-4">No project records available.</Text>}</View>
-            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><View className="flex-row items-center"><View className="w-11 h-11 rounded-full bg-blue-50 items-center justify-center mr-4"><Ionicons name="cube-outline" size={22} color="#3B82F6" /></View><View><Text className="text-gray-500 text-xs font-semibold uppercase">Materials</Text><Text className="text-3xl font-bold text-brand-text mt-1">{materials.total}</Text></View></View>{materials.data.length === 0 && <Text className="text-gray-400 mt-4">No material records available.</Text>}</View>
-            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><View className="flex-row items-center"><View className="w-11 h-11 rounded-full bg-green-50 items-center justify-center mr-4"><Ionicons name="cash-outline" size={22} color="#22C55E" /></View><View><Text className="text-gray-500 text-xs font-semibold uppercase">Salary slips</Text><Text className="text-3xl font-bold text-brand-text mt-1">{payroll.total}</Text></View></View>{payroll.data.length === 0 && <Text className="text-gray-400 mt-4">No payroll records available.</Text>}</View>
+            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-4">
+                    <Ionicons name="business-outline" size={22} color="#F97316" />
+                  </View>
+                  <View>
+                    <Text className="text-gray-500 text-xs font-semibold uppercase">Projects</Text>
+                    <Text className="text-3xl font-bold text-brand-text mt-1">{projects.total}</Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => router.push('/admin/reports/projects')} className="bg-brand-orange px-4 py-2 rounded-lg">
+                  <Text className="text-white font-semibold">View Report</Text>
+                </Pressable>
+              </View>
+              {projects.data.length === 0 && <Text className="text-gray-400 mt-4">No project records available.</Text>}
+            </View>
+
+            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <View className="w-11 h-11 rounded-full bg-blue-50 items-center justify-center mr-4">
+                    <Ionicons name="cube-outline" size={22} color="#3B82F6" />
+                  </View>
+                  <View>
+                    <Text className="text-gray-500 text-xs font-semibold uppercase">Materials</Text>
+                    <Text className="text-3xl font-bold text-brand-text mt-1">{materials.total}</Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => router.push('/admin/reports/materials')} className="bg-brand-orange px-4 py-2 rounded-lg">
+                  <Text className="text-white font-semibold">View Report</Text>
+                </Pressable>
+              </View>
+              {materials.data.length === 0 && <Text className="text-gray-400 mt-4">No material records available.</Text>}
+            </View>
+
+            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <View className="w-11 h-11 rounded-full bg-green-50 items-center justify-center mr-4">
+                    <Ionicons name="cash-outline" size={22} color="#22C55E" />
+                  </View>
+                  <View>
+                    <Text className="text-gray-500 text-xs font-semibold uppercase">Salary slips</Text>
+                    <Text className="text-3xl font-bold text-brand-text mt-1">{payroll.total}</Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => router.push('/admin/reports/payroll')} className="bg-brand-orange px-4 py-2 rounded-lg">
+                  <Text className="text-white font-semibold">View Report</Text>
+                </Pressable>
+              </View>
+              {payroll.data.length === 0 && <Text className="text-gray-400 mt-4">No payroll records available.</Text>}
+            </View>
           </View>
         )}
       </ScrollView>

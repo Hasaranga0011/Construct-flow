@@ -2,7 +2,10 @@ import { supabase } from '../lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+const apiCache = new Map<string, { data: any, timestamp: number, promise?: Promise<any> }>();
+const CACHE_TTL = 60000; // 60 seconds
+
+async function executeFetch(endpoint: string, options: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
@@ -23,6 +26,39 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   }
 
   return response.json();
+}
+
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // On mutation (POST, PATCH, DELETE, PUT), clear the entire cache to ensure fresh data
+  if (method !== 'GET') {
+    apiCache.clear();
+    return executeFetch(endpoint, options);
+  }
+
+  // Handle GET requests with cache
+  const cached = apiCache.get(endpoint);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    if (cached.data) {
+      return cached.data; // Return instantly, no buffering
+    }
+    if (cached.promise) {
+      return cached.promise; // Wait for the in-flight request
+    }
+  }
+
+  // No valid cache, fetch fresh
+  const promise = executeFetch(endpoint, options).then(data => {
+    apiCache.set(endpoint, { data, timestamp: Date.now() });
+    return data;
+  }).catch(err => {
+    apiCache.delete(endpoint);
+    throw err;
+  });
+
+  apiCache.set(endpoint, { data: null, timestamp: Date.now(), promise });
+  return promise;
 }
 
 export const api = {

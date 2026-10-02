@@ -72,20 +72,14 @@ export default function ResetPasswordScreen() {
 
           {/* Logo */}
           <Pressable
-            onPress={() => router.push('/home')}
-            style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 28, gap: 10 }}
+            onPress={() => router.push('/')}
+            style={{ alignSelf: 'flex-start', marginBottom: 28, marginLeft: -12 }}
           >
-            <View style={{
-              width: 38, height: 38, borderRadius: 10,
-              backgroundColor: '#F97316',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
-            }}>
-              <MaterialIcons name="precision-manufacturing" size={22} color="#fff" />
-            </View>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: '#1a1a2e', letterSpacing: 0.3 }}>
-              Construct<Text style={{ color: '#F97316' }}>Ai</Text>
-            </Text>
+            <Image 
+              source={require('../../assets/images/main-logo.png')} 
+              style={{ height: 75, width: 300 }} 
+              resizeMode="contain" 
+            />
           </Pressable>
 
           <View className="mb-10">

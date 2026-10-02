@@ -33,7 +33,12 @@ _DELAY_PKL  = _MODELS_DIR / "delay_classifier.pkl"
 _COST_META  = _MODELS_DIR / "cost_predictor_meta.json"
 _DELAY_META = _MODELS_DIR / "delay_classifier_meta.json"
 
-_COST_FEATURES  = ["square_footage", "num_workers", "materials_cost", "labour_cost", "completion_percentage"]
+_COST_FEATURES = [
+    "square_footage", "location", "project_type", "quality_tier",
+    "num_floors", "site_condition", "structure_type", 
+    "finishing_flooring", "finishing_sanitary", "finishing_electrical",
+    "target_timeline"
+]
 _DELAY_FEATURES = ["worker_count", "material_usage", "task_progress", "safety_incidents",
                    "equipment_utilization_rate", "material_shortage_alert"]
 
@@ -78,7 +83,8 @@ def _require_delay_model():
 
 def _feature_importance_list(model, feature_names: List[str]) -> List[Dict]:
     """Return sorted list of {name, value} from model.feature_importances_."""
-    importances = model.feature_importances_
+    regressor = model.named_steps['regressor'] if hasattr(model, 'named_steps') else model
+    importances = regressor.feature_importances_
     result = [
         {"name": name, "value": round(float(imp) * 100, 1)}
         for name, imp in zip(feature_names, importances)
@@ -86,13 +92,20 @@ def _feature_importance_list(model, feature_names: List[str]) -> List[Dict]:
     return sorted(result, key=lambda x: x["value"], reverse=True)
 
 
-def _prediction_interval(model, X: np.ndarray) -> float:
+def _prediction_interval(model, X) -> float:
     """
     Estimate a ±confidence width by computing the std-dev of the individual
     tree predictions.  Returns the coefficient of variation (std/mean) as a
     0-100 'uncertainty' score; lower is more confident.
     """
-    tree_preds = np.array([tree.predict(X)[0] for tree in model.estimators_])
+    import pandas as pd
+    
+    regressor = model.named_steps['regressor'] if hasattr(model, 'named_steps') else model
+    preprocessor = model.named_steps['preprocessor'] if hasattr(model, 'named_steps') else None
+    
+    X_transformed = preprocessor.transform(X) if preprocessor else X
+    
+    tree_preds = np.array([tree.predict(X_transformed)[0] for tree in regressor.estimators_])
     mean = tree_preds.mean()
     if mean == 0:
         return 50.0
@@ -102,17 +115,22 @@ def _prediction_interval(model, X: np.ndarray) -> float:
     return round(100.0 - uncertainty, 1)
 
 
-def _per_input_importance(model, X_row: np.ndarray, feature_names: List[str]) -> List[Dict]:
+def _per_input_importance(model, X_row, original_df) -> List[Dict]:
     """
     Approximate per-prediction feature contribution by computing the
     weighted mean of each feature's global importance, scaled by how far
     the input value sits from the training mean of each feature.
-    This is a lightweight linear approximation (no SHAP dependency needed).
-    The ranking is meaningful even if the absolute percentages are rounded.
     """
-    importances = model.feature_importances_
-    # Raw contribution = importance × |value| (normalised)
-    values = X_row[0]
+    regressor = model.named_steps['regressor'] if hasattr(model, 'named_steps') else model
+    importances = regressor.feature_importances_
+    
+    # Feature ordering is num_features then cat_features based on ColumnTransformer
+    feature_names = ["square_footage", "num_floors", "location", "project_type", "quality_tier", "site_condition", "structure_type", "finishing_flooring", "finishing_sanitary", "finishing_electrical", "target_timeline"]
+    
+    preprocessor = model.named_steps['preprocessor'] if hasattr(model, 'named_steps') else None
+    X_transformed = preprocessor.transform(X_row) if preprocessor else X_row
+    
+    values = X_transformed[0]
     norms = np.abs(values) / (np.abs(values).sum() + 1e-9)
     raw = importances * norms
     total = raw.sum() + 1e-9
@@ -133,37 +151,17 @@ _QUAL_MAP  = {"Standard": 0, "Premium": 1, "Luxury": 2}
 
 
 class PredictRequest(BaseModel):
-    square_footage: float = Field(
-        ..., gt=50, le=500_000,
-        description="Built-up area in sq ft. Must be between 50 and 500,000."
-    )
-    location: str = Field(..., description="One of: Colombo, Kandy, Galle, Other")
-    project_type: str = Field(..., description="One of: Residential, Commercial, Industrial")
-    quality_tier: str = Field(..., description="One of: Standard, Premium, Luxury")
-
-    @field_validator("location")
-    @classmethod
-    def validate_location(cls, v: str) -> str:
-        allowed = set(_LOC_MAP)
-        if v not in allowed:
-            raise ValueError(f"location must be one of: {', '.join(sorted(allowed))}")
-        return v
-
-    @field_validator("project_type")
-    @classmethod
-    def validate_project_type(cls, v: str) -> str:
-        allowed = set(_TYPE_MAP)
-        if v not in allowed:
-            raise ValueError(f"project_type must be one of: {', '.join(sorted(allowed))}")
-        return v
-
-    @field_validator("quality_tier")
-    @classmethod
-    def validate_quality_tier(cls, v: str) -> str:
-        allowed = set(_QUAL_MAP)
-        if v not in allowed:
-            raise ValueError(f"quality_tier must be one of: {', '.join(sorted(allowed))}")
-        return v
+    square_footage: float = Field(..., gt=50, le=500_000)
+    num_floors: int = Field(..., gt=0, le=100)
+    location: str = Field(...)
+    project_type: str = Field(...)
+    quality_tier: str = Field(...)
+    site_condition: str = Field(...)
+    structure_type: str = Field(...)
+    finishing_flooring: str = Field(...)
+    finishing_sanitary: str = Field(...)
+    finishing_electrical: str = Field(...)
+    target_timeline: str = Field(...)
 
 
 class PredictResponse(BaseModel):
@@ -196,29 +194,28 @@ def predict_cost(
     """
     _require_cost_model()
 
-    # Build the feature vector the model was trained on.
-    # The pipeline uses: square_footage, num_workers, materials_cost,
-    # labour_cost, completion_percentage
-    # For estimation requests we have only 4 user inputs, so we approximate
-    # the derived features from the user-visible inputs.
-    loc_enc   = _LOC_MAP[req.location]
-    type_enc  = _TYPE_MAP[req.project_type]
-    qual_enc  = _QUAL_MAP[req.quality_tier]
+    import pandas as pd
+    
+    # Build a DataFrame for prediction
+    input_data = {
+        "square_footage": [req.square_footage],
+        "location": [req.location],
+        "project_type": [req.project_type],
+        "quality_tier": [req.quality_tier],
+        "num_floors": [req.num_floors],
+        "site_condition": [req.site_condition],
+        "structure_type": [req.structure_type],
+        "finishing_flooring": [req.finishing_flooring],
+        "finishing_sanitary": [req.finishing_sanitary],
+        "finishing_electrical": [req.finishing_electrical],
+        "target_timeline": [req.target_timeline],
+    }
+    
+    X_df = pd.DataFrame(input_data)
 
-    # Derive numeric approximations for pipeline features
-    # (same heuristic as prepare_dataset.py / seed_from_kaggle.py)
-    base_workers = {"Residential": 8, "Commercial": 20, "Industrial": 35}[req.project_type]
-    area_workers = max(base_workers, int(req.square_footage / 450))
-    materials_cost = area_workers * 150 * (1 + qual_enc * 0.5)
-    labour_cost    = area_workers * 45
-    completion_pct = 0.0   # new project — no completion yet
-
-    X = np.array([[req.square_footage, area_workers, materials_cost,
-                   labour_cost, completion_pct]])
-
-    predicted_cost  = float(_cost_model.predict(X)[0])
-    confidence      = _prediction_interval(_cost_model, X)
-    contributions   = _per_input_importance(_cost_model, X, _COST_FEATURES)
+    predicted_cost  = float(_cost_model.predict(X_df)[0])
+    confidence      = _prediction_interval(_cost_model, X_df)
+    contributions   = _per_input_importance(_cost_model, X_df, input_data)
 
     return PredictResponse(
         estimated_cost=max(predicted_cost, 0),
@@ -229,10 +226,11 @@ def predict_cost(
         feature_contributions=contributions,
         features_used={
             "sq_ft": req.square_footage,
-            "location": req.location,
+            "floors": req.num_floors,
             "type": req.project_type,
-            "quality": req.quality_tier,
-            "estimated_workers": area_workers,
+            "location": req.location,
+            "timeline": req.target_timeline,
+            "site": req.site_condition,
         },
     )
 
@@ -258,8 +256,10 @@ def get_insights(
     caller_id = current_user["id"]
 
     # ---- 1. Project Health ------------------------------------------------
+    # NOTE: 'square_footage' and 'project_type' do not currently exist on the 'projects' table.
+    # We omit them from the select() query to avoid 42703 errors, and handle them gracefully via .get() below.
     project_query = db.table("projects").select(
-        "id, name, status, total_budget, spent_cost, pm_id"
+        "id, name, status, total_budget, spent_cost, pm_id, location"
     )
     if role == "pm":
         project_query = project_query.eq("pm_id", pm_id or caller_id)
@@ -269,17 +269,45 @@ def get_insights(
     project_ids = [p["id"] for p in projects]
 
     total   = len(projects)
-    active  = sum(1 for p in projects if p.get("status") == "In Progress")
-    done    = sum(1 for p in projects if p.get("status") == "Completed")
+    active  = sum(1 for p in projects if str(p.get("status") or "").lower() in ("active", "in progress"))
+    done    = sum(1 for p in projects if str(p.get("status") or "").lower() == "completed")
     on_budget = sum(
         1 for p in projects
         if float(p.get("spent_cost") or 0) <= float(p.get("total_budget") or 0)
     )
+    
+    # ---- 1.b Market Trends ------------------------------------------------
+    market_trends = []
+    completed_projects = [
+        p for p in projects 
+        if str(p.get("status") or "").lower() == "completed" 
+        and p.get("square_footage") and float(p.get("square_footage")) > 0
+        and p.get("spent_cost") and float(p.get("spent_cost")) > 0
+    ]
+    from collections import defaultdict
+    trend_groups = defaultdict(list)
+    for p in completed_projects:
+        loc = p.get("location") or "Other"
+        ptype = p.get("project_type") or "Residential"
+        sqft = float(p.get("square_footage"))
+        cost = float(p.get("spent_cost"))
+        trend_groups[(loc, ptype)].append(cost / sqft)
+
+    for (loc, ptype), costs in trend_groups.items():
+        market_trends.append({
+            "location": loc,
+            "project_type": ptype,
+            "avg_cost_per_sqft": sum(costs) / len(costs),
+            "sample_size": len(costs)
+        })
+    market_trends.sort(key=lambda x: x["sample_size"], reverse=True)
+
     project_health = {
         "total": total,
         "active": active,
         "completed": done,
         "on_budget_percent": round(100 * on_budget / total) if total else 0,
+        "trending_over_budget": 0  # Will compute this in the delay loop
     }
 
     # ---- 2. Feature Importance (global, from cost model) ------------------
@@ -351,8 +379,20 @@ def get_insights(
                 reasons.append(f"{overdue_mils} milestone{'s' if overdue_mils > 1 else ''} past due")
             if late_pos > 0:
                 reasons.append(f"{late_pos} late purchase order{'s' if late_pos > 1 else ''}")
-            if suggested_pos > 0:
-                reasons.append(f"{suggested_pos} order{'s' if suggested_pos > 1 else ''} awaiting supplier confirmation")
+            # ---- Forecasted Cost Overrun ----
+            spent_cost = float(project.get("spent_cost") or 0)
+            total_budget = float(project.get("total_budget") or 0)
+            forecasted_final_cost = None
+            is_over_budget = False
+            
+            if str(project.get("status") or "").lower() in ("active", "in progress") and avg_completion > 0 and avg_completion < 100:
+                # Burn rate forecast
+                forecasted_final_cost = spent_cost / (avg_completion / 100.0)
+                if forecasted_final_cost > total_budget and total_budget > 0:
+                    is_over_budget = True
+                    project_health["trending_over_budget"] += 1
+                    reasons.append(f"Trending over budget (Forecast: LKR {forecasted_final_cost:,.0f} vs Budget: LKR {total_budget:,.0f})")
+
             recommendation = "; ".join(reasons) if reasons else "On track"
 
             project_risks.append({
@@ -362,6 +402,10 @@ def get_insights(
                 "recommendation": recommendation,
                 "milestone_overdue_count": overdue_mils,
                 "late_po_count": late_pos,
+                "attendance_gap": 0, # Placeholder for frontend
+                "is_over_budget": is_over_budget,
+                "forecasted_cost": forecasted_final_cost,
+                "total_budget": total_budget
             })
 
     project_risks.sort(key=lambda x: x["delay_risk"], reverse=True)
@@ -376,8 +420,7 @@ def get_insights(
     return {
         "feature_importance": feature_importance,
         "projects": project_risks,
-        # Legacy key kept for DelayRiskPanel backwards compat
-        "market_trends": [],
+        "market_trends": market_trends,
         "project_health": project_health,
         "labour_stats": {
             "total_workers": labour_count,
@@ -391,6 +434,26 @@ def get_insights(
             "delay_model": _delay_meta,
         },
     }
+
+@router.post("/retrain")
+def retrain_models(current_user: dict = Depends(get_current_user)):
+    """
+    Triggers the training pipeline asynchronously. 
+    Respects the validation-gate (does not deploy if R2 is worse).
+    """
+    if current_user["role"] not in ("admin", "super_admin"):
+        raise HTTPException(403, "Only admins can trigger model retraining.")
+    
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    pipeline_script = Path(__file__).resolve().parents[2] / "data_pipeline" / "train_models.py"
+    
+    # Run non-blocking
+    subprocess.Popen([sys.executable, str(pipeline_script)])
+    
+    return {"status": "success", "message": "Model retraining initiated in the background."}
 
 
 @router.get("/model-info")

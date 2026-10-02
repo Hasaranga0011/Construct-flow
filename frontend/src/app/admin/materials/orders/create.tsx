@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { sendSystemNotification } from '../../../../utils/notifications';
 
 export default function AdminMaterialsOrdersCreatePage() {
   const router = useRouter();
@@ -148,6 +149,14 @@ export default function AdminMaterialsOrdersCreatePage() {
 
       const { error } = await supabase.from('purchase_orders').insert([orderData]);
       if (error) throw error;
+      
+      // Dispatch notification
+      await sendSystemNotification(
+        'Purchase Order Created',
+        `PO #${orderData.po_number} was created for ${selectedMaterial ? selectedMaterial.name : 'materials'}.`,
+        'Supplier',
+        orderData.supplier_id
+      );
 
       if (Platform.OS === 'web') window.alert('Order created successfully!');
       else Alert.alert('Success', 'Order created successfully!');

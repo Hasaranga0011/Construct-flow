@@ -60,10 +60,20 @@ def prepare_data():
             'Warehouse', 'Road Construction', 'Renovation',
         ]
         quality_tiers = ['Standard', 'Premium', 'Luxury']
+        site_conditions = ['Flat', 'Sloped', 'Requires Excavation/Piling']
+        structure_types = ['RCC frame', 'Load-bearing', 'Steel']
+        timelines = ['Standard', 'Rushed']
 
         cost_df['location']     = np.random.choice(locations, size=len(cost_df))
         cost_df['project_type'] = np.random.choice(project_types, size=len(cost_df))
         cost_df['quality_tier'] = np.random.choice(quality_tiers, size=len(cost_df))
+        cost_df['num_floors']   = np.random.randint(1, 25, size=len(cost_df))
+        cost_df['site_condition'] = np.random.choice(site_conditions, size=len(cost_df))
+        cost_df['structure_type'] = np.random.choice(structure_types, size=len(cost_df))
+        cost_df['finishing_flooring'] = np.random.choice(quality_tiers, size=len(cost_df))
+        cost_df['finishing_sanitary'] = np.random.choice(quality_tiers, size=len(cost_df))
+        cost_df['finishing_electrical'] = np.random.choice(quality_tiers, size=len(cost_df))
+        cost_df['target_timeline'] = np.random.choice(timelines, p=[0.8, 0.2], size=len(cost_df))
 
         # ---- Realistic Cost Label (LKR) --------------------------------
         # Base rate per sq ft by project type
@@ -86,24 +96,42 @@ def prepare_data():
         }
         loc_mul = cost_df['location'].map(loc_mul_map)
 
-        # Quality multiplier
+        # Base Quality multiplier (overall fallback)
         qual_mul_map = {'Standard': 1.0, 'Premium': 1.5, 'Luxury': 2.2}
-        qual_mul = cost_df['quality_tier'].map(qual_mul_map)
+        
+        # Finishes multipliers
+        floor_mul = cost_df['finishing_flooring'].map(qual_mul_map) * 0.3
+        sani_mul = cost_df['finishing_sanitary'].map(qual_mul_map) * 0.4
+        elec_mul = cost_df['finishing_electrical'].map(qual_mul_map) * 0.3
+        
+        # Site condition multiplier
+        site_mul_map = {'Flat': 1.0, 'Sloped': 1.15, 'Requires Excavation/Piling': 1.35}
+        site_mul = cost_df['site_condition'].map(site_mul_map)
+
+        # Structure type multiplier
+        struct_mul_map = {'Load-bearing': 0.9, 'RCC frame': 1.0, 'Steel': 1.25}
+        struct_mul = cost_df['structure_type'].map(struct_mul_map)
+
+        # Floors multiplier
+        floor_count_mul = 1.0 + (cost_df['num_floors'] * 0.02)
+
+        # Timeline multiplier
+        time_mul = cost_df['target_timeline'].map({'Standard': 1.0, 'Rushed': 1.2})
 
         # Core formula + ±15% noise
         noise = np.random.uniform(0.85, 1.15, size=len(cost_df))
-        cost_df['actual_cost'] = (
-            cost_df['square_footage'] * base_rates * loc_mul * qual_mul
-            * noise
-            + cost_df['materials_cost'] * 0.3
-            + cost_df['labour_cost'] * 0.2
-        )
+        
+        # Calculate actual cost considering all new features
+        base_building_cost = cost_df['square_footage'] * base_rates * loc_mul * struct_mul * floor_count_mul * site_mul
+        finishes_cost = cost_df['square_footage'] * base_rates * (floor_mul + sani_mul + elec_mul)
+        
+        cost_df['actual_cost'] = (base_building_cost + finishes_cost) * time_mul * noise
 
         cost_cols = [
-            'square_footage', 'num_workers', 'materials_cost',
-            'labour_cost', 'completion_percentage',
-            'location', 'project_type', 'quality_tier',
-            'actual_cost',
+            'square_footage', 'location', 'project_type', 'quality_tier',
+            'num_floors', 'site_condition', 'structure_type', 
+            'finishing_flooring', 'finishing_sanitary', 'finishing_electrical',
+            'target_timeline', 'actual_cost',
         ]
         cost_out = os.path.join(pipeline_dir, 'cost_data.csv')
         cost_df[cost_cols].to_csv(cost_out, index=False)

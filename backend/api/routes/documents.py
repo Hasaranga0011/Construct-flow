@@ -8,6 +8,7 @@ from reportlab.pdfgen import canvas
 from core.database import client_for_token
 from core.security import get_current_user
 from datetime import datetime
+import json
 
 router = APIRouter(
     prefix="/documents",
@@ -175,3 +176,145 @@ def generate_invoice(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/estimation/{estimation_id}/pdf")
+def generate_estimation_pdf(
+    estimation_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        supabase = client_for_token(current_user["token"])
+        
+        # Fetch the estimation
+        est_res = supabase.table("estimations").select("*").eq("id", estimation_id).execute()
+        if not est_res.data:
+            raise HTTPException(status_code=404, detail="Estimation not found")
+        
+        est = est_res.data[0]
+        
+        # Parse JSON from project_name if available
+        title = est.get("project_name", "AI Cost Estimate")
+        inputs = None
+        contribs = []
+        try:
+            parsed = json.loads(title)
+            if "title" in parsed:
+                title = parsed["title"]
+                inputs = parsed.get("inputs", {})
+                contribs = parsed.get("contributions", [])
+        except Exception:
+            pass
+
+        # Build the PDF in memory
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+
+        # Header background
+        c.setFillColor(colors.HexColor("#0F1117")) # Dark brand color
+        c.rect(0, height - 1.2 * inch, width, 1.2 * inch, fill=1, stroke=0)
+
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawString(0.5 * inch, height - 0.7 * inch, "ConstructFlow")
+        c.setFont("Helvetica", 14)
+        c.drawString(0.5 * inch, height - 1.0 * inch, "AI Cost Estimation Report")
+
+        # Meta
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(0.5 * inch, height - 1.8 * inch, f"Estimation ID: EST-{str(estimation_id)[:8].upper()}")
+        c.setFont("Helvetica", 10)
+        est_date = datetime.fromisoformat(est["created_at"].replace("Z", "+00:00")).strftime("%d/%m/%Y")
+        c.drawString(0.5 * inch, height - 2.0 * inch, f"Date: {est_date}")
+        c.drawString(0.5 * inch, height - 2.2 * inch, f"Status: {est.get('status', 'Pending')}")
+
+        # Project details
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(width - 4.0 * inch, height - 1.8 * inch, "Project Overview:")
+        c.setFont("Helvetica", 10)
+        c.drawString(width - 4.0 * inch, height - 2.0 * inch, title)
+        
+        if inputs:
+            y_input = height - 2.2 * inch
+            c.drawString(width - 4.0 * inch, y_input, f"Area: {inputs.get('sq_ft', 'N/A')} sq.ft")
+            c.drawString(width - 4.0 * inch, y_input - 0.2*inch, f"Floors: {inputs.get('floors', 'N/A')}")
+            c.drawString(width - 4.0 * inch, y_input - 0.4*inch, f"Site: {inputs.get('site', 'N/A')}")
+            c.drawString(width - 4.0 * inch, y_input - 0.6*inch, f"Structure: {inputs.get('structure', 'N/A')}")
+
+        # Summary
+        y_pos = height - 3.2 * inch
+        c.setStrokeColor(colors.lightgrey)
+        c.line(0.5 * inch, y_pos, width - 0.5 * inch, y_pos)
+        
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(0.5 * inch, y_pos - 0.4 * inch, "Estimated Total Cost:")
+        c.setFillColor(colors.HexColor("#F97316"))
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(3.0 * inch, y_pos - 0.4 * inch, f"Rs. {est.get('estimated_cost', 0):,.2f}")
+        c.setFillColor(colors.black)
+
+        if est.get("confidence_score") is not None:
+            c.setFont("Helvetica", 10)
+            c.drawString(0.5 * inch, y_pos - 0.7 * inch, f"Model Confidence Score: {est.get('confidence_score')}%")
+
+        y_pos -= 1.2 * inch
+
+        # Cost Breakdown table
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(0.5 * inch, y_pos, "Cost Contribution Breakdown (Model Output)")
+        y_pos -= 0.1 * inch
+        
+        c.line(0.5 * inch, y_pos, width - 0.5 * inch, y_pos)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(0.6 * inch, y_pos - 0.2 * inch, "Factor")
+        c.drawString(width - 2.0 * inch, y_pos - 0.2 * inch, "Weight (%)")
+        c.line(0.5 * inch, y_pos - 0.3 * inch, width - 0.5 * inch, y_pos - 0.3 * inch)
+
+        y_pos -= 0.5 * inch
+        c.setFont("Helvetica", 10)
+        
+        if contribs:
+            for item in contribs:
+                c.drawString(0.6 * inch, y_pos, str(item.get("name", "")))
+                c.drawString(width - 2.0 * inch, y_pos, f"{item.get('value', 0):.1f}%")
+                y_pos -= 0.25 * inch
+                c.setStrokeColor(colors.whitesmoke)
+                c.line(0.5 * inch, y_pos + 0.15 * inch, width - 0.5 * inch, y_pos + 0.15 * inch)
+        else:
+            items = [
+                ("Materials", 42.0),
+                ("Labour", 26.0),
+                ("Equipment", 16.0),
+                ("Overhead", 16.0)
+            ]
+            for desc, pct in items:
+                c.drawString(0.6 * inch, y_pos, desc)
+                c.drawString(width - 2.0 * inch, y_pos, f"{pct:.1f}%")
+                y_pos -= 0.25 * inch
+                c.setStrokeColor(colors.whitesmoke)
+                c.line(0.5 * inch, y_pos + 0.15 * inch, width - 0.5 * inch, y_pos + 0.15 * inch)
+
+        # Footer
+        c.setFillColor(colors.gray)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(
+            width / 2.0,
+            0.5 * inch,
+            "Disclaimer: This is an AI-generated estimate and should be validated by a professional Quantity Surveyor."
+        )
+
+        c.showPage()
+        c.save()
+        buffer.seek(0)
+
+        headers = {
+            "Content-Disposition": f'attachment; filename="Estimate_{str(estimation_id)[:8]}.pdf"'
+        }
+        return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

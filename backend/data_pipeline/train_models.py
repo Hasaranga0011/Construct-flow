@@ -31,6 +31,9 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import (accuracy_score, classification_report,
                               mean_absolute_error, r2_score)
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OrdinalEncoder
 
 PIPELINE_DIR = Path(__file__).resolve().parent
 MODELS_DIR   = PIPELINE_DIR.parent / "models"
@@ -43,8 +46,12 @@ DELAY_PKL  = MODELS_DIR / "delay_classifier.pkl"
 COST_META  = MODELS_DIR / "cost_predictor_meta.json"
 DELAY_META = MODELS_DIR / "delay_classifier_meta.json"
 
-COST_FEATURES  = ["square_footage", "num_workers", "materials_cost",
-                   "labour_cost", "completion_percentage"]
+COST_FEATURES = [
+    "square_footage", "location", "project_type", "quality_tier",
+    "num_floors", "site_condition", "structure_type", 
+    "finishing_flooring", "finishing_sanitary", "finishing_electrical",
+    "target_timeline"
+]
 DELAY_FEATURES = ["worker_count", "material_usage", "task_progress",
                   "safety_incidents", "equipment_utilization_rate",
                   "material_shortage_alert"]
@@ -79,8 +86,25 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         X_cost, y_cost, test_size=0.20, random_state=42
     )
 
-    print("Training Cost Predictor (RandomForestRegressor, 150 trees) …")
-    cost_model = RandomForestRegressor(n_estimators=150, random_state=42, n_jobs=-1)
+    print("Training Cost Predictor (Pipeline with OrdinalEncoder + RandomForestRegressor) …")
+    numeric_features = ["square_footage", "num_floors"]
+    categorical_features = [
+        "location", "project_type", "quality_tier", "site_condition", 
+        "structure_type", "finishing_flooring", "finishing_sanitary", 
+        "finishing_electrical", "target_timeline"
+    ]
+    
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', 'passthrough', numeric_features),
+            ('cat', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), categorical_features)
+        ])
+        
+    cost_model = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('regressor', RandomForestRegressor(n_estimators=150, random_state=42, n_jobs=-1))
+    ])
+    
     cost_model.fit(X_tr_c, y_tr_c)
 
     preds_c = cost_model.predict(X_te_c)

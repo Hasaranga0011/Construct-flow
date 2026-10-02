@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ChatWidget } from '../../../components/shared/ChatWidget';
+import { sendSystemNotification } from '../../../utils/notifications';
 
 
 export default function AdminMaterialsOrdersIdPage() {
@@ -71,6 +72,13 @@ export default function AdminMaterialsOrdersIdPage() {
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Dispatch Notification
+      await sendSystemNotification(
+        `Purchase Order ${newStatus}`,
+        `Supplier has marked PO #${order.po_number} as ${newStatus}.`,
+        'Admin'
+      );
 
       if (Platform.OS === 'web') window.alert(`Order marked as ${newStatus}!`);
       else Alert.alert('Success', `Order marked as ${newStatus}!`);

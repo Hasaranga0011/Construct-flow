@@ -72,12 +72,26 @@ export const CostBreakdown = ({
   // Prefer prop (freshest prediction) over stored value
   const confidenceVal = confidence ?? latestEstimate?.confidence_score ?? null;
 
-  // Feature contributions: prefer live prop, fall back to stored JSON if available
-  const storedContribs: FeatureContrib[] | null =
-    latestEstimate?.feature_contributions
-      ? JSON.parse(latestEstimate.feature_contributions)
-      : null;
-  const contribs: FeatureContrib[] = featureContributions || storedContribs || [];
+  // Feature contributions: prefer live prop, fall back to parsed JSON from project_name if available
+  let parsedContribs: FeatureContrib[] | null = null;
+  let explanation = "Illustrative split — generate a new estimate to see model-specific contributions";
+  
+  try {
+    if (latestEstimate?.project_name) {
+      const parsed = JSON.parse(latestEstimate.project_name);
+      if (parsed.contributions) {
+        parsedContribs = parsed.contributions;
+      }
+    }
+  } catch (e) {
+    // Not valid JSON, keep as null
+  }
+  
+  const contribs: FeatureContrib[] = featureContributions || parsedContribs || [];
+
+  if (contribs.length > 0) {
+    explanation = `${contribs[0]?.name} weighted highest due to project size and quality tier`;
+  }
 
   if (loading) {
     return (

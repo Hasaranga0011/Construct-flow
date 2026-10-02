@@ -16,6 +16,25 @@ export default function AdminSuppliersIndex() {
   const [search, setSearch] = useState('');
   
   const [stats, setStats] = useState({ total: 0, activeOrders: 0, recentDeliveries: 0 });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    // Setup Realtime subscriptions
+    const subProfiles = supabase.channel('admin-suppliers-profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: "role=eq.supplier" }, () => {
+        setRefreshTrigger(prev => prev + 1);
+      }).subscribe();
+      
+    const subOrders = supabase.channel('admin-suppliers-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, () => {
+        setRefreshTrigger(prev => prev + 1);
+      }).subscribe();
+
+    return () => {
+      supabase.removeChannel(subProfiles);
+      supabase.removeChannel(subOrders);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,12 +51,12 @@ export default function AdminSuppliersIndex() {
         // Fetch order stats for these suppliers
         const { data: orders, error: ordErr } = await supabase
           .from('purchase_orders')
-          .select('id, supplier_id, status, total_cost, updated_at');
+          .select('id, supplier_id, status, total_price, created_at');
           
         if (ordErr) throw ordErr;
         
         const activeStatuses = ['Pending Delivery', 'Suggested', 'Confirmed'];
-        const recentDeliveries = orders?.filter(o => o.status === 'Delivered' && new Date(o.updated_at).getTime() > Date.now() - (7 * 24 * 60 * 60 * 1000)).length || 0;
+        const recentDeliveries = orders?.filter(o => o.status === 'Delivered' && new Date(o.created_at).getTime() > Date.now() - (7 * 24 * 60 * 60 * 1000)).length || 0;
         
         if (isMounted) {
           setStats({
@@ -52,7 +71,7 @@ export default function AdminSuppliersIndex() {
               ...s,
               totalOrders: supplierOrders.length,
               activeOrders: supplierOrders.filter(o => activeStatuses.includes(o.status)).length,
-              totalSpent: supplierOrders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + (o.total_cost || 0), 0)
+              totalSpent: supplierOrders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + (o.total_price || 0), 0)
             };
           }) || [];
           
@@ -67,7 +86,7 @@ export default function AdminSuppliersIndex() {
     
     fetchData();
     return () => { isMounted = false; };
-  }, []);
+  }, [refreshTrigger]);
 
   const filteredSuppliers = suppliers.filter(s => 
     s.full_name?.toLowerCase().includes(search.toLowerCase()) ||

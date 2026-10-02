@@ -1,15 +1,21 @@
 {
   "model_type": "RandomForestRegressor",
-  "trained_at": "2026-09-27T01:00:47Z",
+  "trained_at": "2026-09-30T10:16:10Z",
   "dataset_size": 50000,
   "features": [
     "square_footage",
-    "num_workers",
-    "materials_cost",
-    "labour_cost",
-    "completion_percentage"
+    "location",
+    "project_type",
+    "quality_tier",
+    "num_floors",
+    "site_condition",
+    "structure_type",
+    "finishing_flooring",
+    "finishing_sanitary",
+    "finishing_electrical",
+    "target_timeline"
   ],
-  "validation_r2": 0.2688,
-  "validation_mae": 86128636.38,
+  "validation_r2": 0.9527,
+  "validation_mae": 37921998.38,
   "n_estimators": 150
 }

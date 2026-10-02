@@ -271,8 +271,28 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
         const { data, error } = await query;
 
         if (error) throw error;
-        
-        if (isMounted) setClients(data || []);
+        if (data && data.length > 0) {
+          const clientIds = data.map(c => c.id);
+          const { data: clientProjects } = await supabase
+            .from('projects')
+            .select('name, client_id')
+            .in('client_id', clientIds);
+            
+          const clientsWithProjects = data.map(client => {
+            const myProjects = (clientProjects || []).filter((p: any) => p.client_id === client.id);
+            let projectName = 'N/A';
+            if (myProjects.length === 1) projectName = myProjects[0].name;
+            else if (myProjects.length > 1) projectName = 'Multiple Projects';
+            
+            return {
+              ...client,
+              projectName
+            };
+          });
+          if (isMounted) setClients(clientsWithProjects);
+        } else {
+          if (isMounted) setClients([]);
+        }
       } catch (error) {
         console.warn('Failed to load clients:', error);
       } finally {
@@ -347,7 +367,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
                   key={client.id}
                   initials={client.full_name?.substring(0, 2).toUpperCase() || 'NA'}
                   colorClass={colorClass}
-                  projectName="Multiple Projects"
+                  projectName={client.projectName || 'N/A'}
                   accessLevel="Full Access"
                   companyName={client.company_name || 'N/A'}
                   clientName={client.full_name || 'Unknown'}

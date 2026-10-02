@@ -26,3 +26,32 @@ export const isNotificationForUser = (
   || (notification.target_user_id == null
     && (notification.target_role === 'All'
       || getNotificationRoleAliases(role).includes(notification.target_role || '')));
+
+import { supabase } from '../lib/supabase';
+
+export const sendSystemNotification = async (
+  title: string,
+  message: string,
+  target_role: string = 'Admin',
+  target_user_id: string | null = null,
+  link: string | null = null
+) => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id || '11111111-1111-1111-1111-111111111111';
+    
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'general',
+      title,
+      message,
+      target_role,
+      target_user_id,
+      link,
+      is_read: false,
+      sent_via: 'in_app'
+    });
+  } catch (error) {
+    console.warn('Failed to send notification', error);
+  }
+};

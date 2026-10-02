@@ -15,7 +15,7 @@ def get_project_reports(request: Request):
     try:
         # Mock aggregation for now
         res = supabase.table("projects").select("id, status").execute()
-        return {"total_projects": len(res.data), "data": res.data}
+        return {"total": len(res.data), "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -24,7 +24,7 @@ def get_material_reports(request: Request):
     supabase = get_auth_client(request)
     try:
         res = supabase.table("materials").select("*").execute()
-        return {"total_materials": len(res.data), "data": res.data}
+        return {"total": len(res.data), "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -33,6 +33,6 @@ def get_payroll_reports(request: Request):
     supabase = get_auth_client(request)
     try:
         res = supabase.table("salary_slips").select("*").execute()
-        return {"total_slips": len(res.data), "data": res.data}
+        return {"total": len(res.data), "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
