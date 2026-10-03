@@ -130,7 +130,7 @@ function InitialLayout() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <SafeAreaView className="flex-1 bg-slate-950">
+      <SafeAreaView className="flex-1" style={{ backgroundColor: 'transparent' }}>
         <StatusBar style="light" />
         <ThemeProvider>
           <AuthProvider>

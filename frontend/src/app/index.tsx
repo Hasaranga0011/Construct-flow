@@ -1,41 +1,143 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Image, TextInput, useWindowDimensions } from 'react-native';
+/**
+ * ConstructAi — Home / Landing Page (rewritten)
+ *
+ * SCROLL-DRIVEN VIDEO BACKGROUND
+ * ─────────────────────────────────
+ * injectVideoBackground() (web-only, called in useEffect) creates a fixed
+ * <video> element behind all content and drives it with a requestAnimationFrame
+ * loop that maps scroll progress (0→1) to video.currentTime (0→duration).
+ * Lerp easing (LERP_FACTOR) makes forward and reverse scrubbing feel smooth.
+ *
+ * TUNEABLE constants at the top of this file:
+ *   BLUR          — video layer backdrop blur        (default "10px")
+ *   DIM           — dark overlay opacity, 0–1        (default "0.45")
+ *   SCROLL_LENGTH — scroll height for one full orbit (default "600vh")
+ *   LERP_FACTOR   — easing smoothness, lower=smoother (default 0.10)
+ *
+ * VIDEO ASSET
+ * ───────────
+ * Place homepage.mp4 (or homepage_scroll.mp4) at:
+ *   frontend/assets/images/homepage.mp4
+ *
+ * For smooth reverse scrubbing, re-encode with ffmpeg (all-keyframe):
+ *   ffmpeg -i homepage.mp4 -c:v libx264 -g 1 -crf 23 -an
+ *          -movflags +faststart -vf "scale=1920:-2" homepage_scroll.mp4
+ *
+ * ffmpeg install on Windows (if missing):
+ *   winget install Gyan.FFmpeg
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, ScrollView, Pressable, Image,
+  TextInput, useWindowDimensions, Platform,
+} from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
 import { getDashboardForRole } from '../utils/auth';
 
-const AnimatedCounter = ({ value, suffix = '', isDecimal = false, triggered }: { value: number, suffix?: string, isDecimal?: boolean, triggered: boolean }) => {
-  const [count, setCount] = useState(0);
 
+// ─── Tuneable constants (adjust here — no other file needs changing) ──────────
+const BLUR: string   = '3px';   // CSS blur on the video layer
+const DIM: string    = '0.45';   // dark overlay opacity 0=none 1=black
+const SCROLL_LENGTH  = '600vh';  // scroll distance for one full video pass
+const LERP_FACTOR    = 0.10;    // easing factor (lower=smoother/more lag)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Resolve the bundled asset URL using Metro's require
+const videoAsset = require('../../images/homepage_scroll.mp4');
+const VIDEO_SRC = typeof videoAsset === 'string' ? videoAsset : Image.resolveAssetSource(videoAsset).uri;
+
+
+function injectVideoBackground(): () => void {
+  if (typeof document === 'undefined') return () => {};
+
+  // CSS
+  if (!document.getElementById('cf-vbg-style')) {
+    const s = document.createElement('style');
+    s.id = 'cf-vbg-style';
+    s.textContent = `
+      :root{--vblur:${BLUR};--vdim:${DIM};}
+      #cf-vbg{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;overflow:hidden;
+        background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0c1a2e 100%);}
+      #cf-vbg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
+        transform:scale(1.1);filter:blur(var(--vblur)) brightness(0.65);
+        opacity:0;transition:opacity 1s ease;}
+      #cf-vbg.rdy video{opacity:1;}
+      #cf-vbg video.rdy{opacity:1;}
+      #cf-vbg .dim{position:absolute;inset:0;z-index:1;
+        background:linear-gradient(to bottom,
+          rgba(0,0,0,calc(var(--vdim)*.5)) 0%,
+          rgba(0,0,0,var(--vdim)) 50%,
+          rgba(0,0,0,calc(var(--vdim)*1.5)) 100%);}
+      body{margin:0;overflow-x:hidden;}
+      body>[data-rnwstyle],body>#root{position:relative;z-index:1;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  // Container
+  let c = document.getElementById('cf-vbg');
+  if (!c) {
+    c = document.createElement('div'); c.id = 'cf-vbg';
+    const d = document.createElement('div'); d.className = 'dim';
+    c.appendChild(d);
+    document.body.insertBefore(c, document.body.firstChild);
+  }
+
+  // Video
+  let v = c.querySelector('video') as HTMLVideoElement | null;
+  if (!v) {
+    v = document.createElement('video');
+    v.muted = true; v.playsInline = true;
+    v.preload = 'auto'; v.autoplay = false;
+    v.loop = false; v.src = VIDEO_SRC;
+    c.appendChild(v);
+    v.addEventListener('loadedmetadata', () => v!.classList.add('rdy'));
+    v.load(); // iOS/Safari seek unlock
+  }
+
+  // rAF scroll scrubber
+  let raf = 0;
+  let cur = 0;
+  let tgt = 0;
+
+  const progress = () => {
+    return (window as any).__cfScrollProgress || 0;
+  };
+
+  const tick = () => {
+    const vid = c!.querySelector('video') as HTMLVideoElement | null;
+    if (vid && vid.readyState >= 1 && vid.duration > 0) {
+      tgt = progress() * vid.duration;
+      cur += (tgt - cur) * LERP_FACTOR;
+      if (Math.abs(vid.currentTime - cur) > 0.008) vid.currentTime = cur;
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(raf);
+}
+
+const AnimatedCounter = ({
+  value, suffix = '', isDecimal = false, triggered,
+}: { value: number; suffix?: string; isDecimal?: boolean; triggered: boolean }) => {
+  const [count, setCount] = useState(0);
   useEffect(() => {
     if (!triggered) return;
-    
-    let start = 0;
-    const end = value;
-    if (start === end) return;
-    
-    const duration = 2000;
-    const incrementTime = 30;
-    const totalSteps = duration / incrementTime;
-    const step = end / totalSteps;
-    
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(start);
-      }
-    }, incrementTime);
-    
-    return () => clearInterval(timer);
+    let s = 0;
+    const step = value / (2200 / 30);
+    const t = setInterval(() => {
+      s += step;
+      if (s >= value) { setCount(value); clearInterval(t); }
+      else setCount(s);
+    }, 30);
+    return () => clearInterval(t);
   }, [value, triggered]);
-
-  const displayValue = isDecimal ? count.toFixed(1) : Math.floor(count).toLocaleString();
-  return <Text className="text-white font-extrabold text-4xl md:text-5xl mb-2">{displayValue}{suffix}</Text>;
-}
+  const d = isDecimal ? count.toFixed(1) : Math.floor(count).toLocaleString();
+  return <Text className="text-white font-extrabold text-4xl md:text-5xl mb-2">{d}{suffix}</Text>;
+};
 
 export default function LandingPage() {
   const { session, role } = useAuth();
@@ -43,89 +145,116 @@ export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [countersTriggered, setCountersTriggered] = useState(false);
   const [countersY, setCountersY] = useState(0);
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: wh } = useWindowDimensions();
+  const cleanup = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    if (Platform.OS === 'web') cleanup.current = injectVideoBackground();
+    return () => cleanup.current?.();
+  }, []);
 
   const handleCTA = () => {
-    if (session) {
-      const destination = role ? getDashboardForRole(role) : null;
-      router.push((destination ?? '/') as any);
-    } else {
-      router.push('/team-register');
-    }
+    if (session) router.push((role ? getDashboardForRole(role) : '/') as any);
+    else router.push('/team-register');
   };
 
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    setIsScrolled(offsetY > 50);
+  const handleScroll = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const contentHeight = e.nativeEvent.contentSize.height;
+    const layoutHeight = e.nativeEvent.layoutMeasurement.height;
     
-    if (!countersTriggered && countersY > 0 && offsetY + windowHeight > countersY + 200) {
-      setCountersTriggered(true);
+    if (Platform.OS === 'web') {
+      const sm = contentHeight - layoutHeight;
+      (window as any).__cfScrollProgress = sm > 0 ? Math.max(0, Math.min(y / sm, 1)) : 0;
+    }
+
+    setIsScrolled(y > 50);
+    if (!countersTriggered && countersY > 0 && y + wh > countersY + 200) setCountersTriggered(true);
+  };
+
+  const scrollTo = (id: string) => {
+    if (typeof document !== 'undefined') {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
-  const scrollTo = (sectionId: string) => {
-    if (typeof document !== 'undefined') {
-      const el = document.getElementById(sectionId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => {
-          const scrollParent = el.closest('[style*="overflow"]');
-          if (scrollParent) scrollParent.scrollBy({ top: -80, behavior: 'smooth' });
-        }, 400);
-      }
-    }
+  const g: any = {
+    backgroundColor: 'rgba(17,24,39,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    backdropFilter: 'blur(20px)',
   };
+
+  const slProjects = [
+    { img: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?q=80&w=600', type: 'Commercial Tower',   name: 'WTC Colombo Expansion',          location: 'Colombo 01',           budget: 'LKR 4.2Bn' },
+    { img: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=600', type: 'Luxury Residential', name: 'Cinnamon Life Residencies',      location: 'Beira Lake, Colombo',  budget: 'LKR 2.8Bn' },
+    { img: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?q=80&w=600', type: 'Infrastructure',    name: 'Colombo\u2013Kandy Expressway Ph.3', location: 'Kadugannawa, Kandy',   budget: 'LKR 18Bn'  },
+    { img: 'https://images.unsplash.com/photo-1551882547-ff40c0d129df?q=80&w=600', type: 'Hospitality',       name: 'Jetwing Galle Fort Hotel',       location: 'Galle Fort',           budget: 'LKR 650M'  },
+    { img: 'https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?q=80&w=600', type: 'Retail Complex',    name: 'One Galle Face Mall Ph.2',       location: 'Colombo 03',           budget: 'LKR 3.1Bn' },
+    { img: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=600', type: 'Industrial',        name: 'Hambantota Port Dry Zone',       location: 'Hambantota',           budget: 'LKR 9.4Bn' },
+  ];
+
+  const features = [
+    { icon: <Ionicons name="people" size={28} color="#F97316" />,          title: 'Role-Based Portals',  desc: 'Separate dashboards for Admin, PM, Site Manager, Supplier, Client and Worker \u2014 each scoped to their data with live Supabase sync.' },
+    { icon: <FontAwesome5 name="layer-group" size={24} color="#F97316" />, title: 'Live Inventory',      desc: 'Track Portland Cement, River Sand, Steel Rebar and 200+ materials across all sites with instant low-stock alerts to your phone.' },
+    { icon: <Ionicons name="hammer" size={28} color="#F97316" />,          title: 'QR Attendance',       desc: 'Workers scan site-specific QR codes to check in. Masons, carpenters, plumbers \u2014 all tracked with hours worked and daily snapshots.' },
+    { icon: <Ionicons name="pie-chart" size={28} color="#F97316" />,       title: 'AI Cost Estimator',   desc: 'RandomForest ML trained on 50,000 Sri Lankan data points. Get LKR-accurate predictions with R\u00b2 = 0.95 confidence in seconds.' },
+    { icon: <Entypo name="globe" size={28} color="#F97316" />,             title: 'Client Portal',       desc: 'Give clients real-time milestone visibility, LKR budget charts, and direct in-app messaging \u2014 no more phone calls for updates.' },
+    { icon: <Ionicons name="notifications" size={28} color="#F97316" />,  title: 'Push Notifications',  desc: 'Instant alerts for delayed deliveries, absent workers, pending approvals, and budget overruns on web and native iOS/Android.' },
+  ];
 
   return (
-    <View className="flex-1 bg-brand-light">
-      
-      {/* --- HEADER NAVBAR (Animated on Scroll) --- */}
-      <View 
-        className={`absolute top-0 w-full z-50 transition-all duration-300 ${
-          isScrolled ? 'bg-brand-dark/95 shadow-lg py-3' : 'bg-transparent py-6'
-        } px-8`}
+    <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
+
+      {/* NAVBAR */}
+      <View
+        className="absolute top-0 w-full z-50 px-6 md:px-10"
+        style={{
+          paddingTop: isScrolled ? 12 : 24,
+          paddingBottom: isScrolled ? 12 : 24,
+          backgroundColor: isScrolled ? 'rgba(10,15,30,0.92)' : 'transparent',
+          backdropFilter: isScrolled ? 'blur(24px)' : 'none',
+          borderBottomWidth: isScrolled ? 1 : 0,
+          borderBottomColor: 'rgba(255,255,255,0.07)',
+        }}
       >
         <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="w-11 h-11 bg-brand-orange rounded-xl items-center justify-center mr-3">
+            <View className="w-11 h-11 bg-brand-orange rounded-xl items-center justify-center mr-3"
+              style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
               <MaterialIcons name="precision-manufacturing" size={24} color="white" />
             </View>
-            <Text className="text-white font-bold text-xl tracking-tight">Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>
+            <Text className="text-white font-bold text-xl tracking-tight">
+              Construct<Text style={{ color: '#F97316' }}>Ai</Text>
+            </Text>
           </View>
+
           <View className="flex-row items-center hidden md:flex">
-            <Pressable className="mx-4 group cursor-pointer" onPress={() => scrollTo('home')}>
-              <Text className="text-gray-300 font-semibold text-lg hover:text-white transition-colors duration-300">Home</Text>
-              <View className="h-0.5 w-0 bg-brand-orange group-hover:w-full transition-all duration-300 mt-1 rounded-full" />
-            </Pressable>
-            <Pressable className="mx-4 group cursor-pointer" onPress={() => scrollTo('about')}>
-              <Text className="text-gray-300 font-semibold text-lg hover:text-white transition-colors duration-300">About</Text>
-              <View className="h-0.5 w-0 bg-brand-orange group-hover:w-full transition-all duration-300 mt-1 rounded-full" />
-            </Pressable>
-            <Pressable className="mx-4 group cursor-pointer" onPress={() => scrollTo('gallery')}>
-              <Text className="text-gray-300 font-semibold text-lg hover:text-white transition-colors duration-300">Services</Text>
-              <View className="h-0.5 w-0 bg-brand-orange group-hover:w-full transition-all duration-300 mt-1 rounded-full" />
-            </Pressable>
-            <Pressable className="mx-4 group cursor-pointer" onPress={() => scrollTo('contact')}>
-              <Text className="text-gray-300 font-semibold text-lg hover:text-white transition-colors duration-300">Contact</Text>
-              <View className="h-0.5 w-0 bg-brand-orange group-hover:w-full transition-all duration-300 mt-1 rounded-full" />
-            </Pressable>
+            {[{ label: 'Home', id: 'home' }, { label: 'Services', id: 'services' }, { label: 'Gallery', id: 'projects' }, { label: 'Contact', id: 'contact' }].map(item => (
+              <Pressable key={item.id} className="mx-4 cursor-pointer" onPress={() => scrollTo(item.id)}>
+                <Text className="text-gray-300 font-semibold text-base hover:text-white transition-colors">{item.label}</Text>
+              </Pressable>
+            ))}
           </View>
+
           <View>
             {session ? (
               <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
-                <Pressable className="bg-brand-orange px-6 py-2 rounded-full hover:bg-orange-600 transition-colors">
+                <Pressable className="bg-brand-orange px-6 py-2.5 rounded-full"
+                  style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10 }}>
                   <Text className="text-white font-bold">Go to Dashboard</Text>
                 </Pressable>
               </Link>
             ) : (
               <View className="flex-row items-center">
                 <Link href="/partner-login" asChild>
-                  <Pressable className="mr-6">
-                    <Text className="text-gray-300 font-bold hover:text-white">Partner Portal</Text>
+                  <Pressable className="mr-5 hidden md:flex">
+                    <Text className="text-gray-300 font-semibold hover:text-white">Partner Portal</Text>
                   </Pressable>
                 </Link>
                 <Link href="/team-login" asChild>
-                  <Pressable className="bg-brand-orange px-6 py-2 rounded-full hover:bg-orange-600 transition-colors">
+                  <Pressable className="bg-brand-orange px-6 py-2.5 rounded-full"
+                    style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10 }}>
                     <Text className="text-white font-bold">Team Portal</Text>
                   </Pressable>
                 </Link>
@@ -135,520 +264,331 @@ export default function LandingPage() {
         </View>
       </View>
 
-      <ScrollView 
-        className="flex-1" 
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
-        {/* --- HERO SECTION --- */}
-        <View className="bg-brand-dark pt-40 pb-24 px-8 relative overflow-hidden" id="home">
-          {/* Abstract subtle background element */}
-          <View className="absolute top-10 right-0 opacity-5">
-             <Ionicons name="layers" size={600} color="#F97316" />
-          </View>
-          
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+
+        {/* HERO */}
+        <View className="pt-36 pb-32 px-6 md:px-12 relative" id="home" style={{ minHeight: wh }}>
+          <View style={{ position: 'absolute', top: -80, right: -80, width: 480, height: 480, borderRadius: 240, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
+          <View style={{ position: 'absolute', bottom: 80, left: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
+
           <View className="max-w-7xl mx-auto w-full flex-row flex-wrap items-center z-10">
-            {/* Left Column */}
-            <View className="w-full lg:w-1/2 pr-0 lg:pr-12 mb-16 lg:mb-0">
-              <View className="self-start px-4 py-1.5 rounded-full border border-brand-orange mb-6 flex-row items-center">
+
+            {/* Left */}
+            <View className="w-full lg:w-1/2 pr-0 lg:pr-16 mb-16 lg:mb-0">
+              <View className="self-start flex-row items-center px-4 py-1.5 rounded-full border mb-6"
+                style={{ borderColor: 'rgba(249,115,22,0.45)', backgroundColor: 'rgba(249,115,22,0.1)' }}>
                 <View className="w-2 h-2 rounded-full bg-brand-orange mr-2" />
-                <Text className="text-brand-orange font-bold text-xs tracking-widest uppercase">Construction Management Platform</Text>
+                <Text className="text-brand-orange font-bold text-xs tracking-widest uppercase">Sri Lanka's #1 Construction Platform</Text>
               </View>
-              
-              <Text className="text-white font-extrabold text-5xl md:text-7xl leading-tight mb-6">
+
+              <Text className="text-white font-extrabold leading-tight mb-6" style={{ fontSize: 52, lineHeight: 60 }}>
                 Build Smarter,{'\n'}
-                <Text className="text-brand-orange">Deliver</Text>{'\n'}
+                <Text style={{ color: '#F97316' }}>Deliver</Text>{'\n'}
                 On Time.
               </Text>
-              
-              <Text className="text-gray-400 text-lg md:text-xl leading-relaxed mb-10 max-w-lg">
-                Complete construction management for Sri Lankan companies — projects, materials, labour, payroll, client portals, and AI-powered cost estimation in one platform.
+
+              <Text className="text-gray-300 text-lg leading-relaxed mb-10 max-w-xl">
+                Complete construction management for Sri Lankan contractors — projects, materials, labour, payroll, client portals, and AI cost estimation in LKR. Trusted by teams from Colombo to Jaffna.
               </Text>
-              
-              <View className="flex-row flex-wrap items-center mb-16">
+
+              <View className="flex-row flex-wrap items-center mb-12">
                 <Link href="/team-login" asChild>
-                  <Pressable className="bg-brand-orange px-8 py-4 rounded-full shadow-lg hover:bg-orange-600 transition-colors mr-4 mb-4 flex-row items-center">
+                  <Pressable className="flex-row items-center px-8 py-4 rounded-full mr-4 mb-4"
+                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 24, elevation: 8 }}>
                     <Text className="text-white font-bold text-lg mr-2">Team Portal</Text>
                     <Ionicons name="arrow-forward" size={20} color="white" />
                   </Pressable>
                 </Link>
-                
                 <Link href="/partner-login" asChild>
-                  <Pressable className="bg-transparent px-8 py-4 rounded-full border border-gray-500 hover:border-white transition-colors mb-4">
+                  <Pressable className="px-8 py-4 rounded-full mb-4"
+                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.05)' }}>
                     <Text className="text-white font-bold text-lg">Partner Portal</Text>
                   </Pressable>
                 </Link>
               </View>
-              
-              <View className="flex-row items-center">
-                <View className="mr-12">
-                  <Text className="text-brand-orange font-extrabold text-2xl md:text-3xl mb-1">15+</Text>
-                  <Text className="text-gray-500 text-xs tracking-widest uppercase font-semibold">Modules</Text>
-                </View>
-                <View className="mr-12">
-                  <Text className="text-brand-orange font-extrabold text-2xl md:text-3xl mb-1">6</Text>
-                  <Text className="text-gray-500 text-xs tracking-widest uppercase font-semibold">Role Types</Text>
-                </View>
-                <View>
-                  <Text className="text-brand-orange font-extrabold text-2xl md:text-3xl mb-1">LKR</Text>
-                  <Text className="text-gray-500 text-xs tracking-widest uppercase font-semibold">Native Currency</Text>
-                </View>
+
+              <View className="flex-row flex-wrap gap-8">
+                {[{ val: '15+', label: 'Modules' }, { val: '6', label: 'Role Types' }, { val: 'LKR', label: 'Native Currency' }, { val: '95%', label: 'ML Accuracy' }].map(s => (
+                  <View key={s.label}>
+                    <Text className="text-brand-orange font-extrabold text-3xl mb-0.5">{s.val}</Text>
+                    <Text className="text-gray-500 text-xs tracking-widest uppercase font-semibold">{s.label}</Text>
+                  </View>
+                ))}
               </View>
             </View>
-            
-            {/* Right Column: Dashboard preview */}
+
+            {/* Right — glass dashboard card */}
             <View className="w-full lg:w-1/2">
-              <View className="bg-[#1F2937] rounded-3xl p-6 md:p-8 border border-gray-700 shadow-2xl relative overflow-hidden opacity-95">
-                {/* Background glow effect for card */}
-                <View className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/10 rounded-full blur-3xl -z-10" />
+              <View className="rounded-3xl p-6 md:p-8 relative overflow-hidden"
+                style={{ ...g, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 16 }}>
+                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(249,115,22,0.13)' }} />
 
-                {/* Preview header */}
-                <View className="flex-row items-center border-b border-gray-700 pb-4 mb-6">
-                  <View className="flex-row mr-4">
-                    <View className="w-3 h-3 rounded-full bg-gray-500 mr-2" />
-                    <View className="w-3 h-3 rounded-full bg-gray-500 mr-2" />
-                    <View className="w-3 h-3 rounded-full bg-gray-500" />
+                <View className="flex-row items-center pb-4 mb-5" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
+                  <View className="flex-row mr-3">
+                    {['#EF4444', '#F59E0B', '#22C55E'].map(c => (
+                      <View key={c} className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: c }} />
+                    ))}
                   </View>
-                  <Text className="text-gray-400 font-medium text-sm">ConstructAi Dashboard</Text>
+                  <Text style={{ color: 'rgba(156,163,175,0.8)', fontSize: 12, fontWeight: '500' }}>ConstructAi — Nimal Fernando (PM)</Text>
                 </View>
-                
-                {/* 4 Cards Grid */}
-                <View className="flex-row flex-wrap -mx-2 mb-4">
-                  <View className="w-1/2 px-2 mb-4">
-                    <View className="bg-[#111827]/80 p-4 md:p-5 rounded-2xl border border-gray-700 hover:border-brand-orange/50 transition-colors">
-                      <Text className="text-gray-400 text-xs tracking-widest font-semibold mb-2">ACTIVE PROJECTS</Text>
-                      <Text className="text-white font-extrabold text-3xl">12</Text>
+
+                <View className="flex-row flex-wrap -mx-1.5 mb-4">
+                  {[
+                    { label: 'ACTIVE PROJECTS', value: '15',        color: '#F97316' },
+                    { label: 'WORKERS ON-SITE',  value: '142',       color: '#22C55E' },
+                    { label: 'MATERIALS VALUE',  value: 'LKR 12.4M', color: '#3B82F6' },
+                    { label: 'PENDING PAYROLL',  value: '7',          color: '#A855F7' },
+                  ].map(card => (
+                    <View key={card.label} className="w-1/2 px-1.5 mb-3">
+                      <View className="p-4 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
+                        <Text style={{ color: 'rgba(156,163,175,0.9)', fontSize: 10, letterSpacing: 1.2, fontWeight: '700', marginBottom: 6 }}>{card.label}</Text>
+                        <Text style={{ color: card.color, fontWeight: '800', fontSize: 22 }}>{card.value}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <View className="w-1/2 px-2 mb-4">
-                    <View className="bg-[#111827]/80 p-4 md:p-5 rounded-2xl border border-gray-700 hover:border-brand-orange/50 transition-colors">
-                      <Text className="text-gray-400 text-xs tracking-widest font-semibold mb-2">WORKERS ON-SITE</Text>
-                      <Text className="text-white font-extrabold text-3xl">48</Text>
+                  ))}
+                </View>
+
+                <View className="p-5 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
+                  <Text style={{ color: 'rgba(156,163,175,0.9)', fontSize: 10, letterSpacing: 1.2, fontWeight: '700', marginBottom: 16 }}>ACTIVE PROJECT PROGRESS</Text>
+                  {[
+                    { name: 'WTC Colombo Expansion',   pct: 72, color: '#F97316' },
+                    { name: 'Kandy Expressway Ph.3',    pct: 45, color: '#3B82F6' },
+                    { name: 'Hambantota Port Zone',     pct: 88, color: '#22C55E' },
+                  ].map(proj => (
+                    <View key={proj.name} className="mb-4">
+                      <View className="flex-row justify-between mb-1.5">
+                        <Text style={{ color: 'rgba(209,213,219,0.9)', fontSize: 13 }}>{proj.name}</Text>
+                        <Text style={{ color: 'rgba(156,163,175,0.8)', fontSize: 13 }}>{proj.pct}%</Text>
+                      </View>
+                      <View className="w-full h-1.5 rounded-full" style={{ backgroundColor: 'rgba(75,85,99,0.5)' }}>
+                        <View className="h-full rounded-full" style={{ width: `${proj.pct}%`, backgroundColor: proj.color }} />
+                      </View>
                     </View>
-                  </View>
-                  <View className="w-1/2 px-2">
-                    <View className="bg-[#111827]/80 p-4 md:p-5 rounded-2xl border border-gray-700 hover:border-brand-orange/50 transition-colors">
-                      <Text className="text-gray-400 text-xs tracking-widest font-semibold mb-2">MATERIALS VALUE</Text>
-                      <Text className="text-brand-orange font-extrabold text-2xl">LKR 4.2M</Text>
-                    </View>
-                  </View>
-                  <View className="w-1/2 px-2">
-                    <View className="bg-[#111827]/80 p-4 md:p-5 rounded-2xl border border-gray-700 hover:border-brand-orange/50 transition-colors">
-                      <Text className="text-gray-400 text-xs tracking-widest font-semibold mb-2">PENDING PAYROLL</Text>
-                      <Text className="text-white font-extrabold text-3xl">3</Text>
-                    </View>
-                  </View>
+                  ))}
                 </View>
-                
-                {/* Progress Section */}
-                <View className="bg-[#111827]/80 p-5 md:p-6 rounded-2xl border border-gray-700">
-                  <Text className="text-gray-400 text-xs tracking-widest font-semibold mb-5">PROJECT PROGRESS</Text>
-                  
-                  <View className="mb-5">
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-gray-300 text-sm">Colombo Tower Complex</Text>
-                      <Text className="text-gray-400 text-sm">72%</Text>
-                    </View>
-                    <View className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                      <View className="bg-brand-orange h-full w-[72%]" />
-                    </View>
-                  </View>
 
-                  <View className="mb-5">
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-gray-300 text-sm">Kandy Bridge Restoration</Text>
-                      <Text className="text-gray-400 text-sm">45%</Text>
-                    </View>
-                    <View className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                      <View className="bg-orange-300 h-full w-[45%]" />
-                    </View>
-                  </View>
-
-                  <View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-gray-300 text-sm">Galle Road Widening</Text>
-                      <Text className="text-gray-400 text-sm">88%</Text>
-                    </View>
-                    <View className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                      <View className="bg-orange-500 h-full w-[88%]" />
-                    </View>
-                  </View>
-                </View>
-                
-              </View>
-            </View>
-          </View>
-        </View>
-
-
-        {/* --- SERVICES SECTION --- */}
-        <View className="py-24 px-8 bg-brand-light" id="services">
-          <View className="max-w-6xl mx-auto">
-            <View className="items-center mb-16">
-              <Text className="text-brand-text font-extrabold text-4xl text-center">Comprehensive Project Control</Text>
-              <View className="w-16 h-1 bg-brand-orange mt-4 rounded-full" />
-            </View>
-            
-            <View className="flex-row flex-wrap -mx-4 justify-center">
-              
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <Ionicons name="people" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Role-Based Access</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Secure your data with distinct Admin, Manager, and Client roles. Ensure everyone sees only what they need to see.
-                  </Text>
-                </View>
-              </View>
-              
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <FontAwesome5 name="layer-group" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Live Inventory</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Track raw materials across all your active projects in real-time. Get instant alerts when stock is running low.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <Ionicons name="hammer" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Labour Tracking</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Monitor worker attendance, calculate logged hours, and oversee workforce distribution instantly from your phone.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <Ionicons name="pie-chart" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Automated Estimations</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Generate accurate cost estimations for new contracts based on historical data and real-time material pricing.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <Entypo name="globe" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Client Portal</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Provide a transparent view for stakeholders to see project milestones, budget consumption, and daily reports.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="w-full md:w-1/3 px-4 mb-8">
-                <View className="bg-gray-50 p-8 rounded-2xl items-center text-center border border-gray-100 hover:shadow-md transition-shadow">
-                  <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-                    <Ionicons name="notifications" size={28} color="#F97316" />
-                  </View>
-                  <Text className="text-brand-text font-bold text-xl mb-3">Push Notifications</Text>
-                  <Text className="text-gray-500 text-center leading-relaxed">
-                    Stay updated on delayed shipments, absent workers, or pending invoice approvals immediately on your device.
-                  </Text>
-                </View>
-              </View>
-
-            </View>
-          </View>
-        </View>
-
-        {/* --- ABOUT SECTION --- */}
-        <View className="py-24 px-8 bg-white" id="about">
-          <View className="max-w-6xl mx-auto flex-row flex-wrap items-center">
-            <View className="w-full md:w-1/2 pr-0 md:pr-12 mb-12 md:mb-0">
-               <View className="bg-gray-300 rounded-3xl w-full h-96 items-center justify-center overflow-hidden relative shadow-lg">
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1541888086925-ebbc14b62db4?q=80&w=800' }} 
-                    className="w-full h-full absolute"
-                    resizeMode="cover"
-                  />
-               </View>
-            </View>
-            <View className="w-full md:w-1/2">
-              <Text className="text-brand-orange font-bold text-xl mb-2">Modernizing Construction</Text>
-              <Text className="text-brand-text font-extrabold text-4xl leading-tight mb-6">
-                Built for builders, designed for efficiency.
-              </Text>
-              <Text className="text-gray-600 text-lg leading-relaxed mb-4">
-                ConstructAi was developed to bridge the gap between the chaotic reality of a construction site and the precise tracking required in the back office. No more lost spreadsheets, delayed communication, or mismanaged inventory.
-              </Text>
-              <Text className="text-gray-600 text-lg leading-relaxed mb-8">
-                Powered by a robust FastAPI backend and real-time database syncing, we give project managers the confidence they need to deliver on time and under budget. 
-              </Text>
-              <Pressable onPress={handleCTA} className="bg-brand-dark px-8 py-4 rounded-full self-start hover:opacity-90 transition-opacity">
-                <Text className="text-white font-bold">Join the Platform</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {/* --- PROJECT INFORMATIONS / GALLERY SECTION --- */}
-        <View className="py-24 px-8 bg-brand-light" id="gallery">
-          <View className="max-w-6xl mx-auto">
-            <View className="items-center mb-16">
-              <Text className="text-brand-text font-extrabold text-4xl text-center">Featured Deployments</Text>
-              <View className="w-16 h-1 bg-brand-orange mt-4 rounded-full" />
-              <Text className="text-gray-500 mt-6 text-center max-w-2xl text-lg">
-                Explore real-world projects that are currently being actively tracked and managed using the ConstructAi ecosystem.
-              </Text>
-            </View>
-
-            <View className="flex-row flex-wrap justify-center -mx-4 items-stretch">
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Commercial Skyscraper</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">Marina Tower</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Retail Complex</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">City Mall Phase 2</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Residential Development</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">Green Villas</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Government Infrastructure</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">Highway Expansion</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Industrial Plant</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">Northern Power Station</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                <View className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100 group mx-auto w-full max-w-[320px] h-full flex-col">
-                  <View className="overflow-hidden">
-                    <Image source={{ uri: 'https://images.unsplash.com/photo-1551882547-ff40c0d129df?q=80&w=600' }} className="w-full h-72 group-hover:scale-110 transition-transform duration-700" />
-                  </View>
-                  <View className="p-8 bg-white flex-1">
-                    <Text className="text-brand-orange font-semibold text-sm mb-2">Luxury Hotel</Text>
-                    <Text className="text-brand-text font-extrabold text-2xl group-hover:text-brand-orange transition-colors duration-300">Azure Coastal Resort</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* --- COUNTERS SECTION --- */}
-        <View 
-          className="px-4 py-12 bg-white"
-          onLayout={(e) => setCountersY(e.nativeEvent.layout.y)}
-        >
-          <View className="relative overflow-hidden shadow-2xl" style={{ borderTopLeftRadius: 100, borderBottomRightRadius: 100, borderTopRightRadius: 16, borderBottomLeftRadius: 16 }}>
-            {/* Background Image */}
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1541888086925-ebbc14b62db4?q=80&w=1200' }} 
-              className="absolute w-full h-full"
-              resizeMode="cover"
-            />
-            {/* Dark Overlay */}
-            <View className="absolute w-full h-full bg-[#111827]/80" />
-            
-            <View className="py-20 px-8">
-              <View className="items-center mb-16">
-                <Text className="text-white font-extrabold text-4xl md:text-5xl text-center leading-tight">
-                  Our Achievements{'\n'}in Numbers
+                <Text style={{ textAlign: 'center', color: 'rgba(107,114,128,0.8)', fontSize: 11, letterSpacing: 2, marginTop: 16 }}>
+                  ↓  SCROLL TO ORBIT THE SITE  ↓
                 </Text>
               </View>
-
-              <View className="max-w-6xl mx-auto flex-row flex-wrap justify-center items-center text-center">
-                <View className="w-1/2 md:w-1/4 mb-12 md:mb-0 items-center px-4 md:px-12">
-                  <View className="mb-4">
-                    <Ionicons name="happy-outline" size={48} color="white" />
-                  </View>
-                  <AnimatedCounter value={12490} triggered={countersTriggered} />
-                  <Text className="text-gray-300 font-medium text-sm tracking-widest uppercase">Active Users</Text>
-                </View>
-
-                <View className="w-1/2 md:w-1/4 mb-12 md:mb-0 items-center px-4 md:px-12">
-                  <View className="mb-4">
-                    <Ionicons name="checkmark-circle-outline" size={48} color="white" />
-                  </View>
-                  <AnimatedCounter value={5230} triggered={countersTriggered} />
-                  <Text className="text-gray-300 font-medium text-sm tracking-widest uppercase">Projects Managed</Text>
-                </View>
-
-                <View className="w-1/2 md:w-1/4 mb-12 md:mb-0 items-center px-4 md:px-12">
-                  <View className="mb-4">
-                    <Ionicons name="people-outline" size={48} color="white" />
-                  </View>
-                  <AnimatedCounter value={1} suffix="M+" triggered={countersTriggered} />
-                  <Text className="text-gray-300 font-medium text-sm tracking-widest uppercase">Materials Tracked</Text>
-                </View>
-
-                <View className="w-1/2 md:w-1/4 items-center px-4 md:px-12">
-                  <View className="mb-4">
-                    <Ionicons name="trophy-outline" size={48} color="white" />
-                  </View>
-                  <AnimatedCounter value={99.9} suffix="%" isDecimal triggered={countersTriggered} />
-                  <Text className="text-gray-300 font-medium text-sm tracking-widest uppercase">Uptime</Text>
-                </View>
-              </View>
             </View>
           </View>
         </View>
 
-        {/* --- CONTACT SECTION --- */}
-        <View className="py-24 px-8 bg-white" id="contact">
+        {/* FEATURES */}
+        <View className="py-24 px-6 md:px-10" id="services" style={{ backgroundColor: 'rgba(10,14,26,0.82)', backdropFilter: 'blur(8px)' }}>
           <View className="max-w-6xl mx-auto">
-            <View className="items-center mb-16">
-              <Text className="text-brand-text font-extrabold text-4xl text-center">Get In Touch</Text>
-              <View className="w-16 h-1 bg-brand-orange mt-4 rounded-full" />
+            <View className="items-center mb-14">
+              <Text className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Platform Capabilities</Text>
+              <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
+                Everything a Sri Lankan{'\n'}<Text style={{ color: '#F97316' }}>Contractor Needs</Text>
+              </Text>
+              <View className="w-20 h-1 bg-brand-orange mt-5 rounded-full" />
             </View>
-            
             <View className="flex-row flex-wrap -mx-4">
-              {/* Form */}
-              <View className="w-full md:w-1/2 px-4 mb-12 md:mb-0">
-                 <View className="bg-gray-50 p-8 rounded-2xl border border-gray-100 shadow-sm">
-                    <TextInput className="w-full bg-white border border-gray-200 rounded-lg p-4 mb-4 text-brand-text" placeholder="Your Name" />
-                    <TextInput className="w-full bg-white border border-gray-200 rounded-lg p-4 mb-4 text-brand-text" placeholder="Email Address" keyboardType="email-address" />
-                    <TextInput className="w-full bg-white border border-gray-200 rounded-lg p-4 mb-4 text-brand-text" placeholder="Subject" />
-                    <TextInput className="w-full bg-white border border-gray-200 rounded-lg p-4 mb-4 text-brand-text h-32" placeholder="Message" multiline textAlignVertical="top" />
-                    <Pressable className="bg-brand-orange w-full py-4 rounded-lg items-center mt-2 shadow-sm hover:bg-orange-600 transition-colors">
-                      <Text className="text-white font-bold text-lg">Send Message</Text>
-                    </Pressable>
-                 </View>
+              {features.map(f => (
+                <View key={f.title} className="w-full md:w-1/3 px-4 mb-8">
+                  <View className="p-8 rounded-3xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <View className="w-14 h-14 rounded-2xl items-center justify-center mb-5" style={{ backgroundColor: 'rgba(249,115,22,0.13)' }}>
+                      {f.icon}
+                    </View>
+                    <Text className="text-white font-bold text-xl mb-3">{f.title}</Text>
+                    <Text className="text-gray-400 leading-relaxed">{f.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* STATS STRIP */}
+        <View className="py-12 px-6" style={{ backgroundColor: 'rgba(249,115,22,0.90)' }}>
+          <View className="max-w-5xl mx-auto flex-row flex-wrap justify-around">
+            {[{ val: '95%', label: 'Model Accuracy (R²)' }, { val: '50K+', label: 'ML Training Samples' }, { val: '6', label: 'User Roles' }, { val: '99.9%', label: 'Platform Uptime' }].map(s => (
+              <View key={s.label} className="items-center px-4 mb-6">
+                <Text className="text-white font-extrabold" style={{ fontSize: 44 }}>{s.val}</Text>
+                <Text className="text-orange-100 text-sm font-medium mt-1 tracking-wide">{s.label}</Text>
               </View>
+            ))}
+          </View>
+        </View>
 
-              {/* Info */}
+        {/* PROJECTS GALLERY */}
+        <View className="py-24 px-6 md:px-10" id="projects" style={{ backgroundColor: 'rgba(8,12,22,0.88)', backdropFilter: 'blur(8px)' }}>
+          <View className="max-w-6xl mx-auto">
+            <View className="items-center mb-14">
+              <Text className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Featured Projects</Text>
+              <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
+                Sri Lanka's Biggest Builds,{'\n'}<Text style={{ color: '#F97316' }}>Tracked Here</Text>
+              </Text>
+              <View className="w-20 h-1 bg-brand-orange mt-5 rounded-full" />
+            </View>
+            <View className="flex-row flex-wrap -mx-4">
+              {slProjects.map(proj => (
+                <View key={proj.name} className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
+                  <View className="rounded-3xl overflow-hidden" style={{ ...g }}>
+                    <View style={{ height: 200, overflow: 'hidden' }}>
+                      <Image source={{ uri: proj.img }} className="w-full h-full" resizeMode="cover" />
+                    </View>
+                    <View className="p-6">
+                      <Text className="text-brand-orange font-semibold text-xs tracking-widest uppercase mb-1">{proj.type}</Text>
+                      <Text className="text-white font-bold text-xl mb-2">{proj.name}</Text>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <Ionicons name="location" size={13} color="#9CA3AF" />
+                          <Text className="text-gray-400 text-sm ml-1">{proj.location}</Text>
+                        </View>
+                        <Text className="text-brand-orange font-bold text-sm">{proj.budget}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* ANIMATED COUNTERS */}
+        <View className="py-24 px-6" style={{ backgroundColor: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(8px)' }}
+          onLayout={e => setCountersY(e.nativeEvent.layout.y)}>
+          <View className="max-w-6xl mx-auto">
+            <View className="items-center mb-14">
+              <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
+                Our Achievements in <Text style={{ color: '#F97316' }}>Numbers</Text>
+              </Text>
+            </View>
+            <View className="flex-row flex-wrap justify-center">
+              {[
+                { icon: 'happy-outline' as const,           value: 12490, suffix: '',   label: 'Active Users' },
+                { icon: 'checkmark-circle-outline' as const, value: 5230, suffix: '',   label: 'Projects Managed' },
+                { icon: 'cube-outline' as const,            value: 1,     suffix: 'M+', label: 'Materials Tracked' },
+                { icon: 'trophy-outline' as const,          value: 99.9,  suffix: '%',  isDecimal: true, label: 'Uptime' },
+              ].map(stat => (
+                <View key={stat.label} className="w-1/2 md:w-1/4 mb-12 md:mb-0 items-center px-4">
+                  <View className="w-20 h-20 rounded-3xl items-center justify-center mb-5"
+                    style={{ backgroundColor: 'rgba(249,115,22,0.13)', borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)' }}>
+                    <Ionicons name={stat.icon} size={36} color="#F97316" />
+                  </View>
+                  <AnimatedCounter value={stat.value} suffix={stat.suffix} isDecimal={stat.isDecimal} triggered={countersTriggered} />
+                  <Text className="text-gray-400 font-medium text-sm tracking-widest uppercase">{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* HOW IT WORKS */}
+        <View className="py-24 px-6 md:px-10"
+          style={{ backgroundColor: 'rgba(249,115,22,0.07)', backdropFilter: 'blur(8px)', borderTopWidth: 1, borderTopColor: 'rgba(249,115,22,0.1)' }}>
+          <View className="max-w-5xl mx-auto">
+            <View className="items-center mb-14">
+              <Text className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Simple Setup</Text>
+              <Text className="text-white font-extrabold text-center" style={{ fontSize: 40 }}>Get Started in Minutes</Text>
+            </View>
+            <View className="flex-row flex-wrap -mx-4">
+              {[
+                { step: '01', title: 'Create Your Organisation', desc: 'Sign up and configure your firm profile with LKR billing details and your Colombo or regional office address.' },
+                { step: '02', title: 'Invite Your Team',         desc: 'Send role-based invites to PMs, site managers, suppliers, and clients. Each gets a tailored Sri Lankan portal.' },
+                { step: '03', title: 'Start Tracking Live',      desc: 'Add projects, assign milestones, log materials, use QR attendance, and get AI-powered LKR cost forecasts.' },
+              ].map(s => (
+                <View key={s.step} className="w-full md:w-1/3 px-4 mb-10 md:mb-0 items-center">
+                  <Text style={{ fontWeight: '900', fontSize: 72, color: 'rgba(249,115,22,0.18)', lineHeight: 80, marginBottom: 16 }}>{s.step}</Text>
+                  <Text className="text-white font-bold text-xl mb-3 text-center">{s.title}</Text>
+                  <Text className="text-gray-400 leading-relaxed text-center">{s.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* CONTACT */}
+        <View className="py-24 px-6 md:px-10" id="contact" style={{ backgroundColor: 'rgba(8,12,22,0.90)', backdropFilter: 'blur(8px)' }}>
+          <View className="max-w-5xl mx-auto">
+            <View className="items-center mb-14">
+              <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
+                Talk to Our <Text style={{ color: '#F97316' }}>Sri Lanka Team</Text>
+              </Text>
+              <View className="w-20 h-1 bg-brand-orange mt-5 rounded-full" />
+            </View>
+            <View className="flex-row flex-wrap -mx-4">
+              <View className="w-full md:w-1/2 px-4 mb-12 md:mb-0">
+                <View className="p-8 rounded-3xl" style={{ ...g }}>
+                  {['Your Name', 'Email Address', 'Company / Project Name'].map(ph => (
+                    <TextInput key={ph} placeholder={ph} placeholderTextColor="rgba(156,163,175,0.65)"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }} />
+                  ))}
+                  <TextInput placeholder="Your message" placeholderTextColor="rgba(156,163,175,0.65)"
+                    multiline textAlignVertical="top"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', height: 120, marginBottom: 14 }} />
+                  <Pressable className="w-full py-4 rounded-xl items-center"
+                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 16 }}>
+                    <Text className="text-white font-bold text-lg">Send Message</Text>
+                  </Pressable>
+                </View>
+              </View>
               <View className="w-full md:w-1/2 px-4 justify-center">
-                 <Text className="text-gray-500 text-lg leading-relaxed mb-8">
-                   Have questions about our enterprise plans? Need help setting up your first project? Our dedicated support team is available 24/7 to assist you.
-                 </Text>
-                 
-                 <View className="flex-row items-center mb-6">
-                   <View className="w-12 h-12 bg-orange-50 rounded-full items-center justify-center mr-4">
-                     <Ionicons name="call" size={20} color="#F97316" />
-                   </View>
-                   <View>
-                     <Text className="text-brand-text font-bold">Phone</Text>
-                     <Text className="text-gray-500">+1 (800) 123-4567</Text>
-                   </View>
-                 </View>
-
-                 <View className="flex-row items-center mb-6">
-                   <View className="w-12 h-12 bg-orange-50 rounded-full items-center justify-center mr-4">
-                     <Ionicons name="mail" size={20} color="#F97316" />
-                   </View>
-                   <View>
-                     <Text className="text-brand-text font-bold">Email</Text>
-                     <Text className="text-gray-500">support@constructai.com</Text>
-                   </View>
-                 </View>
-
-                 <View className="flex-row items-center">
-                   <View className="w-12 h-12 bg-orange-50 rounded-full items-center justify-center mr-4">
-                     <Ionicons name="location" size={20} color="#F97316" />
-                   </View>
-                   <View>
-                     <Text className="text-brand-text font-bold">Office</Text>
-                     <Text className="text-gray-500">One World Trade Center, New York</Text>
-                   </View>
-                 </View>
+                <Text className="text-gray-300 text-lg leading-relaxed mb-10">
+                  Based in Colombo, serving contractors from Jaffna to Matara. Our support team speaks Sinhala, Tamil, and English — reach us any time.
+                </Text>
+                {[
+                  { icon: 'call'     as const, label: 'Phone',  value: '+94 11 234 5678' },
+                  { icon: 'mail'     as const, label: 'Email',  value: 'support@constructai.lk' },
+                  { icon: 'location' as const, label: 'Office', value: 'No. 14, Galle Road, Colombo 03, Sri Lanka' },
+                ].map(c => (
+                  <View key={c.label} className="flex-row items-center mb-6">
+                    <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: 'rgba(249,115,22,0.14)' }}>
+                      <Ionicons name={c.icon} size={20} color="#F97316" />
+                    </View>
+                    <View>
+                      <Text className="text-white font-bold">{c.label}</Text>
+                      <Text className="text-gray-400">{c.value}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
           </View>
         </View>
 
-        {/* --- FOOTER --- */}
-        <View className="bg-transparent mt-12">
-          <View className="bg-brand-dark pt-24 pb-12 px-8 shadow-2xl" style={{ borderTopLeftRadius: 100 }}>
-            <View className="max-w-6xl mx-auto flex-row flex-wrap justify-between border-b border-gray-700 pb-12 mb-8">
+        {/* FOOTER */}
+        <View style={{ backgroundColor: 'rgba(5,8,18,0.97)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+          <View className="pt-20 pb-10 px-6 md:px-10">
+            <View className="max-w-6xl mx-auto flex-row flex-wrap justify-between pb-12 mb-8" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
               <View className="w-full md:w-1/3 mb-10 md:mb-0 pr-8">
-                <View className="flex-row items-center mb-6">
-                  <MaterialIcons name="precision-manufacturing" size={32} color="#F97316" />
-                  <Text className="text-white font-extrabold text-3xl tracking-tight ml-3">Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>
+                <View className="flex-row items-center mb-5">
+                  <MaterialIcons name="precision-manufacturing" size={30} color="#F97316" />
+                  <Text className="text-white font-extrabold text-2xl tracking-tight ml-3">
+                    Construct<Text style={{ color: '#F97316' }}>Ai</Text>
+                  </Text>
                 </View>
-                <Text className="text-gray-400 leading-relaxed text-lg">
-                  Lorem ipsum dolor sit consetetur sadipscing elitr, sed diamnonumy eirmod tempor inidunt ut labore et dolore. Lorem ipsum dolor sit consetetur sadipscing elitr, sed diamnonumy eirmod tempor inidunt ut labore et dolore.
+                <Text className="text-gray-400 leading-relaxed mb-6">
+                  Sri Lanka's most advanced construction management platform. Empowering contractors and project teams with real-time insights and AI-powered estimation in LKR.
                 </Text>
+                <View className="flex-row gap-3">
+                  {['logo-facebook', 'logo-twitter', 'logo-linkedin', 'logo-instagram'].map(icon => (
+                    <View key={icon} className="w-11 h-11 rounded-full items-center justify-center"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' }}>
+                      <Ionicons name={icon as any} size={18} color="#6B7280" />
+                    </View>
+                  ))}
+                </View>
               </View>
-              
-              <View className="w-full md:w-1/5 mb-8 md:mb-0">
-                <Text className="text-white font-bold text-xl mb-6">Company</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Home</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">About</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Service</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Gallery</Text>
-                <Text className="text-gray-400 hover:text-white cursor-pointer transition-colors text-lg">Blog</Text>
-              </View>
-
-              <View className="w-full md:w-1/5 mb-8 md:mb-0">
-                <Text className="text-white font-bold text-xl mb-6">Support</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Terms & Condition</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Privacy</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Policy</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Legal</Text>
-              </View>
-
-              <View className="w-full md:w-1/5">
-                <Text className="text-white font-bold text-xl mb-6">Socials</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Facebook</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Twitter</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">Instagram</Text>
-                <Text className="text-gray-400 mb-4 hover:text-white cursor-pointer transition-colors text-lg">LinkedIn</Text>
-                <Text className="text-gray-400 hover:text-white cursor-pointer transition-colors text-lg">Pinterest</Text>
-              </View>
+              {[
+                { title: 'Platform', links: ['Features', 'AI Estimator', 'Client Portal', 'Mobile App', 'Integrations'] },
+                { title: 'Company',  links: ['About', 'Blog', 'Careers', 'Press', 'Contact'] },
+                { title: 'Legal',    links: ['Privacy Policy', 'Terms of Service', 'Cookie Policy', 'SLA'] },
+              ].map(col => (
+                <View key={col.title} className="w-full md:w-1/6 mb-8 md:mb-0">
+                  <Text className="text-white font-bold text-base mb-5">{col.title}</Text>
+                  {col.links.map(link => (
+                    <Text key={link} className="text-gray-500 mb-3 text-sm hover:text-white cursor-pointer transition-colors">{link}</Text>
+                  ))}
+                </View>
+              ))}
             </View>
-            
-            <View className="max-w-6xl mx-auto items-center">
-               <Text className="text-gray-500">Designed and Developed by <Text className="text-blue-400 font-medium cursor-pointer hover:text-blue-300">ConstructAi Team</Text></Text>
+            <View className="max-w-6xl mx-auto flex-row flex-wrap items-center justify-between">
+              <Text className="text-gray-600 text-sm">© 2025 ConstructAi (Pvt) Ltd. Registered in Sri Lanka. All rights reserved.</Text>
+              <Text className="text-gray-700 text-xs mt-2 md:mt-0">Built with <Text style={{ color: '#F97316' }}>❤</Text> in Colombo, Sri Lanka</Text>
             </View>
           </View>
         </View>
