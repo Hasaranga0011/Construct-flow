@@ -10,8 +10,10 @@ import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { useRealtimeStats } from '../../hooks/useRealtimeStats';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function DashboardScreen() {
+  const { isMobile } = useResponsive();
   const [stats, setStats] = useState({
     activeProjects: 0,
     workersOnSite: 0,
@@ -92,7 +94,7 @@ export default function DashboardScreen() {
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           {/* Top Stat Cards Row */}
-          <View className="flex-col md:flex-row gap-4 mb-6">
+          <View className={`gap-4 mb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             <AnimatedCard delay={100} style={{ flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
@@ -126,7 +128,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className="flex-col md:flex-row gap-6 mb-6">
+          <View className={`gap-6 mb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             {/* Main Content Area (Chart) */}
             <View className="flex-[2] w-full">
               <CostTimelineChart />
@@ -139,7 +141,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className="flex-col md:flex-row gap-6 pb-6">
+          <View className={`gap-6 pb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             <View className="flex-[2] w-full">
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>

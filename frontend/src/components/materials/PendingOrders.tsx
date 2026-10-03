@@ -10,7 +10,7 @@ const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) =>
   return (
     <View className="flex-row items-center py-3 border-b border-gray-50">
       {/* Icon */}
-      <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+      <View className="w-11 h-11 rounded-full bg-blue-100 items-center justify-center mr-3">
         <FontAwesome5 name="box-open" size={16} color="#3B82F6" />
       </View>
       

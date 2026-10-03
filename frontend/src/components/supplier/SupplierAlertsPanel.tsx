@@ -7,7 +7,7 @@ import { api } from '../../services/api';
 const AlertRow = ({ title, project, date }: { title: string, project: string, date: string }) => {
   return (
     <View className="flex-row items-center py-3 border-b border-gray-50">
-      <View className="w-10 h-10 rounded-full bg-red-100 items-center justify-center mr-3">
+      <View className="w-11 h-11 rounded-full bg-red-100 items-center justify-center mr-3">
         <FontAwesome5 name="exclamation-triangle" size={14} color="#EF4444" />
       </View>
       <View className="flex-1 pr-2">

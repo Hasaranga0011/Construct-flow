@@ -1,17 +1,41 @@
-fastapi
-uvicorn
-supabase
-pydantic
-pydantic-settings
+# ============================================================
+# ConstructFlow Backend — pinned requirements
+#
+# IMPORTANT: The numpy/scikit-learn/joblib versions below MUST
+# match the environment used to train models/cost_predictor.pkl
+# and models/delay_classifier.pkl.  If you retrain with a
+# different version, update these three pins accordingly.
+# Mismatched versions cause KeyError / deserialization crashes
+# at startup (see ai.py _load_models for the fault-tolerant guard).
+# ============================================================
+
+# --- ML stack (version-sensitive — keep in sync with trained .pkl files) ---
+numpy==2.5.1
+scikit-learn==1.9.0
+joblib==1.5.3
+pandas==3.0.5
+
+# --- Web framework ---
+fastapi==0.140.0
+uvicorn==0.51.0
+
+# --- Pydantic ---
+pydantic==2.13.4
+pydantic-settings==2.14.2
+
+# --- Supabase / auth ---
+supabase==2.31.0
 python-dotenv
 httpx
 python-multipart
-numpy
-pandas
-scikit-learn
+
+# --- Scheduler ---
 APScheduler>=3.10,<4
+
+# --- Utilities ---
 requests
 reportlab
-cloudinary
+cloudinary==1.45.0
 resend
 email-validator
+

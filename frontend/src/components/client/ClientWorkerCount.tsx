@@ -17,7 +17,7 @@ export const ClientWorkerCount = ({ count = 24 }: { count?: number }) => {
         {[1, 2, 3].map((i) => (
           <View 
             key={i} 
-            className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200"
+            className="w-11 h-11 rounded-full border-2 border-white overflow-hidden bg-gray-200"
             style={{ marginLeft: i === 1 ? 0 : -15 }}
           >
             <Image 
@@ -27,7 +27,7 @@ export const ClientWorkerCount = ({ count = 24 }: { count?: number }) => {
           </View>
         ))}
         <View 
-          className="w-10 h-10 rounded-full border-2 border-white bg-brand-orange items-center justify-center"
+          className="w-11 h-11 rounded-full border-2 border-white bg-brand-orange items-center justify-center"
           style={{ marginLeft: -15 }}
         >
           <Text className="text-white text-xs font-bold">+{count - 3}</Text>

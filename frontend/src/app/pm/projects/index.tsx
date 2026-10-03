@@ -85,7 +85,7 @@ export default function PMProjectsList() {
               projects.map(p => (
                 <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
                   <View className="flex-row items-center mb-3">
-                    <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center mr-3">
+                    <View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-3">
                       <Text className="text-brand-orange font-bold text-lg">{p.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View className="flex-1">

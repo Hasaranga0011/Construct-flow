@@ -48,16 +48,61 @@ _cost_meta   = {}
 _delay_meta  = {}
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def _load_models() -> None:
+    """
+    Load persisted ML artifacts from disk.
+
+    Each artifact is loaded independently so one corrupted / version-incompatible
+    file cannot prevent the others (or the rest of the app) from loading.
+    On any failure the relevant global is left as None and a clear ERROR is
+    written to the log — the app continues to boot, and endpoints that need
+    the model return 503 instead of crashing.
+    """
     global _cost_model, _delay_model, _cost_meta, _delay_meta
+
     if _COST_PKL.exists():
-        _cost_model = joblib.load(_COST_PKL)
+        try:
+            _cost_model = joblib.load(_COST_PKL)
+            logger.info("cost_predictor loaded OK from %s", _COST_PKL)
+        except Exception as exc:  # KeyError, pickle errors, version mismatches…
+            _cost_model = None
+            logger.error(
+                "FAILED to load cost_predictor from %s — model will be unavailable. "
+                "Re-run data_pipeline/train_models.py to regenerate. Error: %s",
+                _COST_PKL, exc,
+            )
+    else:
+        logger.warning("cost_predictor.pkl not found at %s — skipping.", _COST_PKL)
+
     if _DELAY_PKL.exists():
-        _delay_model = joblib.load(_DELAY_PKL)
+        try:
+            _delay_model = joblib.load(_DELAY_PKL)
+            logger.info("delay_classifier loaded OK from %s", _DELAY_PKL)
+        except Exception as exc:
+            _delay_model = None
+            logger.error(
+                "FAILED to load delay_classifier from %s — model will be unavailable. "
+                "Error: %s", _DELAY_PKL, exc,
+            )
+    else:
+        logger.warning("delay_classifier.pkl not found at %s — skipping.", _DELAY_PKL)
+
     if _COST_META.exists():
-        _cost_meta = json.loads(_COST_META.read_text())
+        try:
+            _cost_meta = json.loads(_COST_META.read_text())
+        except Exception as exc:
+            logger.error("Failed to parse cost_predictor_meta.json: %s", exc)
+
     if _DELAY_META.exists():
-        _delay_meta = json.loads(_DELAY_META.read_text())
+        try:
+            _delay_meta = json.loads(_DELAY_META.read_text())
+        except Exception as exc:
+            logger.error("Failed to parse delay_classifier_meta.json: %s", exc)
 
 
 _load_models()
@@ -67,18 +112,28 @@ _load_models()
 # ---------------------------------------------------------------------------
 
 def _require_cost_model():
+    """Raise 503 if the cost model failed to load or was never trained."""
     if _cost_model is None:
         raise HTTPException(
             status_code=503,
-            detail="Model not trained yet — run the training pipeline "
-                   "(cd backend/data_pipeline && python train_models.py)"
+            detail=(
+                "Cost prediction model is not available — the artifact is missing or "
+                "failed to load (possible version mismatch or corruption). "
+                "Contact the administrator or re-run data_pipeline/train_models.py."
+            ),
         )
 
+
 def _require_delay_model():
+    """Raise 503 if the delay classifier failed to load or was never trained."""
     if _delay_model is None:
         raise HTTPException(
             status_code=503,
-            detail="Delay model not trained yet — run the training pipeline"
+            detail=(
+                "Delay risk model is not available — the artifact is missing or "
+                "failed to load. "
+                "Contact the administrator or re-run data_pipeline/train_models.py."
+            ),
         )
 
 def _feature_importance_list(model, feature_names: List[str]) -> List[Dict]:

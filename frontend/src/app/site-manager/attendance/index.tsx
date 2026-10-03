@@ -270,7 +270,7 @@ export default function SMAttendancePage() {
                 {/* Scan Result Card */}
                 {scanResult && (
                   <View className={`rounded-xl p-4 mb-6 flex-row items-center border ${scanResult.action === 'check_in' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${scanResult.action === 'check_in' ? 'bg-green-100' : 'bg-blue-100'}`}>
+                    <View className={`w-11 h-11 rounded-full items-center justify-center mr-3 ${scanResult.action === 'check_in' ? 'bg-green-100' : 'bg-blue-100'}`}>
                       <Ionicons
                         name={scanResult.action === 'check_in' ? 'log-in-outline' : 'log-out-outline'}
                         size={22}

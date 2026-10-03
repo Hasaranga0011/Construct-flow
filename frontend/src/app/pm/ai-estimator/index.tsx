@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert 
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 const LOCATIONS = ['Colombo', 'Kandy', 'Galle', 'Other'];
 const TYPES = ['Residential', 'Commercial', 'Industrial'];
@@ -18,6 +19,7 @@ const OptionPill = ({ label, selected, onPress }: { label: string, selected: boo
 );
 
 export default function PmAiEstimatorPage() {
+  const { isMobile } = useResponsive();
   const [squareFootage, setSquareFootage] = useState('');
   const [location, setLocation] = useState('Colombo');
   const [projectType, setProjectType] = useState('Residential');
@@ -98,13 +100,13 @@ export default function PmAiEstimatorPage() {
       <Text className="px-6 py-3 text-sm text-amber-800 bg-amber-50">Prototype estimates use synthetic data. Accuracy is not validated; confirm costs before budgeting.</Text>
 
       <ScrollView className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
-        <View className="flex-col lg:flex-row gap-6 lg:gap-8">
+        <View className={`gap-6 lg:gap-8 ${isMobile ? 'flex-col' : 'flex-row'}`}>
 
           {/* Left: Form */}
           <View className="flex-[1.2]">
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6">
               <View className="flex-row items-center mb-6">
-                <View className="w-10 h-10 bg-orange-100 rounded-xl items-center justify-center mr-3">
+                <View className="w-11 h-11 bg-orange-100 rounded-xl items-center justify-center mr-3">
                   <Ionicons name="calculator" size={20} color="#F97316" />
                 </View>
                 <View>

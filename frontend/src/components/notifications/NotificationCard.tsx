@@ -47,7 +47,7 @@ export const NotificationCard = ({
     <View className={`bg-white rounded-lg p-4 mb-3 flex-row items-center border ${isUnread ? 'border-l-4 border-l-brand-orange border-y-gray-100 border-r-gray-100' : 'border-gray-100'}`}>
       {/* Icon Area */}
       <View className="relative mr-4">
-        <View className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 items-center justify-center">
+        <View className="w-11 h-11 rounded-full bg-gray-50 border border-gray-100 items-center justify-center">
           <IconFamily name={iconName} size={18} color={iconColor} />
         </View>
         {isUnread && (

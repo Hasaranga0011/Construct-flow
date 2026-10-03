@@ -87,7 +87,7 @@ export default function LandingPage() {
       >
         <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="w-10 h-10 bg-brand-orange rounded-xl items-center justify-center mr-3">
+            <View className="w-11 h-11 bg-brand-orange rounded-xl items-center justify-center mr-3">
               <MaterialIcons name="precision-manufacturing" size={24} color="white" />
             </View>
             <Text className="text-white font-bold text-xl tracking-tight">Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>

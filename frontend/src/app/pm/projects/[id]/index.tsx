@@ -172,7 +172,7 @@ export default function PMProjectDetailsPage() {
                 <Text className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Assigned Personnel</Text>
                 
                 <View className="mb-4 flex-row items-center">
-                  <View className="w-10 h-10 bg-blue-50 rounded-full items-center justify-center mr-3">
+                  <View className="w-11 h-11 bg-blue-50 rounded-full items-center justify-center mr-3">
                     <Ionicons name="briefcase" size={20} color="#3B82F6" />
                   </View>
                   <View>
@@ -182,7 +182,7 @@ export default function PMProjectDetailsPage() {
                 </View>
                 
                 <View className="mb-4 flex-row items-center">
-                  <View className="w-10 h-10 bg-purple-50 rounded-full items-center justify-center mr-3">
+                  <View className="w-11 h-11 bg-purple-50 rounded-full items-center justify-center mr-3">
                     <Ionicons name="person" size={20} color="#8B5CF6" />
                   </View>
                   <View>

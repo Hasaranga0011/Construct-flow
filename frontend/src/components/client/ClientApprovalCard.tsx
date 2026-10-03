@@ -6,7 +6,7 @@ export const ClientApprovalCard = () => {
   return (
     <View className="bg-white rounded-xl p-5 shadow-sm border border-brand-orange/30">
       <View className="flex-row items-center mb-4">
-        <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center mr-3">
+        <View className="w-11 h-11 bg-orange-100 rounded-full items-center justify-center mr-3">
           <Ionicons name="document-text" size={20} color="#F97316" />
         </View>
         <View className="flex-1">

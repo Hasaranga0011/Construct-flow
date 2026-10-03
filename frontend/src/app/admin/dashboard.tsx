@@ -169,7 +169,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className="flex-col lg:flex-row mb-6 gap-6">
+          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             {/* Main Content Area (Chart) */}
             <View className="flex-[2] w-full">
               <CostTimelineChart />
@@ -182,7 +182,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* New Charts Grid Row 1 */}
-          <View className="flex-col lg:flex-row mb-6 gap-6">
+          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             <View className="flex-1 w-full">
               <BudgetUtilizationChart />
             </View>
@@ -192,7 +192,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* New Charts Grid Row 2 */}
-          <View className="flex-col lg:flex-row mb-6 gap-6">
+          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             <View className="flex-1 w-full">
               <PurchaseOrderPipelineChart />
             </View>
@@ -202,7 +202,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className="flex-col lg:flex-row pb-6 gap-6">
+          <View className={`pb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             <View className="flex-[2] w-full">
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>

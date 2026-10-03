@@ -260,7 +260,7 @@ export default function ClientMessagesThreadPage() {
         <Pressable
           onPress={sendMessage}
           disabled={sending || !input.trim() || !receiverId}
-          className={`w-10 h-10 rounded-full items-center justify-center ${sending || !input.trim() || !receiverId ? 'bg-gray-300' : 'bg-brand-orange'}`}
+          className={`w-11 h-11 rounded-full items-center justify-center ${sending || !input.trim() || !receiverId ? 'bg-gray-300' : 'bg-brand-orange'}`}
         >
           {sending ? (
             <ActivityIndicator size="small" color="white" />

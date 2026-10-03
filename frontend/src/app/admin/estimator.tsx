@@ -6,8 +6,10 @@ import { QuotationForm } from '../../components/estimator/QuotationForm';
 import { CostBreakdown } from '../../components/estimator/CostBreakdown';
 import { RecentEstimates } from '../../components/estimator/RecentEstimates';
 import { supabase } from '../../lib/supabase';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function EstimatorScreen() {
+  const { isMobile } = useResponsive();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stats, setStats] = useState({ total: 0, pending: 0, value: 0 });
 
@@ -62,7 +64,7 @@ export default function EstimatorScreen() {
         <QuotationForm onEstimateCreated={() => setRefreshTrigger(prev => prev + 1)} />
 
         {/* Bottom Section Layout */}
-        <View className="flex-col lg:flex-row gap-6 pb-6">
+        <View className={`gap-6 pb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
           <View className="flex-[4] w-full">
             <CostBreakdown refreshTrigger={refreshTrigger} />
           </View>

@@ -207,7 +207,7 @@ export default function AdminSuppliersIndex() {
               ) : (
                 <View key={sup.id} className="flex-row items-center py-4 border-b border-gray-50">
                   <View className="w-[30%] pr-2 flex-row items-center">
-                    <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                    <View className="w-11 h-11 rounded-full bg-blue-100 items-center justify-center mr-3">
                       <Text className="text-blue-700 font-bold">{sup.full_name?.charAt(0) || 'S'}</Text>
                     </View>
                     <View>

@@ -7,7 +7,7 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
   return (
     <View className="flex-row items-center py-3 border-b border-gray-50">
       {/* Icon */}
-      <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center mr-3">
+      <View className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center mr-3">
         <FontAwesome5 name="truck" size={16} color="#F97316" />
       </View>
       

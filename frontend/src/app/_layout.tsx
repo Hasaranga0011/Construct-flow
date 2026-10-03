@@ -1,6 +1,6 @@
 import '../global.css';
 import { Slot, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -130,7 +130,7 @@ function InitialLayout() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <View className="flex-1 bg-slate-950">
+      <SafeAreaView className="flex-1 bg-slate-950">
         <StatusBar style="light" />
         <ThemeProvider>
           <AuthProvider>
@@ -138,7 +138,7 @@ export default function RootLayout() {
             <ToastProvider />
           </AuthProvider>
         </ThemeProvider>
-      </View>
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }

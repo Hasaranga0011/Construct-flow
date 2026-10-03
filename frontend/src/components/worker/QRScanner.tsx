@@ -69,7 +69,7 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
           {/* Overlay mask */}
           <View className="flex-row items-center justify-between p-6 pt-12 bg-black/40">
             <Text className="text-white font-bold text-xl">ස්කෑන් කරන්න (Scan QR)</Text>
-            <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-white/20 items-center justify-center">
+            <Pressable onPress={onClose} className="w-11 h-11 rounded-full bg-white/20 items-center justify-center">
               <Ionicons name="close" size={24} color="white" />
             </Pressable>
           </View>

@@ -96,7 +96,7 @@ export default function AdminMilestonesIndexPage() {
                 {milestones.map((ms, idx) => (
                   <View key={ms.id} className={`flex-row ${idx !== milestones.length - 1 ? 'border-b border-gray-100 mb-6 pb-6' : ''}`}>
                     <View className="mr-6 items-center">
-                      <View className={`w-10 h-10 rounded-full items-center justify-center ${ms.status === 'Completed' ? 'bg-green-100' : 'bg-orange-100'}`}>
+                      <View className={`w-11 h-11 rounded-full items-center justify-center ${ms.status === 'Completed' ? 'bg-green-100' : 'bg-orange-100'}`}>
                         <Ionicons name={ms.status === 'Completed' ? "checkmark" : "time"} size={20} color={ms.status === 'Completed' ? "#16A34A" : "#EA580C"} />
                       </View>
                       {idx !== milestones.length - 1 && (

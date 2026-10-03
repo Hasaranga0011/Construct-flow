@@ -1,6 +1,6 @@
 {
   "model_type": "RandomForestRegressor",
-  "trained_at": "2026-09-30T10:16:10Z",
+  "trained_at": "2026-10-03T02:02:53+00:00",
   "dataset_size": 50000,
   "features": [
     "square_footage",

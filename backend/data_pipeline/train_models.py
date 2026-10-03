@@ -69,13 +69,13 @@ def _load_existing_metric(meta_path: Path, key: str) -> float | None:
 
 def train_and_save_models(skip_gate: bool = False) -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    now = datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
     # ------------------------------------------------------------------
     # 1. Cost Predictor
     # ------------------------------------------------------------------
     print("=" * 60)
-    print("Loading cost dataset …")
+    print("Loading cost dataset...")
     cost_df = pd.read_csv(COST_CSV)
     print(f"  {len(cost_df):,} rows loaded")
 
@@ -86,7 +86,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         X_cost, y_cost, test_size=0.20, random_state=42
     )
 
-    print("Training Cost Predictor (Pipeline with OrdinalEncoder + RandomForestRegressor) …")
+    print("Training Cost Predictor (Pipeline with OrdinalEncoder + RandomForestRegressor)...")
     numeric_features = ["square_footage", "num_floors"]
     categorical_features = [
         "location", "project_type", "quality_tier", "site_condition", 
@@ -127,7 +127,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
     old_r2 = _load_existing_metric(COST_META, "validation_r2")
     if old_r2 is not None and not skip_gate and r2 < old_r2:
         print(
-            f"\n⚠  WARNING: New cost model R² ({r2:.4f}) is worse than deployed "
+            f"\n[WARN] New cost model R2 ({r2:.4f}) is worse than deployed "
             f"({old_r2:.4f}). Keeping the existing model. "
             "Pass --skip-validation-gate to force replacement."
         )
@@ -136,13 +136,13 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         joblib.dump(cost_model, tmp)
         shutil.move(str(tmp), COST_PKL)
         COST_META.write_text(json.dumps(new_cost_meta, indent=2))
-        print("  ✓ Cost predictor saved.")
+        print("  [OK] Cost predictor saved.")
 
     # ------------------------------------------------------------------
     # 2. Delay Classifier
     # ------------------------------------------------------------------
     print("\n" + "=" * 60)
-    print("Loading delay dataset …")
+    print("Loading delay dataset...")
     delay_df = pd.read_csv(DELAY_CSV)
     print(f"  {len(delay_df):,} rows loaded")
 
@@ -153,7 +153,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         X_delay, y_delay, test_size=0.20, random_state=42
     )
 
-    print("Training Delay Classifier (RandomForestClassifier, 150 trees) …")
+    print("Training Delay Classifier (RandomForestClassifier, 150 trees)...")
     delay_model = RandomForestClassifier(
         n_estimators=150, random_state=42, n_jobs=-1, class_weight="balanced"
     )
@@ -176,7 +176,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
     old_acc = _load_existing_metric(DELAY_META, "validation_accuracy")
     if old_acc is not None and not skip_gate and acc < old_acc:
         print(
-            f"\n⚠  WARNING: New delay model accuracy ({acc:.4f}) is worse than deployed "
+            f"\n[WARN] New delay model accuracy ({acc:.4f}) is worse than deployed "
             f"({old_acc:.4f}). Keeping the existing model."
         )
     else:
@@ -184,7 +184,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         joblib.dump(delay_model, tmp)
         shutil.move(str(tmp), DELAY_PKL)
         DELAY_META.write_text(json.dumps(new_delay_meta, indent=2))
-        print("  ✓ Delay classifier saved.")
+        print("  [OK] Delay classifier saved.")
 
     print("\n" + "=" * 60)
     print("Training pipeline complete.")

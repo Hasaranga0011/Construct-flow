@@ -135,7 +135,7 @@ export default function AdminUsersList() {
                 return (
                   <View key={u.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
                     <View className="flex-row items-center mb-3">
-                      <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-3">
+                      <View className="w-11 h-11 rounded-full bg-indigo-50 items-center justify-center mr-3">
                         <Text className="text-indigo-600 font-bold text-lg">{u.full_name?.charAt(0) || '?'}</Text>
                       </View>
                       <View className="flex-1">

@@ -135,7 +135,7 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
         />
         <Pressable 
           onPress={sendMessage}
-          className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${newMessage.trim() ? 'bg-brand-orange' : 'bg-gray-300'}`}
+          className={`ml-2 w-11 h-11 rounded-full items-center justify-center ${newMessage.trim() ? 'bg-brand-orange' : 'bg-gray-300'}`}
           disabled={!newMessage.trim()}
         >
           <Ionicons name="send" size={16} color="white" style={{ marginLeft: 2 }} />

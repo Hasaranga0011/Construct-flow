@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
 
 type Project = { id: string; name: string };
 type Issue = { id: string; title: string; category?: string | null; status?: string | null; created_at?: string | null };
 const categories = ['Quality', 'Delay', 'Safety', 'Payment', 'Other'];
 
 export const ClientIssueForm = () => {
+  const { isMobile } = useResponsive();
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
@@ -71,7 +73,7 @@ export const ClientIssueForm = () => {
   };
 
   return (
-    <View className="flex-1 flex-col lg:flex-row">
+    <View className={`flex-1 ${isMobile ? 'flex-col' : 'flex-row'}`}>
       <View className="flex-[2] bg-white rounded-xl border border-gray-100 p-4 md:p-6 lg:mr-6 mb-6 lg:mb-0">
         <Text className="text-lg font-bold text-brand-text mb-1">Raise a Concern</Text>
         <Text className="text-gray-500 text-xs mb-6">Your project manager will be notified instantly.</Text>
