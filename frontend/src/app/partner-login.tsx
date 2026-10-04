@@ -11,7 +11,9 @@ const REMEMBER_EMAIL_KEY = 'cf_remember_email';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -41,8 +43,12 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!email || !password || !confirmPassword) {
       setErrorMsg('Please fill in all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match');
       return;
     }
 
@@ -140,11 +146,28 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                returnKeyType="next"
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
+              </Pressable>
+            </View>
+          </View>
+
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-gray-700 mb-2">Confirm Password</Text>
+            <View className="w-full flex-row items-center border border-gray-300 rounded-xl bg-gray-50 pr-2">
+              <TextInput
+                className="flex-1 p-4 text-brand-text outline-none"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer">
-                <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
+              <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}>
+                <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
               </Pressable>
             </View>
           </View>

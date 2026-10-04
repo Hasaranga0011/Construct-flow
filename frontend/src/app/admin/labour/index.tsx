@@ -105,7 +105,9 @@ export default function LabourForceScreen() {
                 secondaryColumn: 'email',
                 titleColumn: 'full_name',
                 subtitleColumn: 'email',
-                routePrefix: '/admin/users/'
+                routePrefix: '/admin/users/',
+                filterColumn: 'role',
+                filterValue: 'worker'
               }}
             />
           </View>

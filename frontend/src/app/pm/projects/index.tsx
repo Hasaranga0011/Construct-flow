@@ -5,6 +5,8 @@ import { supabase } from '../../../lib/supabase';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
 import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { TopNav } from '@/components/common/TopNav';
+import { Ionicons } from '@expo/vector-icons';
 import { useDebounce } from '@/hooks/useDebounce';
 
 export default function PMProjectsList() {
@@ -14,6 +16,7 @@ export default function PMProjectsList() {
   const [search, setSearch] = useState('');
   const { isMobile } = useResponsive();
   const debouncedSearch = useDebounce(search, 300);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -22,6 +25,7 @@ export default function PMProjectsList() {
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData?.session?.user;
         if (!user) return;
+        setUserId(user.id);
 
         let query = supabase.from('projects').select('*').eq('pm_id', user.id).order('created_at', { ascending: false });
         if (debouncedSearch) {
@@ -61,7 +65,9 @@ export default function PMProjectsList() {
                 secondaryColumn: 'location',
                 titleColumn: 'name',
                 subtitleColumn: 'location',
-                routePrefix: '/pm/projects/'
+                routePrefix: '/pm/projects/',
+                filterColumn: 'pm_id',
+                filterValue: userId
               }}
             />
           </View>

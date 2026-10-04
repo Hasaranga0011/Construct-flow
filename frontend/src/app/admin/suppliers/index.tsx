@@ -150,7 +150,9 @@ export default function AdminSuppliersIndex() {
               secondaryColumn: 'email',
               titleColumn: 'full_name',
               subtitleColumn: 'email',
-              routePrefix: '/admin/suppliers/'
+              routePrefix: '/admin/suppliers/',
+              filterColumn: 'role',
+              filterValue: 'supplier'
             }}
           />
         </View>

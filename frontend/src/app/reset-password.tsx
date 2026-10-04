@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -122,7 +122,7 @@ export default function ResetPasswordScreen() {
                 secureTextEntry={!showPassword}
                 editable={sessionReady && !successMsg}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2">
+              <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
                 <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#9CA3AF" />
               </Pressable>
             </View>
@@ -140,7 +140,7 @@ export default function ResetPasswordScreen() {
                 secureTextEntry={!showConfirm}
                 editable={sessionReady && !successMsg}
               />
-              <Pressable onPress={() => setShowConfirm(!showConfirm)} className="p-2">
+              <Pressable onPress={() => setShowConfirm(!showConfirm)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showConfirm ? "Hide password" : "Show password"}>
                 <Ionicons name={showConfirm ? 'eye-off' : 'eye'} size={22} color="#9CA3AF" />
               </Pressable>
             </View>

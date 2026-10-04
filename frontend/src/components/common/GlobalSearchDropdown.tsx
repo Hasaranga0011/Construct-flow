@@ -12,6 +12,8 @@ export interface SearchConfig {
   titleColumn: string;
   subtitleColumn?: string;
   routePrefix?: string; // Navigate to this route + id (e.g. '/admin/projects/')
+  filterColumn?: string;
+  filterValue?: string | null;
 }
 
 export const GlobalSearchDropdown = ({ 
@@ -61,6 +63,11 @@ export const GlobalSearchDropdown = ({
       setShowDropdown(true);
       try {
         let query = supabase.from(config.table).select('*').limit(5);
+        
+        if (config.filterColumn && config.filterValue !== undefined) {
+          query = query.eq(config.filterColumn, config.filterValue);
+        }
+
         if (config.secondaryColumn) {
           query = query.or(`${config.searchColumn}.ilike.%${debouncedSearch}%,${config.secondaryColumn}.ilike.%${debouncedSearch}%`);
         } else {

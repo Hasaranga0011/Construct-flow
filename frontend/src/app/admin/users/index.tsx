@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';

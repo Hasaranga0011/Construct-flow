@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
+import { Ionicons } from '@expo/vector-icons';
 
 const ROLES = [
   { label: 'Admin', value: 'super_admin' },
@@ -23,6 +24,9 @@ export default function AdminUsersCreatePage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState('pm');
   const [contactNumber, setContactNumber] = useState('');
   const [workerType, setWorkerType] = useState('General Laborer');
@@ -35,6 +39,10 @@ export default function AdminUsersCreatePage() {
     }
     if (password.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match.');
       return;
     }
 
@@ -52,7 +60,11 @@ export default function AdminUsersCreatePage() {
         daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
       };
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/admin/users`, {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+      console.log('Sending request to:', `${apiUrl}/admin/users`);
+      console.log('Payload:', payload);
+
+      const response = await fetch(`${apiUrl}/admin/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,9 +73,18 @@ export default function AdminUsersCreatePage() {
         body: JSON.stringify(payload)
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to create user');
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          const text = await response.text();
+          console.error('Failed to parse error JSON, text was:', text);
+        }
+        console.error('API Error Response:', errorData);
+        throw new Error((errorData as any).detail || `Server returned ${response.status}`);
       }
 
       // Also update contact number since it's not in the main payload
@@ -79,7 +100,8 @@ export default function AdminUsersCreatePage() {
       router.back();
 
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong.');
+      console.error('Create User Error:', err);
+      Alert.alert('Error', err.message || 'Something went wrong. Check console for details.');
     } finally {
       setLoading(false);
     }
@@ -114,13 +136,40 @@ export default function AdminUsersCreatePage() {
             />
 
             <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Password</Text>
-            <TextInput
-              className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 mb-4 bg-gray-50"
-              placeholder="Min 6 characters"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View className="flex-row items-center border border-gray-200 rounded-lg bg-gray-50 mb-4 pr-3">
+              <TextInput
+                className="flex-1 px-4 py-3 text-sm text-gray-800 outline-none"
+                placeholder="Min 6 characters"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <Pressable 
+                onPress={() => setShowPassword(!showPassword)}
+                className="p-2 min-w-[44px] min-h-[44px] items-center justify-center"
+                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+              >
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Confirm Password</Text>
+            <View className="flex-row items-center border border-gray-200 rounded-lg bg-gray-50 mb-4 pr-3">
+              <TextInput
+                className="flex-1 px-4 py-3 text-sm text-gray-800 outline-none"
+                placeholder="Repeat password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+              />
+              <Pressable 
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="p-2 min-w-[44px] min-h-[44px] items-center justify-center"
+                accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color="#9CA3AF" />
+              </Pressable>
+            </View>
 
             <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Contact Number</Text>
             <TextInput
