@@ -68,6 +68,11 @@ def _load_models() -> None:
     if _COST_PKL.exists():
         try:
             _cost_model = joblib.load(_COST_PKL)
+            # Fix joblib deadlock in Uvicorn threads
+            if hasattr(_cost_model, 'named_steps') and hasattr(_cost_model.named_steps.get('regressor'), 'n_jobs'):
+                _cost_model.named_steps['regressor'].n_jobs = 1
+            elif hasattr(_cost_model, 'n_jobs'):
+                _cost_model.n_jobs = 1
             logger.info("cost_predictor loaded OK from %s", _COST_PKL)
         except Exception as exc:  # KeyError, pickle errors, version mismatches…
             _cost_model = None
@@ -82,6 +87,9 @@ def _load_models() -> None:
     if _DELAY_PKL.exists():
         try:
             _delay_model = joblib.load(_DELAY_PKL)
+            # Fix joblib deadlock in Uvicorn threads
+            if hasattr(_delay_model, 'n_jobs'):
+                _delay_model.n_jobs = 1
             logger.info("delay_classifier loaded OK from %s", _DELAY_PKL)
         except Exception as exc:
             _delay_model = None
@@ -417,16 +425,44 @@ def get_insights(
                 sum(m.get("completion_percentage") or 0 for m in p_mils) / total_mils
                 if total_mils else 50
             )
-            X_delay = np.array([[
-                max(1, project.get("worker_count") or 10),  # fallback
-                po_signal * 100,
-                avg_completion / 100,
-                0,   # safety_incidents (not yet tracked)
-                1 - milestone_signal,
-                1 if late_pos > 0 else 0,
-            ]])
+            
+            import pandas as pd
+            X_delay = pd.DataFrame([{
+                "worker_count": max(1, project.get("worker_count") or 10),
+                "material_usage": po_signal * 100,
+                "task_progress": avg_completion,
+                "safety_incidents": 0,
+                "equipment_utilization_rate": (1 - milestone_signal) * 100,
+                "material_shortage_alert": 1 if late_pos > 0 else 0
+            }])
 
-            delay_proba = float(_delay_model.predict_proba(X_delay)[0][1]) * 100
+            try:
+                base_ml_risk = float(_delay_model.predict_proba(X_delay)[0][1]) * 100
+            except Exception:
+                base_ml_risk = 33.3
+                
+            # Genuine weighted scoring based on actual risk factors
+            risk_penalty = 0.0
+            if overdue_mils > 0:
+                risk_penalty += min(overdue_mils * 15.0, 45.0)  # Up to 45% for overdue milestones
+            if late_pos > 0:
+                risk_penalty += min(late_pos * 10.0, 30.0)      # Up to 30% for late POs
+                
+            # Forecasted Cost Overrun
+            spent_cost = float(project.get("spent_cost") or 0)
+            total_budget = float(project.get("total_budget") or 0)
+            forecasted_final_cost = None
+            is_over_budget = False
+            
+            if str(project.get("status") or "").lower() in ("active", "in progress") and avg_completion > 0 and avg_completion < 100:
+                forecasted_final_cost = spent_cost / (avg_completion / 100.0)
+                if forecasted_final_cost > total_budget and total_budget > 0:
+                    is_over_budget = True
+                    overrun_ratio = (forecasted_final_cost - total_budget) / total_budget
+                    risk_penalty += min(overrun_ratio * 100.0, 25.0)  # Up to 25% for budget overrun
+            
+            # Blend ML risk and practical heuristics
+            delay_proba = min(99.9, (base_ml_risk * 0.2) + risk_penalty)
 
             # Build human-readable risk reason
             reasons = []
@@ -434,19 +470,10 @@ def get_insights(
                 reasons.append(f"{overdue_mils} milestone{'s' if overdue_mils > 1 else ''} past due")
             if late_pos > 0:
                 reasons.append(f"{late_pos} late purchase order{'s' if late_pos > 1 else ''}")
-            # ---- Forecasted Cost Overrun ----
-            spent_cost = float(project.get("spent_cost") or 0)
-            total_budget = float(project.get("total_budget") or 0)
-            forecasted_final_cost = None
-            is_over_budget = False
             
-            if str(project.get("status") or "").lower() in ("active", "in progress") and avg_completion > 0 and avg_completion < 100:
-                # Burn rate forecast
-                forecasted_final_cost = spent_cost / (avg_completion / 100.0)
-                if forecasted_final_cost > total_budget and total_budget > 0:
-                    is_over_budget = True
-                    project_health["trending_over_budget"] += 1
-                    reasons.append(f"Trending over budget (Forecast: LKR {forecasted_final_cost:,.0f} vs Budget: LKR {total_budget:,.0f})")
+            if is_over_budget:
+                project_health["trending_over_budget"] += 1
+                reasons.append(f"Trending over budget (Forecast: LKR {forecasted_final_cost:,.0f} vs Budget: LKR {total_budget:,.0f})")
 
             recommendation = "; ".join(reasons) if reasons else "On track"
 

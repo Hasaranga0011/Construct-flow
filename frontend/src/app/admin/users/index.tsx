@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function AdminUsersList() {
@@ -14,6 +15,7 @@ export default function AdminUsersList() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { isMobile } = useResponsive();
+  const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
     // @ts-ignore
@@ -32,8 +34,8 @@ export default function AdminUsersList() {
       try {
         let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
         
-        if (search) {
-          query = query.ilike('full_name', `%${search}%`);
+        if (debouncedSearch) {
+          query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`);
         }
         
         if (roleFilter !== 'All') {
@@ -52,7 +54,7 @@ export default function AdminUsersList() {
     
     fetchUsers();
     return () => { isMounted = false; };
-  }, [search, roleFilter, refreshTrigger]);
+  }, [debouncedSearch, roleFilter, refreshTrigger]);
 
   const roles = ['All', 'admin', 'pm', 'site_manager', 'client', 'supplier', 'worker'];
   
@@ -80,19 +82,23 @@ export default function AdminUsersList() {
         <TopNav title="Users Directory" actionLabel="+ New User" onActionPress={() => router.push('/admin/users/create')} />
         
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 16 }}>
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 16, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Users</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput 
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search users..."
-                placeholderTextColor="#9CA3AF"
-                value={search}
-                onChangeText={setSearch}
-              />
-            </View>
+            <GlobalSearchDropdown 
+              placeholder="Search users..." 
+              value={search} 
+              onChangeText={setSearch} 
+              className={isMobile ? "w-full" : "w-64"}
+              config={{
+                table: 'profiles',
+                searchColumn: 'full_name',
+                secondaryColumn: 'email',
+                titleColumn: 'full_name',
+                subtitleColumn: 'email',
+                routePrefix: '/admin/users/'
+              }}
+            />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className={isMobile ? "pb-2" : "pb-2 max-w-[700px]"} contentContainerStyle={{ gap: 8 }}>
               {roles.map(role => (

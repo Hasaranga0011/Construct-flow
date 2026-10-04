@@ -9,6 +9,7 @@ import { PayrollSummary } from '../../../components/labour/PayrollSummary';
 import { LabourDistributionChart } from '../../../components/labour/LabourDistributionChart';
 import { CheckInWorkerModal } from '../../../components/labour/CheckInWorkerModal';
 import { supabase } from '../../../lib/supabase';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -90,19 +91,23 @@ export default function LabourForceScreen() {
       ) : (
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Workers</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput 
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search workers..."
-                placeholderTextColor="#9CA3AF"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
+            <GlobalSearchDropdown 
+              placeholder="Search workers..." 
+              value={searchQuery} 
+              onChangeText={setSearchQuery} 
+              className={isMobile ? "w-full" : "w-64"}
+              config={{
+                table: 'profiles',
+                searchColumn: 'full_name',
+                secondaryColumn: 'email',
+                titleColumn: 'full_name',
+                subtitleColumn: 'email',
+                routePrefix: '/admin/users/'
+              }}
+            />
           </View>
 
           {/* Top Stat Cards Row */}

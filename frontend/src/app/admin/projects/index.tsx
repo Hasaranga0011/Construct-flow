@@ -4,6 +4,8 @@ import { useRouter, Link } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { useDebounce } from '@/hooks/useDebounce';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
@@ -14,14 +16,15 @@ export default function AdminProjectsList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const { isMobile } = useResponsive();
+  const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
     let isMounted = true;
     const fetchProjects = async () => {
       try {
         let query = supabase.from('projects').select('*').order('created_at', { ascending: false });
-        if (search) {
-          query = query.ilike('name', `%${search}%`);
+        if (debouncedSearch) {
+          query = query.or(`name.ilike.%${debouncedSearch}%,location.ilike.%${debouncedSearch}%`);
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -71,7 +74,7 @@ export default function AdminProjectsList() {
       isMounted = false; 
       supabase.removeChannel(channel);
     };
-  }, [search]);
+  }, [debouncedSearch]);
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -79,19 +82,23 @@ export default function AdminProjectsList() {
         <TopNav title="Projects" actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
         
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Projects</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput 
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search projects..."
-                placeholderTextColor="#9CA3AF"
-                value={search}
-                onChangeText={setSearch}
-              />
-            </View>
+            <GlobalSearchDropdown 
+              placeholder="Search projects..." 
+              value={search} 
+              onChangeText={setSearch} 
+              className={isMobile ? "w-full" : "w-64"}
+              config={{
+                table: 'projects',
+                searchColumn: 'name',
+                secondaryColumn: 'location',
+                titleColumn: 'name',
+                subtitleColumn: 'location',
+                routePrefix: '/admin/projects/'
+              }}
+            />
           </View>
           
           <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>

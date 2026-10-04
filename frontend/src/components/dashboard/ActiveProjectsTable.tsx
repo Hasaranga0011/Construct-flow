@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { EditProjectModal } from './EditProjectModal';
+import { useDebounce } from '../../hooks/useDebounce';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +87,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [localRefresh, setLocalRefresh] = useState(0);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
     let isMounted = true;
@@ -108,8 +110,8 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
           query = query.eq('pm_id', pmId);
         }
           
-        if (searchQuery) {
-          query = query.ilike('name', `%${searchQuery}%`);
+        if (debouncedSearchQuery) {
+          query = query.or(`name.ilike.%${debouncedSearchQuery}%,location.ilike.%${debouncedSearchQuery}%`);
         }
 
         const { data: projectsData, error } = await query;
@@ -149,7 +151,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
     loadProjects();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, searchQuery, localRefresh]);
+  }, [refreshTrigger, debouncedSearchQuery, localRefresh]);
 
   const handleManage = (project: any) => {
     setSelectedProject(project);

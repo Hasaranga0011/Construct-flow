@@ -7,6 +7,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function AdminSuppliersIndex() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function AdminSuppliersIndex() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   
   const [stats, setStats] = useState({ total: 0, activeOrders: 0, recentDeliveries: 0 });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -88,10 +91,12 @@ export default function AdminSuppliersIndex() {
     return () => { isMounted = false; };
   }, [refreshTrigger]);
 
-  const filteredSuppliers = suppliers.filter(s => 
-    s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredSuppliers = suppliers.filter(s => {
+    if (!debouncedSearch) return true;
+    const searchLower = debouncedSearch.toLowerCase();
+    return s.full_name?.toLowerCase().includes(searchLower) ||
+           s.email?.toLowerCase().includes(searchLower);
+  });
 
   return (
     <View className="flex-1 flex-col bg-gray-50">
@@ -132,18 +137,22 @@ export default function AdminSuppliersIndex() {
           </View>
         </View>
 
-        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
           <Text className="text-2xl font-bold text-brand-text">Supplier Database</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-            <Ionicons name="search" size={16} color="#9CA3AF" />
-            <TextInput 
-              className="flex-1 ml-2 text-sm text-brand-text outline-none"
-              placeholder="Search by name or email..."
-              placeholderTextColor="#9CA3AF"
-              value={search}
-              onChangeText={setSearch}
-            />
-          </View>
+          <GlobalSearchDropdown 
+            placeholder="Search by name or email..." 
+            value={search} 
+            onChangeText={setSearch} 
+            className={isMobile ? "w-full" : "w-64"}
+            config={{
+              table: 'profiles',
+              searchColumn: 'full_name',
+              secondaryColumn: 'email',
+              titleColumn: 'full_name',
+              subtitleColumn: 'email',
+              routePrefix: '/admin/suppliers/'
+            }}
+          />
         </View>
 
         <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-h-[400px]">

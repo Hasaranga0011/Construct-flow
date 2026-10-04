@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const InventoryRow = ({ 
   material, 
@@ -115,6 +116,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
   const { isMobile } = useResponsive();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
     let isMounted = true;
@@ -142,8 +144,8 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
           query = query.eq('projects.status', 'active');
         }
 
-        if (searchQuery) {
-          query = query.ilike('name', `%${searchQuery}%`);
+        if (debouncedSearchQuery) {
+          query = query.ilike('name', `%${debouncedSearchQuery}%`);
         }
 
         const { data, error } = await query;
@@ -161,7 +163,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
     loadMaterials();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, searchQuery, projectId]);
+  }, [refreshTrigger, debouncedSearchQuery, projectId]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">

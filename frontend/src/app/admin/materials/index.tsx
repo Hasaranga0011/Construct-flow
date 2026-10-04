@@ -10,6 +10,7 @@ import { RecentDeliveries } from '../../../components/materials/RecentDeliveries
 import { NewMaterialModal } from '../../../components/materials/NewMaterialModal';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -109,7 +110,7 @@ export default function MaterialsScreen() {
       ) : (
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Materials</Text>
             
             <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, width: isMobile ? '100%' : 'auto', zIndex: 50 }}>
@@ -149,16 +150,19 @@ export default function MaterialsScreen() {
               </View>
 
               {/* Search */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, height: 40, width: isMobile ? '100%' : 220, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-                <Ionicons name="search" size={16} color="#9CA3AF" />
-                <TextInput 
-                  className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                  placeholder="Search materials..."
-                  placeholderTextColor="#9CA3AF"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
+              <GlobalSearchDropdown 
+                placeholder="Search materials..." 
+                value={searchQuery} 
+                onChangeText={setSearchQuery} 
+                className={isMobile ? "w-full" : "w-[220px]"}
+                config={{
+                  table: 'materials',
+                  searchColumn: 'name',
+                  secondaryColumn: 'category',
+                  titleColumn: 'name',
+                  subtitleColumn: 'category'
+                }}
+              />
             </View>
           </View>
 

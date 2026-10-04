@@ -12,6 +12,7 @@ import { ActiveProjectsTable } from '../../components/dashboard/ActiveProjectsTa
 import { RecentAlertsPanel } from '../../components/dashboard/RecentAlertsPanel';
 import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
+import { GlobalSearchDropdown } from '../../components/common/GlobalSearchDropdown';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -115,19 +116,23 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput 
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search projects..."
-                placeholderTextColor="#9CA3AF"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
+            <GlobalSearchDropdown 
+              placeholder="Search projects..." 
+              value={searchQuery} 
+              onChangeText={setSearchQuery} 
+              className={isMobile ? "w-full" : "w-64"}
+              config={{
+                table: 'projects',
+                searchColumn: 'name',
+                secondaryColumn: 'location',
+                titleColumn: 'name',
+                subtitleColumn: 'location',
+                routePrefix: '/admin/projects/'
+              }}
+            />
           </View>
 
           {/* Top Stat Cards Row */}
