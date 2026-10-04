@@ -124,9 +124,9 @@ export default function AdminMilestonesIndexPage() {
                          {ms.status !== 'Completed' && (
                            <Pressable 
                              onPress={() => markComplete(ms.id)}
-                             className="bg-brand-blue px-4 py-2 rounded-lg"
+                             className="bg-[#DCFCE7] border border-[#BBF7D0] min-h-[44px] justify-center px-4 rounded-lg shadow-sm active:bg-[#BBF7D0]"
                            >
-                             <Text className="text-white text-xs font-bold">Mark Complete</Text>
+                             <Text className="text-[#15803D] text-sm font-bold">Mark Complete</Text>
                            </Pressable>
                          )}
                       </View>
