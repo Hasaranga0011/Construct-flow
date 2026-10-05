@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useRouter } from 'expo-router';
 
 const PayrollRow = ({ name, role, total }: { name: string, role: string, total: number }) => (
   <View className="flex-row justify-between items-center py-2 border-b border-gray-50">
@@ -15,6 +16,7 @@ const PayrollRow = ({ name, role, total }: { name: string, role: string, total: 
 );
 
 export const PayrollSummary = ({ refreshTrigger = 0, pmId }: { refreshTrigger?: number, pmId?: string }) => {
+  const router = useRouter();
   const [data, setData] = useState<{name: string, role: string, total: number}[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +51,7 @@ export const PayrollSummary = ({ refreshTrigger = 0, pmId }: { refreshTrigger?: 
           // The backend payroll response might need to include pm_id if we want to filter on frontend, 
           // but since this is an admin dashboard, we can just show all for now or filter if the backend provides it.
           const payrolls = attendance.map((a: any) => {
-            const dailyRate = 3500; // Default daily wage
+            const dailyRate = a.daily_rate || 3500;
             const hourlyRate = dailyRate / 8;
             
             const hours = Number(a.total_hours) || 0;
@@ -95,7 +97,7 @@ export const PayrollSummary = ({ refreshTrigger = 0, pmId }: { refreshTrigger?: 
     if (totalAmount === 0) {
       Alert.alert("No Payroll", "There are no workers checked in today to approve payroll for.");
     } else {
-      Alert.alert("Payroll Approved", `Successfully approved ${formatCurrency(totalAmount)} for ${data.length} workers.`);
+      router.push('/admin/payroll/generate');
     }
   };
 
@@ -127,7 +129,7 @@ export const PayrollSummary = ({ refreshTrigger = 0, pmId }: { refreshTrigger?: 
         onPress={handleApprove}
         className="bg-brand-orange w-full py-3 rounded-lg items-center justify-center hover:bg-orange-600 transition-colors"
       >
-        <Text className="text-white font-semibold text-sm">Approve Payroll</Text>
+        <Text className="text-white font-semibold text-sm">Generate Salary Slips</Text>
       </Pressable>
     </View>
   );

@@ -31,7 +31,7 @@ const ActivityRow = ({
   );
 };
 
-export const RecentClientActivity = () => {
+export const RecentClientActivity = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,27 +66,8 @@ export const RecentClientActivity = () => {
     };
     
     loadActivities();
-
-    const channel = supabase
-      .channel('client_activity')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'client_activity'
-      }, (payload) => {
-        if (isMounted) {
-          // Simplistic logic since we don't have project name in payload easily without joining
-          // We can just prepend it or refetch
-          loadActivities(); 
-        }
-      })
-      .subscribe();
-    
-    return () => { 
-      isMounted = false; 
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return () => { isMounted = false; };
+  }, [refreshTrigger]);
 
   const getIconProps = (action: string) => {
     if (action.toLowerCase().includes('download')) return { iconFamily: FontAwesome5, iconName: 'download', iconColor: '#3B82F6' };

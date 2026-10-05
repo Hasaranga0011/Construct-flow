@@ -164,6 +164,7 @@ export const api = {
   // Reports
   // ----------------------------------------------------------------
   reports: {
+    management: () => executeFetch('/reports/management', {}),
     projects: () => fetchWithAuth('/reports/projects'),
     materials: () => fetchWithAuth('/reports/materials'),
     payroll: () => fetchWithAuth('/reports/payroll'),

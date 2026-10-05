@@ -10,6 +10,8 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 
 import { useResponsive } from '../../hooks/useResponsive';
+import { useTableRealtime } from '../../hooks/useTableRealtime';
+import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 
 export default function ClientPortalScreen() {
   const [stats, setStats] = useState({
@@ -20,33 +22,10 @@ export default function ClientPortalScreen() {
   const [loading, setLoading] = useState(true);
   
   const [isModalVisible, setModalVisible] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const { isMobile } = useResponsive();
-
-  useEffect(() => {
-    // Setup Realtime subscriptions
-    const subProfiles = supabase.channel('admin-client-profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        setRefreshTrigger(prev => prev + 1);
-      }).subscribe();
-      
-    const subProjects = supabase.channel('admin-client-projects')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
-        setRefreshTrigger(prev => prev + 1);
-      }).subscribe();
-      
-    const subInvoices = supabase.channel('admin-client-invoices')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        setRefreshTrigger(prev => prev + 1);
-      }).subscribe();
-
-    return () => {
-      supabase.removeChannel(subProfiles);
-      supabase.removeChannel(subProjects);
-      supabase.removeChannel(subInvoices);
-    };
-  }, []);
+  
+  const { tick, lastUpdated } = useTableRealtime(['profiles', 'projects', 'invoices', 'client_activity', 'shared_documents']);
 
   useEffect(() => {
     let isMounted = true;
@@ -78,11 +57,11 @@ export default function ClientPortalScreen() {
 
     loadStats();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [tick]);
 
   const handleInvite = () => {
     setModalVisible(false);
-    setRefreshTrigger(prev => prev + 1);
+    // tick will naturally update if profiles is updated
   };
 
   return (
@@ -100,19 +79,29 @@ export default function ClientPortalScreen() {
       ) : (
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12 }}>
+          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Clients</Text>
-            
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput 
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search clients..."
-                placeholderTextColor="#9CA3AF"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+              <Text className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
             </View>
+            
+            <GlobalSearchDropdown 
+              placeholder="Search clients..." 
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className={isMobile ? "w-full" : "w-64"}
+              config={{
+                table: 'profiles',
+                searchColumn: 'full_name',
+                secondaryColumn: 'email',
+                titleColumn: 'full_name',
+                subtitleColumn: 'email',
+                routePrefix: '/admin/users/',
+                filterColumn: 'role',
+                filterValue: 'client'
+              }}
+            />
           </View>
 
           {/* Top Stat Cards Row */}
@@ -142,13 +131,13 @@ export default function ClientPortalScreen() {
           <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Client Accounts) */}
             <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
-              <ClientAccountsPanel refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
+              <ClientAccountsPanel refreshTrigger={tick} searchQuery={searchQuery} />
             </View>
             
             {/* Side Panel (Activity & Documents) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
-              <RecentClientActivity />
-              <SharedDocuments />
+              <RecentClientActivity refreshTrigger={tick} />
+              <SharedDocuments refreshTrigger={tick} />
             </View>
           </View>
         </ScrollView>

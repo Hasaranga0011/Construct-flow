@@ -58,6 +58,10 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
             
         response = query.execute()
         
+        worker_names = list(set([row.get("worker_name") for row in (response.data or []) if row.get("worker_name")]))
+        prof_res = client.table("profiles").select("full_name, daily_rate").in_("full_name", worker_names).execute()
+        rates_by_name = {p["full_name"]: p.get("daily_rate") for p in (prof_res.data or [])}
+        
         # Aggregate logic
         payroll_data = {}
         for row in (response.data or []):
@@ -72,7 +76,8 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
                     "project_id": proj_id,
                     "worker_name": worker_name,
                     "total_hours": 0,
-                    "days_present": 0
+                    "days_present": 0,
+                    "daily_rate": rates_by_name.get(worker_name) or 3500
                 }
             payroll_data[key]["total_hours"] += hours
             payroll_data[key]["days_present"] += 1

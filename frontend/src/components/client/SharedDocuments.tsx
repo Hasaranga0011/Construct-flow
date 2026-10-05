@@ -20,7 +20,7 @@ const DocumentRow = ({ filename, project, time }: { filename: string, project: s
   );
 };
 
-export const SharedDocuments = () => {
+export const SharedDocuments = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
   const [documents, setDocuments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -55,25 +55,8 @@ export const SharedDocuments = () => {
     };
     
     loadDocuments();
-
-    const channel = supabase
-      .channel('shared_documents_channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'shared_documents'
-      }, () => {
-        if (isMounted) {
-          loadDocuments(); 
-        }
-      })
-      .subscribe();
-    
-    return () => { 
-      isMounted = false; 
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return () => { isMounted = false; };
+  }, [refreshTrigger]);
 
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString);

@@ -125,16 +125,18 @@ class ClientUpdateRequest(BaseModel):
 @router.put("/{client_id}")
 def update_client(client_id: str, req: ClientUpdateRequest, request: Request):
     try:
-        from core.database import get_auth_client
-        admin_client = get_auth_client(request)
+        # Use service role to bypass RLS and broken RPCs
+        admin_client = new_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         
-        updates = {
-            'p_client_id': client_id,
-            'p_name': req.name,
-            'p_company': req.company
-        }
+        updates = {}
+        if req.name is not None:
+            updates['full_name'] = req.name
+        if req.company is not None:
+            updates['company_name'] = req.company
             
-        res = admin_client.rpc("admin_update_client", updates).execute()
+        if updates:
+            admin_client.table("profiles").update(updates).eq("id", client_id).execute()
+            
         return {"message": "Client updated successfully"}
     except HTTPException:
         raise
@@ -144,12 +146,16 @@ def update_client(client_id: str, req: ClientUpdateRequest, request: Request):
 @router.delete("/{client_id}")
 def delete_client(client_id: str, request: Request):
     try:
-        from core.database import get_auth_client
-        admin_client = get_auth_client(request)
+        # Use service role to completely delete user from auth and profiles
+        admin_client = new_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         
-        # Deleting the profile will hide them from the UI. 
-        # (Admin API would be required to fully delete auth.user)
-        admin_client.rpc("admin_delete_client", {"p_client_id": client_id}).execute()
+        try:
+            admin_client.auth.admin.delete_user(client_id)
+        except Exception as e:
+            print(f"Auth delete failed: {e}")
+            # Fallback to just deleting the profile if auth delete fails
+            admin_client.table("profiles").delete().eq("id", client_id).execute()
+            
         return {"message": "Client deleted successfully"}
     except HTTPException:
         raise

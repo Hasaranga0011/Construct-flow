@@ -57,23 +57,36 @@ export default function AdminSupplierOrdersPage() {
       setLoading(true);
       setError(null);
       try {
-        const [profileRes, ordersRes] = await Promise.all([
+        const [profileRes, ordersRes, materialsRes] = await Promise.all([
           supabase.from('profiles').select('full_name, company_name').eq('id', id).single(),
           supabase.from('purchase_orders')
-            .select(`
-              id, material_id, quantity, total_price, status, expected_delivery,
-              materials (name, item_name, unit)
-            `)
+            .select('id, material_id, quantity_ordered, total_price, status, expected_date, created_at')
             .eq('supplier_id', id)
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }),
+          supabase.from('materials').select('id, name, item_name, unit')
         ]);
 
         if (profileRes.error) throw profileRes.error;
         if (ordersRes.error) throw ordersRes.error;
+        
+        const materialsList = materialsRes?.data || [];
+        const mergedOrders = (ordersRes.data || []).map(order => {
+          const mat: any = materialsList.find(m => m.id === order.material_id) || {};
+          return {
+            ...order,
+            quantity: order.quantity_ordered,
+            expected_delivery: order.expected_date,
+            materials: {
+              name: mat.name,
+              item_name: mat.item_name,
+              unit: mat.unit
+            }
+          };
+        });
 
         if (isMounted) {
           setSupplierName(profileRes.data?.company_name || profileRes.data?.full_name || 'Supplier');
-          setOrders((ordersRes.data || []) as PurchaseOrder[]);
+          setOrders(mergedOrders as PurchaseOrder[]);
         }
       } catch (err: any) {
         if (isMounted) setError(err.message || 'Failed to load supplier orders.');
@@ -95,7 +108,7 @@ export default function AdminSupplierOrdersPage() {
     const executeAction = async () => {
       setActionLoading(orderId);
       try {
-        if (action === 'approve') await api.purchaseOrders.approve(orderId);
+        if (action === 'approve') await api.purchaseOrders.approve(orderId, {});
         else if (action === 'reject') await api.purchaseOrders.reject(orderId);
         else if (action === 'deliver') await api.purchaseOrders.deliver(orderId);
         

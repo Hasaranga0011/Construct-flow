@@ -301,25 +301,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
     };
     
     loadClients();
-    
-    const channel = supabase
-      .channel('client_accounts_channel')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'profiles',
-        filter: 'role=eq.client'
-      }, () => {
-        if (isMounted) {
-          loadClients(); 
-        }
-      })
-      .subscribe();
-      
-    return () => { 
-      isMounted = false; 
-      supabase.removeChannel(channel);
-    };
+    return () => { isMounted = false; };
   }, [refreshTrigger, localRefreshTrigger, searchQuery]);
 
   const getInitials = (name: string) => {
