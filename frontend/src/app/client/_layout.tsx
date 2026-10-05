@@ -26,8 +26,8 @@ export default function ClientLayout() {
     <SidebarProvider>
       <View className="flex-1 flex-row bg-brand-light dark:bg-[#0F172A]">
         {isDesktop && <Sidebar navItems={CLIENT_NAV_ITEMS} basePath="/client" />}
-        <View className="flex-1 overflow-hidden">
-          {!isDesktop && <TopNav />}
+        <View className="flex-1 min-w-0 min-h-0 overflow-hidden">
+          {!isDesktop && <TopNav shell />}
           <Slot />
         </View>
         {!isDesktop && <Sidebar navItems={CLIENT_NAV_ITEMS} basePath="/client" />}

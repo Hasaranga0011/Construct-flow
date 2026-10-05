@@ -1,3 +1,4 @@
+import { ModalViewport } from '../common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { api } from '../../lib/api';
@@ -143,16 +144,16 @@ const ClientDetailsModal = ({ client, visible, onClose, onUpdate }: { client: an
   };
   
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/50 items-center justify-center p-4">
-        <View className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport>
+        <View className="bg-white max-h-full w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
           <View className="flex-row justify-between items-center p-6 border-b border-gray-100 bg-brand-light">
             <Text className="text-xl font-bold text-brand-text">Client Details</Text>
             <Pressable onPress={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
               <Ionicons name="close" size={24} color="#6B7280" />
             </Pressable>
           </View>
-          <ScrollView className="p-6 max-h-[70vh]">
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
             <View className="items-center mb-6">
               <View className="w-20 h-20 rounded-full bg-blue-500 items-center justify-center mb-4">
                 <Text className="text-white text-2xl font-bold">{client.full_name?.substring(0, 2).toUpperCase()}</Text>
@@ -193,7 +194,7 @@ const ClientDetailsModal = ({ client, visible, onClose, onUpdate }: { client: an
           </ScrollView>
 
           {/* Footer Actions */}
-          <View className="p-6 border-t border-gray-100 flex-row justify-end space-x-3 bg-gray-50">
+          <View className="p-6 border-t border-gray-100 flex-row flex-wrap justify-end gap-3 bg-gray-50">
             {isEditing ? (
               <>
                 <Pressable onPress={() => setIsEditing(false)} className="px-4 py-2 rounded-lg bg-gray-200">
@@ -215,7 +216,7 @@ const ClientDetailsModal = ({ client, visible, onClose, onUpdate }: { client: an
             )}
           </View>
         </View>
-      </View>
+      </ModalViewport>
     </Modal>
   );
 };
@@ -320,7 +321,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">
-      <View className="flex-row justify-between items-center mb-6">
+      <View className="flex-row flex-wrap gap-3 justify-between items-center mb-6">
         <View>
           <Text className="text-lg font-bold text-brand-text mb-1">Client Accounts</Text>
           <Text className="text-brand-text-muted text-xs">Manage access and project sharing</Text>

@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Alert, Platform, Modal } from 'react-native';
 import { supabase } from '../../../lib/supabase';
@@ -252,9 +253,9 @@ export default function SMMilestonesPage() {
       )}
 
       {selectedMilestone && (
-        <Modal transparent animationType="fade">
-          <View className="flex-1 bg-black/50 justify-center items-center p-4">
-            <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+        <Modal transparent animationType="fade" onRequestClose={() => setSelectedMilestone(null)}>
+          <ModalViewport>
+            <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white w-full max-w-md rounded-2xl shadow-xl max-h-full">
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-xl font-bold text-brand-text">Update Milestone</Text>
                 <Pressable onPress={() => setSelectedMilestone(null)}>
@@ -322,8 +323,8 @@ export default function SMMilestonesPage() {
                   <Text className="text-white font-bold text-base">Submit Update</Text>
                 )}
               </Pressable>
-            </View>
-          </View>
+            </ScrollView>
+          </ModalViewport>
         </Modal>
       )}
     </View>

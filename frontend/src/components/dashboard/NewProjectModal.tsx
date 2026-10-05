@@ -1,8 +1,9 @@
+import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, useLoadScript, Marker } from './ProjectMap';
 import { toast } from '../../lib/toast';
 import { ProjectAssignmentDropdown } from '../common/ProjectAssignmentDropdown';
 
@@ -415,9 +416,9 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/50 items-center justify-center p-4">
-        <View className="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport>
+        <View className="bg-white max-h-full w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden">
           
           <View className="flex-row justify-between items-center p-6 border-b border-gray-100 bg-brand-light">
             <Text className="text-xl font-bold text-brand-text">Create New Project</Text>
@@ -426,7 +427,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
             </Pressable>
           </View>
 
-          <ScrollView className="p-6 max-h-[85vh]">
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
             {errorMsg ? (
               <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
                 <Text className="text-red-600 text-sm text-center">{errorMsg}</Text>
@@ -441,9 +442,9 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                </View>
             )}
 
-            <View className="flex-row flex-wrap md:flex-nowrap">
+            <View className="flex-col md:flex-row">
               {/* Left Column: Form Fields */}
-              <View className="flex-1 pr-0 md:pr-6 md:border-r border-gray-100 min-w-[250px]">
+              <View className="w-full md:w-auto md:flex-1 pr-0 md:pr-6 md:border-r border-gray-100 min-w-0">
                 <View className="mb-4">
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Project Name</Text>
                   <TextInput
@@ -567,7 +568,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
               </View>
 
               {/* Right Column: Location & Interactive Map */}
-              <View className="flex-1 pl-0 md:pl-6 mt-6 md:mt-0 min-w-[250px]">
+              <View className="w-full md:w-auto md:flex-1 pl-0 md:pl-6 mt-6 md:mt-0 min-w-0">
                 <View className="mb-4">
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Selected Location Address</Text>
                   <TextInput
@@ -658,7 +659,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
 
             {/* Milestones Section */}
             <View className="mt-8 border-t border-gray-100 pt-6">
-              <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4">
                 <Text className="text-lg font-bold text-gray-800">Project Milestones</Text>
                 <Pressable onPress={addMilestone} className="flex-row items-center bg-gray-100 px-3 py-1.5 rounded-lg">
                   <Ionicons name="add" size={16} color="#4B5563" />
@@ -678,7 +679,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                       </Pressable>
                     </View>
                     
-                    <View className="flex-row gap-4 mb-3">
+                    <View className="flex-col sm:flex-row gap-4 mb-3">
                       <View className="flex-[2]">
                         <TextInput 
                           placeholder="Title (e.g. Foundation)" 
@@ -741,7 +742,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           </ScrollView>
 
         </View>
-      </View>
+      </ModalViewport>
     </Modal>
   );
 };

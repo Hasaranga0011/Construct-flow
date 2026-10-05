@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -249,9 +250,9 @@ export default function AdminStockLevels() {
         </View>
       </ScrollView>
 
-      <Modal visible={assignModalVisible} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white rounded-2xl w-full max-w-md p-6">
+      <Modal visible={assignModalVisible} transparent animationType="fade" onRequestClose={() => setAssignModalVisible(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md max-h-full">
             <Text className="text-xl font-bold text-brand-text mb-4">Assign Material to Project</Text>
             <Text className="text-gray-500 mb-4 text-sm">Select an active project to assign this material to.</Text>
             
@@ -274,8 +275,8 @@ export default function AdminStockLevels() {
             <Pressable onPress={() => setAssignModalVisible(false)} className="mt-4 py-3 bg-gray-100 rounded-lg items-center">
               <Text className="text-gray-600 font-bold">Cancel</Text>
             </Pressable>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
 
     </View>

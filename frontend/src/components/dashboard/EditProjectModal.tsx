@@ -55,8 +55,8 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-center items-center">
-        <View className="bg-white rounded-2xl w-full max-w-md max-h-[90%] m-4 shadow-xl overflow-hidden">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-center items-center p-4">
+        <View className="bg-white rounded-2xl w-full max-w-md max-h-full shadow-xl overflow-hidden">
           {/* Header */}
           <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-100">
             <Text className="text-xl font-bold text-brand-text">Edit Project</Text>
@@ -65,7 +65,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
             </Pressable>
           </View>
 
-          <ScrollView className="p-6">
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
             <View className="mb-4">
               <Text className="text-sm font-semibold text-gray-700 mb-1">Project Name</Text>
               <TextInput
@@ -91,19 +91,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
             <View className="mb-4">
               <Text className="text-sm font-semibold text-gray-700 mb-1">Status</Text>
               {/* Simplified dropdown/picker for web/native */}
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                style={{
-                  width: '100%', backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB',
-                  borderRadius: '8px', padding: '12px 16px', outline: 'none',
-                  color: '#1A1A1A', fontSize: '14px'
-                }}
-              >
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
-                <option value="on_hold">On Hold</option>
-              </select>
+              <View className="flex-row flex-wrap gap-2">{['active', 'completed', 'on_hold'].map(option => <Pressable key={option} accessibilityRole="radio" accessibilityState={{ checked: form.status === option }} onPress={() => setForm({ ...form, status: option })} className={`px-4 py-3 border rounded-lg ${form.status === option ? 'bg-orange-50 border-orange-500' : 'border-gray-200'}`}><Text>{option.replace('_', ' ')}</Text></Pressable>)}</View>
             </View>
 
             <View className="mb-6">
@@ -120,7 +108,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
           </ScrollView>
 
           {/* Footer */}
-          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-end space-x-3 gap-3">
+          <View className="px-6 py-4 border-t border-gray-100 flex-row flex-wrap justify-end gap-3">
             <Pressable onPress={onClose} className="px-5 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50" disabled={isSubmitting}>
               <Text className="text-gray-600 font-semibold">Cancel</Text>
             </Pressable>

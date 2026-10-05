@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { useEffect } from 'react';
-import { View, ActivityIndicator, Text, Pressable } from 'react-native';
+import { View, ActivityIndicator, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { ToastProvider } from '../components/common/ToastProvider';
 
@@ -124,7 +124,7 @@ function InitialLayout() {
     );
   }
 
-  return <Slot />;
+  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={inRolePortal && Platform.OS === 'ios' ? 'padding' : undefined}><Slot /></KeyboardAvoidingView>;
 }
 
 export default function RootLayout() {

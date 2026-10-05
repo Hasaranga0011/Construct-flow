@@ -33,7 +33,7 @@ export const StatCard = ({ label, value, indicatorText, indicatorType = 'neutral
   return (
     <View className={`bg-white rounded-lg p-4 md:p-5 shadow-sm border border-gray-100 ${fullWidth ? 'w-full h-full' : isPhone ? 'w-full mb-3' : 'flex-1 mx-1 md:mx-2 mb-3 md:mb-0'}`}>
       <View className="flex-row justify-between items-start mb-2">
-        <Text className="text-brand-text-muted text-xs font-semibold uppercase">{label}</Text>
+        <Text className="flex-1 min-w-0 pr-2 text-brand-text-muted text-xs font-semibold uppercase">{label}</Text>
         {icon ? (
           <View>{icon}</View>
         ) : (

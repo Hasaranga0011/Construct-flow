@@ -10,6 +10,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useAuth } from '../../context/AuthContext';
 
 interface TopNavProps {
+  shell?: boolean;
   title?: string;
   showAction?: boolean;
   actionLabel?: string;
@@ -20,12 +21,12 @@ interface TopNavProps {
   onSearch?: (value: string) => void;
 }
 
-export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Project', onActionPress, role, showBackButton = false, initialSearchQuery = '', onSearch }: TopNavProps) => {
+export const TopNav = ({ shell = false, title = '', showAction = true, actionLabel = '+ New Project', onActionPress, role, showBackButton = false, initialSearchQuery = '', onSearch }: TopNavProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { isDark } = useTheme();
   const { setIsOpen } = useSidebar();
-  const { isMobile } = useResponsive();
+  const { isMobile, width } = useResponsive();
   
   const { unreadCount } = useRealtimeNotifications();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -46,14 +47,14 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
-        <View className="flex-row items-center">
+        <View className="flex-row items-center flex-1 min-w-0 pr-2">
           {showBackButton && (
             <Pressable accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="mr-2 p-3">
               <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#111827'} />
             </Pressable>
           )}
-          {isMobile && (
-            <Pressable onPress={() => setIsOpen(true)} className="mr-4 p-2 -ml-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] items-center justify-center">
+          {isMobile && shell && (
+            <Pressable accessibilityLabel="Open navigation menu" onPress={() => setIsOpen(true)} className="mr-4 p-2 -ml-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] items-center justify-center">
               <Ionicons name="menu" size={26} color={isDark ? "#ffffff" : "#111827"} />
             </Pressable>
           )}
@@ -61,6 +62,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
         </View>
         
         <View className="flex-row items-center gap-2 md:gap-4 flex-shrink-0">
+          {(!isMobile || shell) && <>
           {/* Bell Icon */}
           <Pressable 
             onPress={() => router.push(notificationsHref as any)}
@@ -83,8 +85,9 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
             <Text className="text-brand-orange font-bold text-sm">{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
           </Pressable>
 
+          </>}
           {/* Action Button */}
-          {showAction && onActionPress && (
+          {!isMobile && showAction && onActionPress && (
             <Pressable onPress={onActionPress}>
               <LinearGradient
                 colors={['#F97316', '#EA580C']}
@@ -99,6 +102,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
         </View>
       </LinearGradient>
 
+      {isMobile && showAction && onActionPress && <Pressable accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
       {onSearch && (
         <TextInput accessibilityLabel="Search" placeholder="Search..." value={initialSearchQuery}
           onChangeText={onSearch} className={`mx-4 my-2 px-4 py-3 rounded-lg border ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}`} />
@@ -106,7 +110,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
       {accountMenuOpen && (
         <View
           className={`absolute right-4 top-[64px] w-64 rounded-xl border p-4 shadow-lg ${isDark ? 'bg-[#111827] border-gray-700' : 'bg-white border-gray-200'}`}
-          style={{ zIndex: 20, elevation: 8 }}
+          style={{ zIndex: 20, elevation: 8, width: Math.min(256, width - 32) }}
         >
           <Text className={`text-sm font-bold ${isDark ? 'text-white' : 'text-brand-text'}`} numberOfLines={1}>
             {user?.user_metadata?.full_name || user?.email || 'User'}

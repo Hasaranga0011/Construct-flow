@@ -1,3 +1,4 @@
+import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -83,9 +84,9 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/50 items-center justify-center p-4">
-        <View className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport>
+        <View className="bg-white max-h-full w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
           
           {/* Header */}
           <View className="flex-row justify-between items-center p-6 border-b border-gray-100 bg-brand-light">
@@ -95,7 +96,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
             </Pressable>
           </View>
 
-          <ScrollView className="p-6 max-h-[70vh]">
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
             {errorMsg ? (
               <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
                 <Text className="text-red-600 text-sm text-center">{errorMsg}</Text>
@@ -198,7 +199,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
           </ScrollView>
 
         </View>
-      </View>
+      </ModalViewport>
     </Modal>
   );
 };

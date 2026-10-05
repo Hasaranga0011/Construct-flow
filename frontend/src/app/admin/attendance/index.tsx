@@ -68,16 +68,16 @@ export default function AdminAttendanceIndex() {
   }, [search, tick]);
 
   return (
-    <View className="flex-1 flex-col bg-gray-50 h-screen overflow-hidden">
+    <View className="flex-1 flex-col bg-gray-50 min-h-0 overflow-hidden">
       <TopNav title="Site Attendance" />
       
-      <ScrollView className="flex-1 px-8 py-6" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-4 md:px-8 py-6" showsVerticalScrollIndicator={false}>
         <Pressable onPress={() => router.push('/admin/labour')} className="flex-row items-center mb-6 self-start">
           <Ionicons name="arrow-back" size={20} color="#6B7280" />
           <Text className="text-gray-500 font-semibold ml-2">Back to Labour</Text>
         </Pressable>
 
-        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
           <View>
             <Text className="text-2xl font-bold text-brand-text mb-1">Select Construction Site</Text>
             <Text className="text-gray-500 text-sm">Choose a project to view and manage worker attendance.</Text>
@@ -87,7 +87,7 @@ export default function AdminAttendanceIndex() {
             </View>
           </View>
           
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, width: isMobile ? '100%' : 'auto' }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, flexWrap: 'wrap', maxWidth: '100%', width: isMobile ? '100%' : 'auto' }}>
             <View className="bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 flex-row items-center">
               <Ionicons name="people" size={20} color="#4F46E5" />
               <Text className="text-indigo-700 font-bold ml-2">{globalStats.checkedIn} / {globalStats.totalWorkers} Checked In Today</Text>
@@ -121,7 +121,7 @@ export default function AdminAttendanceIndex() {
               <Pressable
                 key={p.id}
                 onPress={() => router.push(`/admin/attendance/${p.id}`)}
-                className="w-80 bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
+                className="w-full sm:w-80 max-w-full bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
               >
                 <View className="flex-row justify-between items-start mb-4">
                   <View className="w-12 h-12 bg-indigo-50 rounded-xl items-center justify-center">
@@ -138,7 +138,7 @@ export default function AdminAttendanceIndex() {
                 </Text>
                 <View className="flex-row items-center mb-4">
                   <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                  <Text className="text-gray-500 text-sm ml-1 truncate">{p.location || 'Location Not Set'}</Text>
+                  <Text className="flex-1 min-w-0 text-gray-500 text-sm ml-1">{p.location || 'Location Not Set'}</Text>
                 </View>
 
                 <View className="flex-row items-center justify-between border-t border-gray-50 pt-4">

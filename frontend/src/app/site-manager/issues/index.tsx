@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { supabase } from '../../../lib/supabase';
@@ -197,9 +198,9 @@ export default function SMIssuesPage() {
       )}
 
       {/* Report Issue Modal */}
-      <Modal visible={showModal} transparent={true} animationType="fade">
-        <View className="flex-1 bg-black/50 items-center justify-center p-4">
-          <View className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-xl">
+      <Modal visible={showModal} transparent={true} animationType="fade" onRequestClose={() => setShowModal(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white w-full max-w-lg rounded-3xl shadow-xl max-h-full">
             <View className="flex-row justify-between items-center mb-6 border-b border-gray-100 pb-4">
               <Text className="text-xl font-bold text-brand-text">Report New Issue</Text>
               <Pressable onPress={() => setShowModal(false)}>
@@ -255,8 +256,8 @@ export default function SMIssuesPage() {
                 <Text className="text-white font-bold text-lg">Submit Report</Text>
               )}
             </Pressable>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
 
     </View>

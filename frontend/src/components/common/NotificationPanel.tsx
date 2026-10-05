@@ -1,3 +1,4 @@
+import { ModalViewport } from './ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,9 +56,9 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/30 items-end justify-start pt-16 pr-4">
-        <View className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden mt-2">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport>
+        <View className="bg-white max-h-full w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden mt-2">
           
           <View className="flex-row justify-between items-center p-4 border-b border-gray-100 bg-brand-light">
             <Text className="text-lg font-bold text-brand-text">Notifications</Text>
@@ -75,7 +76,7 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
             </Pressable>
           </View>
 
-          <ScrollView className="max-h-96 min-h-[250px] bg-gray-50">
+          <ScrollView style={{ flexShrink: 1 }} className="max-h-96 bg-gray-50">
             {activeTab === 'inbox' ? (
               loading ? (
                 <ActivityIndicator color="#F97316" className="mt-8" />
@@ -122,7 +123,7 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
           </ScrollView>
 
         </View>
-      </View>
+      </ModalViewport>
     </Modal>
   );
 };

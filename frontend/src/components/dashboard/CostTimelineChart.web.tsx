@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { NativeDataChart } from '../common/NativeDataChart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -212,7 +212,22 @@ export const CostTimelineChart = () => {
       ) : (
         <View className="flex-1 min-h-[250px]">
           {/* @ts-ignore */}
-          <NativeDataChart data={chartData} labelKey="label" series={[...(showForecast ? [{ key: 'forecast', label: 'Planned budget (LKR millions)', color: '#FDBA74' }] : []), { key: 'actual', label: 'Actual spend (LKR millions)', color: '#334155' }]} />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(val) => `${val}M`} />
+              <Tooltip 
+                cursor={{ fill: '#f9fafb' }} 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                formatter={(value) => [`Rs. ${Number(value ?? 0).toFixed(2)}M`, '']}
+              />
+              {showForecast && (
+                <Bar dataKey="forecast" name="Planned Budget" fill="#fed7aa" radius={[4, 4, 0, 0]} />
+              )}
+              <Bar dataKey="actual" name="Actual Spend" fill="#1e293b" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </View>
       )}
     </View>

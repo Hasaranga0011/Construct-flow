@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Image, Alert, TextInput, Modal, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -151,9 +152,9 @@ export default function SitePhotos() {
       </View>
 
       {/* Upload Modal */}
-      <Modal visible={showUploadModal} transparent animationType="slide">
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
+      <Modal visible={showUploadModal} transparent animationType="slide" onRequestClose={() => setShowUploadModal(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 0 }} className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl max-h-full">
             <View className="p-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
               <Text className="text-lg font-bold text-brand-text">Photo Details</Text>
               <Pressable onPress={() => !uploading && setShowUploadModal(false)}>
@@ -210,8 +211,8 @@ export default function SitePhotos() {
                 )}
               </Pressable>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
 
       {/* Grid */}

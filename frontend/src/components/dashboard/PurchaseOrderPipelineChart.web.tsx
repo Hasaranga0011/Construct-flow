@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { NativeDataChart } from '../common/NativeDataChart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -86,7 +86,23 @@ export const PurchaseOrderPipelineChart = () => {
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}
-        <NativeDataChart data={data} labelKey="status" series={[{ key: 'count', label: 'Orders', color: '#F97316' }]} />
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+            <XAxis dataKey="status" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} angle={-45} textAnchor="end" dy={10} />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+            <Tooltip 
+              cursor={{ fill: '#f9fafb' }} 
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              formatter={(val) => [`${val} Orders`, 'Count']}
+            />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={50}>
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </View>
     </View>
   );

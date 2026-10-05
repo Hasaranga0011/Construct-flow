@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { NativeDataChart } from '../common/NativeDataChart';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export const MaterialsStockChart = () => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const loadData = async () => {
     try {
@@ -78,7 +80,30 @@ export const MaterialsStockChart = () => {
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}
-        <NativeDataChart data={data} labelKey="name" series={[{ key: 'value', label: 'Materials', color: '#F97316' }]} />
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="value"
+              onClick={(d) => router.push(`/admin/materials?status=${d.payload.status}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip 
+              formatter={(val) => [`${val} Items`, 'Count']}
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            />
+            <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+          </PieChart>
+        </ResponsiveContainer>
       </View>
     </View>
   );

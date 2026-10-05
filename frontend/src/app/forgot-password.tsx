@@ -1,3 +1,4 @@
+import AuthPageLayout from '../components/auth/AuthPageLayout';
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
@@ -36,24 +37,44 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <View className="flex-1 flex-row bg-white">
-      {/* Left Column: Form */}
-      <View className="w-full lg:w-1/2 flex-1 items-center justify-center p-8 md:p-12">
-        <View className="w-full max-w-md">
+    <AuthPageLayout hero={
+      <View className="w-1/2 py-12 bg-brand-dark relative overflow-hidden items-center justify-center">
+        {/* Background Image with Overlay */}
+        <Image 
+          source={{ uri: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1200' }} 
+          className="absolute w-full h-full opacity-20"
+          resizeMode="cover"
+        />
+        <View className="absolute inset-0 bg-brand-dark/90" />
+        
+        {/* Abstract Shapes */}
+        <View className="absolute -top-32 -right-32 w-96 h-96 bg-brand-orange/20 rounded-full blur-3xl" />
+        <View className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+
+        <View className="z-10 w-full px-8 xl:px-16 max-w-xl">
+          <View className="w-16 h-16 bg-brand-orange/20 rounded-2xl items-center justify-center mb-8 border border-brand-orange/30">
+            <Ionicons name="lock-closed" size={32} color="#F97316" />
+          </View>
+          <Text className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Secure Recovery</Text>
+          <Text className="text-white font-extrabold text-5xl leading-tight mb-6">Regain access to your workspace.</Text>
+          <Text className="text-gray-400 text-lg leading-relaxed mb-12">Your data is secured with enterprise-grade encryption. Once verified, you can quickly get back to managing your projects and team.</Text>
+        </View>
+      </View>
+    }>
           <View className="items-center mb-10">
             {/* ── Construct Ai Logo ── */}
             <Pressable
               onPress={() => router.push('/')}
-              style={{ alignSelf: 'flex-start', marginBottom: 28, marginLeft: -12 }}
+              style={{ alignSelf: 'flex-start', width: '100%', maxWidth: 280, marginBottom: 24 }}
             >
               <Image 
                 source={require('../../assets/images/main-logo.png')} 
-                style={{ height: 75, width: 300 }} 
+                style={{ width: '100%', aspectRatio: 4 }} 
                 resizeMode="contain" 
               />
             </Pressable>
             <View className="w-full">
-              <Text className="text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
+              <Text className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
               <Text className="text-gray-500 text-base leading-relaxed">Enter your email address and we&apos;ll send you a secure link to reset your password.</Text>
             </View>
           </View>
@@ -94,7 +115,7 @@ export default function ForgotPasswordScreen() {
             )}
           </Pressable>
 
-          <View className="flex-row justify-center">
+          <View className="flex-row flex-wrap justify-center">
             <Text className="text-gray-500">Remember your password? </Text>
             <Link href="/login" asChild>
               <Pressable>
@@ -102,32 +123,6 @@ export default function ForgotPasswordScreen() {
               </Pressable>
             </Link>
           </View>
-        </View>
-      </View>
-
-      {/* Right Column: Graphic/Hero */}
-      <View className="hidden lg:flex w-1/2 bg-brand-dark relative overflow-hidden items-center justify-center">
-        {/* Background Image with Overlay */}
-        <Image 
-          source={{ uri: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1200' }} 
-          className="absolute w-full h-full opacity-20"
-          resizeMode="cover"
-        />
-        <View className="absolute inset-0 bg-brand-dark/90" />
-        
-        {/* Abstract Shapes */}
-        <View className="absolute -top-32 -right-32 w-96 h-96 bg-brand-orange/20 rounded-full blur-3xl" />
-        <View className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-
-        <View className="z-10 px-16 max-w-xl">
-          <View className="w-16 h-16 bg-brand-orange/20 rounded-2xl items-center justify-center mb-8 border border-brand-orange/30">
-            <Ionicons name="lock-closed" size={32} color="#F97316" />
-          </View>
-          <Text className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Secure Recovery</Text>
-          <Text className="text-white font-extrabold text-5xl leading-tight mb-6">Regain access to your workspace.</Text>
-          <Text className="text-gray-400 text-lg leading-relaxed mb-12">Your data is secured with enterprise-grade encryption. Once verified, you can quickly get back to managing your projects and team.</Text>
-        </View>
-      </View>
-    </View>
+    </AuthPageLayout>
   );
 }

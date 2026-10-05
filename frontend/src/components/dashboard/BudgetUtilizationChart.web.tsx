@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { NativeDataChart } from '../common/NativeDataChart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api } from '../../services/api';
@@ -85,7 +85,29 @@ export const BudgetUtilizationChart = () => {
 
       <View className="flex-1 min-h-[250px]">
         {/* @ts-ignore */}
-        <NativeDataChart data={data} labelKey="name" series={[{ key: 'percent', label: 'Budget used (%)', color: '#F97316' }]} onSelect={row => router.push(`/admin/projects/${row.id}` as any)} />
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f3f4f6" />
+            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} domain={[0, 'dataMax']} unit="%" />
+            <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} width={90} />
+            <Tooltip 
+              cursor={{ fill: '#f9fafb' }} 
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              formatter={(val, name, props) => [`${val}% (${props.payload.spentText})`, 'Utilization']}
+            />
+            <Bar 
+              dataKey="percent" 
+              radius={[0, 4, 4, 0]} 
+              barSize={20}
+              onClick={(d) => router.push(`/admin/projects/${d.id}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </View>
     </View>
   );

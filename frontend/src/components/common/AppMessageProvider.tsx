@@ -1,5 +1,6 @@
+import { ModalViewport } from './ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, Text, View, ScrollView } from 'react-native';
 
 type MessageButton = {
   text: string;
@@ -53,11 +54,11 @@ export const AppMessageProvider = () => {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => setMessage(null)}>
-      <View className="flex-1 items-center justify-center bg-black/50 px-6">
-        <View className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+      <ModalViewport>
+        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="w-full max-w-sm max-h-full rounded-2xl bg-white shadow-2xl">
           <Text className="text-xl font-bold text-gray-900">{message.title}</Text>
           {!!message.message && <Text className="mt-2 text-sm leading-5 text-gray-500">{message.message}</Text>}
-          <View className="mt-6 flex-row justify-end gap-3">
+          <View className="mt-6 flex-row flex-wrap justify-end gap-3">
             {message.buttons.map((button, index) => (
               <Pressable
                 key={`${button.text}-${index}`}
@@ -70,8 +71,8 @@ export const AppMessageProvider = () => {
               </Pressable>
             ))}
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </ModalViewport>
     </Modal>
   );
 };

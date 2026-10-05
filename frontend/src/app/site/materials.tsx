@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -164,9 +165,9 @@ export default function SiteMaterials() {
       </View>
 
       {/* New Request Modal */}
-      <Modal visible={showModal} transparent animationType="slide">
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 0 }} className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl max-h-full">
             <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-brand-light">
               <Text className="text-xl font-bold text-brand-text">Request Material</Text>
               <Pressable onPress={() => !submitting && setShowModal(false)}>
@@ -234,8 +235,8 @@ export default function SiteMaterials() {
                 )}
               </Pressable>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
 
     </View>

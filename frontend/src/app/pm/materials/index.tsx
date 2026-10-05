@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -335,9 +336,9 @@ export default function PMApprovalQueue() {
       </View>
 
       {/* Reject Modal */}
-      <Modal visible={showRejectModal} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+      <Modal visible={showRejectModal} transparent animationType="fade" onRequestClose={() => setShowRejectModal(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 0 }} className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl max-h-full">
             <View className="p-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
               <Text className="text-lg font-bold text-red-600">Reject Request</Text>
               <Pressable onPress={() => !actioningId && setShowRejectModal(false)}>
@@ -368,8 +369,8 @@ export default function PMApprovalQueue() {
                 )}
               </Pressable>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
 
     </View>

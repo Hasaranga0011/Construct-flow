@@ -1,10 +1,11 @@
+import { useResponsive } from '../../../hooks/useResponsive';
 // Modified for Expo Go mobile compatibility
 import React from 'react';
-import { View, Text, Platform, ScrollView } from 'react-native';
+import { View, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 export default function ClientProjectMapPage() {
-  const isMobile = Platform.OS !== 'web';
+  const { isMobile } = useResponsive();
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Project Map" showAction={false} />

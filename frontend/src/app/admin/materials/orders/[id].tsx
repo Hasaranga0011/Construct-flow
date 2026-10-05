@@ -1,3 +1,4 @@
+import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,9 +28,9 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
   if (!visible || !order) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/50 justify-center items-center p-4">
-        <View className="bg-white rounded-2xl w-full max-w-md p-6">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport>
+        <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md max-h-full">
           <Text className="text-xl font-bold text-brand-text mb-4">Counter-Offer</Text>
           <Text className="text-gray-500 mb-4 text-sm">Propose a different quantity, date, or price to the supplier.</Text>
 
@@ -75,8 +76,8 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
               <Text className="text-white font-bold">Submit Counter</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </ModalViewport>
     </Modal>
   );
 };
@@ -399,9 +400,9 @@ export default function AdminMaterialsOrdersIdPage() {
         onSubmit={handleSuggestSubmit}
       />
       
-      <Modal visible={assignModalVisible} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white rounded-2xl w-full max-w-md p-6">
+      <Modal visible={assignModalVisible} transparent animationType="fade" onRequestClose={() => setAssignModalVisible(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md max-h-full">
             <Text className="text-xl font-bold text-gray-800 mb-4">Assign Project</Text>
             <Text className="text-gray-500 mb-4">Select a project for this unassigned order:</Text>
             <ScrollView className="max-h-60 mb-4">
@@ -418,8 +419,8 @@ export default function AdminMaterialsOrdersIdPage() {
             <Pressable onPress={() => setAssignModalVisible(false)} className="self-end px-4 py-2 bg-gray-200 rounded-lg">
               <Text className="text-gray-700 font-bold">Cancel</Text>
             </Pressable>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
       </Modal>
     </View>
   );

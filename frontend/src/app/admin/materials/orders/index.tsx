@@ -77,11 +77,11 @@ export default function AdminPurchaseOrders() {
           <Text className="text-gray-500 font-semibold ml-2">Back to Materials</Text>
         </Pressable>
 
-        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
           <Text className="text-2xl font-bold text-brand-text">All Orders</Text>
           
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, width: isMobile ? '100%' : 'auto' }}>
-            <View className="flex-row border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, width: '100%', flexWrap: 'wrap' }}>
+            <View className="flex-row flex-1 min-w-0 border border-gray-200 rounded-lg overflow-hidden bg-white">
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {statuses.map(s => (
                   <Pressable 

@@ -79,7 +79,7 @@ export default function AdminUsersList() {
 
   return (
     <View className="flex-1 bg-gray-50">
-      <View className="flex-1 flex-col h-screen overflow-hidden">
+      <View className="flex-1 flex-col min-h-0 overflow-hidden">
         <TopNav title="Users Directory" actionLabel="+ New User" onActionPress={() => router.push('/admin/users/create')} />
         
         <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>

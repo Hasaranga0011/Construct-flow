@@ -10,7 +10,7 @@ export default function AdminAttendanceProjectPage() {
   const router = useRouter();
 
   return (
-    <View className="flex-1 flex-col bg-gray-50 h-screen overflow-hidden">
+    <View className="flex-1 flex-col bg-gray-50 min-h-0 overflow-hidden">
       <TopNav title="Project Attendance Logs" showAction={false} />
       
       <ScrollView className="flex-1 px-8 py-6" showsVerticalScrollIndicator={false}>

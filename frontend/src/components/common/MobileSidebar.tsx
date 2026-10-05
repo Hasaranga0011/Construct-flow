@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Pressable, Platform, Animated, Easing, TouchableOpacity, useWindowDimensions, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, BackHandler, Animated, Easing, TouchableOpacity, useWindowDimensions, StyleSheet, ScrollView } from 'react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -25,7 +25,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
   const { isDark } = useTheme();
   const { isOpen, setIsOpen } = useSidebar();
   const { width } = useWindowDimensions();
-  const isMobile = Platform.OS !== 'web' || width < 1024;
+  const isMobile = width < 1024;
 
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,7 +63,14 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
         })
       ]).start();
     }
-  }, [isOpen, isMobile]);
+  }, [isOpen, isMobile, fadeAnim, slideAnim]);
+
+  useEffect(() => { setIsOpen(false); }, [pathname, isMobile, setIsOpen]);
+  useEffect(() => {
+    if (!isMobile || !isOpen) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { setIsOpen(false); return true; });
+    return () => subscription.remove();
+  }, [isMobile, isOpen, setIsOpen]);
 
   const completeLogout = async () => {
     await supabase.auth.signOut();
@@ -99,7 +106,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
   }, [user, role]);
 
   const SidebarContent = () => (
-    <View className={`w-full max-w-[260px] h-full py-6 flex-col border-r ${isMobile ? 'bg-slate-900 border-slate-800' : (isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100')}`}>
+    <View className={`w-[260px] max-w-full h-full py-6 flex-col border-r ${isMobile ? 'bg-slate-900 border-slate-800' : (isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100')}`}>
       {/* Logo Area */}
       <View className="px-4 mb-8">
         <Text className={`font-bold text-xl ${isMobile || isDark ? 'text-white' : 'text-brand-text'}`}>Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>
@@ -183,15 +190,15 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
 
   return (
     <>
-      <View style={StyleSheet.absoluteFill} pointerEvents={isOpen ? 'auto' : 'none'} className="z-50">
+      <View accessibilityElementsHidden={!isOpen} importantForAccessibility={isOpen ? 'yes' : 'no-hide-descendants'} style={StyleSheet.absoluteFill} pointerEvents={isOpen ? 'auto' : 'none'} className="z-50">
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
-        <TouchableOpacity 
+        <TouchableOpacity accessibilityLabel="Close navigation menu"
           onPress={() => setIsOpen(false)}
           activeOpacity={1}
           style={{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)' }} 
         />
       </Animated.View>
-      <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+      <Animated.View style={{ width: Math.min(260, width - 32), height: '100%', transform: [{ translateX: slideAnim }] }}>
         <SidebarContent />
       </Animated.View>
       </View>

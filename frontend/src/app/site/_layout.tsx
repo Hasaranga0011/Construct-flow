@@ -1,4 +1,5 @@
 import React from 'react';
+import { TopNav } from '../../components/common/TopNav';
 import { View, useWindowDimensions } from 'react-native';
 import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
@@ -21,7 +22,8 @@ export default function SiteLayout() {
     <SidebarProvider>
       <View className="flex-1 flex-row bg-brand-light">
       {!isMobile && <Sidebar navItems={SITE_NAV_ITEMS} basePath="/site" />}
-      <View className="flex-1 overflow-hidden">
+      <View className="flex-1 min-w-0 min-h-0 overflow-hidden">
+        {isMobile && <TopNav shell />}
         <Slot />
       </View>
       {isMobile && <Sidebar navItems={SITE_NAV_ITEMS} basePath="/site" />}

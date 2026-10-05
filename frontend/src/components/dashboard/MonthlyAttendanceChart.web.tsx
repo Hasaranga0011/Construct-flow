@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { NativeDataChart } from '../common/NativeDataChart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
 
 export const MonthlyAttendanceChart = () => {
@@ -93,7 +93,33 @@ export const MonthlyAttendanceChart = () => {
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}
-        <NativeDataChart data={data} labelKey="label" series={[{ key: 'workers', label: 'Workers present', color: '#F97316' }]} />
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+            <XAxis 
+              dataKey="label" 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fill: '#9ca3af' }} 
+              dy={10} 
+              minTickGap={20}
+            />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+            <Tooltip 
+              cursor={{ stroke: '#f3f4f6', strokeWidth: 2 }} 
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              formatter={(val) => [`${val} Workers`, 'Present']}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="workers" 
+              stroke="#F97316" // brand-orange
+              strokeWidth={3} 
+              dot={{ r: 3, fill: '#F97316', strokeWidth: 0 }} 
+              activeDot={{ r: 6, fill: '#1e293b' }} 
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </View>
     </View>
   );
