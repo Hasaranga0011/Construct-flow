@@ -18,7 +18,6 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
   const [materialName, setMaterialName] = useState('');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [unit, setUnit] = useState('Bags');
   
@@ -38,10 +37,9 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     const fetchData = async () => {
       setFetchingData(true);
       try {
-        const [projectsReq, materialsReq, suppliersReq] = await Promise.all([
+        const [projectsReq, materialsReq] = await Promise.all([
           supabase.from('projects').select('id, name').eq('status', 'active'),
-          supabase.from('materials').select('id, name'),
-          supabase.from('profiles').select('id, full_name').eq('role', 'supplier')
+          supabase.from('materials').select('id, name')
         ]);
         
         if (projectsReq.error) throw projectsReq.error;
@@ -50,7 +48,6 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
         if (isMounted) {
           setProjects(projectsReq.data || []);
           setMaterials(materialsReq.data || []);
-          setDbSuppliers(suppliersReq.data || []);
         }
       } catch (err) {
         console.warn('Could not load lookup data for order modal', err);
@@ -62,10 +59,42 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     return () => { isMounted = false; };
   }, [visible]);
 
-  const totalPrice = (Number(quantity) || 0) * (Number(unitPrice) || 0);
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSuppliers = async () => {
+      if (!projectId) {
+        setDbSuppliers([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('project_role_assignments')
+          .select('user_id, profiles!inner(full_name, is_approved)')
+          .eq('project_id', projectId)
+          .eq('role', 'supplier')
+          .eq('profiles.is_approved', true);
+          
+        if (error) throw error;
+        if (isMounted) {
+          // Flatten the response
+          const suppliers = data.map((d: any) => ({
+            id: d.user_id,
+            full_name: d.profiles.full_name
+          }));
+          setDbSuppliers(suppliers);
+        }
+      } catch (err) {
+        console.warn('Could not load suppliers for project', err);
+      }
+    };
+    fetchSuppliers();
+    return () => { isMounted = false; };
+  }, [projectId]);
+
+
 
   const handleCreate = async () => {
-    if (!supplierName || (!materialId && !materialName) || !projectId || !quantity || !unitPrice || !expectedDate) {
+    if (!supplierName || (!materialId && !materialName) || !projectId || !quantity || !expectedDate) {
       setErrorMsg('Please fill in all fields.');
       return;
     }
@@ -80,9 +109,9 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
         material_id: materialId || materialName, // fallback to typed name
         project_id: projectId,
         quantity_ordered: Number(quantity),
-        unit_price: Number(unitPrice),
+        unit_price: 0,
         expected_date: expectedDate,
-        total_price: totalPrice,
+        total_price: 0,
         unit: unit
       });
 
@@ -93,7 +122,6 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
       setMaterialName('');
       setProjectId(null);
       setQuantity('');
-      setUnitPrice('');
       setExpectedDate('');
       
       toast.success('Order created!');
@@ -132,6 +160,30 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
             ) : (
               <>
                 <View className="mb-4">
+                  <Text className="text-sm font-semibold text-gray-700 mb-2">Assign to Project (Select First)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+                    {projects.map(p => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => {
+                          setProjectId(p.id);
+                          setSupplierId(null);
+                          setSupplierName('');
+                        }}
+                        className={`px-4 py-2 rounded-full border ${projectId === p.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
+                      >
+                        <Text className={`text-sm font-semibold ${projectId === p.id ? 'text-white' : 'text-gray-600'}`}>
+                          {p.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {projects.length === 0 && (
+                       <Text className="text-gray-400 text-sm italic">No active projects found.</Text>
+                    )}
+                  </ScrollView>
+                </View>
+
+                <View className="mb-4">
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Supplier</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
                     {dbSuppliers.map(sup => (
@@ -146,7 +198,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                       </Pressable>
                     ))}
                     {dbSuppliers.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">No suppliers are available for this order.</Text>
+                       <Text className="text-gray-400 text-sm italic">{projectId ? 'No suppliers assigned to this project.' : 'Select a project first.'}</Text>
                     )}
                   </ScrollView>
                   <TextInput
@@ -184,46 +236,14 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Assign to Project</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
-                    {projects.map(p => (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => setProjectId(p.id)}
-                        className={`px-4 py-2 rounded-full border ${projectId === p.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
-                      >
-                        <Text className={`text-sm font-semibold ${projectId === p.id ? 'text-white' : 'text-gray-600'}`}>
-                          {p.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    {projects.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">No active projects found.</Text>
-                    )}
-                  </ScrollView>
-                </View>
-
-                <View className="flex-row gap-4 mb-4">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Quantity</Text>
-                    <TextInput
-                      className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-                      placeholder="0"
-                      keyboardType="numeric"
-                      value={quantity}
-                      onChangeText={setQuantity}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">Unit Price (Rs.)</Text>
-                    <TextInput
-                      className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-                      placeholder="0.00"
-                      keyboardType="numeric"
-                      value={unitPrice}
-                      onChangeText={setUnitPrice}
-                    />
-                  </View>
+                  <Text className="text-sm font-semibold text-gray-700 mb-2">Quantity</Text>
+                  <TextInput
+                    className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                  />
                 </View>
 
                 <View className="mb-4">
@@ -269,12 +289,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                   )}
                 </View>
 
-                <View className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <Text className="text-sm font-semibold text-gray-500 mb-1">Total Order Value</Text>
-                  <Text className="text-2xl font-bold text-brand-text">
-                    Rs. {totalPrice.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-                  </Text>
-                </View>
+
               </>
             )}
 

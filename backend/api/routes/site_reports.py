@@ -75,22 +75,24 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
                 notifications_to_add = []
                 if project.get("pm_id"):
                     notifications_to_add.append({
+                        "user_id": "11111111-1111-1111-1111-111111111111",
                         "project_id": payload.project_id,
                         "target_user_id": project["pm_id"],
                         "target_role": "pm",
                         "title": "New Site Report",
                         "message": f"A new daily site report has been submitted for '{project_name}' on {payload.date}.",
-                        "type": "info",
+                        "type": "general",
                         "is_read": False,
                     })
                 if project.get("client_id"):
                     notifications_to_add.append({
+                        "user_id": "11111111-1111-1111-1111-111111111111",
                         "project_id": payload.project_id,
                         "target_user_id": project["client_id"],
                         "target_role": "client",
                         "title": "Site Update Available",
                         "message": f"Your site manager has submitted a progress report for '{project_name}' on {payload.date}.",
-                        "type": "info",
+                        "type": "general",
                         "is_read": False,
                     })
                 if notifications_to_add:

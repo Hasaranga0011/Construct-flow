@@ -61,7 +61,7 @@ def create_request(req: MaterialRequest, user=Depends(get_current_user)):
         notification = {
             "title": "New Material Request",
             "message": f"Request for {req.quantity} {req.unit} of {req.item_name}",
-            "type": "info",
+            "type": "general",
             "target_role": "super_admin",
             "is_read": False
         }

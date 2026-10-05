@@ -7,6 +7,80 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { api } from '../../../../services/api';
 import { ChatWidget } from '../../../../components/shared/ChatWidget';
+import { Modal, TextInput } from 'react-native';
+
+const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
+  const [qty, setQty] = useState('');
+  const [date, setDate] = useState('');
+  const [price, setPrice] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (order) {
+      setQty((order.suggested_quantity || order.quantity_ordered)?.toString() || '');
+      setDate(order.suggested_date || order.expected_date || '');
+      setPrice(order.suggested_price ? order.suggested_price.toString() : (order.unit_price ? order.unit_price.toString() : ''));
+      setNotes('');
+    }
+  }, [order]);
+
+  if (!visible || !order) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View className="flex-1 bg-black/50 justify-center items-center p-4">
+        <View className="bg-white rounded-2xl w-full max-w-md p-6">
+          <Text className="text-xl font-bold text-brand-text mb-4">Counter-Offer</Text>
+          <Text className="text-gray-500 mb-4 text-sm">Propose a different quantity, date, or price to the supplier.</Text>
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Quantity</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            keyboardType="numeric"
+            value={qty}
+            onChangeText={setQty}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            value={date}
+            onChangeText={setDate}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Unit Price (LKR)</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            keyboardType="numeric"
+            value={price}
+            onChangeText={setPrice}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Notes to Supplier</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-6 text-brand-text h-20"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+          />
+
+          <View className="flex-row justify-end space-x-3">
+            <Pressable onPress={onClose} className="px-4 py-2">
+              <Text className="text-gray-500 font-bold">Cancel</Text>
+            </Pressable>
+            <Pressable 
+              onPress={() => onSubmit(order.id, parseFloat(qty), date, parseFloat(price), notes)} 
+              className="bg-brand-warning px-6 py-2 rounded-lg"
+            >
+              <Text className="text-white font-bold">Submit Counter</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 
 export default function AdminMaterialsOrdersIdPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -15,8 +89,15 @@ export default function AdminMaterialsOrdersIdPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [suggestModalVisible, setSuggestModalVisible] = useState(false);
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
-  useEffect(() => { supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); }, []);
+
+  useEffect(() => { 
+    supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); 
+    supabase.from('projects').select('id, name').then(({data}) => setProjects(data || []));
+  }, []);
 
   const fetchOrder = async () => {
     try {
@@ -77,6 +158,39 @@ export default function AdminMaterialsOrdersIdPage() {
     }
   };
 
+  const handleSuggestSubmit = async (orderId: string, qty: number, date: string, price: number, notes: string) => {
+    try {
+      setActionLoading(true);
+      setSuggestModalVisible(false);
+      await api.purchaseOrders.suggest(orderId, {
+        suggested_quantity: qty,
+        suggested_date: date,
+        suggested_price: price,
+        supplier_notes: notes
+      });
+      fetchOrder();
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to submit suggestion');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAssignProject = async (projectId: string) => {
+    try {
+      setActionLoading(true);
+      const { error } = await supabase.from('purchase_orders').update({ project_id: projectId }).eq('id', id);
+      if (error) throw error;
+      setAssignModalVisible(false);
+      fetchOrder();
+      Alert.alert('Success', 'Project assigned successfully.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to assign project');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <View className="flex-1 bg-brand-light items-center justify-center">
@@ -110,6 +224,17 @@ export default function AdminMaterialsOrdersIdPage() {
   };
 
   const isCompleted = order.status === 'Received' || order.status === 'Rejected' || order.status === 'Cancelled';
+
+  // Parse negotiation log
+  let negotiationLog: any[] = [];
+  try {
+    if (order.supplier_notes) {
+      const parsed = JSON.parse(order.supplier_notes);
+      if (Array.isArray(parsed)) {
+        negotiationLog = parsed;
+      }
+    }
+  } catch (e) {}
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -154,7 +279,12 @@ export default function AdminMaterialsOrdersIdPage() {
                   <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
                     <FontAwesome5 name="hard-hat" size={12} color="#10B981" />
                   </View>
-                  <Text className="text-gray-800 font-medium text-base">{order.project?.name || 'Unassigned'}</Text>
+                  <Text className="text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
+                  {!order.project && (
+                    <Pressable onPress={() => setAssignModalVisible(true)} className="bg-gray-200 px-3 py-1 rounded-full">
+                      <Text className="text-xs text-gray-700 font-bold">Assign</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
 
@@ -187,6 +317,30 @@ export default function AdminMaterialsOrdersIdPage() {
               </View>
             </View>
 
+            {negotiationLog.length > 0 && (
+              <View className="mt-8">
+                <Text className="text-lg font-bold text-gray-800 mb-4">Negotiation History</Text>
+                <View className="border-l-2 border-gray-200 ml-3 pl-4">
+                  {negotiationLog.map((event, idx) => (
+                    <View key={idx} className="mb-4 relative">
+                      <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
+                      <Text className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'Supplier' : 'You'}</Text>
+                      <View className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <Text className="font-bold text-gray-700 capitalize mb-1">{event.action}</Text>
+                        {event.quantity && <Text className="text-sm text-gray-600">Qty: {event.quantity}</Text>}
+                        {event.suggested_quantity && <Text className="text-sm text-gray-600">Qty: {event.suggested_quantity}</Text>}
+                        {event.unit_price && <Text className="text-sm text-gray-600">Price: Rs. {event.unit_price}</Text>}
+                        {event.suggested_price && <Text className="text-sm text-gray-600">Price: Rs. {event.suggested_price}</Text>}
+                        {event.date && <Text className="text-sm text-gray-600">Date: {event.date}</Text>}
+                        {event.suggested_date && <Text className="text-sm text-gray-600">Date: {event.suggested_date}</Text>}
+                        {event.note && <Text className="text-sm text-gray-500 italic mt-2">"{event.note}"</Text>}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
           </View>
 
           {/* Action Buttons Section */}
@@ -212,27 +366,61 @@ export default function AdminMaterialsOrdersIdPage() {
                   <Text className="text-red-600 font-bold">Reject Order</Text>
                 </Pressable>}
                 
-                {order.status === 'Confirmed' ? <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Delivered')}
-                  className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
-                >
-                  {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
-                  <Text className="text-white font-bold">Mark Delivered</Text>
-                </Pressable> : order.status !== 'Delivered' ? <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Confirmed')}
-                  className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
-                >
-                  {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
-                  <Text className="text-white font-bold">Confirm Order</Text>
-                </Pressable> : null}
+                {order.status === 'Suggested' ? (
+                  <>
+                    <Pressable
+                      disabled={actionLoading}
+                      onPress={() => setSuggestModalVisible(true)}
+                      className="bg-yellow-500 shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                    >
+                      <Text className="text-white font-bold">Counter Supplier</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={actionLoading}
+                      onPress={() => handleUpdateStatus('Confirmed')}
+                      className="bg-brand-success shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                    >
+                      {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                      <Text className="text-white font-bold">Accept Counter</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
           )}
 
         </View>
       </ScrollView>
+
+      <SuggestModal 
+        visible={suggestModalVisible}
+        order={order}
+        onClose={() => setSuggestModalVisible(false)}
+        onSubmit={handleSuggestSubmit}
+      />
+      
+      <Modal visible={assignModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-white rounded-2xl w-full max-w-md p-6">
+            <Text className="text-xl font-bold text-gray-800 mb-4">Assign Project</Text>
+            <Text className="text-gray-500 mb-4">Select a project for this unassigned order:</Text>
+            <ScrollView className="max-h-60 mb-4">
+              {projects.map(p => (
+                <Pressable 
+                  key={p.id} 
+                  onPress={() => handleAssignProject(p.id)}
+                  className="py-3 border-b border-gray-100"
+                >
+                  <Text className="text-gray-800">{p.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable onPress={() => setAssignModalVisible(false)} className="self-end px-4 py-2 bg-gray-200 rounded-lg">
+              <Text className="text-gray-700 font-bold">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

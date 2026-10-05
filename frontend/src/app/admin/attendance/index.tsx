@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { useTableRealtime } from '../../../hooks/useTableRealtime';
 
 export default function AdminAttendanceIndex() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function AdminAttendanceIndex() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects']);
   
   const [globalStats, setGlobalStats] = useState({ totalWorkers: 0, checkedIn: 0 });
 
@@ -31,7 +33,7 @@ export default function AdminAttendanceIndex() {
         
         // Fetch today's attendance to show quick stats per site
         const { data: attData, error: attErr } = await supabase
-          .from('labour')
+          .from('legacy_labour')
           .select('id, project_id, status')
           .eq('date', today);
           
@@ -63,7 +65,7 @@ export default function AdminAttendanceIndex() {
     
     fetchSites();
     return () => { isMounted = false; };
-  }, [search]);
+  }, [search, tick]);
 
   return (
     <View className="flex-1 flex-col bg-gray-50 h-screen overflow-hidden">
@@ -79,6 +81,10 @@ export default function AdminAttendanceIndex() {
           <View>
             <Text className="text-2xl font-bold text-brand-text mb-1">Select Construction Site</Text>
             <Text className="text-gray-500 text-sm">Choose a project to view and manage worker attendance.</Text>
+            <View className="flex-row items-center mt-1">
+              <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+              <Text className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+            </View>
           </View>
           
           <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 16, width: isMobile ? '100%' : 'auto' }}>

@@ -75,7 +75,7 @@ def generate_payroll(req: PayrollGenerate, user=Depends(get_current_user)):
             supabase_db.table("notifications").insert({
                 "title": "Payroll Generated",
                 "message": f"{generated_count} payroll records ready for approval for {month_str}",
-                "type": "info",
+                "type": "general",
                 "target_role": "super_admin"
             }).execute()
             
@@ -97,7 +97,7 @@ def approve_payroll(payroll_id: str, user=Depends(get_current_user)):
                 supabase_db.table("notifications").insert({
                     "title": "Payroll Approved",
                     "message": "Your payroll for this month has been approved.",
-                    "type": "success",
+                    "type": "general",
                     "user_id": lab_res.data[0]["user_id"]
                 }).execute()
                 

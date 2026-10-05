@@ -101,9 +101,10 @@ export default function AdminPayrollGeneratePage() {
           <TouchableOpacity 
             onPress={handleGenerate}
             disabled={loading}
-            className="bg-brand-blue py-4 rounded-xl items-center flex-row justify-center mb-6"
+            style={{ backgroundColor: loading ? '#FDBA74' : '#F97316', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 24, minHeight: 56 }}
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg">Generate Salary Slips</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>Generate Salary Slips</Text>}
+
           </TouchableOpacity>
           
           {result && (

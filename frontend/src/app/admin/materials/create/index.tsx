@@ -14,7 +14,6 @@
 	 const [unit, setUnit] = useState('');
 	 const [quantity, setQuantity] = useState('');
 	 const [minQuantity, setMinQuantity] = useState('');
-	 const [unitPrice, setUnitPrice] = useState('');
 	 const [loading, setLoading] = useState(true);
 	 const [submitting, setSubmitting] = useState(false);
 	 const [error, setError] = useState<string | null>(null);
@@ -39,9 +38,8 @@
 	 const handleSubmit = async () => {
 		 const parsedQuantity = Number(quantity);
 		 const parsedMinQuantity = Number(minQuantity);
-		 const parsedUnitPrice = Number(unitPrice);
-		 if (!name.trim() || !unit.trim() || !projectId || !Number.isFinite(parsedQuantity) || parsedQuantity < 0 || !Number.isFinite(parsedMinQuantity) || parsedMinQuantity < 0 || !Number.isFinite(parsedUnitPrice) || parsedUnitPrice < 0) {
-			 setError('Enter a name, unit, project, and valid non-negative quantity, minimum quantity, and unit price.');
+		 if (!name.trim() || !unit.trim() || !projectId || !Number.isFinite(parsedQuantity) || parsedQuantity < 0 || !Number.isFinite(parsedMinQuantity) || parsedMinQuantity < 0) {
+			 setError('Enter a name, unit, project, and valid non-negative quantity and minimum threshold.');
 			 return;
 		 }
  
@@ -51,9 +49,8 @@
 			 const { error: insertError } = await supabase.from('materials').insert({
 				 name: name.trim(),
 				 unit: unit.trim(),
-				 quantity: parsedQuantity,
-				 min_quantity: parsedMinQuantity,
-				 unit_price: parsedUnitPrice,
+				 current_stock: parsedQuantity,
+				 minimum_threshold: parsedMinQuantity,
 				 project_id: projectId,
 			 });
 			 if (insertError) throw insertError;
@@ -89,9 +86,7 @@
 							 <View className="flex-1"><Text className="text-sm font-semibold text-gray-700 mb-2">Quantity *</Text><TextInput value={quantity} onChangeText={setQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
 							 <View className="flex-1"><Text className="text-sm font-semibold text-gray-700 mb-2">Minimum *</Text><TextInput value={minQuantity} onChangeText={setMinQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
 						 </View>
-						 <Text className="text-sm font-semibold text-gray-700 mb-2">Unit price (LKR) *</Text>
-						 <TextInput value={unitPrice} onChangeText={setUnitPrice} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-6" />
-						 <Pressable onPress={handleSubmit} disabled={submitting} className={`rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}><Text className="text-white font-bold">{submitting ? 'Saving...' : 'Create material'}</Text></Pressable>
+						 <Pressable onPress={handleSubmit} disabled={submitting} className={`mt-6 rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}><Text className="text-white font-bold">{submitting ? 'Saving...' : 'Create material'}</Text></Pressable>
 					 </>}
 				 </View>
 			 </ScrollView>

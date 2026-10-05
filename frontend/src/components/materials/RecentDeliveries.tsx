@@ -42,11 +42,11 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
           .from('purchase_orders')
           .select(`
             id, items, status, 
-            actual_delivery, created_at,
+            actual_delivery, created_at, updated_at,
             projects!inner(name)
           `)
-          .eq('status', 'Delivered')
-          .order('actual_delivery', { ascending: false })
+          .eq('status', 'Received')
+          .order('updated_at', { ascending: false })
           .limit(5);
 
         if (error) throw error;
@@ -86,9 +86,9 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
             return (
               <DeliveryRow 
                 key={d.id}
-                title={`${itemsStr} delivered`} 
+                title={`${itemsStr} received`} 
                 project={projectName} 
-                time={d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()} 
+                time={d.updated_at ? new Date(d.updated_at).toLocaleDateString() : (d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.created_at).toLocaleDateString())} 
               />
             );
           })

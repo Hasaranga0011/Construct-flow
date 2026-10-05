@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
 
-const AlertRow = ({ title, project, date }: { title: string, project: string, date: string }) => {
+const AlertRow = ({ title, project, location, date }: { title: string, project: string, location?: string, date: string }) => {
   return (
     <View className="flex-row items-center py-3 border-b border-gray-50">
       <View className="w-11 h-11 rounded-full bg-red-100 items-center justify-center mr-3">
@@ -12,59 +11,34 @@ const AlertRow = ({ title, project, date }: { title: string, project: string, da
       </View>
       <View className="flex-1 pr-2">
         <Text className="text-brand-danger font-bold text-sm mb-0.5" numberOfLines={1}>{title}</Text>
-        <Text className="text-gray-500 text-xs truncate" numberOfLines={1}>{project}</Text>
+        <Text 
+          onPress={() => {
+            if (location) {
+              import('react-native').then(({ Alert, Platform }) => {
+                if (Platform.OS === 'web') window.alert(location);
+                else Alert.alert('Project Location', location);
+              });
+            }
+          }}
+          className={`text-gray-500 text-xs truncate ${location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`} 
+          numberOfLines={1}
+        >
+          {project}
+        </Text>
       </View>
       <Text className="text-red-400 text-xs font-bold">{date}</Text>
     </View>
   );
 };
 
-export const SupplierAlertsPanel = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const SupplierAlertsPanel = ({ orders, loading = false }: { orders: any[], loading?: boolean }) => {
+  // Same definition as the "Late Deliveries" stat card (see isLateOrder in useSupplierOrders).
+  const alerts = orders.slice(0, 5);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    const checkLateOrders = async () => {
-      try {
-        // Trigger the backend to check and generate notifications if needed
-        await api.purchaseOrders.checkLate();
-
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        // Fetch orders that are late
-        const today = new Date().toISOString().split('T')[0];
-        
-        const { data, error } = await supabase
-          .from('purchase_orders')
-          .select(`
-            id, po_number, expected_date,
-            projects!inner(name)
-          `)
-          .in('status', ['Pending Delivery', 'Confirmed'])
-          .lt('expected_date', today)
-          .order('expected_date', { ascending: true })
-          .limit(5);
-
-        if (error) throw error;
-        
-        if (isMounted) setAlerts(data || []);
-      } catch (error) {
-        console.warn('Failed to load supplier alerts:', error);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    
-    checkLateOrders();
-    
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+    // Ask the backend to generate overdue notifications once per mount; display data is live via props.
+    api.purchaseOrders.checkLate().catch(() => {});
+  }, []);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-red-100">
@@ -91,7 +65,8 @@ export const SupplierAlertsPanel = ({ refreshTrigger = 0 }: { refreshTrigger?: n
             <AlertRow 
               key={alert.id}
               title={`PO ${alert.po_number} Overdue`} 
-              project={alert.projects?.name || 'Unknown Project'} 
+              project={alert.project_name || alert.projects?.name || 'Unknown Project'} 
+              location={alert.project_location || alert.projects?.location || ''}
               date={alert.expected_date} 
             />
           ))

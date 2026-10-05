@@ -26,7 +26,7 @@ def get_labour(project_id: Optional[str] = Query(None, description="Filter by pr
     try:
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
-        query = client.table("labour").select("*")
+        query = client.table("legacy_labour").select("*")
         if project_id:
             if allowed_projects is not None and project_id not in allowed_projects:
                 raise HTTPException(status_code=403, detail="Access denied: not your project")
@@ -48,7 +48,7 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
     try:
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
-        query = client.table("labour").select(
+        query = client.table("legacy_labour").select(
             "hours_worked, date, status, project_id, worker_name"
         ).eq("status", "Present")
         
@@ -96,7 +96,7 @@ def create_labour(labour: LabourCreate, current_user: dict = Depends(get_current
         if labour_data['status'] == 'Present':
              labour_data['check_in_time'] = datetime.now(timezone.utc).isoformat()
         
-        response = client.table("labour").insert(labour_data).execute()
+        response = client.table("legacy_labour").insert(labour_data).execute()
         
         if not response.data:
             raise HTTPException(status_code=400, detail="Failed to add labour record")
@@ -143,12 +143,12 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
             
         # 3. Check today's attendance record
         today = datetime.now(timezone.utc).date().isoformat()
-        
-        att_res = supabase.table("labour") \
-            .select("worker_name, hours_worked") \
-            .eq("project_id", payload.site_id) \
-            .gte("date", payload.start_date) \
-            .lte("date", payload.end_date) \
+        now_iso = datetime.now(timezone.utc).isoformat()
+        att_res = supabase.table("attendance") \
+            .select("id, check_in_time, check_out_time") \
+            .eq("worker_id", worker_id) \
+            .eq("site_id", payload.site_id) \
+            .eq("date", today) \
             .execute()
         if not att_res.data:
             # Check-in
@@ -198,7 +198,7 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
     supabase = client_for_token(current_user["token"])
     try:
         # Fetch all attendance records for this site within the date range
-        att_res = supabase.table("labour") \
+        att_res = supabase.table("legacy_labour") \
             .select("worker_name, hours_worked") \
             .eq("project_id", payload.site_id) \
             .gte("date", payload.start_date) \
@@ -269,7 +269,7 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                         "target_role": "worker",
                         "title": "Salary Slip Ready",
                         "message": f"Your salary slip for {payload.start_date} to {payload.end_date} is ready. Log in to view it.",
-                        "type": "info",
+                        "type": "general",
                         "is_read": False,
                     })
                     profile = profile_by_user.get(uid)

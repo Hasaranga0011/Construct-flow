@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { Modal } from 'react-native';
 import { useResponsive } from '../../../../hooks/useResponsive';
 
 export default function AdminStockLevels() {
@@ -20,7 +21,7 @@ export default function AdminStockLevels() {
     const fetchStock = async () => {
       try {
         let query = supabase.from('materials').select(`
-          *,
+          id, name, unit, current_stock, minimum_threshold, last_updated, project_id,
           project:projects(name)
         `).order('last_updated', { ascending: false });
         
@@ -57,7 +58,7 @@ export default function AdminStockLevels() {
     
     fetchStock();
     return () => { isMounted = false; };
-  }, [search, statusFilter]);
+  }, [search, statusFilter, loading]); // Added loading to dependency array so it refreshes on assign
 
   const statuses = ['All', 'In Stock', 'Low Stock', 'Out of Stock'];
 
@@ -67,6 +68,29 @@ export default function AdminStockLevels() {
       case 'Low Stock': return 'bg-yellow-100 text-yellow-700';
       case 'Out of Stock': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (assignModalVisible) {
+      supabase.from('projects').select('id, name').eq('status', 'active').then(({ data }) => {
+        if (data) setProjects(data);
+      });
+    }
+  }, [assignModalVisible]);
+
+  const handleAssign = async (projectId: string) => {
+    if (!selectedMaterialId) return;
+    try {
+      await supabase.from('materials').update({ project_id: projectId }).eq('id', selectedMaterialId);
+      setAssignModalVisible(false);
+      setLoading(true); // Trigger a refresh
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -150,7 +174,13 @@ export default function AdminStockLevels() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 16 }}>{m.name || 'Unnamed Material'}</Text>
-                      <Text style={{ color: '#6B7280', fontSize: 12 }}>Project: {m.project?.name || 'Unassigned Site'}</Text>
+                      {m.project_id ? (
+                        <Text style={{ color: '#6B7280', fontSize: 12 }}>Project: {m.project?.name}</Text>
+                      ) : (
+                        <Pressable onPress={() => { setSelectedMaterialId(m.id); setAssignModalVisible(true); }} className="bg-brand-orange/10 self-start px-2 py-1 rounded mt-1">
+                          <Text className="text-brand-orange text-xs font-bold">Assign to Project</Text>
+                        </Pressable>
+                      )}
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <View className={`px-2 py-1 rounded ${getStatusColor(calcStatus)}`}>
@@ -182,7 +212,13 @@ export default function AdminStockLevels() {
                   </View>
                   
                   <View className="w-[25%] pr-2">
-                    <Text className="text-gray-600 text-sm truncate font-medium">{m.project?.name || 'Unassigned Site'}</Text>
+                    {m.project_id ? (
+                      <Text className="text-gray-600 text-sm truncate font-medium">{m.project?.name}</Text>
+                    ) : (
+                      <Pressable onPress={() => { setSelectedMaterialId(m.id); setAssignModalVisible(true); }} className="bg-brand-orange/10 px-3 py-1.5 rounded-lg self-start">
+                        <Text className="text-brand-orange text-xs font-bold">Assign</Text>
+                      </Pressable>
+                    )}
                   </View>
   
                   <View className="w-[15%] pr-2">
@@ -212,6 +248,36 @@ export default function AdminStockLevels() {
           )}
         </View>
       </ScrollView>
+
+      <Modal visible={assignModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-white rounded-2xl w-full max-w-md p-6">
+            <Text className="text-xl font-bold text-brand-text mb-4">Assign Material to Project</Text>
+            <Text className="text-gray-500 mb-4 text-sm">Select an active project to assign this material to.</Text>
+            
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+              {projects.map(p => (
+                <Pressable 
+                  key={p.id}
+                  onPress={() => handleAssign(p.id)}
+                  className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 flex-row justify-between items-center"
+                >
+                  <Text className="text-brand-text font-semibold">{p.name}</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+                </Pressable>
+              ))}
+              {projects.length === 0 && (
+                <Text className="text-gray-400 text-center py-4">No active projects found.</Text>
+              )}
+            </ScrollView>
+
+            <Pressable onPress={() => setAssignModalVisible(false)} className="mt-4 py-3 bg-gray-100 rounded-lg items-center">
+              <Text className="text-gray-600 font-bold">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

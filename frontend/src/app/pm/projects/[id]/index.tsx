@@ -214,7 +214,7 @@ export default function PMProjectDetailsPage() {
                  <Text className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Quick Actions</Text>
                  
                  <TouchableOpacity 
-                    onPress={() => router.push(`/admin/projects/${project.id}/milestones`)}
+                    onPress={() => router.push(`/pm/projects/${project.id}/milestones`)}
                     className="flex-row items-center p-3 bg-gray-50 rounded-xl mb-3 border border-gray-200"
                  >
                     <Ionicons name="flag" size={20} color="#F97316" className="mr-3" />
@@ -226,25 +226,25 @@ export default function PMProjectDetailsPage() {
                  </TouchableOpacity>
 
                  <TouchableOpacity 
-                    onPress={() => router.push(`/admin/projects/${project.id}/expenses`)}
+                    onPress={() => router.push(`/pm/projects/${project.id}/reports`)}
+                    className="flex-row items-center p-3 bg-blue-50 rounded-xl mb-3 border border-blue-200"
+                 >
+                    <Ionicons name="document-text" size={20} color="#3B82F6" className="mr-3" />
+                    <View className="flex-1">
+                      <Text className="font-bold text-blue-800">View Site Reports</Text>
+                      <Text className="text-xs text-blue-600">Daily progress from Site Managers</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#3B82F6" />
+                 </TouchableOpacity>
+
+                 <TouchableOpacity 
+                    onPress={() => router.push(`/pm/projects/${project.id}/expenses`)}
                     className="flex-row items-center p-3 bg-gray-50 rounded-xl mb-3 border border-gray-200"
                  >
                     <Ionicons name="cash-outline" size={20} color="#EF4444" className="mr-3" />
                     <View className="flex-1">
                       <Text className="font-bold text-gray-800">Manage Expenses</Text>
                       <Text className="text-xs text-gray-500">Track spent costs dynamically</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                 </TouchableOpacity>
-
-                 <TouchableOpacity 
-                    onPress={() => router.push(`/admin/projects/${project.id}/edit`)}
-                    className="flex-row items-center p-3 bg-gray-50 rounded-xl border border-gray-200"
-                 >
-                    <Ionicons name="settings" size={20} color="#3B82F6" className="mr-3" />
-                    <View className="flex-1">
-                      <Text className="font-bold text-gray-800">Edit Project</Text>
-                      <Text className="text-xs text-gray-500">Update budget & details</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                  </TouchableOpacity>

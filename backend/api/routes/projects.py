@@ -22,6 +22,22 @@ def get_projects(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from pydantic import BaseModel
+
+class BulkProjectRequest(BaseModel):
+    ids: List[str]
+
+@router.post("/bulk-names")
+def get_bulk_project_names(req: BulkProjectRequest):
+    try:
+        from supabase import create_client
+        from core.config import settings
+        service_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        res = service_client.table("projects").select("id, name, location").in_("id", req.ids).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/debug_schema")
 def debug_schema(request: Request):
     client = get_auth_client(request)
@@ -98,22 +114,24 @@ def create_project(project: ProjectCreate, request: Request):
     notifications = []
     if saved.get("pm_id"):
         notifications.append({
+            "user_id": "11111111-1111-1111-1111-111111111111",
             "project_id": saved["id"],
             "target_user_id": saved["pm_id"],
             "target_role": "pm",
             "title": "New Project Assigned",
             "message": f"You have been assigned as Project Manager for: {saved['name']}",
-            "type": "info",
+            "type": "general",
             "is_read": False,
         })
     # Notify super_admin (Bug 11 fix)
     notifications.append({
+        "user_id": "11111111-1111-1111-1111-111111111111",
         "project_id": saved["id"],
         "target_user_id": None,
         "target_role": "super_admin",
         "title": "New Project Created",
         "message": f"Project '{saved['name']}' has been created successfully.",
-        "type": "Success",
+        "type": "general",
         "is_read": False,
     })
     
@@ -139,9 +157,34 @@ def create_project(project: ProjectCreate, request: Request):
                 import uuid
                 w_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "worker_id": w_id} for w_id in project.workers]
                 client.table("site_workers").insert(w_inserts).execute()
+
+        if getattr(project, "suppliers", None) is not None:
+            client.table("project_role_assignments").delete().eq("project_id", saved["id"]).eq("role", "supplier").execute()
+            if project.suppliers:
+                import uuid
+                supp_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "user_id": s_id, "role": "supplier"} for s_id in project.suppliers]
+                client.table("project_role_assignments").insert(supp_inserts).execute()
+                # notify suppliers
+                for s_id in project.suppliers:
+                    notifications.append({
+                        "user_id": "11111111-1111-1111-1111-111111111111",
+                        "project_id": saved["id"],
+                        "target_user_id": s_id,
+                        "target_role": "supplier",
+                        "title": "New Project Assignment",
+                        "message": f"You have been assigned as a supplier for: {saved['name']}",
+                        "type": "general",
+                        "is_read": False,
+                    })
+                # Re-insert notifications for suppliers
+                if notifications:
+                    try:
+                        client.table("notifications").insert(notifications).execute()
+                    except Exception:
+                        pass
     except Exception:
         import logging
-        logging.exception("Failed to sync site_manager_sites or site_workers")
+        logging.exception("Failed to sync site_manager_sites, site_workers or suppliers")
 
     notify_assigned_client(client, saved)
     return saved
@@ -168,9 +211,33 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request):
                 import uuid
                 w_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "worker_id": w_id} for w_id in project.workers]
                 client.table("site_workers").insert(w_inserts).execute()
+
+        if getattr(project, "suppliers", None) is not None:
+            client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "supplier").execute()
+            if project.suppliers:
+                import uuid
+                supp_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "user_id": s_id, "role": "supplier"} for s_id in project.suppliers]
+                client.table("project_role_assignments").insert(supp_inserts).execute()
+                
+                # notify newly assigned suppliers
+                try:
+                    notifs = [{
+                        "user_id": "11111111-1111-1111-1111-111111111111",
+                        "project_id": project_id,
+                        "target_user_id": s_id,
+                        "target_role": "supplier",
+                        "title": "New Project Assignment",
+                        "message": f"You have been assigned as a supplier for project: {saved.get('name', 'Unknown')}",
+                        "type": "general",
+                        "is_read": False,
+                    } for s_id in project.suppliers]
+                    client.table("notifications").insert(notifs).execute()
+                except:
+                    pass
+
     except Exception:
         import logging
-        logging.exception("Failed to sync site_manager_sites or site_workers")
+        logging.exception("Failed to sync site_manager_sites, site_workers or suppliers")
 
     if data.get("client_id"):
         notify_assigned_client(client, saved)
@@ -256,12 +323,13 @@ def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdat
             proj = supabase.table("projects").select("client_id, name").eq("id", project_id).execute()
             if proj.data and proj.data[0].get("client_id"):
                 supabase.table("notifications").insert({
+                    "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": project_id,
                     "target_user_id": proj.data[0]["client_id"],
                     "target_role": "client",
                     "title": "Milestone Updated",
                     "message": f"A milestone has been updated to '{payload.status}' on your project '{proj.data[0].get('name', '')}'.",
-                    "type": "info",
+                    "type": "general",
                     "is_read": False,
                 }).execute()
         except Exception:
@@ -378,22 +446,24 @@ def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_
     try:
         notifications = [
             {
+                "user_id": "11111111-1111-1111-1111-111111111111",
                 "project_id": project_id,
                 "target_role": "super_admin",
                 "title": f"Budget {threshold_pct}% Exceeded",
                 "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
-                "type": "error" if threshold_pct >= 100 else "warning",
+                "type": "general",
                 "is_read": False,
             }
         ]
         if pm_id:
             notifications.append({
+                "user_id": "11111111-1111-1111-1111-111111111111",
                 "project_id": project_id,
                 "target_user_id": pm_id,
                 "target_role": "pm",
                 "title": f"Budget {threshold_pct}% Exceeded",
                 "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
-                "type": "error" if threshold_pct >= 100 else "warning",
+                "type": "general",
                 "is_read": False,
             })
         supabase.table("notifications").insert(notifications).execute()

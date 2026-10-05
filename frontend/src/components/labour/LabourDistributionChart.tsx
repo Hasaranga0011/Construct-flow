@@ -44,7 +44,7 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
         
         // Fetch all attendance for today
         const today = new Date().toISOString().split('T')[0];
-        const { data: todayLabour } = await supabase.from('labour').select('project_id, worker_name').eq('date', today);
+        const { data: todayLabour } = await supabase.from('legacy_labour').select('project_id, worker_name').eq('date', today);
         
         if (projects && todayLabour) {
           const counts = projects.map(p => {

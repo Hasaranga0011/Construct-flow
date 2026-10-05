@@ -82,9 +82,10 @@ export default function ClientProjectPage() {
                 <View><Text className="text-gray-400 text-xs uppercase">Spent</Text><Text className="text-brand-text font-bold mt-1">{formatCurrency(Number(project.spent_cost || 0))}</Text></View>
                 <View><Text className="text-gray-400 text-xs uppercase">Target end</Text><Text className="text-brand-text font-bold mt-1">{formatDate(project.end_date)}</Text></View>
               </View>
-              <View className="flex-row gap-3 mt-5">
-                <Link href={`/client/project/milestones?projectId=${project.id}`} asChild><Pressable className="flex-1 bg-brand-orange py-3 rounded-lg items-center"><Text className="text-white font-bold">Milestones</Text></Pressable></Link>
-                <Link href={`/client/messages/${project.id}`} asChild><Pressable className="flex-1 border border-gray-300 py-3 rounded-lg items-center"><Text className="text-gray-700 font-bold">Message PM</Text></Pressable></Link>
+              <View className="flex-row gap-2 mt-5">
+                <Link href={`/client/project/milestones?projectId=${project.id}`} asChild><Pressable className="flex-1 bg-brand-orange py-3 rounded-lg items-center"><Text className="text-white font-bold text-xs">Milestones</Text></Pressable></Link>
+                <Link href={`/client/project/${project.id}/reports`} asChild><Pressable className="flex-1 bg-blue-50 border border-blue-200 py-3 rounded-lg items-center"><Text className="text-blue-700 font-bold text-xs">Site Reports</Text></Pressable></Link>
+                <Link href={`/client/messages/${project.id}`} asChild><Pressable className="flex-1 border border-gray-300 py-3 rounded-lg items-center"><Text className="text-gray-700 font-bold text-xs">Message PM</Text></Pressable></Link>
               </View>
             </View>
           );

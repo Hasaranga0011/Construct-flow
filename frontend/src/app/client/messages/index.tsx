@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 
 type Project = { id: string; name: string; pm_id?: string | null };
-type Message = { id: string; project_id: string; message?: string | null; created_at: string; sender_id: string; sender_role?: string; receiver_role?: string };
+type Message = { id: string; project_id: string; message?: string | null; created_at: string; sender_id: string; sender_role?: string; receiver_role?: string; receiver_id?: string; read_at?: string | null };
 
 export default function ClientMessagesPage() {
   const { user } = useAuth();
@@ -17,6 +17,7 @@ export default function ClientMessagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [activeChannel, setActiveChannel] = useState<'pm' | 'super_admin' | 'site_manager'>('pm');
+  const [unreadCounts, setUnreadCounts] = useState({ pm: 0, super_admin: 0, site_manager: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -40,16 +41,26 @@ export default function ClientMessagesPage() {
         if (projectIds.length > 0) {
           const { data, error: messageError } = await supabase
             .from('client_messages')
-            .select('id, project_id, message, created_at, sender_id, sender_role, receiver_role')
+            .select('id, project_id, message, created_at, sender_id, sender_role, receiver_role, receiver_id, read_at')
             .in('project_id', projectIds)
             .order('created_at', { ascending: false });
           if (messageError) throw messageError;
           messageData = (data || []) as Message[];
         }
 
+        const counts = { pm: 0, super_admin: 0, site_manager: 0 };
+        messageData.forEach(m => {
+          if (m.receiver_id === user.id && !m.read_at) {
+            if (m.sender_role === 'pm') counts.pm++;
+            else if (m.sender_role === 'super_admin') counts.super_admin++;
+            else if (m.sender_role === 'site_manager') counts.site_manager++;
+          }
+        });
+
         if (isMounted) {
           setProjects(clientProjects);
           setLatestMessages(messageData);
+          setUnreadCounts(counts);
         }
       } catch (loadError: any) {
         if (isMounted) setError(loadError.message || 'Failed to load conversations.');
@@ -75,18 +86,23 @@ export default function ClientMessagesPage() {
       <TopNav title="Client Messages" showAction={false} />
       <View className="bg-white border-b border-gray-100 flex-row px-4">
         {[
-          { key: 'pm', label: 'Project Manager' },
-          { key: 'super_admin', label: 'Admin' },
-          { key: 'site_manager', label: 'Site Manager' }
+          { key: 'pm', label: 'Project Manager', count: unreadCounts.pm },
+          { key: 'super_admin', label: 'Admin', count: unreadCounts.super_admin },
+          { key: 'site_manager', label: 'Site Manager', count: unreadCounts.site_manager }
         ].map(ch => (
           <Pressable
             key={ch.key}
             onPress={() => setActiveChannel(ch.key as any)}
-            className={`mr-6 py-3 border-b-2 ${activeChannel === ch.key ? 'border-brand-orange' : 'border-transparent'}`}
+            className={`mr-6 py-3 border-b-2 flex-row items-center ${activeChannel === ch.key ? 'border-brand-orange' : 'border-transparent'}`}
           >
             <Text className={`text-sm font-semibold ${activeChannel === ch.key ? 'text-brand-orange' : 'text-gray-400'}`}>
               {ch.label}
             </Text>
+            {ch.count > 0 && (
+              <View className="ml-2 bg-brand-orange rounded-full px-1.5 py-0.5">
+                <Text className="text-white text-[10px] font-bold">{ch.count}</Text>
+              </View>
+            )}
           </Pressable>
         ))}
       </View>

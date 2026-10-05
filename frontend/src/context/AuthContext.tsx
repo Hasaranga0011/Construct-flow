@@ -8,6 +8,7 @@ type AuthContextType = {
   user: User | null;
   role: string | null;
   isLoading: boolean;
+  isApproved: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   isLoading: true,
+  isApproved: true,
   signOut: async () => {},
 });
 
@@ -23,6 +25,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         prevUserId = null;
         if (mounted && requestId === roleRequest) {
           setRole(null);
+          setIsApproved(true);
           setIsLoading(false);
         }
         return;
@@ -58,20 +62,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const metaRole = nextSession.user.user_metadata?.role;
         let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
+        let resolvedIsApproved = true;
         
-        if (!resolvedRole) {
+        if (!resolvedRole || resolvedRole === 'supplier') {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_approved')
             .eq('id', nextSession.user.id)
             .single();
-          resolvedRole = !profileError ? normalizeRole(profile?.role) : null;
+          if (!profileError) {
+             if (!resolvedRole) resolvedRole = normalizeRole(profile?.role);
+             if (profile?.is_approved !== undefined) resolvedIsApproved = profile.is_approved;
+          }
         }
 
-        if (mounted && requestId === roleRequest) setRole(resolvedRole);
+        if (mounted && requestId === roleRequest) {
+            setRole(resolvedRole);
+            setIsApproved(resolvedIsApproved);
+        }
       } catch (error) {
         console.error('Error fetching role:', error);
-        if (mounted && requestId === roleRequest) setRole(null);
+        if (mounted && requestId === roleRequest) {
+            setRole(null);
+            setIsApproved(true);
+        }
       } finally {
         if (mounted && requestId === roleRequest) setIsLoading(false);
       }
@@ -101,7 +115,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isLoading, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isLoading, isApproved, signOut }}>
       {children}
     </AuthContext.Provider>
   );

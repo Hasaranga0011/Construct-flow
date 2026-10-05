@@ -95,7 +95,7 @@ def invite_client(req: InviteClientRequest, request: Request):
             "user_id": new_user_id,
             "title": "Welcome to ConstructFlow",
             "message": f"You have been invited to ConstructFlow. Your account is ready.",
-            "type": "info",
+            "type": "general",
             "project_id": req.project_id
         }).execute()
         

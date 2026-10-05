@@ -52,7 +52,7 @@ export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refresh
             id, supplier_name, po_number, status, expected_date,
             projects!inner(name)
           `)
-          .eq('status', 'Pending Delivery') // only show pending deliveries
+          .in('status', ['Delivered']) // only show delivered (shipped but not received)
           .order('expected_date', { ascending: true })
           .limit(5);
 
@@ -87,14 +87,14 @@ export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refresh
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">
       <View className="mb-4">
         <Text className="text-lg font-bold text-brand-text">Expected Deliveries</Text>
-        <Text className="text-brand-text-muted text-xs">Approved by Supplier</Text>
+        <Text className="text-brand-text-muted text-xs">Shipped by Supplier, Awaiting Receipt</Text>
       </View>
 
       <View>
         {loading ? (
           <ActivityIndicator color="#F97316" />
         ) : orders.length === 0 ? (
-          <Text className="text-gray-400 text-sm">No approved orders pending delivery.</Text>
+          <Text className="text-gray-400 text-sm">No orders currently in transit.</Text>
         ) : (
           orders.map(order => (
             <OrderRow 

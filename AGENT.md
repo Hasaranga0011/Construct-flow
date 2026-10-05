@@ -195,6 +195,14 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 - **Pathing Warning**: Pay extreme attention to relative import depth (e.g., `../../../components/common/TopNav`) when scaffolding or modifying nested pages. Incorrect depth will crash the Metro Bundler.
 
 ## 12. Changelog
+- [2026-10-04] (Gap Completion Plan execution)
+  - Cleaned up API wrappers and removed defunct endpoints (`estimations.predict`, `materials.checkStock`).
+  - Implemented supplier approval gate in `AuthContext.tsx` and protected supplier views.
+  - Built frontend 3-way multichannel chat support (Client <-> PM, Admin, Site Manager) with unread counts.
+  - Wired frontend finance charts (`BudgetUtilizationChart`, `ClientBudgetRing`) directly to the backend `/financials` endpoint for accurate real-time aggregates.
+  - Deprecated `labour` table references in the API and PM frontend, migrating them to `legacy_labour` for schema consolidation safety.
+  - Implemented APScheduler job run observability by logging `start` and `end` events to the `job_runs` table in `scheduler.py`.
+  - Stubbed out workflow and permission boundaries tests in `test_workflow.py`.
 - [2026-09-27] (Schema consolidation, Supplier approval, and Observability phase completion)
   - Deprecated legacy `labour` and `photos` tables via a new schema consolidation migration, moving entirely to canonical `attendance` and `site_reports` architectures.
   - Rewrote the backend `/labour/payroll` endpoint to generate accurate client payroll data natively via the canonical `attendance` table.

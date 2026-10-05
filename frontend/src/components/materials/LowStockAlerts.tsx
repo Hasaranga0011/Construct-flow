@@ -12,7 +12,10 @@ const AlertRow = ({ material, project, remaining }: { material: string, project:
         <Text className="text-brand-text font-bold text-sm mb-0.5">{material}</Text>
         <Text className="text-gray-500 text-xs">{project}</Text>
       </View>
-      <Text className="text-brand-orange font-bold text-sm">{remaining}</Text>
+      <View className="items-end">
+        <Text className="text-brand-orange font-bold text-sm">{remaining}</Text>
+        <Text className="text-gray-400 text-[10px]">In stock</Text>
+      </View>
     </View>
   );
 };
@@ -30,22 +33,23 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
       }
 
       const { data, error } = await supabase
-        .from('material_requests')
+        .from('materials')
         .select(`
-          id, item_name, unit,
-          projects(name),
-          materials(current_stock, minimum_threshold)
+          id, name, unit, current_stock, minimum_threshold,
+          projects!inner(name, status)
         `)
-        .order('updated_at', { ascending: false });
+        .eq('projects.status', 'active');
 
       if (error) throw error;
       
       let lowStock: any[] = [];
       if (data) {
-        lowStock = data.filter((req: any) => {
-          const m = Array.isArray(req.materials) ? req.materials[0] : req.materials;
-          if (!m) return false;
+        lowStock = data.filter((m: any) => {
           return (m.current_stock || 0) < (m.minimum_threshold || 1);
+        }).sort((a: any, b: any) => {
+          const pctA = (a.current_stock || 0) / (a.minimum_threshold || 1);
+          const pctB = (b.current_stock || 0) / (b.minimum_threshold || 1);
+          return pctA - pctB; // lowest percentage first
         }).slice(0, 5);
       }
 
@@ -80,15 +84,14 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
             <Text className="text-gray-400 text-sm">No low stock items.</Text>
           </View>
         ) : (
-          alerts.map(a => {
-            const projectName = a.projects?.name || 'Unknown';
-            const m = Array.isArray(a.materials) ? a.materials[0] : a.materials;
-            const remaining = m ? `${m.current_stock} ${a.unit || ''}` : '0';
+            alerts.map(m => {
+            const projectName = m.projects?.name || 'Unknown';
+            const remaining = `${m.current_stock || 0} ${m.unit || ''}`;
 
             return (
               <AlertRow 
-                key={a.id} 
-                material={a.item_name} 
+                key={m.id} 
+                material={m.name} 
                 project={projectName} 
                 remaining={remaining} 
               />

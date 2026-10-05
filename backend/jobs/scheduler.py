@@ -3,7 +3,26 @@ from apscheduler.triggers.cron import CronTrigger
 from core.supabase_client import supabase_db
 from datetime import datetime
 
+async def _log_job_start(job_name: str) -> str:
+    try:
+        res = supabase_db.table("job_runs").insert({"job_name": job_name, "status": "Running"}).execute()
+        return res.data[0]["id"] if res.data else None
+    except:
+        return None
+
+async def _log_job_end(job_id: str, status: str, error_message: str = None):
+    if not job_id: return
+    try:
+        supabase_db.table("job_runs").update({
+            "status": status,
+            "error_message": error_message,
+            "completed_at": datetime.now().isoformat()
+        }).eq("id", job_id).execute()
+    except:
+        pass
+
 async def stock_alert_job():
+    job_id = await _log_job_start("stock_alert_job")
     try:
         print(f"[{datetime.now()}] Running stock_alert_job")
         res = supabase_db.table("materials").select("*").execute()
@@ -14,13 +33,16 @@ async def stock_alert_job():
             message = f"Only {item.get('global_stock_quantity')} {item.get('unit')} remaining. Reorder immediately."
             
             supabase_db.table("notifications").insert([
-                {"title": title, "message": message, "type": "alert", "target_role": "super_admin", "is_read": False},
-                {"title": title, "message": message, "type": "alert", "target_role": "pm", "is_read": False}
+                {"title": title, "message": message, "type": "general", "target_role": "super_admin", "is_read": False},
+                {"title": title, "message": message, "type": "general", "target_role": "pm", "is_read": False}
             ]).execute()
+        await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Stock alert job error: {e}")
+        await _log_job_end(job_id, "Failed", str(e))
 
 async def delay_check_job():
+    job_id = await _log_job_start("delay_check_job")
     try:
         print(f"[{datetime.now()}] Running delay_check_job")
         # Reuse insights logic or simplified check here
@@ -33,39 +55,41 @@ async def delay_check_job():
             message = f"{p.get('delay_risk_score')}% delay probability. Immediate review needed."
             
             supabase_db.table("notifications").insert([
-                {"title": title, "message": message, "type": "alert", "target_role": "super_admin"},
-                {"title": title, "message": message, "type": "alert", "target_role": "pm"}
+                {"title": title, "message": message, "type": "general", "target_role": "super_admin"},
+                {"title": title, "message": message, "type": "general", "target_role": "pm"}
             ]).execute()
+        await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Delay check job error: {e}")
+        await _log_job_end(job_id, "Failed", str(e))
 
 async def payroll_job():
+    job_id = await _log_job_start("payroll_job")
     try:
         print(f"[{datetime.now()}] Running payroll_job")
         now = datetime.now()
         month_str = f"{now.year}-{now.month:02d}"
         
-        # Simplified generation logic - calls internal logic
-        # For full implementation, we would extract the generate_payroll logic to a service
-        # and call it from both the API and here.
-        # Just sending the notification for now as placeholder for the job.
-        
         supabase_db.table("notifications").insert({
             "title": "💰 Payroll Generation Time",
             "message": f"Please generate payroll records for {month_str}",
-            "type": "info",
+            "type": "general",
             "target_role": "super_admin"
         }).execute()
+        await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Payroll job error: {e}")
+        await _log_job_end(job_id, "Failed", str(e))
 
 async def weekly_report_job():
+    job_id = await _log_job_start("weekly_report_job")
     try:
         print(f"[{datetime.now()}] Running weekly_report_job")
         # Logic to fetch projects and email clients
-        pass
+        await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Weekly report job error: {e}")
+        await _log_job_end(job_id, "Failed", str(e))
 
 def start_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()

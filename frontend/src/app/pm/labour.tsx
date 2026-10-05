@@ -43,8 +43,8 @@ export default function PMLabourScreen() {
 
         if (activeProjectIds.length > 0) {
           const [workersReq, labourReq] = await Promise.all([
-            supabase.from('labour').select('id', { count: 'exact', head: true }).in('assigned_project_id', activeProjectIds),
-            supabase.from('labour')
+            supabase.from('legacy_labour').select('id', { count: 'exact', head: true }).in('assigned_project_id', activeProjectIds),
+            supabase.from('legacy_labour')
               .select('id, status, hours_worked')
               .eq('date', today)
               .in('assigned_project_id', activeProjectIds)

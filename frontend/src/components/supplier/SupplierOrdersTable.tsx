@@ -1,74 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Modal, TextInput } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Modal, TextInput, Platform } from 'react-native';
 import { api } from '../../services/api';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useAuth } from '../../context/AuthContext';
 
-const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
-  const [qty, setQty] = useState('');
-  const [date, setDate] = useState('');
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    if (order) {
-      setQty(order.quantity_ordered?.toString() || '');
-      setDate(order.expected_date || '');
-      setNotes('');
-    }
-  }, [order]);
-
-  if (!visible || !order) return null;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/50 justify-center items-center p-4">
-        <View className="bg-white rounded-2xl w-full max-w-md p-6">
-          <Text className="text-xl font-bold text-brand-text mb-4">Counter-Offer Suggestion</Text>
-          <Text className="text-gray-500 mb-4 text-sm">Propose a different quantity or delivery date for PO {order.po_number}.</Text>
-
-          <Text className="font-semibold text-gray-700 mb-1">Suggested Quantity</Text>
-          <TextInput 
-            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
-            keyboardType="numeric"
-            value={qty}
-            onChangeText={setQty}
-          />
-
-          <Text className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
-          <TextInput 
-            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
-            value={date}
-            onChangeText={setDate}
-          />
-
-          <Text className="font-semibold text-gray-700 mb-1">Notes to Admin</Text>
-          <TextInput 
-            className="border border-gray-300 rounded-lg p-3 mb-6 text-brand-text h-20"
-            multiline
-            value={notes}
-            onChangeText={setNotes}
-          />
-
-          <View className="flex-row justify-end space-x-3">
-            <Pressable onPress={onClose} className="px-4 py-2">
-              <Text className="text-gray-500 font-bold">Cancel</Text>
-            </Pressable>
-            <Pressable 
-              onPress={() => onSubmit(order.id, parseFloat(qty), date, notes)} 
-              className="bg-brand-warning px-6 py-2 rounded-lg"
-            >
-              <Text className="text-white font-bold">Submit Suggestion</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+const showError = (fallback: string, e: any) => {
+  const msg = e?.message || e?.detail || fallback;
+  if (Platform.OS === 'web') window.alert(msg); else Alert.alert('Error', msg);
 };
 
-const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMobile }: any) => {
-  const projectName = order.projects?.name || 'Unknown Project';
+
+
+const OrderRow = ({ order, onOpen, isMobile }: any) => {
+  const projectName = order.project_name || order.projects?.name || 'Unknown Project';
   const isPending = order.status === 'Pending Delivery';
   const isConfirmed = order.status === 'Confirmed';
   const isRejected = order.status === 'Rejected';
@@ -91,8 +34,18 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMob
       <View style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 16 }}>{order.po_number}</Text>
-            <Text style={{ color: '#6B7280', fontSize: 12 }}>{projectName}</Text>
+            <Text onPress={onOpen ? () => onOpen(order.id) : undefined} style={{ color: '#111827', fontWeight: 'bold', fontSize: 16, textDecorationLine: onOpen ? 'underline' : 'none' }}>{order.po_number}</Text>
+            <Text 
+              onPress={() => {
+                if (order.project_location) {
+                  if (Platform.OS === 'web') window.alert(order.project_location);
+                  else Alert.alert('Project Location', order.project_location);
+                }
+              }}
+              style={{ color: '#6B7280', fontSize: 12, textDecorationLine: order.project_location ? 'underline' : 'none' }}
+            >
+              {projectName}
+            </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <View className={`px-2 py-1 rounded ${getStatusColor().split(' ')[0]}`}>
@@ -107,9 +60,16 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMob
             <Text style={{ color: '#374151', fontWeight: '600' }} numberOfLines={2}>
               {order.items || `Material ID: ${order.material_id}`}
             </Text>
-            {isSuggested && order.supplier_notes && (
-              <Text style={{ color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }} numberOfLines={1}>Note: {order.supplier_notes}</Text>
-            )}
+            {isSuggested && order.supplier_notes && (() => {
+              try {
+                const log = JSON.parse(order.supplier_notes);
+                if (Array.isArray(log) && log.length > 0) {
+                  const lastNote = [...log].reverse().find((e: any) => e.note);
+                  if (lastNote) return <Text style={{ color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }} numberOfLines={1}>Note: {lastNote.note}</Text>;
+                }
+              } catch(e) {}
+              return <Text style={{ color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }} numberOfLines={1}>Note: {order.supplier_notes}</Text>;
+            })()}
           </View>
           <View style={{ alignItems: 'flex-end', paddingLeft: 8 }}>
             <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 4 }}>Quantity / Cost</Text>
@@ -139,35 +99,9 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMob
           </View>
         </View>
         
-        {isPending ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-            <Pressable onPress={() => onApprove(order.id)} style={{ flex: 1, backgroundColor: '#22C55E', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Approve</Text>
-            </Pressable>
-            <Pressable onPress={() => onSuggestClick(order)} style={{ flex: 1, backgroundColor: '#EAB308', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Suggest</Text>
-            </Pressable>
-            <Pressable onPress={() => onReject(order.id)} style={{ flex: 1, backgroundColor: '#EF4444', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Reject</Text>
-            </Pressable>
-          </View>
-        ) : isConfirmed ? (
-          <Pressable onPress={() => onDeliver(order.id)} style={{ backgroundColor: '#8B5CF6', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Mark Delivered</Text>
-          </Pressable>
-        ) : isDelivered ? (
-          <View style={{ backgroundColor: '#EDE9FE', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-            <Text style={{ color: '#7C3AED', fontSize: 12, fontWeight: 'bold' }}>Awaiting Receipt Confirmation</Text>
-          </View>
-        ) : isReceived ? (
-          <View style={{ backgroundColor: '#DCFCE7', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-            <Text style={{ color: '#16A34A', fontSize: 12, fontWeight: 'bold' }}>✓ Goods Received &amp; Confirmed</Text>
-          </View>
-        ) : (
-          <View style={{ backgroundColor: '#F3F4F6', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
-            <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: 'bold' }}>No Action Available</Text>
-          </View>
-        )}
+        <Pressable onPress={() => onOpen && onOpen(order.id)} style={{ backgroundColor: '#F97316', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>View Order</Text>
+        </Pressable>
       </View>
     );
   }
@@ -175,17 +109,35 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMob
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       <View className="w-[15%] pr-2">
-        <Text className="text-brand-text font-bold text-sm truncate" numberOfLines={1}>{order.po_number}</Text>
-        <Text className="text-gray-500 text-xs truncate" numberOfLines={1}>{projectName}</Text>
+        <Text onPress={onOpen ? () => onOpen(order.id) : undefined} className={`text-brand-text font-bold text-sm truncate ${onOpen ? 'hover:text-brand-orange underline' : ''}`} numberOfLines={1}>{order.po_number}</Text>
+        <Text 
+          onPress={() => {
+            if (order.project_location) {
+              if (Platform.OS === 'web') window.alert(order.project_location);
+              else Alert.alert('Project Location', order.project_location);
+            }
+          }}
+          className={`text-gray-500 text-xs truncate ${order.project_location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`} 
+          numberOfLines={1}
+        >
+          {projectName}
+        </Text>
       </View>
 
       <View className="w-[20%] pr-2">
         <Text className="text-brand-text text-sm" numberOfLines={2}>
           {order.items || `Material ID: ${order.material_id}`}
         </Text>
-        {isSuggested && order.supplier_notes && (
-          <Text className="text-yellow-600 text-xs italic mt-1" numberOfLines={1}>Note: {order.supplier_notes}</Text>
-        )}
+        {isSuggested && order.supplier_notes && (() => {
+          try {
+            const log = JSON.parse(order.supplier_notes);
+            if (Array.isArray(log) && log.length > 0) {
+              const lastNote = [...log].reverse().find((e: any) => e.note);
+              if (lastNote) return <Text className="text-yellow-600 text-xs italic mt-1" numberOfLines={1}>Note: {lastNote.note}</Text>;
+            }
+          } catch(e) {}
+          return <Text className="text-yellow-600 text-xs italic mt-1" numberOfLines={1}>Note: {order.supplier_notes}</Text>;
+        })()}
       </View>
 
       <View className="w-[12%]">
@@ -220,152 +172,37 @@ const OrderRow = ({ order, onApprove, onReject, onSuggestClick, onDeliver, isMob
       </View>
 
       <View className="flex-1 flex-row justify-end pl-1">
-        {isPending ? (
-          <View className="flex-row items-center space-x-1.5">
-            <Pressable onPress={() => onApprove(order.id)} className="bg-green-500 px-2 py-1.5 rounded shadow-sm">
-              <Text className="text-white text-[11px] font-bold">Approve</Text>
-            </Pressable>
-            <Pressable onPress={() => onSuggestClick(order)} className="bg-yellow-500 px-2 py-1.5 rounded shadow-sm">
-              <Text className="text-white text-[11px] font-bold">Suggest</Text>
-            </Pressable>
-            <Pressable onPress={() => onReject(order.id)} className="bg-red-500 px-2 py-1.5 rounded shadow-sm">
-              <Text className="text-white text-[11px] font-bold">Reject</Text>
-            </Pressable>
-          </View>
-        ) : isConfirmed ? (
-          <Pressable onPress={() => onDeliver(order.id)} className="bg-purple-500 px-2 py-1.5 rounded shadow-sm">
-            <Text className="text-white text-[11px] font-bold">Mark Delivered</Text>
-          </Pressable>
-        ) : isDelivered ? (
-          <Text className="text-purple-600 text-[11px] font-bold text-right pr-2">Awaiting Receipt</Text>
-        ) : isReceived ? (
-          <Text className="text-green-600 text-[11px] font-bold text-right pr-2">✓ Confirmed</Text>
-        ) : (
-          <Text className="text-gray-400 text-xs text-right pr-2">No Action</Text>
-        )}
+        <Pressable onPress={() => onOpen && onOpen(order.id)} className="bg-brand-orange px-3 py-1.5 rounded-md shadow-sm">
+          <Text className="text-white text-xs font-bold">View</Text>
+        </Pressable>
       </View>
     </View>
   );
 };
 
 
-export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { refreshTrigger?: number, onOrderAction: () => void }) => {
+export const SupplierOrdersTable = ({
+  orders: sourceOrders,
+  loading: sourceLoading = false,
+  onOpenOrder,
+  title = 'Incoming Purchase Orders',
+  subtitle = 'Awaiting your response or admin review of your counter-offer',
+}: {
+  orders: any[],
+  loading?: boolean,
+  onOpenOrder?: (id: string) => void,
+  title?: string,
+  subtitle?: string,
+}) => {
   const { isMobile } = useResponsive();
-  const { user } = useAuth();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [suggestModalVisible, setSuggestModalVisible] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadOrders = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session || !user) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('purchase_orders')
-          .select(`
-            id, po_number, items, material_id, quantity_ordered, total_price, expected_date, status,
-            suggested_quantity, suggested_date, supplier_notes,
-            projects!inner(name)
-          `)
-          .eq('supplier_id', user.id)
-          .in('status', ['Pending Delivery', 'Confirmed', 'Delivered', 'Received', 'Rejected', 'Suggested'])
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (isMounted) setOrders(data || []);
-      } catch (error) {
-        console.warn('Failed to load supplier orders:', error);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadOrders();
-
-    // Realtime: live order updates for this supplier.
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    if (user) {
-      channel = supabase
-        .channel(`supplier-orders-table:${user.id}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_orders',
-          filter: `supplier_id=eq.${user.id}`,
-        }, () => { loadOrders(); })
-        .subscribe();
-    }
-
-    return () => {
-      isMounted = false;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [refreshTrigger, user]);
-
-  const handleApprove = async (id: string) => {
-    try {
-      setLoading(true);
-      await api.purchaseOrders.approve(id);
-      onOrderAction();
-    } catch (e: any) {
-      Alert.alert('Error', 'Failed to approve order');
-      setLoading(false);
-    }
-  };
-
-  const handleReject = async (id: string) => {
-    try {
-      setLoading(true);
-      await api.purchaseOrders.reject(id);
-      onOrderAction();
-    } catch (e: any) {
-      Alert.alert('Error', 'Failed to reject order');
-      setLoading(false);
-    }
-  };
-
-  const handleDeliver = async (id: string) => {
-    try {
-      setLoading(true);
-      await api.purchaseOrders.deliver(id);
-      onOrderAction();
-    } catch (e: any) {
-      Alert.alert('Error', 'Failed to mark as delivered');
-      setLoading(false);
-    }
-  };
-
-  const handleSuggestSubmit = async (id: string, qty: number, date: string, notes: string) => {
-    try {
-      setLoading(true);
-      setSuggestModalVisible(false);
-      await api.purchaseOrders.suggest(id, {
-        suggested_quantity: qty,
-        suggested_date: date,
-        supplier_notes: notes
-      });
-      onOrderAction();
-    } catch (e: any) {
-      Alert.alert('Error', 'Failed to submit suggestion');
-      setLoading(false);
-    }
-  };
+  const orders = sourceOrders.map(o => ({ ...o, projects: o.projects || { name: o.project_name } }));
+  const loading = sourceLoading;
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[500px]">
       <View className="mb-6">
-        <Text className="text-lg font-bold text-brand-text mb-1">Incoming Purchase Orders</Text>
-        <Text className="text-brand-text-muted text-xs">Manage and approve material requests</Text>
+        <Text className="text-lg font-bold text-brand-text mb-1">{title}</Text>
+        <Text className="text-brand-text-muted text-xs">{subtitle}</Text>
       </View>
 
       {!isMobile && (
@@ -386,7 +223,7 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
           </View>
         ) : orders.length === 0 ? (
           <View className="py-10 items-center justify-center">
-            <Text className="text-gray-400">No active purchase orders found.</Text>
+            <Text className="text-gray-400">No orders awaiting your response.</Text>
           </View>
         ) : (
           orders.map(order => (
@@ -394,21 +231,11 @@ export const SupplierOrdersTable = ({ refreshTrigger = 0, onOrderAction }: { ref
               key={order.id}
               order={order}
               isMobile={isMobile}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onDeliver={handleDeliver}
-              onSuggestClick={(o: any) => { setSelectedOrder(o); setSuggestModalVisible(true); }}
+              onOpen={onOpenOrder}
             />
           ))
         )}
       </ScrollView>
-
-      <SuggestModal 
-        visible={suggestModalVisible}
-        order={selectedOrder}
-        onClose={() => setSuggestModalVisible(false)}
-        onSubmit={handleSuggestSubmit}
-      />
     </View>
   );
 };

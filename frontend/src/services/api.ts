@@ -22,7 +22,15 @@ async function executeFetch(endpoint: string, options: RequestInit) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'API request failed');
+    let errMsg = 'API request failed';
+    if (errorData.detail) {
+       errMsg = typeof errorData.detail === 'string' 
+         ? errorData.detail 
+         : JSON.stringify(errorData.detail);
+    } else if (errorData.message) {
+       errMsg = errorData.message;
+    }
+    throw new Error(errMsg);
   }
 
   return response.json();
@@ -69,6 +77,7 @@ export const api = {
     getAll: () => fetchWithAuth('/projects/'),
     create: (data: any) => fetchWithAuth('/projects/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => fetchWithAuth(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    bulkNames: (ids: string[]) => fetchWithAuth('/projects/bulk-names', { method: 'POST', body: JSON.stringify({ ids }) }),
     createMilestone: (projectId: string, data: any) => fetchWithAuth(`/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify(data) }),
     updateMilestone: (projectId: string, milestoneId: string, data: any) => fetchWithAuth(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deleteMilestone: (projectId: string, milestoneId: string) => fetchWithAuth(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'DELETE' }),
@@ -84,13 +93,6 @@ export const api = {
   materials: {
     getAll: (projectId?: string) => fetchWithAuth(`/materials/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
     create: (data: any) => fetchWithAuth('/materials/', { method: 'POST', body: JSON.stringify(data) }),
-    /**
-     * NOTE: there is no /materials/check-stock REST endpoint.
-     * Stock checking runs as an APScheduler cron server-side.
-     * Call this only if a manual trigger endpoint is added.
-     * @deprecated Use the cron directly.
-     */
-    // checkStock: () => fetchWithAuth('/materials/check-stock', { method: 'POST' }),
   },
 
   // ----------------------------------------------------------------
@@ -130,8 +132,6 @@ export const api = {
     /** Save a completed estimate to the `estimations` history table. */
     save: (data: any) => fetchWithAuth('/estimations/', { method: 'POST', body: JSON.stringify(data) }),
     getAll: () => fetchWithAuth('/estimations/'),
-    // NOTE: /estimations/predict does NOT exist on the backend.
-    // Use api.ai.predictCost() instead.
   },
 
   // ----------------------------------------------------------------
@@ -151,7 +151,7 @@ export const api = {
   purchaseOrders: {
     getAll: (projectId?: string) => fetchWithAuth(`/purchase-orders${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
     create: (data: any) => fetchWithAuth('/purchase-orders', { method: 'POST', body: JSON.stringify(data) }),
-    approve: (id: string) => fetchWithAuth(`/purchase-orders/${id}/approve`, { method: 'PATCH' }),
+    approve: (id: string, data: any) => fetchWithAuth(`/purchase-orders/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) }),
     reject: (id: string) => fetchWithAuth(`/purchase-orders/${id}/reject`, { method: 'PATCH' }),
     suggest: (id: string, data: any) => fetchWithAuth(`/purchase-orders/${id}/suggest`, { method: 'PATCH', body: JSON.stringify(data) }),
     deliver: (id: string) => fetchWithAuth(`/purchase-orders/${id}/deliver`, { method: 'PATCH' }),

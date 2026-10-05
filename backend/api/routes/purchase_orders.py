@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
-from core.database import client_for_token
+from core.database import client_for_token, supabase as admin_supabase
 from core.security import get_current_user, require_manager_or_admin
 from datetime import datetime
 import uuid
+import json
 
 router = APIRouter(
     prefix="/purchase-orders",
@@ -17,15 +18,35 @@ class PurchaseOrderCreate(BaseModel):
     material_id: str
     project_id: str
     quantity_ordered: float = Field(gt=0, allow_inf_nan=False)
-    unit_price: float = Field(ge=0, allow_inf_nan=False)
+    unit_price: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
     expected_date: str
-    total_price: float = Field(ge=0, allow_inf_nan=False)
+    total_price: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
     unit: Optional[str] = None
+
+class PurchaseOrderApprove(BaseModel):
+    unit_price: Optional[float] = None
 
 class PurchaseOrderSuggest(BaseModel):
     suggested_quantity: float = Field(gt=0, allow_inf_nan=False)
     suggested_date: str
     supplier_notes: Optional[str] = None
+    suggested_price: Optional[float] = None
+
+def append_event(order, event):
+    log = []
+    notes = order.get("supplier_notes")
+    if notes:
+        try:
+            log = json.loads(notes)
+            if not isinstance(log, list):
+                log = [{"role": "system", "action": "legacy_note", "note": notes}]
+        except:
+            log = [{"role": "system", "action": "legacy_note", "note": notes}]
+            
+    if "timestamp" not in event:
+        event["timestamp"] = datetime.now().isoformat()
+    log.append(event)
+    return json.dumps(log)
 
 def check_order_access(client, po_id, user):
     result = client.table("purchase_orders").select("*").eq("id", po_id).execute()
@@ -57,22 +78,55 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
     try:
         po_number = f"PO-{str(uuid.uuid4())[:8].upper()}"
         
-        # In a real app we'd fetch the material name, but we can store it in items as JSON or string
-        # For now, let's just make items string describe the order
-        items_str = f"{order.quantity_ordered} {order.unit or ''} (Material ID: {order.material_id})"
+        log = [{
+            "role": current_user["role"],
+            "action": "created",
+            "quantity": order.quantity_ordered,
+            "date": order.expected_date,
+            "timestamp": datetime.now().isoformat()
+        }]
         
+        # Ensure material_id is a valid UUID
+        material_id = order.material_id
+        is_valid_uuid = False
+        try:
+            if material_id:
+                uuid.UUID(str(material_id))
+                is_valid_uuid = True
+        except ValueError:
+            pass
+
+        if not is_valid_uuid:
+            mat_name = str(material_id) if material_id else f"Material for {po_number}"
+            existing = supabase.table("materials").select("id").eq("name", mat_name).eq("project_id", order.project_id).execute()
+            if existing.data:
+                material_id = existing.data[0]["id"]
+            else:
+                mat_res = supabase.table("materials").insert({
+                    "project_id": order.project_id,
+                    "name": mat_name,
+                    "unit": order.unit or "Units",
+                    "current_stock": 0,
+                    "minimum_threshold": 10
+                }).execute()
+                if mat_res.data:
+                    material_id = mat_res.data[0]["id"]
+                    
+        items_str = f"{order.quantity_ordered} {order.unit or ''} (Material ID: {material_id})"
+
         po_data = {
             "project_id": order.project_id,
             "supplier_id": order.supplier_id,
             "supplier_name": order.supplier_name,
-            "material_id": order.material_id,
+            "material_id": material_id,
             "quantity_ordered": order.quantity_ordered,
             "unit_price": order.unit_price,
             "total_price": round(order.quantity_ordered * order.unit_price, 2),
             "po_number": po_number,
             "items": items_str,
             "expected_date": order.expected_date,
-            "status": "Pending Delivery"
+            "status": "Pending Delivery",
+            "supplier_notes": json.dumps(log)
         }
         
         response = supabase.table("purchase_orders").insert(po_data).execute()
@@ -83,13 +137,14 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
         # Trigger notification to supplier
         if order.supplier_id:
             try:
-                supabase.table("notifications").insert({
+                admin_supabase.table("notifications").insert({
+                    "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": order.project_id,
                     "target_role": "supplier",
                     "target_user_id": order.supplier_id,
                     "title": "New Material Order",
                     "message": f"You have received a new purchase order: {po_number}",
-                    "type": "info"
+                    "type": "general"
                 }).execute()
             except Exception as notif_err:
                 print(f"Failed to send notification to supplier: {notif_err}")
@@ -101,25 +156,44 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{po_id}/approve")
-def approve_po(po_id: str, current_user: dict = Depends(get_current_user)):
+def approve_po(po_id: str, data: PurchaseOrderApprove, current_user: dict = Depends(get_current_user)):
     supabase = client_for_token(current_user["token"])
     order = check_order_access(supabase, po_id, current_user)
     if order.get("status") not in {"Pending Delivery", "Confirmed", "Suggested"}:
         raise HTTPException(status_code=409, detail="This order can no longer be changed")
     try:
-        res = supabase.table("purchase_orders").update({"status": "Confirmed"}).eq("id", po_id).execute()
+        qty = order.get("suggested_quantity") or order.get("quantity_ordered") or 0
+        final_price = data.unit_price if data.unit_price is not None else order.get("suggested_price") or order.get("unit_price") or 0
+        total_cost = round(qty * final_price, 2)
+        
+        log_json = append_event(order, {
+            "role": current_user["role"],
+            "action": "approved",
+            "unit_price": final_price,
+            "quantity": qty
+        })
+        
+        res = supabase.table("purchase_orders").update({
+            "status": "Confirmed",
+            "unit_price": final_price,
+            "quantity_ordered": qty, # accept suggested qty
+            "expected_date": order.get("suggested_date") or order.get("expected_date"),
+            "total_price": total_cost,
+            "supplier_notes": log_json
+        }).eq("id", po_id).execute()
         
         if not res.data:
             raise HTTPException(status_code=404, detail="PO not found")
             
         order = res.data[0]
         # Notify Admin/Manager
-        supabase.table("notifications").insert({
+        admin_supabase.table("notifications").insert({
+            "user_id": "11111111-1111-1111-1111-111111111111",
             "project_id": order.get("project_id"),
             "target_role": "pm",
             "title": "Order Approved",
             "message": f"Supplier has approved purchase order {order.get('po_number')}",
-            "type": "success"
+            "type": "general"
         }).execute()
         
         return res.data[0]
@@ -135,7 +209,14 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
     if order.get("status") not in {"Pending Delivery", "Confirmed", "Suggested"}:
         raise HTTPException(status_code=409, detail="This order can no longer be changed")
     try:
-        res = supabase.table("purchase_orders").update({"status": "Rejected"}).eq("id", po_id).execute()
+        log_json = append_event(order, {
+            "role": current_user["role"],
+            "action": "rejected"
+        })
+        res = supabase.table("purchase_orders").update({
+            "status": "Rejected",
+            "supplier_notes": log_json
+        }).eq("id", po_id).execute()
 
         if not res.data:
             raise HTTPException(status_code=404, detail="PO not found")
@@ -155,14 +236,16 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
         # Notify PM with an explicit shortage-risk warning.
         notifications_to_insert = [
             {
+                "user_id": "11111111-1111-1111-1111-111111111111",
                 "project_id": project_id,
                 "target_role": "pm",
                 "title": "Order Rejected",
                 "message": f"Supplier rejected purchase order {order.get('po_number')}",
-                "type": "error",
+                "type": "general",
                 "is_read": False,
             },
             {
+                "user_id": "11111111-1111-1111-1111-111111111111",
                 "project_id": project_id,
                 "target_role": "pm",
                 "target_user_id": pm_id,
@@ -171,12 +254,12 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
                     f"PO {order.get('po_number')} was rejected by the supplier. "
                     "Consider raising a new order or sourcing an alternative supplier to avoid material shortages."
                 ),
-                "type": "warning",
+                "type": "general",
                 "is_read": False,
             },
         ]
         try:
-            supabase.table("notifications").insert(notifications_to_insert).execute()
+            admin_supabase.table("notifications").insert(notifications_to_insert).execute()
         except Exception:
             import logging
             logging.exception("Rejection notifications failed")
@@ -194,11 +277,19 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
     if order.get("status") not in {"Pending Delivery", "Confirmed", "Suggested"}:
         raise HTTPException(status_code=409, detail="This order can no longer be changed")
     try:
+        log_json = append_event(order, {
+            "role": current_user["role"],
+            "action": "suggested",
+            "suggested_quantity": suggestion.suggested_quantity,
+            "suggested_date": suggestion.suggested_date,
+            "suggested_price": suggestion.suggested_price,
+            "note": suggestion.supplier_notes
+        })
         res = supabase.table("purchase_orders").update({
             "status": "Suggested",
             "suggested_quantity": suggestion.suggested_quantity,
             "suggested_date": suggestion.suggested_date,
-            "supplier_notes": suggestion.supplier_notes
+            "supplier_notes": log_json
         }).eq("id", po_id).execute()
 
         if not res.data:
@@ -218,17 +309,19 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
 
         # Counter-offer notification + shortage-risk warning.
         try:
-            supabase.table("notifications").insert([
+            admin_supabase.table("notifications").insert([
                 {
+                    "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": project_id,
                     "target_role": "pm",
                     "target_user_id": pm_id,
                     "title": "Order Counter-Offer",
                     "message": f"Supplier suggested new terms for PO {order.get('po_number')}: qty {suggestion.suggested_quantity}, date {suggestion.suggested_date}",
-                    "type": "warning",
+                    "type": "general",
                     "is_read": False,
                 },
                 {
+                    "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": project_id,
                     "target_role": "pm",
                     "target_user_id": pm_id,
@@ -237,7 +330,7 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
                         f"PO {order.get('po_number')}: supplier cannot supply {order.get('quantity_ordered')} units by {order.get('expected_date')}. "
                         "Review and accept or reject the counter-offer."
                     ),
-                    "type": "warning",
+                    "type": "general",
                     "is_read": False,
                 },
             ]).execute()
@@ -253,11 +346,63 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
 
 @router.patch("/{po_id}/deliver")
 def deliver_po(po_id: str, current_user: dict = Depends(get_current_user)):
-    client = client_for_token(current_user["token"])
-    check_order_access(client, po_id, current_user)
-    # The database function locks the order and updates stock in one transaction.
-    result = client.rpc("deliver_purchase_order", {"p_order_id": po_id}).execute()
-    return result.data
+    try:
+        client = client_for_token(current_user["token"])
+        order = check_order_access(client, po_id, current_user)
+        
+        if order.get("status") not in {"Confirmed"}:
+            raise HTTPException(status_code=409, detail="Only Confirmed orders can be marked as Delivered")
+            
+        # Ensure material_id is a valid UUID before triggering the status update
+        material_id = order.get("material_id")
+        is_valid_uuid = False
+        try:
+            if material_id:
+                uuid.UUID(str(material_id))
+                is_valid_uuid = True
+        except ValueError:
+            pass
+            
+        if not is_valid_uuid:
+            # If not a UUID (e.g. text name like "Bricks"), try to find it or create it
+            mat_name = str(material_id) if material_id else order.get("items", f"Material for {order.get('po_number')}")
+            # Try to lookup first
+            existing = client.table("materials").select("id").eq("name", mat_name).eq("project_id", order.get("project_id")).execute()
+            if existing.data:
+                material_id = existing.data[0]["id"]
+            else:
+                mat_res = client.table("materials").insert({
+                    "project_id": order.get("project_id"),
+                    "name": mat_name,
+                    "unit": order.get("unit", "Units"),
+                    "current_stock": 0,
+                    "minimum_threshold": 10
+                }).execute()
+                if mat_res.data:
+                    material_id = mat_res.data[0]["id"]
+            
+            if material_id:
+                # Update the order with the valid UUID before marking delivered
+                client.table("purchase_orders").update({"material_id": material_id}).eq("id", po_id).execute()
+        
+        log_json = append_event(order, {
+            "role": current_user["role"],
+            "action": "delivered"
+        })
+        
+        res = client.table("purchase_orders").update({
+            "status": "Delivered",
+            "supplier_notes": log_json
+        }).eq("id", po_id).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        return res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/{po_id}/receive")
@@ -274,20 +419,33 @@ def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
     if order.get("status") not in ["Delivered", "Pending Delivery"]:
         raise HTTPException(status_code=400, detail="Order must be delivered or pending delivery before receipt confirmation")
 
-    # Handle material_id
+    # Handle material_id resolution (ensure it's a UUID)
     material_id = order.get("material_id")
-    # if it's empty string or None, we need to create it
-    if not material_id or str(material_id).strip() == "":
-        mat_res = client.table("materials").insert({
-            "project_id": order.get("project_id"),
-            "name": order.get("items", f"Material for {order.get('po_number')}"),
-            "unit": order.get("unit", "Units"),
-            "current_stock": 0,
-            "minimum_threshold": 10
-        }).execute()
-        if mat_res.data:
-            material_id = mat_res.data[0]["id"]
-            # We must update the material_id on the PO
+    is_valid_uuid = False
+    try:
+        if material_id:
+            uuid.UUID(str(material_id))
+            is_valid_uuid = True
+    except ValueError:
+        pass
+
+    if not is_valid_uuid:
+        mat_name = str(material_id) if material_id else order.get("items", f"Material for {order.get('po_number')}")
+        existing = client.table("materials").select("id").eq("name", mat_name).eq("project_id", order.get("project_id")).execute()
+        if existing.data:
+            material_id = existing.data[0]["id"]
+        else:
+            mat_res = client.table("materials").insert({
+                "project_id": order.get("project_id"),
+                "name": mat_name,
+                "unit": order.get("unit", "Units"),
+                "current_stock": 0,
+                "minimum_threshold": 10
+            }).execute()
+            if mat_res.data:
+                material_id = mat_res.data[0]["id"]
+                
+        if material_id:
             client.table("purchase_orders").update({"material_id": material_id}).eq("id", po_id).execute()
 
     if not material_id:
@@ -314,13 +472,14 @@ def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
         project_id = order.get("project_id")
         proj = client.table("projects").select("pm_id, name").eq("id", project_id).execute()
         if proj.data and proj.data[0].get("pm_id"):
-            client.table("notifications").insert({
+            admin_supabase.table("notifications").insert({
+                "user_id": "11111111-1111-1111-1111-111111111111",
                 "project_id": project_id,
                 "target_user_id": proj.data[0]["pm_id"],
                 "target_role": "pm",
                 "title": "Goods Received",
                 "message": f"PO {order.get('po_number')} has been confirmed received and stock updated.",
-                "type": "success",
+                "type": "general",
                 "is_read": False,
             }).execute()
     except Exception:
@@ -349,16 +508,34 @@ def check_late_orders(supabase):
         for order in res.data:
             if order.get("supplier_id"):
                 notifications.append({
+                    "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": order.get("project_id"),
                     "target_role": "supplier",
                     "target_user_id": order.get("supplier_id"),
                     "title": "LATE MATERIAL ALERT",
                     "message": f"Order {order.get('po_number')} is overdue! Expected: {order.get('expected_date')}",
-                    "type": "error" # Red alert
+                    "type": "delay_risk" # Red alert
+                })
+                # Also notify admin and PM for operational visibility
+                notifications.append({
+                    "user_id": "11111111-1111-1111-1111-111111111111",
+                    "project_id": order.get("project_id"),
+                    "target_role": "super_admin",
+                    "title": "LATE MATERIAL ALERT",
+                    "message": f"Order {order.get('po_number')} is overdue from supplier! Expected: {order.get('expected_date')}",
+                    "type": "delay_risk"
+                })
+                notifications.append({
+                    "user_id": "11111111-1111-1111-1111-111111111111",
+                    "project_id": order.get("project_id"),
+                    "target_role": "pm",
+                    "title": "LATE MATERIAL ALERT",
+                    "message": f"Order {order.get('po_number')} is overdue from supplier! Expected: {order.get('expected_date')}",
+                    "type": "delay_risk"
                 })
                 
         if notifications:
-            supabase.table("notifications").insert(notifications).execute()
+            admin_supabase.table("notifications").insert(notifications).execute()
             
         return {"checked": len(res.data), "alerts_sent": len(notifications)}
     except HTTPException:

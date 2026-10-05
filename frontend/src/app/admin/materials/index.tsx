@@ -6,6 +6,7 @@ import { StatCard } from '../../../components/common/StatCard';
 import { InventoryTable } from '../../../components/materials/InventoryTable';
 import { LowStockAlerts } from '../../../components/materials/LowStockAlerts';
 import { PendingOrders } from '../../../components/materials/PendingOrders';
+import { PendingDeliveries } from '../../../components/materials/PendingDeliveries';
 import { RecentDeliveries } from '../../../components/materials/RecentDeliveries';
 import { NewMaterialModal } from '../../../components/materials/NewMaterialModal';
 import { Ionicons } from '@expo/vector-icons';
@@ -215,6 +216,7 @@ export default function MaterialsScreen() {
             {/* Side Panel (Alerts & Deliveries) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1 }}>
               <LowStockAlerts refreshTrigger={refreshTrigger} />
+              <PendingDeliveries refreshTrigger={refreshTrigger} />
               <PendingOrders refreshTrigger={refreshTrigger} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
               <RecentDeliveries refreshTrigger={refreshTrigger} />
             </View>

@@ -125,12 +125,15 @@ export default function ClientDashboardPage() {
 
         // Fetch financials for all projects
         const financialsList = await Promise.all(
-          projectIds.map(id => api.projects.financials(id).catch(() => null))
+          projectIds.map(async id => {
+            const fin = await api.projects.financials(id).catch(() => null);
+            return { id, fin };
+          })
         );
 
-        const expenseTotals = financialsList.reduce<Record<string, number>>((totals, fin) => {
-          if (fin) {
-            totals[fin.project_id] = fin.actual_spend || 0;
+        const expenseTotals = financialsList.reduce<Record<string, number>>((totals, item) => {
+          if (item.fin) {
+            totals[item.id] = item.fin.actual_spend || 0;
           }
           return totals;
         }, {});

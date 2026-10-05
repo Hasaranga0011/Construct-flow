@@ -7,7 +7,80 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ChatWidget } from '../../../components/shared/ChatWidget';
 import { sendSystemNotification } from '../../../utils/notifications';
+import { api } from '../../../services/api';
+import { Modal, TextInput } from 'react-native';
 
+const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
+  const [qty, setQty] = useState('');
+  const [date, setDate] = useState('');
+  const [price, setPrice] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (order) {
+      setQty((order.suggested_quantity || order.quantity_ordered)?.toString() || '');
+      setDate(order.suggested_date || order.expected_date || '');
+      setPrice(order.suggested_price ? order.suggested_price.toString() : (order.unit_price ? order.unit_price.toString() : ''));
+      setNotes('');
+    }
+  }, [order]);
+
+  if (!visible || !order) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View className="flex-1 bg-black/50 justify-center items-center p-4">
+        <View className="bg-white rounded-2xl w-full max-w-md p-6">
+          <Text className="text-xl font-bold text-brand-text mb-4">Counter-Offer</Text>
+          <Text className="text-gray-500 mb-4 text-sm">Propose a different quantity, date, or price.</Text>
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Quantity</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            keyboardType="numeric"
+            value={qty}
+            onChangeText={setQty}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            value={date}
+            onChangeText={setDate}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Suggested Unit Price (LKR)</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
+            keyboardType="numeric"
+            value={price}
+            onChangeText={setPrice}
+          />
+
+          <Text className="font-semibold text-gray-700 mb-1">Notes to Admin</Text>
+          <TextInput 
+            className="border border-gray-300 rounded-lg p-3 mb-6 text-brand-text h-20"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+          />
+
+          <View className="flex-row justify-end space-x-3">
+            <Pressable onPress={onClose} className="px-4 py-2">
+              <Text className="text-gray-500 font-bold">Cancel</Text>
+            </Pressable>
+            <Pressable 
+              onPress={() => onSubmit(order.id, parseFloat(qty), date, parseFloat(price), notes)} 
+              className="bg-brand-warning px-6 py-2 rounded-lg"
+            >
+              <Text className="text-white font-bold">Submit Counter</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function AdminMaterialsOrdersIdPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -16,6 +89,8 @@ export default function AdminMaterialsOrdersIdPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [suggestModalVisible, setSuggestModalVisible] = useState(false);
+  const [unitPrice, setUnitPrice] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState('');
   useEffect(() => { supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); }, []);
 
@@ -25,16 +100,32 @@ export default function AdminMaterialsOrdersIdPage() {
         .from('purchase_orders')
         .select(`
           *,
-          project:projects(name)
+          project:projects(name, location)
         `)
         .eq('id', id)
         .single();
         
       if (error) throw error;
-      setOrder(data);
+
+      let orderData = data;
+      if (!orderData.project && orderData.project_id) {
+        try {
+           const extra = await api.projects.bulkNames([orderData.project_id]);
+           if (extra && extra.length > 0) {
+             orderData.project = extra[0];
+           }
+        } catch (e) {
+           console.warn("Failed to fetch project via bulkNames", e);
+        }
+      }
+
+      setOrder(orderData);
+      if (orderData.unit_price) setUnitPrice(orderData.unit_price.toString());
+      else setUnitPrice('');
     } catch (err: any) {
-      if (Platform.OS === 'web') console.error(err);
-      else Alert.alert('Error', 'Failed to fetch order details');
+      const msg = err.message || err.detail || 'Failed to fetch order details';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
@@ -64,21 +155,19 @@ export default function AdminMaterialsOrdersIdPage() {
     setActionLoading(true);
     try {
       if (!id) throw new Error('Order id is required');
-
-      // Update status directly in Supabase (bypasses FastAPI)
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      // Dispatch Notification
-      await sendSystemNotification(
-        `Purchase Order ${newStatus}`,
-        `Supplier has marked PO #${order.po_number} as ${newStatus}.`,
-        'Admin'
-      );
+      if (newStatus === 'Confirmed') {
+         if (!unitPrice || parseFloat(unitPrice) <= 0) {
+            const msg = 'Please enter a valid unit price before confirming.';
+            if (Platform.OS === 'web') window.alert(msg);
+            else Alert.alert('Error', msg);
+            setActionLoading(false);
+            return;
+         }
+         await api.purchaseOrders.approve(id, { unit_price: parseFloat(unitPrice) });
+      }
+      if (newStatus === 'Rejected') await api.purchaseOrders.reject(id);
+      if (newStatus === 'Delivered') await api.purchaseOrders.deliver(id);
+      if (newStatus === 'Received') await api.purchaseOrders.receive(id);
 
       if (Platform.OS === 'web') window.alert(`Order marked as ${newStatus}!`);
       else Alert.alert('Success', `Order marked as ${newStatus}!`);
@@ -87,6 +176,26 @@ export default function AdminMaterialsOrdersIdPage() {
       fetchOrder();
     } catch (err: any) {
       const msg = err.message || 'Failed to update status';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSuggestSubmit = async (orderId: string, qty: number, date: string, price: number, notes: string) => {
+    try {
+      setActionLoading(true);
+      setSuggestModalVisible(false);
+      await api.purchaseOrders.suggest(orderId, {
+        suggested_quantity: qty,
+        suggested_date: date,
+        suggested_price: price,
+        supplier_notes: notes
+      });
+      fetchOrder();
+    } catch (err: any) {
+      const msg = err.message || err.detail || 'Failed to submit suggestion';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
     } finally {
@@ -129,6 +238,17 @@ export default function AdminMaterialsOrdersIdPage() {
 
   const isCompleted = order.status === 'Received' || order.status === 'Rejected' || order.status === 'Cancelled';
 
+  // Parse negotiation log
+  let negotiationLog: any[] = [];
+  try {
+    if (order.supplier_notes) {
+      const parsed = JSON.parse(order.supplier_notes);
+      if (Array.isArray(parsed)) {
+        negotiationLog = parsed;
+      }
+    }
+  } catch (e) {}
+
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title={`Order ${order.po_number}`} showAction={false} />
@@ -166,13 +286,18 @@ export default function AdminMaterialsOrdersIdPage() {
                 </View>
               </View>
 
-              <View className="w-1/2 mb-6">
+              <View className="w-1/2 mb-6 pr-4" style={{ minWidth: 0 }}>
                 <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Site</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
                     <FontAwesome5 name="hard-hat" size={12} color="#10B981" />
                   </View>
-                  <Text className="text-gray-800 font-medium text-base">{order.project?.name || 'Unassigned'}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text className="text-gray-800 font-medium text-base" style={{ flexShrink: 1 }}>{order.project?.name || 'Unknown Project'}</Text>
+                    {order.project?.location ? (
+                      <Text className="text-xs text-gray-500 mt-0.5" style={{ flexShrink: 1 }} numberOfLines={3}>{order.project.location}</Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
 
@@ -197,13 +322,53 @@ export default function AdminMaterialsOrdersIdPage() {
               <View className="flex-row justify-between items-center py-3 border-b border-gray-200 mb-2">
                 <Text className="text-gray-800 font-medium flex-1">{order.items}</Text>
                 <Text className="text-gray-500 w-24 text-right">Qty: {order.quantity_ordered}</Text>
-                <Text className="text-gray-800 font-bold w-32 text-right">Rs. {(order.unit_price || 0).toLocaleString()}</Text>
+                
+                {order.status === 'Pending Delivery' ? (
+                  <View className="w-32 flex-row items-center justify-end">
+                    <Text className="text-gray-500 mr-2 font-bold">Rs.</Text>
+                    <TextInput
+                      className="border border-gray-300 rounded-lg bg-white p-2 w-24 text-right text-brand-text font-bold"
+                      keyboardType="numeric"
+                      value={unitPrice}
+                      onChangeText={setUnitPrice}
+                      placeholder="0.00"
+                    />
+                  </View>
+                ) : (
+                  <Text className="text-gray-800 font-bold w-32 text-right">Rs. {(order.unit_price || 0).toLocaleString()}</Text>
+                )}
               </View>
               <View className="flex-row justify-between items-center pt-2">
                 <Text className="text-gray-500 font-bold">Total</Text>
-                <Text className="text-brand-orange font-bold text-lg">Rs. {(order.total_price || 0).toLocaleString()}</Text>
+                <Text className="text-brand-orange font-bold text-lg">
+                  Rs. {order.status === 'Pending Delivery' ? ((parseFloat(unitPrice) || 0) * (order.quantity_ordered || 0)).toLocaleString() : (order.total_price || 0).toLocaleString()}
+                </Text>
               </View>
             </View>
+
+            {negotiationLog.length > 0 && (
+              <View className="mt-8">
+                <Text className="text-lg font-bold text-gray-800 mb-4">Negotiation History</Text>
+                <View className="border-l-2 border-gray-200 ml-3 pl-4">
+                  {negotiationLog.map((event, idx) => (
+                    <View key={idx} className="mb-4 relative">
+                      <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
+                      <Text className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'You' : 'Admin/PM'}</Text>
+                      <View className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <Text className="font-bold text-gray-700 capitalize mb-1">{event.action}</Text>
+                        {event.quantity && <Text className="text-sm text-gray-600">Qty: {event.quantity}</Text>}
+                        {event.suggested_quantity && <Text className="text-sm text-gray-600">Qty: {event.suggested_quantity}</Text>}
+                        {event.unit_price && <Text className="text-sm text-gray-600">Price: Rs. {event.unit_price}</Text>}
+                        {event.suggested_price && <Text className="text-sm text-gray-600">Price: Rs. {event.suggested_price}</Text>}
+                        {event.date && <Text className="text-sm text-gray-600">Date: {event.date}</Text>}
+                        {event.suggested_date && <Text className="text-sm text-gray-600">Date: {event.suggested_date}</Text>}
+                        {event.note && <Text className="text-sm text-gray-500 italic mt-2">"{event.note}"</Text>}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
           </View>
 
@@ -216,19 +381,13 @@ export default function AdminMaterialsOrdersIdPage() {
               </View>
               
               <View className="flex-row gap-3">
-                {order.status === 'Delivered' ? <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Received')}
-                  className="bg-brand-success px-6 py-3 rounded-lg"
-                >
-                  <Text className="text-white font-bold">Confirm Receipt</Text>
-                </Pressable> : <Pressable
+                {order.status === 'Pending Delivery' ? <Pressable
                   disabled={actionLoading}
                   onPress={() => handleUpdateStatus('Rejected')}
-                  className="bg-red-50 border border-red-200 px-6 py-3 rounded-lg"
+                  className="bg-red-50 border border-red-200 px-6 py-3 rounded-lg mr-3"
                 >
-                  <Text className="text-red-600 font-bold">Reject Order</Text>
-                </Pressable>}
+                  <Text className="text-red-600 font-bold">Reject</Text>
+                </Pressable> : null}
                 
                 {order.status === 'Confirmed' ? <Pressable
                   disabled={actionLoading}
@@ -237,20 +396,38 @@ export default function AdminMaterialsOrdersIdPage() {
                 >
                   {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
                   <Text className="text-white font-bold">Mark Delivered</Text>
-                </Pressable> : order.status !== 'Delivered' ? <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Confirmed')}
-                  className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
-                >
-                  {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
-                  <Text className="text-white font-bold">Confirm Order</Text>
-                </Pressable> : null}
+                </Pressable> : order.status === 'Pending Delivery' ? (
+                  <>
+                    <Pressable
+                      disabled={actionLoading}
+                      onPress={() => setSuggestModalVisible(true)}
+                      className="bg-yellow-500 shadow-sm px-6 py-3 rounded-lg flex-row items-center mr-3"
+                    >
+                      <Text className="text-white font-bold">Counter Admin</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={actionLoading}
+                      onPress={() => handleUpdateStatus('Confirmed')}
+                      className="bg-brand-orange shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                    >
+                      {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                      <Text className="text-white font-bold">Confirm Order</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
           )}
 
         </View>
       </ScrollView>
+
+      <SuggestModal 
+        visible={suggestModalVisible}
+        order={order}
+        onClose={() => setSuggestModalVisible(false)}
+        onSubmit={handleSuggestSubmit}
+      />
     </View>
   );
 }

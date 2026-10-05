@@ -69,7 +69,7 @@ def create_purchase_order(req: POCreate, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "New Purchase Order",
             "message": f"PO {po_number} received from ConstructFlow",
-            "type": "info",
+            "type": "general",
             "target_role": "supplier" # Note: in prod we should use user_id of the supplier
         }).execute()
         
@@ -92,7 +92,7 @@ def approve_po(po_id: str, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "PO Approved",
             "message": f"PO {order.get('po_number')} confirmed by supplier",
-            "type": "success",
+            "type": "general",
             "target_role": "pm"
         }).execute()
         return {"message": "PO approved", "data": order}
@@ -108,7 +108,7 @@ def reject_po(po_id: str, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "PO Rejected",
             "message": f"PO {order.get('po_number')} was rejected by supplier",
-            "type": "error",
+            "type": "general",
             "target_role": "pm"
         }).execute()
         return {"message": "PO rejected", "data": order}
@@ -129,7 +129,7 @@ def suggest_po(po_id: str, req: SuggestData, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "PO Suggestion",
             "message": f"Supplier suggested changes for PO {order.get('po_number')}",
-            "type": "warning",
+            "type": "general",
             "target_role": "pm"
         }).execute()
         return {"message": "Suggestion submitted", "data": order}
@@ -148,7 +148,7 @@ def deliver_po(po_id: str, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "Delivery Sent",
             "message": f"PO {order.get('po_number')} has been dispatched by supplier.",
-            "type": "info",
+            "type": "general",
             "target_role": "site_manager"
         }).execute()
         return {"message": "PO marked as delivered", "data": order}
@@ -179,7 +179,7 @@ def receive_po(po_id: str, user=Depends(get_current_user)):
         supabase_db.table("notifications").insert({
             "title": "Goods Received",
             "message": f"PO {order.get('po_number')} goods have been received on site.",
-            "type": "success",
+            "type": "general",
             "target_role": "pm"
         }).execute()
         
@@ -195,7 +195,7 @@ def upload_invoice(po_id: str, req: InvoiceUpload, user=Depends(get_current_user
         supabase_db.table("notifications").insert({
             "title": "Invoice Uploaded",
             "message": f"Invoice uploaded for PO {res.data[0].get('po_number')}",
-            "type": "info",
+            "type": "general",
             "target_role": "super_admin"
         }).execute()
         

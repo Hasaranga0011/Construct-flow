@@ -46,6 +46,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [assignedProjects, setAssignedProjects] = useState<any[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -74,6 +75,19 @@ export default function ProfileScreen() {
           bio: data.bio || '',
           company_name: data.company_name || '',
         });
+
+        const { data: roleData } = await supabase
+          .from('project_role_assignments')
+          .select('project_id, projects(id, name, location)')
+          .eq('user_id', user.id);
+          
+        if (roleData && isMounted) {
+           const projectsMap = new Map();
+           roleData.forEach((r: any) => {
+             if (r.projects) projectsMap.set(r.project_id, r.projects);
+           });
+           setAssignedProjects(Array.from(projectsMap.values()));
+        }
       }
       if (isMounted) setLoading(false);
     };
@@ -381,7 +395,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Account Details Card */}
-          <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme }}>
+          <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme, marginBottom: 20 }}>
             <Text style={{ fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }}>Account Details</Text>
             {[
               { label: 'Email Address', value: profile?.email || user?.email || '—', icon: 'mail-outline', note: 'Read-only' },
@@ -404,6 +418,24 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
+
+          {/* Assigned Projects Card */}
+          {assignedProjects.length > 0 && (
+             <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme }}>
+               <Text style={{ fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }}>Assigned Projects</Text>
+               {assignedProjects.map(proj => (
+                 <View key={proj.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: borderTheme }}>
+                   <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: inputBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                     <Ionicons name="construct" size={17} color={rc.color} />
+                   </View>
+                   <View style={{ flex: 1 }}>
+                     <Text style={{ fontSize: 13, color: textTheme, fontWeight: '600' }}>{proj.name}</Text>
+                     <Text style={{ fontSize: 11, color: textSubTheme, fontWeight: '500', marginTop: 2 }}>{proj.location}</Text>
+                   </View>
+                 </View>
+               ))}
+             </View>
+          )}
         </View>
       </ScrollView>
     </View>

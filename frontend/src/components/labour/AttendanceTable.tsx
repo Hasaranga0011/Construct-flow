@@ -142,7 +142,7 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
 
         // Fetch attendance for today from labour table
         let query = supabase
-          .from('labour')
+          .from('legacy_labour')
           .select(`
             id, check_in_time, hours_worked, status, worker_name, role,
             project:projects!inner(name, pm_id)

@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { api } from '../../services/api';
 
 export const BudgetUtilizationChart = () => {
   const [data, setData] = useState<any[]>([]);
@@ -14,15 +15,22 @@ export const BudgetUtilizationChart = () => {
     try {
       const { data: projData, error } = await supabase
         .from('projects')
-        .select('id, name, total_budget, spent_cost')
+        .select('id, name, total_budget')
         .eq('status', 'active');
 
       if (error) throw error;
       
-      const formatted = (projData || []).map(p => {
-        const spent = Number(p.spent_cost) || 0;
-        const budget = Number(p.total_budget) || 1; // avoid division by zero
-        const percent = Math.round((spent / budget) * 100);
+      const activeProjects = projData || [];
+      const financialsList = await Promise.all(
+        activeProjects.map(async p => {
+          const fin = await api.projects.financials(p.id).catch(() => null);
+          return { id: p.id, name: p.name, budget: Number(p.total_budget) || 1, fin };
+        })
+      );
+      
+      const formatted = financialsList.map(p => {
+        const spent = p.fin ? (p.fin.actual_spend || 0) : 0;
+        const percent = Math.round((spent / p.budget) * 100);
         let fill = '#10B981'; // brand-success
         if (percent >= 100) fill = '#EF4444'; // brand-danger
         else if (percent >= 70) fill = '#F59E0B'; // brand-warning

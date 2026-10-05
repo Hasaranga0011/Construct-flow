@@ -16,17 +16,32 @@ export interface SearchConfig {
   filterValue?: string | null;
 }
 
+/** Suggestion produced from data already loaded (and already scoped) on the client. */
+export interface LocalSearchResult {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  raw?: any;
+}
+
 export const GlobalSearchDropdown = ({ 
   placeholder, 
   value, 
   onChangeText, 
   config,
+  getLocalResults,
+  onSelectResult,
   className = "" 
 }: { 
   placeholder: string, 
   value: string, 
   onChangeText: (v: string) => void,
   config?: SearchConfig,
+  /** When provided, suggestions come from this function instead of a Supabase query. */
+  getLocalResults?: (query: string) => LocalSearchResult[],
+  /** Called when a local suggestion is picked (e.g. to navigate to an order). */
+  onSelectResult?: (item: LocalSearchResult) => void,
   className?: string 
 }) => {
   const router = useRouter();
@@ -35,6 +50,8 @@ export const GlobalSearchDropdown = ({
   const [loading, setLoading] = useState(false);
   const debouncedSearch = useDebounce(value, 300);
   const containerRef = useRef<any>(null);
+  const isLocal = !!getLocalResults;
+  const localResults = isLocal && value.trim() !== '' ? getLocalResults!(value).slice(0, 8) : [];
 
   useEffect(() => {
     if (Platform.OS === 'web' && showDropdown) {
@@ -51,6 +68,7 @@ export const GlobalSearchDropdown = ({
   }, [showDropdown]);
 
   useEffect(() => {
+    if (isLocal) return;
     if (!config || !debouncedSearch || debouncedSearch.trim() === '') {
       setResults([]);
       setShowDropdown(false);
@@ -87,7 +105,7 @@ export const GlobalSearchDropdown = ({
     
     fetchResults();
     return () => { isMounted = false; };
-  }, [debouncedSearch, config]);
+  }, [debouncedSearch, config, isLocal]);
 
   return (
     <View ref={containerRef} className={`relative z-50 ${className}`}>
@@ -112,7 +130,47 @@ export const GlobalSearchDropdown = ({
         )}
       </View>
 
-      {showDropdown && config && (
+      {showDropdown && isLocal && value.trim() !== '' && (
+        <View 
+          className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg"
+          style={{ zIndex: 1000, elevation: 20, maxHeight: 300 }}
+        >
+          {localResults.length === 0 ? (
+            <View className="py-4 items-center justify-center">
+              <Text className="text-gray-500 text-sm">No matches in your orders.</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {localResults.map((item, index) => (
+                <Pressable
+                  key={item.id || index}
+                  onPress={() => {
+                    setShowDropdown(false);
+                    if (onSelectResult) onSelectResult(item);
+                    else onChangeText(item.title);
+                  }}
+                  className={`py-3 px-4 flex-row items-center justify-between ${index !== localResults.length - 1 ? 'border-b border-gray-100' : ''} hover:bg-gray-50`}
+                >
+                  <View className="flex-1 pr-2">
+                    <Text className="text-gray-900 font-semibold text-sm" numberOfLines={1}>{item.title}</Text>
+                    {!!item.subtitle && (
+                      <Text className="text-gray-500 text-xs" numberOfLines={1}>{item.subtitle}</Text>
+                    )}
+                  </View>
+                  {!!item.badge && (
+                    <View className="bg-orange-50 px-2 py-0.5 rounded mr-2">
+                      <Text className="text-brand-orange text-[10px] font-bold uppercase">{item.badge}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
+      {showDropdown && !isLocal && config && (
         <View 
           className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg"
           style={{ zIndex: 100, elevation: 10, maxHeight: 250 }}

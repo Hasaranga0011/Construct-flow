@@ -5,6 +5,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { sendSystemNotification } from '../../../../utils/notifications';
+import { ProjectAssignmentDropdown } from '../../../../components/common/ProjectAssignmentDropdown';
 
 export default function AdminMaterialsOrdersCreatePage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function AdminMaterialsOrdersCreatePage() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
 
   // Selected values
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -26,7 +28,6 @@ export default function AdminMaterialsOrdersCreatePage() {
 
   // Form Inputs
   const [quantity, setQuantity] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Dropdown states
@@ -73,10 +74,17 @@ export default function AdminMaterialsOrdersCreatePage() {
         // If materials fetch fails (e.g. RLS or table doesn't exist), just ignore
         const validMaterials = matErr ? [] : (matData || []);
 
+        // Fetch Assignments
+        const { data: assignData } = await supabase
+          .from('project_role_assignments')
+          .select('project_id, user_id')
+          .eq('role', 'supplier');
+
         if (isMounted) {
           setSuppliers(supData || []);
           setProjects(projData || []);
           setMaterials(validMaterials);
+          setAssignments(assignData || []);
         }
       } catch (err: any) {
         if (isMounted && Platform.OS !== 'web') {
@@ -108,9 +116,31 @@ export default function AdminMaterialsOrdersCreatePage() {
     }
   };
 
+  const handleAssignSuppliers = async (newSupplierIds: string[]) => {
+    if (!selectedProject || newSupplierIds.length === 0) return;
+    try {
+      setLoading(true);
+      const inserts = newSupplierIds.map(id => ({
+        project_id: selectedProject.id,
+        user_id: id,
+        role: 'supplier'
+      }));
+      const { error } = await supabase.from('project_role_assignments').insert(inserts);
+      if (error) throw error;
+      
+      const newAssignments = [...assignments, ...inserts];
+      setAssignments(newAssignments);
+      Alert.alert('Success', 'Suppliers assigned to project!');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to assign suppliers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!selectedSupplier || !selectedProject || !quantity || !unitPrice) {
-      const msg = 'Please select a supplier, project, quantity, and unit price.';
+    if (!selectedSupplier || !selectedProject || !quantity) {
+      const msg = 'Please select a supplier, project, and quantity.';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
       return;
@@ -122,8 +152,6 @@ export default function AdminMaterialsOrdersCreatePage() {
       const poNumber = `PO-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
       const q = parseFloat(quantity);
-      const u = parseFloat(unitPrice);
-      const total = q * u;
 
       // Construct items string
       const itemsString = selectedMaterial 
@@ -135,8 +163,8 @@ export default function AdminMaterialsOrdersCreatePage() {
         supplier_id: selectedSupplier.id,
         supplier_name: selectedSupplier.full_name,
         quantity_ordered: q,
-        unit_price: u,
-        total_price: total,
+        unit_price: 0,
+        total_price: 0,
         po_number: poNumber,
         items: itemsString,
         expected_date: expectedDate,
@@ -189,56 +217,21 @@ export default function AdminMaterialsOrdersCreatePage() {
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
             <Text className="text-xl font-bold text-gray-800 mb-6">Order Details</Text>
 
-            {/* Supplier Dropdown */}
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Select Supplier</Text>
-            <View className="relative z-[60] mb-4">
-              <Pressable 
-                onPress={() => { setShowSupplierDrop(!showSupplierDrop); setShowProjectDrop(false); setShowMaterialDrop(false); }}
-                className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
-              >
-                <Text className={selectedSupplier ? "text-gray-800" : "text-gray-400"}>
-                  {selectedSupplier ? selectedSupplier.full_name : 'Select a supplier from database...'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-              </Pressable>
-              
-              {showSupplierDrop && (
-                <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[60]">
-                  <ScrollView nestedScrollEnabled={true}>
-                    {suppliers.length === 0 ? (
-                      <Text className="p-4 text-gray-500">No suppliers found.</Text>
-                    ) : (
-                      suppliers.map(sup => (
-                        <Pressable 
-                          key={sup.id} 
-                          onPress={() => { setSelectedSupplier(sup); setShowSupplierDrop(false); }}
-                          className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
-                        >
-                          <Text className="text-gray-800 font-medium">{sup.full_name}</Text>
-                          <Text className="text-xs text-gray-500">{sup.email || 'No email'}</Text>
-                        </Pressable>
-                      ))
-                    )}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
             {/* Project Dropdown */}
             <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Assign to Project</Text>
-            <View className="relative z-[50] mb-4">
+            <View className="relative z-[60] mb-4">
               <Pressable 
                 onPress={() => { setShowProjectDrop(!showProjectDrop); setShowSupplierDrop(false); setShowMaterialDrop(false); }}
                 className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
               >
                 <Text className={selectedProject ? "text-gray-800" : "text-gray-400"}>
-                  {selectedProject ? selectedProject.name : 'Select project...'}
+                  {selectedProject ? selectedProject.name : 'Select project first...'}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
               </Pressable>
               
               {showProjectDrop && (
-                <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[50]">
+                <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[60]">
                   <ScrollView nestedScrollEnabled={true}>
                     {projects.length === 0 ? (
                       <Text className="p-4 text-gray-500">No projects found.</Text>
@@ -246,7 +239,7 @@ export default function AdminMaterialsOrdersCreatePage() {
                       projects.map(proj => (
                         <Pressable 
                           key={proj.id} 
-                          onPress={() => { setSelectedProject(proj); setShowProjectDrop(false); }}
+                          onPress={() => { setSelectedProject(proj); setSelectedSupplier(null); setShowProjectDrop(false); }}
                           className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
                         >
                           <Text className="text-gray-800">{proj.name}</Text>
@@ -257,6 +250,65 @@ export default function AdminMaterialsOrdersCreatePage() {
                 </View>
               )}
             </View>
+
+            {/* Supplier Dropdown */}
+            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Select Supplier</Text>
+            
+            {!selectedProject ? (
+              <View className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4">
+                <Text className="text-gray-400">Please select a project first</Text>
+              </View>
+            ) : (() => {
+              const projectSupplierIds = assignments.filter(a => a.project_id === selectedProject.id).map(a => a.user_id);
+              const availableSuppliers = suppliers.filter(s => projectSupplierIds.includes(s.id));
+              
+              if (availableSuppliers.length === 0) {
+                return (
+                  <View className="bg-orange-50 border border-orange-100 p-4 rounded-lg mb-4 z-[50]">
+                    <Text className="text-orange-800 font-bold mb-2">No suppliers assigned</Text>
+                    <Text className="text-sm text-orange-700 mb-4">You must assign at least one supplier to {selectedProject.name} before ordering.</Text>
+                    <ProjectAssignmentDropdown 
+                      label="Assign Suppliers Now" 
+                      users={suppliers} 
+                      multiple 
+                      selectedIds={[]} 
+                      onChange={handleAssignSuppliers} 
+                    />
+                  </View>
+                );
+              }
+
+              return (
+                <View className="relative z-[50] mb-4">
+                  <Pressable 
+                    onPress={() => { setShowSupplierDrop(!showSupplierDrop); setShowProjectDrop(false); setShowMaterialDrop(false); }}
+                    className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
+                  >
+                    <Text className={selectedSupplier ? "text-gray-800" : "text-gray-400"}>
+                      {selectedSupplier ? selectedSupplier.full_name : 'Select an assigned supplier...'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+                  </Pressable>
+                  
+                  {showSupplierDrop && (
+                    <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[50]">
+                      <ScrollView nestedScrollEnabled={true}>
+                        {availableSuppliers.map(sup => (
+                          <Pressable 
+                            key={sup.id} 
+                            onPress={() => { setSelectedSupplier(sup); setShowSupplierDrop(false); }}
+                            className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
+                          >
+                            <Text className="text-gray-800 font-medium">{sup.full_name}</Text>
+                            <Text className="text-xs text-gray-500">{sup.email || 'No email'}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
 
             {/* Material Dropdown */}
             <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Material</Text>
@@ -348,17 +400,6 @@ export default function AdminMaterialsOrdersCreatePage() {
                     </View>
                   )}
                 </View>
-              </View>
-
-              <View className="flex-1">
-                <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Unit Price (LKR)</Text>
-                <TextInput
-                  className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
-                  placeholder="e.g. 15000"
-                  value={unitPrice}
-                  onChangeText={setUnitPrice}
-                  keyboardType="numeric"
-                />
               </View>
             </View>
 

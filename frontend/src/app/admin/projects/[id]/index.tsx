@@ -13,6 +13,7 @@ export default function AdminProjectDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [supplierStats, setSupplierStats] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,8 +57,38 @@ export default function AdminProjectDetailsPage() {
         if (isMounted) {
             setProject(projData);
             if (roleData) {
-              const otherStaff = roleData.filter((a: any) => a.role !== 'pm' && a.role !== 'client');
+              const otherStaff = roleData.filter((a: any) => a.role !== 'pm' && a.role !== 'client' && a.role !== 'supplier');
               setAssignments(otherStaff);
+
+              const supplierIds = roleData.filter((a: any) => a.role === 'supplier').map((a:any) => a.user_id);
+              if (supplierIds.length > 0) {
+                 // Fetch POs to compute stats
+                 const { data: poData } = await supabase.from('purchase_orders').select('*').eq('project_id', id);
+                 const pos = poData || [];
+
+                 const stats = supplierIds.map((sid: string) => {
+                    const supName = roleData.find((a:any) => a.user_id === sid)?.profiles?.full_name || 'Unknown Supplier';
+                    const supOrders = pos.filter((p:any) => p.supplier_id === sid);
+                    const openOrders = supOrders.filter((p:any) => ['Pending Delivery', 'Confirmed', 'Suggested'].includes(p.status));
+                    const deliveredOrders = supOrders.filter((p:any) => ['Delivered', 'Received'].includes(p.status));
+                    const counteredOrders = supOrders.filter((p:any) => ['Suggested', 'Rejected'].includes(p.status));
+                    
+                    const lastDelivery = deliveredOrders.length > 0 
+                        ? new Date(Math.max(...deliveredOrders.map((o:any) => new Date(o.updated_at).getTime())))
+                        : null;
+
+                    return {
+                       id: sid,
+                       name: supName,
+                       openCount: openOrders.length,
+                       counteredCount: counteredOrders.length,
+                       lastDelivery: lastDelivery ? lastDelivery.toDateString() : 'Never'
+                    };
+                 });
+                 setSupplierStats(stats);
+              } else {
+                 setSupplierStats([]);
+              }
             }
         }
       } catch (err: any) {
@@ -261,6 +292,64 @@ export default function AdminProjectDetailsPage() {
                     <Ionicons name="chevron-forward" size={20} color="#EF4444" />
                  </TouchableOpacity>
               </View>
+            </View>
+
+            {/* Assigned Suppliers Section */}
+            <View className="mt-8">
+               <View className="flex-row justify-between items-center mb-4">
+                 <Text className="text-xl font-bold text-gray-800">Assigned Suppliers</Text>
+                 <TouchableOpacity onPress={() => router.push(`/admin/projects/${project.id}/edit`)}>
+                   <Text className="text-brand-orange font-bold text-sm">Manage</Text>
+                 </TouchableOpacity>
+               </View>
+
+               {supplierStats.length === 0 ? (
+                 <View className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 items-center justify-center">
+                   <Ionicons name="people-outline" size={48} color="#D1D5DB" className="mb-4" />
+                   <Text className="text-gray-500 font-medium mb-4 text-center">No suppliers assigned yet.</Text>
+                   <TouchableOpacity onPress={() => router.push(`/admin/projects/${project.id}/edit`)} className="bg-gray-100 px-6 py-2 rounded-lg">
+                     <Text className="text-gray-700 font-bold">Add Supplier</Text>
+                   </TouchableOpacity>
+                 </View>
+               ) : (
+                 <View className="flex-row flex-wrap" style={{ marginHorizontal: -8 }}>
+                   {supplierStats.map(stat => (
+                     <View key={stat.id} style={isMobile ? { width: '100%', padding: 8 } : { width: '33.33%', padding: 8 }}>
+                       <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 h-full">
+                         <View className="flex-row items-center mb-4">
+                           <View className="w-10 h-10 bg-blue-50 rounded-full items-center justify-center mr-3">
+                             <Ionicons name="business" size={18} color="#3B82F6" />
+                           </View>
+                           <View className="flex-1">
+                             <Text className="font-bold text-gray-800" numberOfLines={1}>{stat.name}</Text>
+                             <Text className="text-xs text-gray-400">Supplier</Text>
+                           </View>
+                         </View>
+                         
+                         <View className="flex-row justify-between mb-2">
+                           <Text className="text-sm text-gray-500">Open Orders:</Text>
+                           <Text className="text-sm font-bold text-gray-800">{stat.openCount}</Text>
+                         </View>
+                         <View className="flex-row justify-between mb-2">
+                           <Text className="text-sm text-gray-500">Countered/Rejected:</Text>
+                           <Text className="text-sm font-bold text-orange-600">{stat.counteredCount}</Text>
+                         </View>
+                         <View className="flex-row justify-between mb-4">
+                           <Text className="text-sm text-gray-500">Last Delivery:</Text>
+                           <Text className="text-sm font-medium text-gray-800">{stat.lastDelivery}</Text>
+                         </View>
+
+                         <TouchableOpacity 
+                           onPress={() => router.push(`/admin/materials/orders?supplier_id=${stat.id}&project_id=${project.id}`)}
+                           className="mt-auto bg-gray-50 py-2 rounded-lg items-center border border-gray-200"
+                         >
+                           <Text className="text-gray-700 font-bold text-sm">View Orders</Text>
+                         </TouchableOpacity>
+                       </View>
+                     </View>
+                   ))}
+                 </View>
+               )}
             </View>
 
           </View>

@@ -12,6 +12,7 @@ import { supabase } from '../../../lib/supabase';
 import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
 
 import { useResponsive } from '../../../hooks/useResponsive';
+import { useTableRealtime } from '../../../hooks/useTableRealtime';
 
 export default function LabourForceScreen() {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function LabourForceScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const { isMobile } = useResponsive();
+  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects', 'salary_slips']);
+  const liveTrigger = refreshTrigger + tick;
 
   useEffect(() => {
     let isMounted = true;
@@ -39,9 +42,9 @@ export default function LabourForceScreen() {
 
         const [workersReq, checkinsReq, sitesReq, labourReq] = await Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker'),
-          supabase.from('labour').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
+          supabase.from('legacy_labour').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
           supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('labour').select('hours_worked').eq('date', today).eq('status', 'Present')
+          supabase.from('legacy_labour').select('hours_worked').eq('date', today).eq('status', 'Present')
         ]);
         
         let overtimeHrs = 0;
@@ -69,7 +72,7 @@ export default function LabourForceScreen() {
 
     loadStats();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [liveTrigger]);
 
   const handleWorkerCreated = () => {
     setModalVisible(false);
@@ -93,6 +96,10 @@ export default function LabourForceScreen() {
           
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text className="text-2xl font-bold text-brand-text">All Workers</Text>
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+              <Text className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+            </View>
             
             <GlobalSearchDropdown 
               placeholder="Search workers..." 
@@ -153,14 +160,14 @@ export default function LabourForceScreen() {
           <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Attendance Table) */}
             <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
-              <AttendanceTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
+              <AttendanceTable refreshTrigger={liveTrigger} searchQuery={searchQuery} />
             </View>
             
             {/* Side Panel (Payroll & Chart) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
-              <PayrollSummary refreshTrigger={refreshTrigger} />
+              <PayrollSummary refreshTrigger={liveTrigger} />
               <View style={isMobile ? { height: 256, marginTop: 16 } : { height: 256 }}>
-                <LabourDistributionChart refreshTrigger={refreshTrigger} />
+                <LabourDistributionChart refreshTrigger={liveTrigger} />
               </View>
             </View>
           </View>

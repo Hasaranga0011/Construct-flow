@@ -56,7 +56,7 @@ def check_stock(supabase):
                     "target_role": "super_admin",
                     "title": "LOW STOCK ALERT",
                     "message": f"Material {mat.get('name')} is running low (Current: {mat.get('global_stock_quantity')})",
-                    "type": "warning"
+                    "type": "general"
                 })
                 # PMs might also care, but sticking to admin for simplicity
                 
