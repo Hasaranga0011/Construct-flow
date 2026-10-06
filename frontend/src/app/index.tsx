@@ -147,6 +147,8 @@ export default function LandingPage() {
   const [countersY, setCountersY] = useState(0);
   const { height: wh } = useWindowDimensions();
   const cleanup = useRef<() => void>(() => {});
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (Platform.OS === 'web') cleanup.current = injectVideoBackground();
@@ -173,9 +175,7 @@ export default function LandingPage() {
   };
 
   const scrollTo = (id: string) => {
-    if (typeof document !== 'undefined') {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    scrollRef.current?.scrollTo({ y: Math.max(0, (sectionOffsets.current[id] ?? 0) - 80), animated: true });
   };
 
   const g: any = {
@@ -224,12 +224,12 @@ export default function LandingPage() {
               style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
               <MaterialIcons name="precision-manufacturing" size={24} color="white" />
             </View>
-            <Text className="text-white font-bold text-xl tracking-tight">
+            <Text className="text-white font-bold text-base sm:text-xl tracking-tight">
               Construct<Text style={{ color: '#F97316' }}>Ai</Text>
             </Text>
           </View>
 
-          <View className="flex-row items-center hidden md:flex">
+          <View className="flex-row items-center hidden xl:flex">
             {[{ label: 'Home', id: 'home' }, { label: 'Services', id: 'services' }, { label: 'Gallery', id: 'projects' }, { label: 'Contact', id: 'contact' }].map(item => (
               <Pressable key={item.id} className="mx-4 cursor-pointer" onPress={() => scrollTo(item.id)}>
                 <Text className="text-gray-300 font-semibold text-base hover:text-white transition-colors">{item.label}</Text>
@@ -240,22 +240,22 @@ export default function LandingPage() {
           <View>
             {session ? (
               <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
-                <Pressable className="bg-brand-orange px-6 py-2.5 rounded-full"
+                <Pressable className="bg-brand-orange px-3 sm:px-6 py-2.5 rounded-full"
                   style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10 }}>
-                  <Text className="text-white font-bold">Go to Dashboard</Text>
+                  <Text className="text-white font-bold text-xs sm:text-base">Go to Dashboard</Text>
                 </Pressable>
               </Link>
             ) : (
               <View className="flex-row items-center">
                 <Link href="/partner-login" asChild>
-                  <Pressable className="mr-5 hidden md:flex">
+                  <Pressable className="mr-5 hidden lg:flex">
                     <Text className="text-gray-300 font-semibold hover:text-white">Partner Portal</Text>
                   </Pressable>
                 </Link>
                 <Link href="/team-login" asChild>
-                  <Pressable className="bg-brand-orange px-6 py-2.5 rounded-full"
+                  <Pressable className="bg-brand-orange px-3 sm:px-6 py-2.5 rounded-full"
                     style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10 }}>
-                    <Text className="text-white font-bold">Team Portal</Text>
+                    <Text className="text-white font-bold text-xs sm:text-base">Team Portal</Text>
                   </Pressable>
                 </Link>
               </View>
@@ -264,10 +264,10 @@ export default function LandingPage() {
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
         {/* HERO */}
-        <View className="pt-36 pb-32 px-6 md:px-12 relative" id="home" style={{ minHeight: wh }}>
+        <View className="pt-36 pb-32 px-6 md:px-12 relative" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
           <View style={{ position: 'absolute', top: -80, right: -80, width: 480, height: 480, borderRadius: 240, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
           <View style={{ position: 'absolute', bottom: 80, left: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
 
@@ -278,7 +278,7 @@ export default function LandingPage() {
               <View className="self-start flex-row items-center px-4 py-1.5 rounded-full border mb-6"
                 style={{ borderColor: 'rgba(249,115,22,0.45)', backgroundColor: 'rgba(249,115,22,0.1)' }}>
                 <View className="w-2 h-2 rounded-full bg-brand-orange mr-2" />
-                <Text className="text-brand-orange font-bold text-xs tracking-widest uppercase">Sri Lanka's #1 Construction Platform</Text>
+                <Text className="text-brand-orange font-bold text-xs tracking-widest uppercase">Sri Lanka&apos;s #1 Construction Platform</Text>
               </View>
 
               <Text className="text-white font-extrabold leading-tight mb-6" style={{ fontSize: 52, lineHeight: 60 }}>
@@ -376,7 +376,7 @@ export default function LandingPage() {
         </View>
 
         {/* FEATURES */}
-        <View className="py-24 px-6 md:px-10" id="services" style={{ backgroundColor: 'rgba(10,14,26,0.82)', backdropFilter: 'blur(8px)' }}>
+        <View className="py-24 px-6 md:px-10" id="services" onLayout={event => { sectionOffsets.current.services = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(10,14,26,0.82)', backdropFilter: 'blur(8px)' }}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
               <Text className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Platform Capabilities</Text>
@@ -414,12 +414,12 @@ export default function LandingPage() {
         </View>
 
         {/* PROJECTS GALLERY */}
-        <View className="py-24 px-6 md:px-10" id="projects" style={{ backgroundColor: 'rgba(8,12,22,0.88)', backdropFilter: 'blur(8px)' }}>
+        <View className="py-24 px-6 md:px-10" id="projects" onLayout={event => { sectionOffsets.current.projects = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.88)', backdropFilter: 'blur(8px)' }}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
               <Text className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Featured Projects</Text>
               <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
-                Sri Lanka's Biggest Builds,{'\n'}<Text style={{ color: '#F97316' }}>Tracked Here</Text>
+                Sri Lanka&apos;s Biggest Builds,{'\n'}<Text style={{ color: '#F97316' }}>Tracked Here</Text>
               </Text>
               <View className="w-20 h-1 bg-brand-orange mt-5 rounded-full" />
             </View>
@@ -502,7 +502,7 @@ export default function LandingPage() {
         </View>
 
         {/* CONTACT */}
-        <View className="py-24 px-6 md:px-10" id="contact" style={{ backgroundColor: 'rgba(8,12,22,0.90)', backdropFilter: 'blur(8px)' }}>
+        <View className="py-24 px-6 md:px-10" id="contact" onLayout={event => { sectionOffsets.current.contact = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.90)', backdropFilter: 'blur(8px)' }}>
           <View className="max-w-5xl mx-auto">
             <View className="items-center mb-14">
               <Text className="text-white font-extrabold text-center" style={{ fontSize: 40, lineHeight: 50 }}>
@@ -562,7 +562,7 @@ export default function LandingPage() {
                   </Text>
                 </View>
                 <Text className="text-gray-400 leading-relaxed mb-6">
-                  Sri Lanka's most advanced construction management platform. Empowering contractors and project teams with real-time insights and AI-powered estimation in LKR.
+                  Sri Lanka&apos;s most advanced construction management platform. Empowering contractors and project teams with real-time insights and AI-powered estimation in LKR.
                 </Text>
                 <View className="flex-row gap-3">
                   {['logo-facebook', 'logo-twitter', 'logo-linkedin', 'logo-instagram'].map(icon => (

@@ -31,7 +31,8 @@ export const TopNav = ({ shell = false, title = '', showAction = true, actionLab
   const { unreadCount } = useRealtimeNotifications();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
-  const portalRole = role || pathname.split('/')[1] || 'admin';
+  const currentPortal = role || pathname.split('/')[1] || 'admin';
+  const portalRole = currentPortal === 'site' ? 'site-manager' : currentPortal;
   const notificationsHref = portalRole === 'site-manager'
     ? '/site-manager/notifications'
     : `/${portalRole}/notifications`;
