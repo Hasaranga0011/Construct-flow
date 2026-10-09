@@ -2,6 +2,7 @@ import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { TopNav } from '../../../components/common/TopNav';
+import { SearchInput } from '@/components/common/SearchInput';
 import { supabase } from '../../../lib/supabase';
 
 type TeamMember = { id: string; full_name?: string | null; email?: string | null; role?: string | null };
@@ -11,6 +12,7 @@ export default function PMTeamPage() {
 	const [error, setError] = useState('');
 	const [refresh, setRefresh] = useState(0);
 	const [loading, setLoading] = useState(true);
+	const [search, setSearch] = useState('');
 
 	useEffect(() => {
 		let mounted = true;
@@ -64,11 +66,20 @@ export default function PMTeamPage() {
 			<ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-6" showsVerticalScrollIndicator={false}>
 				<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-2">Your Project Team</Text>
 				<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-6">Only workers and site managers assigned to your projects are shown.</Text>
-				{loading ? <ActivityIndicator color="#F97316" /> : members.length === 0 ? (
+				<View className="mb-4 z-50">
+					<SearchInput 
+						placeholder="Search team members..." 
+						value={search} 
+						onChangeText={setSearch} 
+						items={members} 
+						entityLabel="team" 
+					/>
+				</View>
+				{loading ? <ActivityIndicator color="#F97316" /> : members.filter(m => (m.full_name || '').toLowerCase().includes(search.toLowerCase()) || (m.email || '').toLowerCase().includes(search.toLowerCase())).length === 0 ? (
 					<View className="bg-white rounded-xl border border-gray-100 p-8 items-center">
-						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No team members are assigned yet.</Text>
+						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No team members match your search.</Text>
 					</View>
-				) : members.map(member => (
+				) : members.filter(m => (m.full_name || '').toLowerCase().includes(search.toLowerCase()) || (m.email || '').toLowerCase().includes(search.toLowerCase())).map(member => (
 					<View key={member.id} className="bg-white rounded-xl border border-gray-100 p-5 mb-3 shadow-sm">
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-brand-text">{member.full_name || 'Unnamed member'}</Text>
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-1">{member.email || 'No email available'}</Text>

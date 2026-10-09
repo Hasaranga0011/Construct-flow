@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { TopNav } from '@/components/common/TopNav';
@@ -62,7 +63,16 @@ export default function PMMaterialsPage() {
   const visible = rows.filter(row => `${row.item_name || row.name || row.po_number || ''} ${row.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
   return <View className="flex-1 bg-brand-light">
     <TopNav title="Materials Management" actionLabel="Refresh" onActionPress={load} />
-    <View className="px-4 pt-4"><TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={search} onChangeText={setSearch} placeholder="Search item, order or project" className="bg-white border border-gray-200 rounded-xl p-3 mb-3" />
+    <View className="px-4 pt-4">
+      <View className="mb-3 z-50">
+        <SearchInput 
+          placeholder="Search item, order or project..." 
+          value={search} 
+          onChangeText={setSearch} 
+          items={rows} 
+          entityLabel="materials" 
+        />
+      </View>
       <View className="flex-row flex-wrap gap-2 mb-3">{([['queue','Approval Queue'],['stock','Site Stock'],['orders','Purchase Orders']] as const).map(([value,label]) => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={value} onPress={() => setTab(value)} className={`rounded-lg px-3 py-3 ${tab === value ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={tab === value ? 'text-white font-bold' : 'text-gray-600'}>{label}</Text></Pressable>)}</View>
       {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-3">{error}</Text>}
     </View>

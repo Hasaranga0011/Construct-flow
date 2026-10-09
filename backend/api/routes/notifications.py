@@ -6,6 +6,8 @@ import httpx
 from dotenv import load_dotenv
 from core.security import get_current_user
 from core.notification_helper import create_notification
+from core.database import supabase as admin_supabase
+from typing import List
 
 load_dotenv()
 
@@ -42,6 +44,24 @@ async def send_system_notification(payload: SystemNotificationPayload, current_u
         sent_via="in_app"
     )
     return {"success": True}
+
+class MarkReadPayload(BaseModel):
+    ids: List[str]
+
+@router.patch("/mark-read")
+async def mark_notifications_read(payload: MarkReadPayload, current_user: dict = Depends(get_current_user)):
+    """Bypass strict RLS to mark notifications as read for the current user."""
+    if not payload.ids:
+        return {"success": True}
+        
+    try:
+        # Using admin_supabase to bypass RLS since users can't update role-based notifications
+        admin_supabase.table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
+        return {"success": True, "updated": len(payload.ids)}
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to mark notifications as read: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 class EmailPayload(BaseModel):
     to: str

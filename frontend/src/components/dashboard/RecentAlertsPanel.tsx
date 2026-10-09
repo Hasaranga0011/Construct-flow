@@ -3,7 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
+import { useNotifications } from '../../context/NotificationContext';
 
 const AlertItem = ({ title, subtext, iconColor }: { title: string, subtext: string, iconColor: string }) => {
   return (
@@ -27,7 +27,7 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
   const { isMobile } = useResponsive();
   
   // Directly use the shared real-time notification hook to ensure it always matches the bell icon perfectly.
-  const { notifications, unreadCount, loading } = useRealtimeNotifications();
+  const { notifications, unreadCount, loading } = useNotifications();
 
   // Show only the 5 most recent alerts
   const alerts = notifications.slice(0, 5);

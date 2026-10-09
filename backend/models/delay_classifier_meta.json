@@ -1,6 +1,6 @@
 {
   "model_type": "RandomForestClassifier",
-  "trained_at": "2026-10-03T02:02:53+00:00",
+  "trained_at": "2026-10-09T04:49:00+00:00",
   "dataset_size": 50000,
   "features": [
     "worker_count",

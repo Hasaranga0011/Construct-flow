@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
@@ -37,7 +38,15 @@ export default function PMLabourScreen() {
   return <View className="flex-1 bg-brand-light"><TopNav title="Project Labour" actionLabel="Refresh" onActionPress={load} /><ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
     <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',stats.overtime.toFixed(1)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mt-2">{value}</Text></View>)}</View>
     <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold">Today?s Attendance</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">View Payroll</Text></Pressable></View>
-    <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} placeholder="Search worker or project" value={search} onChangeText={setSearch} className="border border-gray-200 bg-white p-4 rounded-xl mb-4" />
+    <View className="mb-4 z-50">
+      <SearchInput 
+        placeholder="Search worker or project..." 
+        value={search} 
+        onChangeText={setSearch} 
+        items={rows} 
+        entityLabel="labour" 
+      />
+    </View>
     {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
     {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.hours_worked ?? 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{a.status || 'Not recorded'}</Text></View></View>)}
   </ScrollView></View>;

@@ -3,7 +3,7 @@ import { View, Pressable, Text, TextInput, Platform, Modal, ScrollView } from 'r
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
-import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
+import { useNotifications } from '../../context/NotificationContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -30,7 +30,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
   const { isMobile, width } = useResponsive();
   const useDrawer = Platform.OS !== 'web' || isMobile;
 
-  const { unreadCount } = useRealtimeNotifications();
+  const { unreadCount } = useNotifications();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const currentPortal = role || pathname.split('/')[1] || 'admin';

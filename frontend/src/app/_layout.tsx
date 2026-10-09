@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { ToastProvider } from '../components/common/ToastProvider';
+import { NotificationProvider } from '../context/NotificationContext';
 
 import { normalizeRole } from '../utils/auth';
 import { supabase } from '../lib/supabase';
@@ -132,8 +133,10 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <ThemeProvider>
           <AuthProvider>
-            <InitialLayout />
-            <ToastProvider />
+            <NotificationProvider>
+              <InitialLayout />
+              <ToastProvider />
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaView>

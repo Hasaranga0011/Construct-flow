@@ -9,7 +9,8 @@ export const NotificationCard = ({
   iconName,
   iconColor,
   isUnread = false,
-  actionLabel = 'View'
+  actionLabel = 'View',
+  onActionPress
 }: {
   title: string,
   subtitle: string,
@@ -17,7 +18,8 @@ export const NotificationCard = ({
   iconName: string,
   iconColor: string,
   isUnread?: boolean,
-  actionLabel?: string
+  actionLabel?: string,
+  onActionPress?: () => void
 }) => {
   const { isMobile } = useResponsive();
 
@@ -36,7 +38,7 @@ export const NotificationCard = ({
             <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#6B7280', fontSize: 13 }]}>{subtitle}</Text>
           </View>
         </View>
-        <Pressable style={[{ width: '100%', borderWidth: 1, borderColor: '#D1D5DB', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }, { minHeight: 44, minWidth: 44 }]}>
+        <Pressable onPress={onActionPress} style={[{ width: '100%', borderWidth: 1, borderColor: '#D1D5DB', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }, { minHeight: 44, minWidth: 44 }]}>
           <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#4B5563', fontWeight: '600', fontSize: 13 }]}>{actionLabel}</Text>
         </Pressable>
       </View>
@@ -62,7 +64,7 @@ export const NotificationCard = ({
       </View>
 
       {/* Action Area */}
-      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="border border-gray-300 px-4 py-2 rounded-lg ml-4">
+      <Pressable onPress={onActionPress} style={{ minHeight: 44, minWidth: 44 }} className="border border-gray-300 px-4 py-2 rounded-lg ml-4">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 font-semibold text-sm">{actionLabel}</Text>
       </Pressable>
     </View>

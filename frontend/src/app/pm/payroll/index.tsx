@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal } from 'react-native';
+import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
@@ -30,7 +31,15 @@ export default function PMPayrollPage() {
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mb-2">Salary Slips</Text>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4">Generated payroll records for projects you manage.</Text>
       <View className="bg-white rounded-xl p-5 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Pending payment: {pending.length} slips</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mt-2">{formatMoney(pendingTotal)}</Text></View>
-      <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Search payroll" placeholder="Search worker or project" value={search} onChangeText={setSearch} className="bg-white border border-gray-200 rounded-xl p-4 mb-4" />
+      <View className="mb-4 z-50">
+        <SearchInput 
+          placeholder="Search worker or project..." 
+          value={search} 
+          onChangeText={setSearch} 
+          items={rows} 
+          entityLabel="payroll" 
+        />
+      </View>
       <View className="flex-row flex-wrap gap-3 mb-4">{['All', 'Pending', 'Paid'].map(status => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={status} onPress={() => setFilter(status)} className={`px-4 py-3 rounded-lg ${filter === status ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={filter === status ? 'text-white font-bold' : 'text-gray-700'}>{status}</Text></Pressable>)}</View>
       {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
       {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No salary slips match these filters.</Text> : visible.map(s => <View key={s.id} className="bg-white rounded-xl p-5 mb-3">

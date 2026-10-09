@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { NotificationCard } from '../../components/notifications/NotificationCard';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
+import { useNotifications } from '../../context/NotificationContext';
 import { useResponsive } from '../../hooks/useResponsive';
 
 export default function NotificationsScreen() {
-  const { notifications, loading, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { notifications, loading, markAsRead, markAllAsRead } = useNotifications();
+  const [searchQuery, setSearchQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const visibleNotifications = unreadOnly ? notifications.filter(n => !n.is_read) : notifications;
+  
+  const visibleNotifications = notifications.filter(n => {
+    if (unreadOnly && n.is_read) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!(n.title || '').toLowerCase().includes(q) && !(n.message || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
   const { isMobile } = useResponsive();
 
   const getIconProps = (action: string) => {
@@ -34,7 +43,12 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav title="Notifications" showAction={false} />
+      <TopNav 
+        title="Notifications" 
+        showAction={false} 
+        initialSearchQuery={searchQuery}
+        onSearch={setSearchQuery}
+      />
       
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6 max-w-4xl mx-auto w-full'}`} showsVerticalScrollIndicator={false}>
         
@@ -73,6 +87,10 @@ export default function NotificationsScreen() {
                     iconName={props.iconName}
                     iconColor={props.iconColor}
                     isUnread={!n.is_read}
+                    onActionPress={() => {
+                      if (!n.is_read) markAsRead(n.id);
+                      Alert.alert(n.title, n.message, [{ text: 'Close', style: 'cancel' }]);
+                    }}
                   />
                 </Pressable>
               );

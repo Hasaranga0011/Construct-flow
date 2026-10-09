@@ -1,18 +1,18 @@
 import { ModalViewport } from './ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
-import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
+import { useNotifications } from '../../context/NotificationContext';
 
 export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
   const { user, role } = useAuth();
   const [activeTab, setActiveTab] = useState<'inbox' | 'settings'>('inbox');
   const [pushEnabled, setPushEnabled] = useState(false);
 
-  const { notifications, loading, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { notifications, loading, markAsRead, markAllAsRead } = useNotifications();
 
   // Initialize Push Token listener (already handled in root layout, but we need it to trigger permission requests)
   const { expoPushToken, requestToken } = usePushNotifications(user?.id || null);
@@ -27,7 +27,7 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
     if (!user) return;
     try {
       const { data } = await supabase.from('profiles').select('expo_push_token').eq('id', user.id).single();
-      setPushEnabled(!!data?.expo_push_token);
+      setPushEnabled(!!(data as any)?.expo_push_token);
     } catch (e) {}
   };
 
@@ -45,13 +45,13 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
 
       const token = await requestToken();
       if (token) {
-        await supabase.from('profiles').update({ expo_push_token: token }).eq('id', user.id);
+        await supabase.from('profiles').update({ expo_push_token: token } as any).eq('id', user.id);
       } else {
         setPushEnabled(false); // Revert if permission denied
       }
     } else {
       // User turned off
-      await supabase.from('profiles').update({ expo_push_token: null }).eq('id', user.id);
+      await supabase.from('profiles').update({ expo_push_token: null } as any).eq('id', user.id);
     }
   };
 
@@ -67,13 +67,20 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
             </Pressable>
           </View>
 
-          <View className="flex-row border-b border-gray-100 px-4">
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveTab('inbox')} className={`py-3 mr-6 ${activeTab === 'inbox' ? 'border-b-2 border-brand-orange' : ''}`}>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold ${activeTab === 'inbox' ? 'text-brand-orange' : 'text-gray-400'}`}>Inbox</Text>
-            </Pressable>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveTab('settings')} className={`py-3 ${activeTab === 'settings' ? 'border-b-2 border-brand-orange' : ''}`}>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold ${activeTab === 'settings' ? 'text-brand-orange' : 'text-gray-400'}`}>Settings</Text>
-            </Pressable>
+          <View className="flex-row justify-between border-b border-gray-100 px-4 items-center">
+            <View className="flex-row">
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveTab('inbox')} className={`py-3 mr-6 ${activeTab === 'inbox' ? 'border-b-2 border-brand-orange' : ''}`}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold ${activeTab === 'inbox' ? 'text-brand-orange' : 'text-gray-400'}`}>Inbox</Text>
+              </Pressable>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveTab('settings')} className={`py-3 ${activeTab === 'settings' ? 'border-b-2 border-brand-orange' : ''}`}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold ${activeTab === 'settings' ? 'text-brand-orange' : 'text-gray-400'}`}>Settings</Text>
+              </Pressable>
+            </View>
+            {activeTab === 'inbox' && notifications.some(n => !n.is_read) && (
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={markAllAsRead}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-semibold">Mark all read</Text>
+              </Pressable>
+            )}
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} className="max-h-96 bg-gray-50">
@@ -89,7 +96,10 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
                 notifications.map(n => (
                   <Pressable style={{ minHeight: 44, minWidth: 44 }}
                     key={n.id}
-                    onPress={() => markAsRead(n.id)}
+                    onPress={() => {
+                      if (!n.is_read) markAsRead(n.id);
+                      Alert.alert(n.title, n.message, [{ text: 'Close', style: 'cancel' }]);
+                    }}
                     className={`p-4 border-b border-gray-100 flex-row ${n.is_read ? 'bg-white opacity-60' : 'bg-orange-50/50'}`}
                   >
                     <View className="flex-1">
