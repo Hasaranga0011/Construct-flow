@@ -41,7 +41,7 @@ export default function SupplierDetailPage() {
         
         const { data: ords, error: ordErr } = await supabase
           .from('purchase_orders')
-          .select('*, projects(name), materials(name)')
+          .select('*, projects(name)')
           .eq('supplier_id', id)
           .order('created_at', { ascending: false });
         if (ordErr) throw ordErr;

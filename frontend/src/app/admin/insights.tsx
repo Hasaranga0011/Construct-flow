@@ -18,6 +18,7 @@ export default function MLInsightsDashboard() {
   const [simQuality, setSimQuality] = useState('Standard');
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<number | null>(null);
+  const [retraining, setRetraining] = useState(false);
 
   const runSimulator = async () => {
     setSimulating(true);
@@ -44,20 +45,32 @@ export default function MLInsightsDashboard() {
   };
 
   const handleRetrain = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        const confirm = window.confirm("Initiate training pipeline? This will analyze the latest data and safely deploy if metrics improve.");
-        if (!confirm) return;
-      } else {
-        // Assume native Alert logic could be here if needed, keeping simple for web/mobile hybrid
-      }
+    const confirmMessage = "Retrain the cost model now? This may take a minute.";
+    if (Platform.OS === 'web') {
+      if (!window.confirm(confirmMessage)) return;
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        Alert.alert('Retrain Model', confirmMessage, [
+          { text: 'Cancel', style: 'cancel', onPress: () => reject(new Error('Cancelled')) },
+          { text: 'Retrain', onPress: resolve }
+        ]);
+      }).catch(() => { /* do nothing */ });
+    }
 
+    setRetraining(true);
+    try {
       const res = await api.post('/ai/retrain', {});
-      if (Platform.OS === 'web') window.alert(res.message);
-      else Alert.alert('Success', res.message);
+      if (Platform.OS === 'web') window.alert(res.message || 'Model retraining completed successfully.');
+      else Alert.alert('Success', res.message || 'Model retraining completed successfully.');
+      
+      // refresh insights after retraining
+      const data = await api.get('/ai/insights');
+      setInsights(data);
     } catch (err: any) {
-      if (Platform.OS === 'web') window.alert(err.message);
-      else Alert.alert('Error', err.message);
+      if (Platform.OS === 'web') window.alert(err.message || 'Error retraining model.');
+      else Alert.alert('Error', err.message || 'Error retraining model.');
+    } finally {
+      setRetraining(false);
     }
   };
 
@@ -100,18 +113,19 @@ export default function MLInsightsDashboard() {
     <View className="flex-1 bg-brand-light dark:bg-[#0F172A]">
       <TopNav title="AI Analytics & Insights" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className={isMobile ? "p-4" : "p-8"}>
-        <View className="mb-8 flex-row justify-between items-start">
-          <View className="flex-1">
+        <View className={`mb-8 flex-row ${isMobile ? 'flex-col gap-4' : 'justify-between items-start'}`}>
+          <View className="flex-1 min-w-0">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-text dark:text-white mb-2">ML Insights</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-gray-400">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-gray-400 leading-normal">
               Live model analytics from your project and construction data. Cost predictions and delay risks are machine-learning estimates — not financial commitments.
             </Text>
           </View>
-          <Pressable style={{ minHeight: 44, minWidth: 44 }}
-            className="bg-brand-orange px-4 py-2 rounded-lg flex-row items-center ml-4"
+          <Pressable style={{ minHeight: 44, minWidth: isMobile ? '100%' : 44 }}
+            className={`bg-brand-orange px-4 py-2 rounded-lg flex-row items-center justify-center flex-shrink-0 ${isMobile ? '' : 'ml-4 self-start'}`}
             onPress={handleRetrain}
+            disabled={retraining}
           >
-            <Ionicons name="refresh-outline" size={16} color="#fff" />
+            {retraining ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="refresh-outline" size={16} color="#fff" />}
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold ml-2">Retrain Model</Text>
           </Pressable>
         </View>

@@ -43,7 +43,7 @@ def get_bulk_project_names(req: BulkProjectRequest):
 @router.get("/debug_schema")
 def debug_schema(request: Request):
     client = get_auth_client(request)
-    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}]).data
+    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}).execute().data
 
 def send_client_assignment_email(email: str, project_name: str):
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
