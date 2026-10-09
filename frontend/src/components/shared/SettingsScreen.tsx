@@ -45,7 +45,6 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
 
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
-
   const toastColors = { success: '#10B981', error: '#EF4444', info: '#3B82F6' };
 
   const showToast = (msg: string, type: 'success' | 'error' | 'info') => {
@@ -109,36 +108,31 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
     setLogoutModalVisible(true);
   };
 
-  const bgTheme = isDark ? '#0F172A' : '#F8F9FB';
-  const cardTheme = isDark ? '#1E293B' : 'white';
-  const textTheme = isDark ? 'white' : '#0F172A';
-  const textSubTheme = isDark ? '#94A3B8' : '#64748B';
-  const borderTheme = isDark ? '#334155' : '#F1F5F9';
-  const inputBg = isDark ? '#0F172A' : '#F8F9FB';
-
-  // Section wrapper
+  // Shared Card primitive style
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <View style={{ marginBottom: 16 }}>
-      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 4 }]}>{title}</Text>
-      <View style={{ backgroundColor: cardTheme, borderRadius: 20, borderWidth: 1, borderColor: borderTheme, overflow: 'hidden', shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 12 }}>
+    <View className="mb-6">
+      <Text maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 px-2">
+        {title}
+      </Text>
+      <View className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-sm">
         {children}
       </View>
     </View>
   );
 
   const ToggleRow = ({ icon, iconBg, iconColor, title, subtitle, value, onToggle }: any) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: borderTheme }}>
-      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? '#334155' : iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-        <Ionicons name={icon} size={17} color={iconColor} />
+    <View className="flex-row items-center px-4 py-4 border-b border-gray-100 dark:border-slate-700">
+      <View className="w-10 h-10 rounded-xl items-center justify-center mr-4" style={{ backgroundColor: isDark ? '#334155' : iconBg }}>
+        <Ionicons name={icon} size={18} color={iconColor} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{title}</Text>
-        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: textSubTheme, marginTop: 1 }]}>{subtitle}</Text>
+      <View className="flex-1 min-w-0 pr-4">
+        <Text maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-slate-900 dark:text-white" numberOfLines={1}>{title}</Text>
+        <Text maxFontSizeMultiplier={1.3} className="text-xs text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>{subtitle}</Text>
       </View>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#E2E8F0', true: rc.color + '50' }}
+        trackColor={{ false: '#E2E8F0', true: rc.color + '80' }}
         thumbColor={value ? rc.color : '#CBD5E1'}
         ios_backgroundColor="#E2E8F0"
       />
@@ -148,26 +142,22 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
   const ActionRow = ({ icon, iconBg, iconColor, title, subtitle, onPress, loading = false }: any) => (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [({
-        flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 16, paddingVertical: 14,
-        borderBottomWidth: 1, borderBottomColor: borderTheme,
-        backgroundColor: pressed ? (isDark ? '#334155' : '#F8F9FB') : 'transparent',
-      }), { minHeight: 44, minWidth: 44 }]}
+      className="flex-row items-center px-4 py-4 border-b border-gray-100 dark:border-slate-700 active:bg-slate-50 dark:active:bg-slate-700 transition-colors"
+      style={{ minHeight: 48 }}
     >
-      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? '#334155' : iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-        {loading ? <ActivityIndicator size="small" color={iconColor} /> : <Ionicons name={icon} size={17} color={iconColor} />}
+      <View className="w-10 h-10 rounded-xl items-center justify-center mr-4" style={{ backgroundColor: isDark ? '#334155' : iconBg }}>
+        {loading ? <ActivityIndicator size="small" color={iconColor} /> : <Ionicons name={icon} size={18} color={iconColor} />}
       </View>
-      <View style={{ flex: 1 }}>
-        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{title}</Text>
-        {subtitle && <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: textSubTheme, marginTop: 1 }]}>{subtitle}</Text>}
+      <View className="flex-1 min-w-0 pr-4">
+        <Text maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-slate-900 dark:text-white" numberOfLines={1}>{title}</Text>
+        {subtitle && <Text maxFontSizeMultiplier={1.3} className="text-xs text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>{subtitle}</Text>}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={textSubTheme} />
+      <Ionicons name="chevron-forward" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
     </Pressable>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: bgTheme }}>
+    <View className="flex-1 bg-slate-50 dark:bg-slate-900">
       <LogoutConfirmationModal
         visible={logoutModalVisible}
         isDark={isDark}
@@ -177,77 +167,66 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
       {/* Toast */}
       {toast && (
         <Animated.View style={{ opacity: toastOpacity, position: 'absolute', bottom: 32, alignSelf: 'center', zIndex: 999 }}>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 10,
-            paddingHorizontal: 20, paddingVertical: 13, borderRadius: 18,
-            backgroundColor: toastColors[toast.type],
-            shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20
-          }}>
+          <View className="flex-row items-center gap-2.5 px-5 py-3.5 rounded-2xl shadow-xl" style={{ backgroundColor: toastColors[toast.type] }}>
             <Ionicons
               name={toast.type === 'success' ? 'checkmark-circle' : toast.type === 'error' ? 'alert-circle' : 'information-circle'}
               size={18} color="white"
             />
-            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontWeight: '700', fontSize: 13 }]}>{toast.msg}</Text>
+            <Text maxFontSizeMultiplier={1.3} className="text-white font-bold text-sm">{toast.msg}</Text>
           </View>
         </Animated.View>
       )}
 
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={{ maxWidth: 580, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 28, paddingBottom: 48 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className="flex-1">
+        <View className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-8 pb-16">
 
           {/* Account Hero */}
           <LinearGradient
             colors={['#0F172A', '#1E293B']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ borderRadius: 24, marginBottom: 20, overflow: 'hidden' }}
+            className="rounded-3xl mb-8 overflow-hidden shadow-md"
           >
-            <View style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: rc.color + '15' }} />
-            <View style={{ padding: 24, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{
-                width: 60, height: 60, borderRadius: 30,
-                backgroundColor: rc.color + '25', borderWidth: 2, borderColor: rc.color + '50',
-                alignItems: 'center', justifyContent: 'center', marginRight: 16,
-                overflow: 'hidden',
-              }}>
+            <View style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: rc.color + '15', pointerEvents: 'none' }} />
+            <View className="p-6 md:p-8 flex-row items-center flex-wrap gap-4">
+              <View className="w-16 h-16 rounded-full items-center justify-center border-2 overflow-hidden flex-shrink-0"
+                style={{ backgroundColor: rc.color + '25', borderColor: rc.color + '50' }}>
                 {profile?.avatar_url ? (
-                  <View style={{ width: 60, height: 60, borderRadius: 30, overflow: 'hidden' }}>
-                    <Image source={{ uri: profile.avatar_url }} style={{ width: 60, height: 60 }} resizeMode="cover" />
-                  </View>
+                  <Image source={{ uri: profile.avatar_url }} className="w-full h-full" resizeMode="cover" />
                 ) : (
-                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontSize: 22, fontWeight: '800' }]}>{initials}</Text>
+                  <Text maxFontSizeMultiplier={1.3} className="text-xl font-extrabold" style={{ color: rc.color }}>{initials}</Text>
                 )}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontSize: 17, fontWeight: '800' }]}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#94A3B8', fontSize: 12, marginTop: 2 }]}>{profile?.email || user?.email}</Text>
-                <View style={{
-                  alignSelf: 'flex-start', marginTop: 8, borderRadius: 10,
-                  backgroundColor: rc.color + '25', borderWidth: 1, borderColor: rc.color + '50',
-                  paddingHorizontal: 10, paddingVertical: 3,
-                }}>
-                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontSize: 11, fontWeight: '700' }]}>{rc.label}</Text>
+              <View className="flex-1 min-w-[200px]">
+                <Text maxFontSizeMultiplier={1.3} className="text-white text-xl font-extrabold" numberOfLines={1}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
+                <Text maxFontSizeMultiplier={1.3} className="text-slate-400 text-sm mt-0.5" numberOfLines={1}>{profile?.email || user?.email}</Text>
+                <View className="self-start mt-2.5 rounded-lg px-3 py-1 border"
+                  style={{ backgroundColor: rc.color + '25', borderColor: rc.color + '50' }}>
+                  <Text maxFontSizeMultiplier={1.3} className="text-xs font-bold" style={{ color: rc.color }}>{rc.label}</Text>
                 </View>
               </View>
-              <Pressable
-                onPress={() => profileHref ? router.push(profileHref as any) : null}
-                style={[{ backgroundColor: '#ffffff15', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#ffffff20' }, { minHeight: 44, minWidth: 44 }]}
-              >
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontSize: 12, fontWeight: '600' }]}>Edit Profile</Text>
-              </Pressable>
+              {profileHref && (
+                <Pressable
+                  onPress={() => router.push(profileHref as any)}
+                  className="bg-white/10 rounded-xl px-4 py-2.5 border border-white/20 active:bg-white/20 transition-colors w-full md:w-auto items-center"
+                  style={{ minHeight: 44 }}
+                >
+                  <Text maxFontSizeMultiplier={1.3} className="text-white text-sm font-semibold">Edit Profile</Text>
+                </Pressable>
+              )}
             </View>
           </LinearGradient>
 
           {/* Appearance */}
           <Section title="Appearance">
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-                <Ionicons name={isDark ? 'moon' : 'sunny'} size={17} color={isDark ? '#818CF8' : '#F59E0B'} />
+            <View className="flex-row items-center px-4 py-4">
+              <View className="w-10 h-10 rounded-xl items-center justify-center mr-4" style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }}>
+                <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={isDark ? '#818CF8' : '#F59E0B'} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: '#0F172A' }]}>
+              <View className="flex-1 min-w-0 pr-4">
+                <Text maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-slate-900 dark:text-white" numberOfLines={1}>
                   {isDark ? 'Dark Mode' : 'Light Mode'}
                 </Text>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: '#94A3B8', marginTop: 1 }]}>
+                <Text maxFontSizeMultiplier={1.3} className="text-xs text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>
                   {isDark ? 'Switch to light theme' : 'Switch to dark theme'}
                 </Text>
               </View>
@@ -300,13 +279,9 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
               { label: 'Theme', value: isDark ? 'Dark' : 'Light' },
               { label: 'Role', value: rc.label },
             ].map(({ label, value }, i, arr) => (
-              <View key={label} style={{
-                flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                paddingHorizontal: 16, paddingVertical: 13,
-                borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: borderTheme,
-              }}>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, color: textSubTheme }]}>{label}</Text>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{value}</Text>
+              <View key={label} className={`flex-row justify-between items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-gray-100 dark:border-slate-700' : ''}`}>
+                <Text maxFontSizeMultiplier={1.3} className="text-sm text-slate-500 dark:text-slate-400" numberOfLines={1}>{label}</Text>
+                <Text maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-slate-900 dark:text-white" numberOfLines={1}>{value}</Text>
               </View>
             ))}
           </Section>
@@ -315,13 +290,11 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
           <Section title="Danger Zone">
             <Pressable
               onPress={handleSignOut}
-              style={({ pressed }) => [({
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-                paddingVertical: 18, backgroundColor: pressed ? (isDark ? '#7F1D1D' : '#FEF2F2') : 'transparent',
-              }), { minHeight: 44, minWidth: 44 }]}
+              className="flex-row items-center justify-center gap-2.5 py-4 active:bg-red-50 dark:active:bg-red-900/20 transition-colors"
+              style={{ minHeight: 48 }}
             >
               {signingOut ? <ActivityIndicator size="small" color="#EF4444" /> : <Ionicons name="log-out-outline" size={20} color="#EF4444" />}
-              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#EF4444', fontWeight: '700', fontSize: 15 }]}>
+              <Text maxFontSizeMultiplier={1.3} className="text-red-500 font-bold text-base">
                 {signingOut ? 'Signing out...' : 'Sign Out'}
               </Text>
             </Pressable>

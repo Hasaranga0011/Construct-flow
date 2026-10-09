@@ -53,7 +53,7 @@ export const HorizontalBarChart: React.FC<HorizontalBarChartProps> = ({
   const displayedData = showAll ? data : top8;
   const hasMore = data.length > 8;
 
-  const labelWidth = isMobile ? 120 : 160;
+  const labelWidth = isMobile ? 140 : 220;
 
   return (
     <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -95,7 +95,7 @@ export const HorizontalBarChart: React.FC<HorizontalBarChartProps> = ({
               <View 
                 style={{ 
                   position: 'absolute', 
-                  left: labelWidth + ((100 / domainMax) * 100) + '%',
+                  left: (labelWidth + ((100 / domainMax) * 100) + '%') as any,
                   marginLeft: -(100 / domainMax) * labelWidth,
                   top: 0, 
                   bottom: 0, 
@@ -124,12 +124,13 @@ export const HorizontalBarChart: React.FC<HorizontalBarChartProps> = ({
                   onHoverOut={Platform.OS === 'web' ? () => setActiveTooltip(null) : undefined}
                   // @ts-ignore
                   onPressIn={Platform.OS !== 'web' ? () => setActiveTooltip(item.id) : undefined}
-                  onPressOut={Platform.OS !== 'web' ? () => setActiveTooltip(null) : undefined}
-                  style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', marginBottom: 8, zIndex: showTooltip ? 10 : 1 }}
+                  // @ts-ignore
+                  title={Platform.OS === 'web' ? `${item.tooltipTitle}\n${item.tooltipSubtitle}` : undefined}
+                  style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', marginBottom: 12, zIndex: showTooltip ? 10 : 1 }}
                 >
-                  <View style={{ width: labelWidth, paddingRight: 8, justifyContent: 'center' }}>
+                  <View style={{ width: labelWidth, paddingRight: 12, justifyContent: 'center' }}>
                     <Text 
-                      numberOfLines={1} 
+                      numberOfLines={2} 
                       ellipsizeMode="tail" 
                       style={{ flexShrink: 1, minWidth: 0 }} 
                       maxFontSizeMultiplier={1.3} 
@@ -140,17 +141,21 @@ export const HorizontalBarChart: React.FC<HorizontalBarChartProps> = ({
                   </View>
 
                   <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
-                    <View style={{ position: 'absolute', left: 0, right: 0, height: 24, backgroundColor: '#F3F4F6', borderRadius: 4 }} />
+                    {item.value > 0 && (
+                      <View style={{ position: 'absolute', left: 0, right: 0, height: 24, backgroundColor: '#F3F4F6', borderRadius: 4 }} />
+                    )}
                     
-                    <View 
-                      style={{ 
-                        width: `${barWidthPercent}%`, 
-                        height: 24, 
-                        backgroundColor: item.color, 
-                        borderRadius: 4,
-                        minWidth: item.value > 0 ? 4 : 0 
-                      }} 
-                    />
+                    {item.value > 0 && (
+                      <View 
+                        style={{ 
+                          width: `${barWidthPercent}%`, 
+                          height: 24, 
+                          backgroundColor: item.color, 
+                          borderRadius: 4,
+                          minWidth: 4 
+                        }} 
+                      />
+                    )}
                     
                     <Text 
                       style={{ flexShrink: 1, minWidth: 0, marginLeft: 6 }} 
@@ -160,7 +165,7 @@ export const HorizontalBarChart: React.FC<HorizontalBarChartProps> = ({
                       {item.value}%
                     </Text>
 
-                    {showTooltip && (item.tooltipTitle || item.tooltipSubtitle) && (
+                    {showTooltip && Platform.OS !== 'web' && (item.tooltipTitle || item.tooltipSubtitle) && (
                       <View 
                         style={{ 
                           position: 'absolute', 

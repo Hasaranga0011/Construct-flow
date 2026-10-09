@@ -1,4 +1,5 @@
 import { getApiUrl } from '../../lib/apiUrl';
+import { useApi } from '../../hooks/useApi';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -54,7 +55,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
         const token = session?.access_token;
 
         const params = pmId ? `?pm_id=${pmId}` : '';
-        const data = await apiRequest(`/ai/insights${params}`, {
+        const data = await apiRequest(`/insights${params}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
