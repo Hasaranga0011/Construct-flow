@@ -40,7 +40,7 @@ export default function ClientMediaPage() {
             .from('site_media')
             .select('id, project_id, file_url, caption, file_type, uploaded_at')
             .in('project_id', projectIds)
-            .order('uploaded_at', { ascending: false });
+            .order('uploaded_at', { ascending: true });
           if (photoError) throw photoError;
           if (isMounted) setPhotos((photoData || []) as Photo[]);
         }
@@ -105,11 +105,11 @@ export default function ClientMediaPage() {
                 {/* Photo Grid */}
                 <View className="flex-row flex-wrap gap-4">
                   {photos.filter(photo => photo.project_id === selectedProjectId).map(photo => (
-                    <View key={photo.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full md:w-[31%]">
-                      <Image source={{ uri: photo.file_url }} className="w-full h-36 bg-gray-100" resizeMode="cover" />
-                      <View className="p-3">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm">{photo.caption || photo.file_type || 'Progress photo'}</Text>
-                        <View className="flex-row items-center mt-2"><Ionicons name="calendar-outline" size={12} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs ml-1">{new Date(photo.uploaded_at).toLocaleDateString('en-GB')}</Text></View>
+                    <View key={photo.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full md:w-[48%] lg:w-[31%]">
+                      <Image source={{ uri: photo.file_url }} className="w-full h-48 bg-gray-100" resizeMode="cover" />
+                      <View className="p-4">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm mb-1">{photo.caption || photo.file_type || 'Progress photo'}</Text>
+                        <View className="flex-row items-center"><Ionicons name="time-outline" size={14} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1 font-medium">{new Date(photo.uploaded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</Text></View>
                       </View>
                     </View>
                   ))}

@@ -12,6 +12,7 @@ const PM_NAV_ITEMS: NavItem[] = [
   { label: 'Labour',       href: '/labour',       IconFamily: FontAwesome5,  iconName: 'hard-hat' },
   { label: 'Payroll',      href: '/payroll',      IconFamily: FontAwesome5,  iconName: 'money-check-alt' },
   { label: 'Clients',      href: '/client',       IconFamily: FontAwesome5,  iconName: 'users' },
+  { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Suppliers',    href: '/suppliers',    IconFamily: FontAwesome5,  iconName: 'truck' },
   { label: 'Team',         href: '/team',         IconFamily: FontAwesome5,  iconName: 'user-friends' },
   { label: 'AI Estimator', href: '/ai-estimator', IconFamily: FontAwesome5,  iconName: 'calculator' },

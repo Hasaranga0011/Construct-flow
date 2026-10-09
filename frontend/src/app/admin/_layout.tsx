@@ -12,6 +12,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: 'Materials',    href: '/materials',    IconFamily: FontAwesome5,  iconName: 'box' },
   { label: 'Labour',       href: '/labour',       IconFamily: FontAwesome5,  iconName: 'users' },
   { label: 'Client Portal',href: '/client',       IconFamily: FontAwesome5,  iconName: 'globe' },
+  { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Suppliers',    href: '/suppliers',    IconFamily: FontAwesome5,  iconName: 'truck' },
   { label: 'AI Estimator', href: '/estimator',    IconFamily: FontAwesome5,  iconName: 'calculator' },
   { label: 'Notifications',href: '/notifications',badge: 4, IconFamily: Ionicons, iconName: 'notifications' },

@@ -12,6 +12,7 @@ const SM_NAV_ITEMS: NavItem[] = [
   { label: 'Materials',    href: '/materials',    IconFamily: FontAwesome5,  iconName: 'box' },
   { label: 'Milestones',   href: '/milestones',   IconFamily: Ionicons,      iconName: 'flag' },
   { label: 'Issues',       href: '/issues',       IconFamily: Ionicons,      iconName: 'warning' },
+  { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Team',         href: '/team',         IconFamily: FontAwesome5,  iconName: 'user-friends' },
   { label: 'Notifications',href: '/notifications', IconFamily: Ionicons, iconName: 'notifications' },
   { label: 'Profile',      href: '/profile',      IconFamily: Ionicons,      iconName: 'person-circle-outline' },
