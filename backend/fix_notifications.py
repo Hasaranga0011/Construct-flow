@@ -49,7 +49,7 @@ def replace_in_file(path):
     # }).execute()
     
     content = '\n'.join(lines)
-    content = content.replace('}).execute()', '}])')
+    content = content.replace('}).execute()', '}).execute()')
     content = content.replace('create_notifications({', 'create_notifications([{')
     
     # Array multiline inserts:

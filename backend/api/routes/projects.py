@@ -90,7 +90,7 @@ def save_project(client, data, project_id=None):
     # rolls back the project change as part of the same database transaction.
     result = client.rpc("save_project_with_assignments", {
         "p_project_id": project_id, "p_data": data,
-    }])
+    }).execute()
     if not result.data:
         raise HTTPException(status_code=400, detail="Failed to save project")
     return result.data
@@ -300,7 +300,7 @@ def create_milestone(project_id: str, payload: MilestoneCreate, current_user: di
             "due_date": payload.due_date,
             "planned_date": payload.due_date,  # Added to satisfy legacy table constraint
             "status": "Pending"
-        }])
+        }).execute()
         return res.data[0]
     except HTTPException:
         raise
@@ -462,9 +462,9 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
         if total_budget > 0:
             utilisation = (committed_cost + actual_spend) / total_budget
             if utilisation >= 1.0:
-                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 100)
+                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 100, current_user["id"])
             elif utilisation >= 0.9:
-                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 90)
+                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 90, current_user["id"])
 
         return result
     except HTTPException:
@@ -473,13 +473,13 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_id, threshold_pct: int):
+def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_id, threshold_pct: int, current_user_id: str):
     """Insert a budget-overrun warning notification for PM and admin."""
     import logging
     try:
         notifications = [
             {
-                "user_id": current_user["id"],
+                "user_id": current_user_id,
                 "project_id": project_id,
                 "target_role": "super_admin",
                 "title": f"Budget {threshold_pct}% Exceeded",
@@ -490,7 +490,7 @@ def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_
         ]
         if pm_id:
             notifications.append({
-                "user_id": current_user["id"],
+                "user_id": current_user_id,
                 "project_id": project_id,
                 "target_user_id": pm_id,
                 "target_role": "pm",

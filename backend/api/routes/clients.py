@@ -56,7 +56,7 @@ class InviteClientRequest(BaseModel):
 def invite_client(req: InviteClientRequest, request: Request):
     try:
         from core.notification_helper import create_notifications, create_notification
-from core.database import get_auth_client
+        from core.database import get_auth_client
         # We need an auth client to ensure the person inviting is authenticated
         admin_client = get_auth_client(request)
         
@@ -90,7 +90,7 @@ from core.database import get_auth_client
             "action": f"Client {req.name} was invited",
             "project_id": req.project_id,
             "client_id": new_user_id
-        }])
+        }).execute()
         
         # 5b. Notify the client
         create_notifications([{

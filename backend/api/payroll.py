@@ -69,7 +69,7 @@ def generate_payroll(req: PayrollGenerate, user=Depends(get_current_user)):
                     "total_days": total_days,
                     "amount": total_pay,
                     "status": "pending"
-                }])
+                }).execute()
                 generated_count += 1
                 
         if generated_count > 0:

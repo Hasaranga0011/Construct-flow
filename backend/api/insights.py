@@ -99,7 +99,7 @@ def get_insights(user=Depends(get_current_user)):
                 "resource_score": attendance_rate,
                 "recommendation": rec,
                 "confidence": 88
-            }])
+            }).execute()
 
         num_proj = len(projects)
         avg_delay_risk = total_risk / num_proj

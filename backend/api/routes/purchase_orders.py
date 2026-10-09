@@ -109,7 +109,7 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
                     "unit": order.unit or "Units",
                     "current_stock": 0,
                     "minimum_threshold": 10
-                }])
+                }).execute()
                 if mat_res.data:
                     material_id = mat_res.data[0]["id"]
                     
@@ -352,11 +352,60 @@ def _transition_order(po_id: str, current_user: dict, operation: str):
     client = client_for_token(current_user["token"])
     check_order_access(client, po_id, current_user)
     try:
-        # The database locks the order and updates its status/stock in one transaction.
-        response = client.rpc(operation, {"p_order_id": po_id})
-        if not response.data:
+        from datetime import datetime
+        order_res = client.table("purchase_orders").select("*").eq("id", po_id).execute()
+        if not order_res.data:
             raise HTTPException(status_code=404, detail="Order not found")
-        
+        order = order_res.data[0]
+
+        if operation == "deliver_purchase_order":
+            if order["status"] in ["Received", "Delivered"]:
+                return order
+            if order["status"] != "Confirmed":
+                raise HTTPException(status_code=400, detail="Order must be confirmed before delivery")
+            
+            res = client.table("purchase_orders").update({
+                "status": "Delivered", 
+                "delivered_at": datetime.now().isoformat(),
+                "delivered_by": current_user.get("id")
+            }).eq("id", po_id).execute()
+            
+            from core.notification_helper import create_notifications
+            create_notifications([{
+                "project_id": order["project_id"], "target_role": "pm", "title": "Goods delivered", "message": f"Purchase order {order.get('po_number')} is ready for receipt confirmation.", "type": "general"
+            }, {
+                "project_id": order["project_id"], "target_role": "site_manager", "title": "Goods delivered", "message": f"Purchase order {order.get('po_number')} is ready for receipt confirmation.", "type": "general"
+            }])
+            response_data = res.data[0] if res.data else order
+            
+        elif operation == "receive_purchase_order":
+            if order["status"] == "Received":
+                return order
+            if order["status"] not in ["Confirmed", "Delivered"]:
+                raise HTTPException(status_code=400, detail="Order must be confirmed or delivered before receipt")
+                
+            res = client.table("purchase_orders").update({
+                "status": "Received", 
+                "received_at": datetime.now().isoformat(),
+                "received_by": current_user.get("id")
+            }).eq("id", po_id).execute()
+            
+            mat_res = client.table("materials").select("id, current_stock").eq("name", order.get("items", "")).eq("project_id", order["project_id"]).execute()
+            if mat_res.data:
+                mat = mat_res.data[0]
+                client.table("materials").update({"current_stock": mat.get("current_stock", 0) + (order.get("quantity_ordered") or 0)}).eq("id", mat["id"]).execute()
+            
+            from core.notification_helper import create_notifications
+            create_notifications([{
+                "project_id": order["project_id"], "target_role": "pm", "title": "Goods received", "message": f"Purchase order {order.get('po_number')} was received and added to stock.", "type": "general"
+            }, {
+                "project_id": order["project_id"], "target_role": "site_manager", "title": "Goods received", "message": f"Purchase order {order.get('po_number')} was received and added to stock.", "type": "general"
+            }])
+            response_data = res.data[0] if res.data else order
+        else:
+            response = client.rpc(operation, {"p_order_id": po_id}).execute()
+            response_data = response.data
+
         # Record the actor in history
         try:
             order_res = client.table("purchase_orders").select("*").eq("id", po_id).execute()
@@ -371,7 +420,7 @@ def _transition_order(po_id: str, current_user: dict, operation: str):
             import logging
             logging.error(f"Failed to append history log for {po_id}: {e}")
             
-        return response.data
+        return response_data
     except HTTPException:
         raise
     except Exception as exc:

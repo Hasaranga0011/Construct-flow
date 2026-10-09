@@ -215,7 +215,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
                 "site_id": site_id,
                 "date": today,
                 "check_in_time": now_iso
-            }])
+            }).execute()
             
             return {"action": "check_in", "worker_name": worker["full_name"], "time": now_iso}
             

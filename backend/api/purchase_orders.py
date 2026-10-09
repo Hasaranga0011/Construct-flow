@@ -160,11 +160,8 @@ def deliver_po(po_id: str, user=Depends(get_current_user)):
 @router.patch("/{po_id}/receive")
 def receive_po(po_id: str, user=Depends(get_current_user)):
     try:
-        # Call the secure SQL RPC that increments stock
-        res = supabase_db.rpc("deliver_purchase_order", {"p_order_id": po_id}])
-        # The RPC handles stock increment and notifications. But since the RPC was originally named "deliver_purchase_order",
-        # it marks the status as "Delivered" inside the RPC. We want it to be "Received". We will update it.
-        # Actually, let's just do it directly here for simplicity and safety, since RPC might have RLS issues if called via service key.
+        # The RPC handled stock increment and notifications but was broken due to enum. 
+        # We will directly update status and stock.
         
         # We will directly update status and stock.
         res = supabase_db.table("purchase_orders").update({"status": "Received"}).eq("id", po_id).execute()

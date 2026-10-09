@@ -164,7 +164,7 @@ def set_user_role(
     res = db.rpc("admin_set_user_role", {
         "p_user_id": user_id,
         "p_role": payload.role,
-    }])
+    }).execute()
     return res.data or {"ok": True}
 
 
@@ -179,7 +179,7 @@ def approve_supplier(
 ) -> Dict:
     _require_admin(current_user)
     db = client_for_token(current_user["token"])
-    res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}])
+    res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Supplier not found or already approved")
     return res.data

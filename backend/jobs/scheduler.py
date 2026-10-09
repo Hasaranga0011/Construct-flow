@@ -6,7 +6,7 @@ from datetime import datetime
 
 async def _log_job_start(job_name: str) -> str:
     try:
-        res = supabase_db.table("job_runs").insert({"job_name": job_name, "status": "Running"}])
+        res = supabase_db.table("job_runs").insert({"job_name": job_name, "status": "Running"}).execute()
         return res.data[0]["id"] if res.data else None
     except:
         return None
