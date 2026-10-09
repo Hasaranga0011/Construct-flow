@@ -81,8 +81,7 @@ export default function SupplierDashboardScreen() {
     <View className="flex-1 bg-brand-light">
       <TopNav 
         title="Supplier Dashboard" 
-        actionLabel="Refresh" 
-        onActionPress={refresh} 
+        showAction={false}
       />
 
       {loading ? (
@@ -112,8 +111,8 @@ export default function SupplierDashboardScreen() {
           </View>
 
           {/* Top Stat Cards Row */}
-          <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
-            <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+          <View className={isMobile ? "flex-col mb-6" : "flex-row gap-4 mb-6"}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
               <StatCard 
                 label="New Orders" 
                 value={stats.pendingOrders.toString()} 
@@ -121,7 +120,7 @@ export default function SupplierDashboardScreen() {
                 indicatorType="warning" 
               />
             </AnimatedCard>
-            <AnimatedCard delay={200} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={200} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
               <StatCard 
                 label="In Transit" 
                 value={stats.confirmedOrders.toString()} 
@@ -129,7 +128,7 @@ export default function SupplierDashboardScreen() {
                 indicatorType="success"
               />
             </AnimatedCard>
-            <AnimatedCard delay={300} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={300} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
               <StatCard 
                 label="Late Deliveries" 
                 value={stats.lateDeliveries.toString()} 
@@ -138,7 +137,7 @@ export default function SupplierDashboardScreen() {
                 icon={<Ionicons name={stats.lateDeliveries > 0 ? "warning" : "checkmark-circle"} size={16} color={stats.lateDeliveries > 0 ? "#EF4444" : "#10B981"} />}
               />
             </AnimatedCard>
-            <AnimatedCard delay={400} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={400} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
               <StatCard 
                 label="Total Revenue" 
                 value={formatCurrency(stats.totalRevenue)} 

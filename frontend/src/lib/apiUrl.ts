@@ -12,7 +12,11 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
     }
     url.hostname = developmentHost;
   }
-  return url.toString().replace(/\/$/, '');
+  let finalUrl = url.toString().replace(/\/$/, '');
+  if (!finalUrl.endsWith('/api')) {
+    finalUrl += '/api';
+  }
+  return finalUrl;
 }
 
 export function getApiUrl(): string {

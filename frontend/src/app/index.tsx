@@ -194,7 +194,9 @@ export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [countersTriggered, setCountersTriggered] = useState(false);
   const [countersY, setCountersY] = useState(0);
-  const { height: wh } = useWindowDimensions();
+  const { height: wh, width: ww } = useWindowDimensions();
+  const isMobile = ww < 768;
+  const isTablet = ww >= 768 && ww < 1024;
   const cleanup = useRef<() => void>(() => {});
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -269,9 +271,9 @@ export default function LandingPage() {
       >
         <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <View className="w-11 h-11 bg-brand-orange rounded-xl items-center justify-center mr-3"
+            <View className="w-9 h-9 sm:w-11 sm:h-11 bg-brand-orange rounded-xl items-center justify-center mr-3"
               style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
-              <MaterialIcons name="precision-manufacturing" size={24} color="white" />
+              <MaterialIcons name="precision-manufacturing" size={isMobile ? 20 : 24} color="white" />
             </View>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-xl tracking-tight">
               Construct<Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Ai</Text>
@@ -318,7 +320,7 @@ export default function LandingPage() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs tracking-widest uppercase">Sri Lanka&apos;s #1 Construction Platform</Text>
               </View>
 
-              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold leading-tight mb-6" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 52, lineHeight: 60 }]}>
+              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold leading-tight mb-6" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 40 : 52, lineHeight: isMobile ? 48 : 60 }]}>
                 Build Smarter,{'\n'}
                 <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Deliver</Text>{'\n'}
                 On Time.
@@ -369,17 +371,17 @@ export default function LandingPage() {
                   <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.8)', fontSize: 12, fontWeight: '500' }]}>ConstructAi — Nimal Fernando (PM)</Text>
                 </View>
 
-                <View className="flex-row flex-wrap -mx-1.5 mb-4">
+                <View className={isMobile ? "flex-col mb-4" : "flex-row flex-wrap -mx-1.5 mb-4"}>
                   {[
                     { label: 'ACTIVE PROJECTS', value: '15',        color: '#F97316' },
                     { label: 'WORKERS ON-SITE',  value: '142',       color: '#22C55E' },
                     { label: 'MATERIALS VALUE',  value: 'LKR 12.4M', color: '#3B82F6' },
                     { label: 'PENDING PAYROLL',  value: '7',          color: '#A855F7' },
                   ].map(card => (
-                    <View key={card.label} className="w-1/2 px-1.5 mb-3">
+                    <View key={card.label} className={isMobile ? "w-full mb-3" : "w-1/2 px-1.5 mb-3"}>
                       <View className="p-4 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
                         <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.9)', fontSize: 10, letterSpacing: 1.2, fontWeight: '700', marginBottom: 6 }]}>{card.label}</Text>
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: card.color, fontWeight: '800', fontSize: 22 }]}>{card.value}</Text>
+                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: card.color, fontWeight: '800', fontSize: isMobile ? 18 : 22 }]}>{card.value}</Text>
                       </View>
                     </View>
                   ))}
@@ -443,8 +445,8 @@ export default function LandingPage() {
           <View className="max-w-5xl mx-auto flex-row flex-wrap justify-around">
             {[{ val: '95%', label: 'Model Accuracy (R²)' }, { val: '50K+', label: 'ML Training Samples' }, { val: '6', label: 'User Roles' }, { val: '99.9%', label: 'Platform Uptime' }].map(s => (
               <View key={s.label} className="items-center px-4 mb-6">
-                <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 44 }]}>{s.val}</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-100 text-sm font-medium mt-1 tracking-wide">{s.label}</Text>
+                <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 32 : 44 }]}>{s.val}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-100 text-sm font-medium mt-1 tracking-wide text-center">{s.label}</Text>
               </View>
             ))}
           </View>
@@ -490,7 +492,7 @@ export default function LandingPage() {
           onLayout={e => setCountersY(e.nativeEvent.layout.y)}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
-              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 40, lineHeight: 50 }]}>
+              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 28 : 40, lineHeight: isMobile ? 36 : 50 }]}>
                 Our Achievements in <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Numbers</Text>
               </Text>
             </View>
@@ -520,7 +522,7 @@ export default function LandingPage() {
           <View className="max-w-5xl mx-auto">
             <View className="items-center mb-14">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Simple Setup</Text>
-              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 40 }]}>Get Started in Minutes</Text>
+              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 32 : 40 }]}>Get Started in Minutes</Text>
             </View>
             <View className="flex-row flex-wrap -mx-4">
               {[
@@ -529,7 +531,7 @@ export default function LandingPage() {
                 { step: '03', title: 'Start Tracking Live',      desc: 'Add projects, assign milestones, log materials, use QR attendance, and get AI-powered LKR cost forecasts.' },
               ].map(s => (
                 <View key={s.step} className="w-full md:w-1/3 px-4 mb-10 md:mb-0 items-center">
-                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontWeight: '900', fontSize: 72, color: 'rgba(249,115,22,0.18)', lineHeight: 80, marginBottom: 16 }]}>{s.step}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontWeight: '900', fontSize: isMobile ? 56 : 72, color: 'rgba(249,115,22,0.18)', lineHeight: isMobile ? 64 : 80, marginBottom: 16 }]}>{s.step}</Text>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xl mb-3 text-center">{s.title}</Text>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 leading-relaxed text-center">{s.desc}</Text>
                 </View>
@@ -542,7 +544,7 @@ export default function LandingPage() {
         <View className="py-24 px-6 md:px-10" id="contact" onLayout={event => { sectionOffsets.current.contact = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.90)', backdropFilter: 'blur(8px)' }}>
           <View className="max-w-5xl mx-auto">
             <View className="items-center mb-14">
-              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 40, lineHeight: 50 }]}>
+              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 32 : 40, lineHeight: isMobile ? 40 : 50 }]}>
                 Talk to Our <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Sri Lanka Team</Text>
               </Text>
               <View className="w-20 h-1 bg-brand-orange mt-5 rounded-full" />

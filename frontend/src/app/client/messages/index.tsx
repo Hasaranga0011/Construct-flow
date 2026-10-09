@@ -41,7 +41,7 @@ export default function ClientMessagesPage() {
         if (projectIds.length > 0) {
           const { data, error: messageError } = await supabase
             .from('client_messages')
-            .select('id, project_id, message, created_at, sender_id, sender_role, receiver_role, receiver_id, read_at')
+            .select('id, project_id, message_text, created_at, sender_id, sender_role, receiver_role, receiver_id, read_at')
             .in('project_id', projectIds)
             .order('created_at', { ascending: false });
           if (messageError) throw messageError;
@@ -133,7 +133,7 @@ export default function ClientMessagesPage() {
               ((m.sender_role === 'client' && m.receiver_role === activeChannel) ||
                (m.sender_role === activeChannel && m.receiver_role === 'client'))
             );
-            const preview = message?.message || 'No messages yet';
+            const preview = message?.message_text || 'No messages yet';
             return (
               <Link key={project.id} href={`/client/messages/${project.id}?channel=${activeChannel}`} asChild>
                 <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-white rounded-2xl border border-gray-100 p-5 mb-3 flex-row items-center">

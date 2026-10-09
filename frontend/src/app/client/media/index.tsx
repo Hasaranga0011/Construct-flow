@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 
-type Photo = { id: string; project_id: string; url: string; caption?: string | null; category?: string | null; created_at: string };
+type Photo = { id: string; project_id: string; file_url: string; caption?: string | null; file_type?: string | null; uploaded_at: string };
 
 export default function ClientMediaPage() {
   const [loading, setLoading] = useState(true);
@@ -37,10 +37,10 @@ export default function ClientMediaPage() {
         const projectIds = (data || []).map(project => project.id);
         if (projectIds.length > 0) {
           const { data: photoData, error: photoError } = await supabase
-            .from('photos')
-            .select('id, project_id, url, caption, category, created_at')
+            .from('site_media')
+            .select('id, project_id, file_url, caption, file_type, uploaded_at')
             .in('project_id', projectIds)
-            .order('created_at', { ascending: false });
+            .order('uploaded_at', { ascending: false });
           if (photoError) throw photoError;
           if (isMounted) setPhotos((photoData || []) as Photo[]);
         }
@@ -106,10 +106,10 @@ export default function ClientMediaPage() {
                 <View className="flex-row flex-wrap gap-4">
                   {photos.filter(photo => photo.project_id === selectedProjectId).map(photo => (
                     <View key={photo.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full md:w-[31%]">
-                      <Image source={{ uri: photo.url }} className="w-full h-36 bg-gray-100" resizeMode="cover" />
+                      <Image source={{ uri: photo.file_url }} className="w-full h-36 bg-gray-100" resizeMode="cover" />
                       <View className="p-3">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm">{photo.caption || photo.category || 'Progress photo'}</Text>
-                        <View className="flex-row items-center mt-2"><Ionicons name="calendar-outline" size={12} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs ml-1">{new Date(photo.created_at).toLocaleDateString('en-GB')}</Text></View>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm">{photo.caption || photo.file_type || 'Progress photo'}</Text>
+                        <View className="flex-row items-center mt-2"><Ionicons name="calendar-outline" size={12} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs ml-1">{new Date(photo.uploaded_at).toLocaleDateString('en-GB')}</Text></View>
                       </View>
                     </View>
                   ))}

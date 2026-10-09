@@ -12,7 +12,7 @@ import { useAuth } from '../../../context/AuthContext';
 type Message = {
   id: string;
   project_id: string;
-  message?: string | null;
+  message_text?: string | null;
   sender_id: string;
   receiver_id: string;
   sender_role?: string | null;
@@ -96,7 +96,7 @@ export default function ClientMessagesThreadPage() {
         // Fetch messages for this channel (both directions).
         const msgRes = await supabase
           .from('client_messages')
-          .select('id, project_id, message, sender_id, receiver_id, sender_role, receiver_role, created_at')
+          .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
           .eq('project_id', threadId)
           .or(
             `and(sender_role.eq.client,receiver_role.eq.${activeChannel}),` +
@@ -164,10 +164,10 @@ export default function ClientMessagesThreadPage() {
           receiver_id: receiverId,
           sender_role: 'client',
           receiver_role: activeChannel,
-          message: trimmed,
+          message_text: trimmed,
           is_read: false,
         })
-        .select('id, project_id, message, sender_id, receiver_id, sender_role, receiver_role, created_at')
+        .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
         .single();
       if (sendError) throw sendError;
       if (data) {
@@ -232,7 +232,7 @@ export default function ClientMessagesThreadPage() {
           </View>
         ) : messages.map(message => {
           const isSender = message.sender_id === user?.id;
-          const text = message.message;
+          const text = message.message_text;
           return (
             <View key={message.id} className={`mb-4 ${isSender ? 'self-end' : 'self-start'} max-w-[80%]`}>
               <View className={`p-3 rounded-2xl ${isSender ? 'bg-brand-orange rounded-tr-sm' : 'bg-white rounded-tl-sm shadow-sm border border-gray-100'}`}>
