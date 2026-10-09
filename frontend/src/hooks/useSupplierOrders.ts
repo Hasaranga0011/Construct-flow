@@ -98,7 +98,7 @@ export function matchesSupplierSearch(o: SupplierOrder, query: string) {
   );
 }
 
-/** Suggestions for GlobalSearchDropdown's local mode, built only from this supplier's orders. */
+/** Suggestions for SearchInput's local mode, built only from this supplier's orders. */
 export function buildOrderSuggestions(orders: SupplierOrder[], query: string) {
   return orders
     .filter(o => matchesSupplierSearch(o, query))

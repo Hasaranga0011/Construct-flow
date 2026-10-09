@@ -175,10 +175,10 @@ export default function ClientDashboardPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Client Dashboard" showAction={false} />
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <View className="mb-6">
-          <Text className="text-2xl font-bold text-brand-text">Your Projects</Text>
-          <Text className="text-gray-500 mt-1">Live progress, budget, and milestone updates.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Your Projects</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">Live progress, budget, and milestone updates.</Text>
         </View>
 
         {loading ? (
@@ -194,40 +194,40 @@ export default function ClientDashboardPage() {
         ) : error ? (
           <View className="bg-red-50 border border-red-200 rounded-2xl p-6 items-center">
             <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
-            <Text className="text-red-700 font-semibold text-center mt-3">{error}</Text>
-            <Pressable onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4">
-              <Text className="text-white font-bold">Retry</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 font-semibold text-center mt-3">{error}</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Retry</Text>
             </Pressable>
           </View>
         ) : projects.length === 0 ? (
           <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center">
             <Ionicons name="business-outline" size={48} color="#D1D5DB" />
-            <Text className="text-gray-700 font-bold text-lg mt-4">No projects assigned yet</Text>
-            <Text className="text-gray-500 text-center mt-2">Your project information will appear here once an administrator assigns a project to your account.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-lg mt-4">No projects assigned yet</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-2">Your project information will appear here once an administrator assigns a project to your account.</Text>
           </View>
         ) : (
           <>
             <View className="flex-row flex-wrap gap-4 mb-6">
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text className="text-gray-500 text-xs font-semibold uppercase">Projects</Text>
-                <Text className="text-3xl font-bold text-brand-text mt-2">{projects.length}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Projects</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-text mt-2">{projects.length}</Text>
               </View>
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text className="text-gray-500 text-xs font-semibold uppercase">Progress</Text>
-                <Text className="text-3xl font-bold text-brand-orange mt-2">{averageProgress}%</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Progress</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange mt-2">{averageProgress}%</Text>
               </View>
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text className="text-gray-500 text-xs font-semibold uppercase">Budget</Text>
-                <Text className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalBudget)}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Budget</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalBudget)}</Text>
               </View>
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text className="text-gray-500 text-xs font-semibold uppercase">Spent</Text>
-                <Text className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalSpent)}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Spent</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalSpent)}</Text>
               </View>
             </View>
 
             <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-              <Text className="text-lg font-bold text-brand-text mb-4">Project Progress</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4">Project Progress</Text>
               {projects.map(project => {
                 const projectMilestones = milestones.filter(milestone => milestone.project_id === project.id);
                 const projectProgress = Number(project.completion_percentage || 0);
@@ -235,8 +235,8 @@ export default function ClientDashboardPage() {
                   <View key={project.id} className="border-b border-gray-100 py-4 last:border-b-0">
                     <View className="flex-row justify-between items-center">
                       <View className="flex-1 pr-4">
-                        <Text className="text-brand-text font-bold">{project.name}</Text>
-                        <Text className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{project.name}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
                       </View>
                       <ClientBudgetRing 
                         spent={spentCosts[project.id] || 0} 
@@ -246,16 +246,16 @@ export default function ClientDashboardPage() {
                     <View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
                       <View className={`h-full bg-brand-orange rounded-full ${getProgressWidthClass(projectProgress)}`} />
                     </View>
-                    <Text className="text-gray-400 text-xs mt-2">{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'} · Target end {formatDate(project.end_date)}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-2">{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'} · Target end {formatDate(project.end_date)}</Text>
                   </View>
                 );
               })}
             </View>
 
             <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-              <Text className="text-lg font-bold text-brand-text mb-4">Milestone Summary</Text>
-              <Text className="text-gray-600">{completedMilestones} of {milestones.length} milestones completed.</Text>
-              {milestones.length === 0 && <Text className="text-gray-400 mt-3">No milestones have been created for your projects yet.</Text>}
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4">Milestone Summary</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">{completedMilestones} of {milestones.length} milestones completed.</Text>
+              {milestones.length === 0 && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-3">No milestones have been created for your projects yet.</Text>}
             </View>
           </>
         )}

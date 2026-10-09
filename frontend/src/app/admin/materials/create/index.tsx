@@ -70,23 +70,23 @@
 			 <TopNav title="Create Material" showAction={false} />
 			 <ScrollView className="flex-1 p-6" keyboardShouldPersistTaps="handled">
 				 <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 max-w-2xl w-full mx-auto">
-					 <Text className="text-xl font-bold text-brand-text mb-6">Material details</Text>
-					 {error && <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5"><Text className="text-red-700">{error}</Text></View>}
+					 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mb-6">Material details</Text>
+					 {error && <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{error}</Text></View>}
 					 {loading ? <View className="py-12 items-center"><ActivityIndicator color="#F97316" /></View> : <>
-						 <Text className="text-sm font-semibold text-gray-700 mb-2">Material name *</Text>
-						 <TextInput value={name} onChangeText={setName} placeholder="Cement" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" />
-						 <Text className="text-sm font-semibold text-gray-700 mb-2">Unit *</Text>
-						 <TextInput value={unit} onChangeText={setUnit} placeholder="bags" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" />
-						 <Text className="text-sm font-semibold text-gray-700 mb-2">Project *</Text>
-						 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-							 {projects.map(project => <Pressable key={project.id} onPress={() => setProjectId(project.id)} className={`px-4 py-2 rounded-full border mr-2 ${projectId === project.id ? 'bg-brand-orange border-brand-orange' : 'bg-white border-gray-300'}`}><Text className={projectId === project.id ? 'text-white font-bold' : 'text-gray-600'}>{project.name}</Text></Pressable>)}
+						 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Material name *</Text>
+						 <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={name} onChangeText={setName} placeholder="Cement" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" />
+						 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Unit *</Text>
+						 <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={unit} onChangeText={setUnit} placeholder="bags" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" />
+						 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Project *</Text>
+						 <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+							 {projects.map(project => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={project.id} onPress={() => setProjectId(project.id)} className={`px-4 py-2 rounded-full border mr-2 ${projectId === project.id ? 'bg-brand-orange border-brand-orange' : 'bg-white border-gray-300'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={projectId === project.id ? 'text-white font-bold' : 'text-gray-600'}>{project.name}</Text></Pressable>)}
 						 </ScrollView>
-						 {projects.length === 0 && <Text className="text-gray-500 mb-4">No projects are available for assignment.</Text>}
+						 {projects.length === 0 && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4">No projects are available for assignment.</Text>}
 						 <View className="flex-row gap-4">
-							 <View className="flex-1"><Text className="text-sm font-semibold text-gray-700 mb-2">Quantity *</Text><TextInput value={quantity} onChangeText={setQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
-							 <View className="flex-1"><Text className="text-sm font-semibold text-gray-700 mb-2">Minimum *</Text><TextInput value={minQuantity} onChangeText={setMinQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
+							 <View className="flex-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Quantity *</Text><TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={quantity} onChangeText={setQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
+							 <View className="flex-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Minimum *</Text><TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={minQuantity} onChangeText={setMinQuantity} keyboardType="numeric" placeholder="0" className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" /></View>
 						 </View>
-						 <Pressable onPress={handleSubmit} disabled={submitting} className={`mt-6 rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}><Text className="text-white font-bold">{submitting ? 'Saving...' : 'Create material'}</Text></Pressable>
+						 <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={handleSubmit} disabled={submitting} className={`mt-6 rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">{submitting ? 'Saving...' : 'Create material'}</Text></Pressable>
 					 </>}
 				 </View>
 			 </ScrollView>

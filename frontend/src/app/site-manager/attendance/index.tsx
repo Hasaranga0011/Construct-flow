@@ -1,5 +1,12 @@
+import { ScannerModal } from '@/components/worker/ScannerModal';
+import { RecordCard } from '@/components/common/RecordCard';
+import { useResponsive } from '@/hooks/useResponsive';
+import { api } from '@/services/api';
+import { dataError, assignedWorkers, projectSites } from '@/services/siteData';
+import { ModalViewport } from '@/components/common/ModalViewport';
+import { notify } from '@/utils/notify';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +14,7 @@ import { QRScanner } from '@/components/worker/QRScanner';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
+import { FilterChipGrid } from '@/components/common/FilterChipGrid';
 
 type AttendanceRecord = {
   id: string;
@@ -29,8 +37,10 @@ type ScanResult = {
 };
 
 export default function SMAttendancePage() {
+  const { isMobile } = useResponsive();
   const { user } = useAuth();
-  const { assignedProjectIds, siteAssignmentIds, assignments, loading: sitesLoading } = useAssignedSites(user?.id);
+  const [loadError, setLoadError] = useState('');
+  const { assignedProjectIds, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
   
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
@@ -48,68 +58,61 @@ export default function SMAttendancePage() {
   const [manualSubmitting, setManualSubmitting] = useState(false);
   
   const isMounted = useRef(true);
+  const requestVersion = useRef(0);
 
   const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
   const fetchAttendanceData = useCallback(async (skipLoadingState = false) => {
+    const version = ++requestVersion.current;
     try {
       if (!skipLoadingState) setLoading(true);
+      setLoadError('');
       if (!user?.id || sitesLoading || !isMounted.current) return;
 
-      const siteMap = Object.fromEntries(
-        assignments.map((a: any) => [a.projectId, a.assignmentId]),
-      );
-      if (isMounted.current) setSiteByProject(siteMap);
+      const actualSites = await projectSites(assignedProjectIds);
+      const siteMap: Record<string, string> = {};
+      actualSites.forEach(s => { if (!siteMap[s.project_id]) siteMap[s.project_id] = s.id; });
+      if (isMounted.current && version === requestVersion.current) setSiteByProject(siteMap);
 
-      const { data: projectsData } = assignedProjectIds.length
-        ? await supabase.from('projects').select('id, name, location').in('id', assignedProjectIds).eq('status', 'active')
-        : { data: [] };
+      const { data: projectsData, error: projectsDataError } = assignedProjectIds.length
+        ? await supabase.from('projects').select('id, name, location').in('id', assignedProjectIds)
+        : { data: [], error: null };
+      if (projectsDataError) throw projectsDataError;
 
       const parsedProjects = projectsData || [];
-      if (isMounted.current) setProjects(parsedProjects);
+      if (isMounted.current && version === requestVersion.current) setProjects(parsedProjects);
 
       if (parsedProjects.length > 0) {
-        const currentProject = activeProjectId || parsedProjects[0].id;
-        if (!activeProjectId && isMounted.current) setActiveProjectId(currentProject);
+        const currentProject = parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId! : parsedProjects[0].id;
+        if (activeProjectId !== currentProject && isMounted.current) setActiveProjectId(currentProject);
 
         const siteId = siteMap[currentProject];
-        if (!siteId) return;
+        if (!siteId) { setProjectWorkers([]); setTodayAttendance([]); throw new Error('This project has no attendance site. Ask an administrator to link a site to the project.'); }
 
-        // 2. Fetch today's attendance from canonical attendance table (not legacy labour)
+        // attendance.site_id references the physical sites table.
         const todayStr = getTodayDateString();
-        const { data: attData } = await supabase
+        const { data: attData, error: attDataError } = await supabase
           .from('attendance')
-          .select('id, worker_id, site_id, date, status, check_in_time, check_out_time, hours_worked')
+          .select('id, worker_id, site_id, date, check_in_time, check_out_time, hours_worked')
           .eq('site_id', siteId)
           .eq('date', todayStr);
+      if (attDataError) throw attDataError;
 
-        if (isMounted.current) setTodayAttendance((attData || []) as AttendanceRecord[]);
+        if (isMounted.current && version === requestVersion.current) setTodayAttendance((attData || []) as AttendanceRecord[]);
 
-        // 3. Fetch workers assigned to this project's site via site_workers
-        const { data: siteWorkers } = await supabase
-          .from('site_workers')
-          .select('worker_id, profiles!inner(id, full_name, qr_code, avatar_url)')
-          .eq('project_id', currentProject);
+        const rows = await assignedWorkers([currentProject]);
+        if (isMounted.current && version === requestVersion.current) setProjectWorkers(rows.filter(row => row.workerRecordId).map(row => ({
+          id: row.workerRecordId!, full_name: row.profiles?.full_name || 'Worker',
+          qr_code: row.profiles?.qr_code || null, avatar_url: row.profiles?.avatar_url,
+        })));
 
-        if (isMounted.current) {
-          const workerProfiles: WorkerProfile[] = (siteWorkers || []).map((sw: any) => {
-            const profile = Array.isArray(sw.profiles) ? sw.profiles[0] : sw.profiles;
-            return {
-              id: sw.worker_id,
-              full_name: profile?.full_name || null,
-              qr_code: profile?.qr_code || null,
-              avatar_url: profile?.avatar_url || null,
-            };
-          });
-          setProjectWorkers(workerProfiles);
-        }
       }
     } catch (error: any) {
-      console.error('Error fetching attendance data', error);
+      if (version === requestVersion.current) setLoadError(dataError(error));
     } finally {
-      if (isMounted.current && !skipLoadingState) setLoading(false);
+      if (isMounted.current && version === requestVersion.current && !skipLoadingState) setLoading(false);
     }
-  }, [user?.id, sitesLoading, assignedProjectIds, assignments, activeProjectId]);
+  }, [user?.id, sitesLoading, assignedProjectIds, activeProjectId]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -143,46 +146,30 @@ export default function SMAttendancePage() {
       if (Platform.OS === 'web') {
         window.alert('No active site assignment was found for this project.');
       } else {
-        Alert.alert('Site unavailable', 'No active site assignment was found for this project.');
+        notify('Site unavailable', 'No active site assignment was found for this project.');
       }
       return;
     }
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/labour/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ qr_code: qrCode, site_id: siteId }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.detail || 'Scan failed');
-      }
+      const result = await api.labour.scan({ qr_code: qrCode, site_id: activeProjectId });
 
       // Show scan result card instead of just an alert
       setScanResult(result as ScanResult);
       if (isScanning) setIsScanning(false);
-      // Attendance list will update via Realtime subscription above
+      await fetchAttendanceData(true);
     } catch (error: any) {
       if (Platform.OS === 'web') {
         window.alert(`Scan failed: ${error.message}`);
       } else {
-        Alert.alert('Scan Error', error.message);
+        notify('Scan Error', error.message);
       }
     }
   };
 
   const handleManualCheckIn = async () => {
-    if (!manualWorkerId || !activeProjectId) return;
-    const siteId = siteByProject[activeProjectId];
-    if (!siteId) return;
+    if (manualSubmitting || !manualWorkerId || !activeProjectId) return;
+    const attendanceSiteId = siteByProject[activeProjectId];
+    if (!attendanceSiteId) { notify('Site unavailable', 'This project needs a linked attendance site.'); return; }
 
     setManualSubmitting(true);
     try {
@@ -192,34 +179,41 @@ export default function SMAttendancePage() {
       const now = new Date();
       const timeStr = now.toISOString();
 
-      if (existing && !existing.check_out_time) {
+      if (existing?.check_out_time) {
+        notify('Attendance complete', 'This worker has already checked out today.');
+        return;
+      }
+      if (existing?.check_in_time && !existing.check_out_time) {
         // Check out
         const { error } = await supabase
           .from('attendance')
-          .update({ check_out_time: timeStr })
-          .eq('id', existing.id);
+          .update({ check_out_time: timeStr, hours_worked: Math.max(0, Math.round((now.getTime() - new Date(existing.check_in_time!).getTime()) / 36000) / 100) })
+          .eq('id', existing.id).eq('site_id', attendanceSiteId).is('check_out_time', null).select('id').single();
         if (error) throw error;
         toast('Checked out successfully');
-      } else if (!existing) {
+      } else if (existing) {
+        const result = await supabase.from('attendance').update({ check_in_time: timeStr }).eq('id', existing.id).select('id').single();
+        if (result.error) throw result.error;
+        toast('Checked in successfully');
+      } else {
         // Check in
         const { error } = await supabase
           .from('attendance')
           .insert({
             worker_id: manualWorkerId,
-            site_id: siteId,
+            site_id: attendanceSiteId,
             date: todayStr,
-            status: 'Present',
             check_in_time: timeStr
-          });
+          }).select('id').single();
         if (error) throw error;
         toast('Checked in successfully');
       }
       
       setShowManualModal(false);
       setManualWorkerId(null);
-      // Realtime will update the list
+      await fetchAttendanceData(true);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      notify('Error', e.message);
     } finally {
       setManualSubmitting(false);
     }
@@ -232,12 +226,13 @@ export default function SMAttendancePage() {
   // Helper for web alert
   const toast = (msg: string) => {
     if (Platform.OS === 'web') window.alert(msg);
-    else Alert.alert('Success', msg);
+    else notify('Success', msg);
   };
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav title="Daily Attendance" />
+      <TopNav title="Daily Attendance" actionLabel="Refresh" onActionPress={() => { fetchAttendanceData(); } } />
+      {loadError || assignmentError ? <View className="bg-red-50 p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{loadError || assignmentError}</Text><Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} accessibilityRole="button" onPress={refreshAssignments} className="text-brand-orange font-bold mt-2">Reload site assignments</Text></View> : null}
 
       {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
@@ -250,14 +245,14 @@ export default function SMAttendancePage() {
             <>
               {/* Project Selector Tabs */}
               <View className="bg-white px-6 pt-4 border-b border-gray-200">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                   {projects.map(project => (
-                    <Pressable
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       key={project.id}
-                      onPress={() => setActiveProjectId(project.id)}
+                      onPress={() => { setManualWorkerId(null); setTodayAttendance([]); setProjectWorkers([]); setActiveProjectId(project.id); }}
                       className={`mr-6 pb-3 border-b-2 ${activeProjectId === project.id ? 'border-brand-orange' : 'border-transparent'}`}
                     >
-                      <Text className={`font-bold text-base ${activeProjectId === project.id ? 'text-brand-orange' : 'text-gray-500'}`}>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold text-base ${activeProjectId === project.id ? 'text-brand-orange' : 'text-gray-500'}`}>
                         {project.name}
                       </Text>
                     </Pressable>
@@ -265,7 +260,7 @@ export default function SMAttendancePage() {
                 </ScrollView>
               </View>
 
-              <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
+              <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-8" showsVerticalScrollIndicator={false}>
 
                 {/* Scan Result Card */}
                 {scanResult && (
@@ -278,60 +273,61 @@ export default function SMAttendancePage() {
                       />
                     </View>
                     <View className="flex-1">
-                      <Text className="font-bold text-brand-text">{scanResult.worker_name}</Text>
-                      <Text className="text-gray-500 text-sm">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{scanResult.worker_name}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">
                         {scanResult.action === 'check_in' ? 'Checked In' : `Checked Out · ${scanResult.hours_worked?.toFixed(1) || 0}h worked`}
                       </Text>
                     </View>
-                    <Pressable onPress={() => setScanResult(null)} className="p-2">
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setScanResult(null)} className="p-2">
                       <Ionicons name="close" size={18} color="#9CA3AF" />
                     </Pressable>
                   </View>
                 )}
 
-                <View className="flex-row justify-between items-center mb-6">
+                <View className="flex-row flex-wrap gap-4 justify-between items-center mb-6">
                   <View>
-                    <Text className="text-2xl font-bold text-gray-800">Today&apos;s Attendance</Text>
-                    <Text className="text-gray-500">{new Date().toDateString()}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800">Today&apos;s Attendance</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{new Date().toDateString()}</Text>
                   </View>
 
-                  <View className="flex-row gap-3">
-                    <Pressable
+                  <View className="flex-row flex-wrap gap-3">
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       onPress={() => setShowManualModal(true)}
                       className="bg-white border border-gray-200 px-5 py-3 rounded-xl flex-row items-center shadow-sm"
                     >
                       <Ionicons name="create-outline" size={20} color="#4B5563" style={{ marginRight: 8 }} />
-                      <Text className="text-gray-700 font-bold text-base">Manual</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-base">Manual</Text>
                     </Pressable>
-                    <Pressable
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       onPress={() => setIsScanning(true)}
                       className="bg-brand-orange px-5 py-3 rounded-xl flex-row items-center shadow-sm"
                     >
                       <Ionicons name="qr-code-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                      <Text className="text-white font-bold text-base">Scan QR</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Scan QR</Text>
                     </Pressable>
                   </View>
                 </View>
 
                 <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <View className="flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
-                    <Text className="flex-1 text-xs font-bold text-gray-500 uppercase">Worker</Text>
-                    <Text className="w-[22%] text-xs font-bold text-gray-500 uppercase">Status</Text>
-                    <Text className="w-[22%] text-xs font-bold text-gray-500 uppercase text-right">Hours</Text>
+                  <View className="hidden lg:flex flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Worker</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-bold text-gray-500 uppercase">Status</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-bold text-gray-500 uppercase text-right">Hours</Text>
                   </View>
 
                   {projectWorkers.length === 0 ? (
                     <View className="p-10 items-center justify-center">
                       <Ionicons name="people-outline" size={48} color="#E5E7EB" />
-                      <Text className="text-gray-400 mt-4 font-medium">No workers assigned to this site yet.</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4 font-medium">No workers assigned to this site yet.</Text>
                     </View>
                   ) : (
                     projectWorkers.map((worker) => {
                       const attRecord = getAttendanceForWorker(worker.id);
-                      const status = attRecord?.status || 'Pending';
+                      const status = attRecord?.check_in_time ? 'Present' : 'Pending';
                       const hours = attRecord?.hours_worked;
                       const checkedIn = attRecord?.check_in_time && !attRecord?.check_out_time;
 
+                      if (isMobile) return <RecordCard key={worker.id} title={worker.full_name || 'Unknown Worker'} fields={[{ label: 'Status', value: checkedIn ? 'Present - active' : status }, { label: 'Hours', value: hours == null ? 'Not recorded' : `${Number(hours).toFixed(1)}h` }]} action={{ label: checkedIn ? 'Check out' : 'Mark attendance', disabled: !!attRecord?.check_out_time, onPress: () => { setManualWorkerId(worker.id); setShowManualModal(true); } }} />;
                       return (
                         <View key={worker.id} className="flex-row items-center py-4 px-6 border-b border-gray-50">
                           <View className="flex-1 flex-row items-center">
@@ -339,9 +335,9 @@ export default function SMAttendancePage() {
                               <Ionicons name="person" size={14} color="#3B82F6" />
                             </View>
                             <View>
-                              <Text className="font-bold text-gray-800">{worker.full_name || 'Unknown Worker'}</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">{worker.full_name || 'Unknown Worker'}</Text>
                               {checkedIn && (
-                                <Text className="text-xs text-green-600">
+                                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-green-600">
                                   In: {new Date(attRecord!.check_in_time!).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' })}
                                 </Text>
                               )}
@@ -350,21 +346,21 @@ export default function SMAttendancePage() {
 
                           <View className="w-[22%]">
                             {status === 'Pending' ? (
-                              <Text className="text-gray-400 font-semibold italic text-sm">Pending</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 font-semibold italic text-sm">Pending</Text>
                             ) : status === 'Present' ? (
-                              <Text className="text-green-600 font-bold bg-green-100 px-2 py-1 rounded self-start text-xs">Present</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-600 font-bold bg-green-100 px-2 py-1 rounded self-start text-xs">Present</Text>
                             ) : (
-                              <Text className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded self-start text-xs">Absent</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded self-start text-xs">Absent</Text>
                             )}
                           </View>
 
                           <View className="w-[22%] items-end">
                             {hours != null ? (
-                              <Text className="text-brand-text font-bold text-sm">{hours.toFixed(1)}h</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{hours.toFixed(1)}h</Text>
                             ) : checkedIn ? (
-                              <Text className="text-brand-orange text-xs font-semibold">Active</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-semibold">Active</Text>
                             ) : (
-                              <Text className="text-gray-300 text-sm">—</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 text-sm">—</Text>
                             )}
                           </View>
                         </View>
@@ -379,52 +375,56 @@ export default function SMAttendancePage() {
 
       {/* Manual Check-in Modal */}
       {showManualModal && (
-        <View className="absolute inset-0 bg-black/50 items-center justify-center p-4 z-50">
-          <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl font-bold text-brand-text">Manual Attendance</Text>
-              <Pressable onPress={() => setShowManualModal(false)}>
+        <Modal transparent animationType="fade" onRequestClose={() => !manualSubmitting && setShowManualModal(false)}>
+        <ModalViewport>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white w-full max-w-md rounded-2xl shadow-xl">
+            <View className="flex-row flex-wrap gap-4 justify-between items-center mb-6">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">Manual Attendance</Text>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setShowManualModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </Pressable>
             </View>
 
             <View className="mb-6">
-              <Text className="text-sm font-semibold text-gray-700 mb-2">Select Worker</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 pb-2">
-                {projectWorkers.map(w => {
-                  const att = getAttendanceForWorker(w.id);
-                  const isCheckedIn = att?.check_in_time && !att?.check_out_time;
-                  return (
-                    <Pressable
-                      key={w.id}
-                      onPress={() => setManualWorkerId(w.id)}
-                      className={`px-4 py-3 rounded-xl border ${manualWorkerId === w.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
-                    >
-                      <Text className={`text-sm font-semibold ${manualWorkerId === w.id ? 'text-white' : 'text-gray-600'}`}>
-                        {w.full_name || 'Unknown'} {isCheckedIn ? '(Active)' : ''}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Select Worker</Text>
+              {projectWorkers.length > 0 ? (
+                <FilterChipGrid
+                  options={projectWorkers.map(w => {
+                    const att = getAttendanceForWorker(w.id);
+                    const isCheckedIn = att?.check_in_time && !att?.check_out_time;
+                    let label = w.full_name || 'Unknown';
+                    if (att?.check_out_time) label += ' (Completed)';
+                    else if (isCheckedIn) label += ' (Active)';
+                    return { id: w.id, label };
+                  })}
+                  selectedValue={manualWorkerId || ''}
+                  onSelect={(id) => {
+                    const att = getAttendanceForWorker(id);
+                    if (!att?.check_out_time) setManualWorkerId(id);
+                  }}
+                />
+              ) : (
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">No active workers found.</Text>
+              )}
             </View>
 
-            <Pressable
+            <Pressable style={{ minHeight: 44, minWidth: 44 }}
               onPress={handleManualCheckIn}
               disabled={!manualWorkerId || manualSubmitting}
               className={`w-full py-4 rounded-xl items-center justify-center ${!manualWorkerId ? 'bg-gray-300' : 'bg-brand-orange'}`}
             >
               {manualSubmitting ? <ActivityIndicator color="white" /> : (
-                <Text className="text-white font-bold text-base">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">
                   {manualWorkerId && getAttendanceForWorker(manualWorkerId)?.check_in_time && !getAttendanceForWorker(manualWorkerId)?.check_out_time ? 'Check Out' : 'Check In'}
                 </Text>
               )}
             </Pressable>
-          </View>
-        </View>
+          </ScrollView>
+        </ModalViewport>
+        </Modal>
       )}
 
-      {isScanning && <QRScanner onScan={markAttendance} onClose={() => setIsScanning(false)} />}
+      <ScannerModal visible={isScanning} onScan={markAttendance} onClose={() => setIsScanning(false)} />
 
     </View>
   );

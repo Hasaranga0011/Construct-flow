@@ -5,9 +5,10 @@ import string
 import resend
 from core.config import settings
 from ..models import ClientCreate, ClientResponse
+from core.notification_helper import create_notifications, create_notification
 from core.database import get_auth_client
 from supabase import create_client as new_supabase_client, ClientOptions
-from core.security import require_manager_or_admin
+from core.security import require_manager_or_admin, require_admin
 
 router = APIRouter(
     prefix="/clients",
@@ -54,7 +55,8 @@ class InviteClientRequest(BaseModel):
 @router.post("/invite")
 def invite_client(req: InviteClientRequest, request: Request):
     try:
-        from core.database import get_auth_client
+        from core.notification_helper import create_notifications, create_notification
+from core.database import get_auth_client
         # We need an auth client to ensure the person inviting is authenticated
         admin_client = get_auth_client(request)
         
@@ -88,16 +90,16 @@ def invite_client(req: InviteClientRequest, request: Request):
             "action": f"Client {req.name} was invited",
             "project_id": req.project_id,
             "client_id": new_user_id
-        }).execute()
+        }])
         
         # 5b. Notify the client
-        admin_client.table("notifications").insert({
+        create_notifications([{
             "user_id": new_user_id,
             "title": "Welcome to ConstructFlow",
             "message": f"You have been invited to ConstructFlow. Your account is ready.",
             "type": "general",
             "project_id": req.project_id
-        }).execute()
+        }])
         
         # 6. Send Email using Resend
         if settings.RESEND_API_KEY:
@@ -122,7 +124,7 @@ class ClientUpdateRequest(BaseModel):
     name: Optional[str] = None
     company: Optional[str] = None
 
-@router.put("/{client_id}")
+@router.put("/{client_id}", dependencies=[Depends(require_admin)])
 def update_client(client_id: str, req: ClientUpdateRequest, request: Request):
     try:
         # Use service role to bypass RLS and broken RPCs
@@ -143,7 +145,7 @@ def update_client(client_id: str, req: ClientUpdateRequest, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/{client_id}")
+@router.delete("/{client_id}", dependencies=[Depends(require_admin)])
 def delete_client(client_id: str, request: Request):
     try:
         # Use service role to completely delete user from auth and profiles

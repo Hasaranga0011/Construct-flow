@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from typing import List, Optional
 from ..models import MaterialCreate, MaterialResponse
+from core.notification_helper import create_notifications, create_notification
 from core.database import get_auth_client, client_for_token
 from core.security import require_manager_or_admin
 
@@ -61,7 +62,7 @@ def check_stock(supabase):
                 # PMs might also care, but sticking to admin for simplicity
                 
         if notifications:
-            supabase.table("notifications").insert(notifications).execute()
+            create_notifications(notifications)
             
         return {"checked": len(res.data), "alerts_sent": len(notifications)}
     except HTTPException:

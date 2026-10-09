@@ -34,8 +34,10 @@ const ExpoSecureStoreAdapter = {
   },
 };
 
+import { Database } from './database.types';
+
 // Keep the same client API during SSR, without browser session work.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: !isWebServer,

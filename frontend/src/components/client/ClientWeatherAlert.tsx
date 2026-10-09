@@ -9,8 +9,8 @@ export const ClientWeatherAlert = () => {
         <Ionicons name="rainy" size={20} color="#3B82F6" />
       </View>
       <View className="flex-1">
-        <Text className="font-bold text-blue-900 mb-1">Weather Impact Alert</Text>
-        <Text className="text-blue-800 text-sm leading-tight">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-blue-900 mb-1">Weather Impact Alert</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-blue-800 text-sm leading-tight">
           Heavy rain expected this week. Potential 2-day delay for exterior painting and landscaping works.
         </Text>
       </View>

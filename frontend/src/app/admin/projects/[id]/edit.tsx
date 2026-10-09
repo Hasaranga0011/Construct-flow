@@ -1,3 +1,4 @@
+import { getApiUrl } from '../../../../lib/apiUrl';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,14 +11,14 @@ export default function AdminProjectEditPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   const [pms, setPms] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [siteManagers, setSiteManagers] = useState<any[]>([]);
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -48,7 +49,7 @@ export default function AdminProjectEditPage() {
           supabase.from('pm_projects').select('pm_id').eq('project_id', projectId),
           supabase.from('project_role_assignments').select('user_id, role').eq('project_id', projectId)
         ]);
-          
+
         if (projRes.error) throw projRes.error;
         const data = projRes.data;
         const assignmentByRole: Record<string, string[]> = { admin: [], site_manager: [], worker: [], supplier: [] };
@@ -57,14 +58,14 @@ export default function AdminProjectEditPage() {
           if (!assignmentByRole[role]) assignmentByRole[role] = [];
           assignmentByRole[role].push(assignment.user_id);
         }
-        
+
         if (pmData.data) setPms(pmData.data);
         if (clientData.data) setClients(clientData.data);
         if (smData.data) setSiteManagers(smData.data);
         if (workerData.data) setAvailableWorkers(workerData.data);
         if (supplierData.data) setSuppliers(supplierData.data);
         if (adminData.data) setAdmins(adminData.data);
-        
+
         setFormData({
           name: data.name || '',
           location: data.location || '',
@@ -84,7 +85,7 @@ export default function AdminProjectEditPage() {
         setLoading(false);
       }
     };
-    
+
     if (projectId) fetchData();
   }, [projectId]);
 
@@ -93,7 +94,7 @@ export default function AdminProjectEditPage() {
       Alert.alert("Error", "Project name is required");
       return;
     }
-    
+
     setSaving(true);
     try {
       const payload = {
@@ -109,8 +110,8 @@ export default function AdminProjectEditPage() {
         , suppliers: formData.suppliers
         , admins: formData.admins
       };
-      
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/projects/${projectId}`, {
+
+      const response = await fetch(`${getApiUrl()}/projects/${projectId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -118,12 +119,12 @@ export default function AdminProjectEditPage() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || 'Failed to update project');
       }
-      
+
       Alert.alert('Success', "Project updated successfully!");
       router.push(`/admin/projects/${projectId}`);
     } catch (err: any) {
@@ -136,28 +137,28 @@ export default function AdminProjectEditPage() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-brand-light">
       <TopNav title="Edit Project" showAction={false} />
-      
-      <ScrollView className="flex-1 p-6">
+
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6">
         {loading ? (
           <ActivityIndicator size="large" color="#F97316" />
         ) : (
           <View className="max-w-2xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <Text className="text-2xl font-bold text-gray-800 mb-6">Update Project Details</Text>
-            
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800 mb-6">Update Project Details</Text>
+
             <View className="mb-4">
-              <Text className="text-sm font-bold text-gray-600 mb-1">Project Name</Text>
-              <TextInput 
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-1">Project Name</Text>
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
                 value={formData.name}
                 onChangeText={(t) => setFormData({...formData, name: t})}
                 placeholder="Enter project name"
               />
             </View>
-            
+
             <View className="flex-row space-x-4 mb-4">
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-600 mb-1">Location</Text>
-                <TextInput 
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-1">Location</Text>
+                <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                   className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
                   value={formData.location}
                   onChangeText={(t) => setFormData({...formData, location: t})}
@@ -165,8 +166,8 @@ export default function AdminProjectEditPage() {
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-600 mb-1">Budget (Rs.)</Text>
-                <TextInput 
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-1">Budget (Rs.)</Text>
+                <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                   className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
                   value={formData.total_budget}
                   onChangeText={(t) => setFormData({...formData, total_budget: t})}
@@ -177,8 +178,8 @@ export default function AdminProjectEditPage() {
             </View>
 
             <View className="mb-4">
-              <Text className="text-sm font-bold text-gray-600 mb-1">Address</Text>
-              <TextInput 
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-1">Address</Text>
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
                 value={formData.address}
                 onChangeText={(t) => setFormData({...formData, address: t})}
@@ -186,23 +187,23 @@ export default function AdminProjectEditPage() {
                 multiline
               />
             </View>
-            
+
             <View className="mb-8">
-              <Text className="text-sm font-bold text-gray-600 mb-2">Status</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-2">Status</Text>
               <View className="flex-row flex-wrap">
                 {['Planning', 'Active', 'Completed', 'On Hold'].map(status => (
-                  <TouchableOpacity 
+                  <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
                     key={status}
                     onPress={() => setFormData({...formData, status})}
                     className={`px-4 py-2 rounded-full mr-2 mb-2 ${formData.status === status ? 'bg-blue-600' : 'bg-gray-100'}`}
                   >
-                    <Text className={formData.status === status ? 'text-white font-bold' : 'text-gray-600'}>{status}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={formData.status === status ? 'text-white font-bold' : 'text-gray-600'}>{status}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            <Text className="text-xl font-bold text-gray-800 mb-6 mt-4 border-t border-gray-100 pt-6">Assignments</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6 mt-4 border-t border-gray-100 pt-6">Assignments</Text>
             <ProjectAssignmentDropdown label="Assign Administrators" users={admins} multiple selectedIds={formData.admins} onChange={(admins) => setFormData({ ...formData, admins })} />
             <ProjectAssignmentDropdown label="Assign Project Manager" users={pms} selectedIds={formData.pm_id ? [formData.pm_id] : []} onChange={(ids) => setFormData({ ...formData, pm_id: ids[0] || '' })} />
             <ProjectAssignmentDropdown label="Assign Client" users={clients} selectedIds={formData.client_id ? [formData.client_id] : []} onChange={(ids) => setFormData({ ...formData, client_id: ids[0] || '' })} />
@@ -211,22 +212,22 @@ export default function AdminProjectEditPage() {
             <ProjectAssignmentDropdown label="Assign Suppliers" users={suppliers} multiple selectedIds={formData.suppliers} onChange={(suppliers) => setFormData({ ...formData, suppliers })} />
 
             <View className="flex-row space-x-4 mt-4">
-              <TouchableOpacity 
+              <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
                 onPress={() => router.push(`/admin/projects/${projectId}`)}
                 className="flex-1 py-4 bg-gray-100 rounded-xl items-center"
               >
-                <Text className="text-gray-600 font-bold">Cancel</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 font-bold">Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
                 onPress={handleSave}
                 disabled={saving}
                 className="flex-1 py-4 bg-brand-orange rounded-xl items-center flex-row justify-center shadow-sm"
               >
-                {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-white font-bold">Save Changes</Text>}
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Save Changes</Text>}
               </TouchableOpacity>
             </View>
-            
+
           </View>
         )}
       </ScrollView>

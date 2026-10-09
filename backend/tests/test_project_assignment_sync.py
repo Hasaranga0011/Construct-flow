@@ -11,8 +11,12 @@ class Client:
 def test_create_project_and_assignments_saved_atomically(monkeypatch):
     client = Client()
     monkeypatch.setattr(projects, "get_auth_client", lambda request: client)
+    setup_calls = []
+    monkeypatch.setattr(projects, "setup_client", lambda: client)
+    monkeypatch.setattr(projects, "ensure_project_attendance", lambda c, p: setup_calls.append(p))
     payload = ProjectCreate(name="Demo", location="Colombo", start_date="2026-01-01", end_date="2026-12-31", total_budget=1000, suppliers=["supplier-1"], admins=["admin-1"])
     assert projects.create_project(payload, object())["id"] == "proj-123"
+    assert setup_calls == ["proj-123"]
     assert len(client.calls) == 1
     name, args = client.calls[0]
     assert name == "save_project_with_assignments"
@@ -24,5 +28,9 @@ def test_create_project_and_assignments_saved_atomically(monkeypatch):
 def test_update_preserves_omitted_assignments_and_explicit_clear(monkeypatch):
     client = Client()
     monkeypatch.setattr(projects, "get_auth_client", lambda request: client)
+    setup_calls = []
+    monkeypatch.setattr(projects, "setup_client", lambda: client)
+    monkeypatch.setattr(projects, "ensure_project_attendance", lambda c, p: setup_calls.append(p))
     projects.update_project("proj-123", ProjectUpdate(name="Renamed", workers=[]), object())
+    assert setup_calls == ["proj-123"]
     assert client.calls == [("save_project_with_assignments", {"p_project_id": "proj-123", "p_data": {"name": "Renamed", "workers": []}})]

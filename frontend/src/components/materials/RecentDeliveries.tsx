@@ -13,12 +13,12 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
       
       {/* Content */}
       <View className="flex-1">
-        <Text className="text-brand-text font-bold text-sm mb-0.5">{title}</Text>
-        <Text className="text-gray-500 text-xs truncate" numberOfLines={1}>{project}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{title}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
       </View>
       
       {/* Time */}
-      <Text className="text-gray-400 text-xs">{time}</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">{time}</Text>
     </View>
   );
 };
@@ -67,21 +67,19 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
       <View className="mb-4">
-        <Text className="text-lg font-bold text-brand-text">Recent Deliveries</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Recent Deliveries</Text>
       </View>
 
       <View>
         {loading ? (
           <ActivityIndicator color="#F97316" />
         ) : deliveries.length === 0 ? (
-          <Text className="text-gray-400 text-sm">No recent deliveries.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm">No recent deliveries.</Text>
         ) : (
           deliveries.map(d => {
             const projectName = d.projects?.name || 'Unknown';
-            const items = d.items || [];
-            const itemsStr = Array.isArray(items) && items.length > 0 
-              ? items.map(i => i.item_name).join(', ') 
-              : 'Materials';
+            const items = d.items;
+            const itemsStr = typeof items === 'string' ? items : 'Materials';
               
             return (
               <DeliveryRow 

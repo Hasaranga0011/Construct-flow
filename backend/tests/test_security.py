@@ -36,3 +36,14 @@ def test_worker_cannot_use_manager_endpoint():
     with pytest.raises(HTTPException) as error:
         security.require_manager_or_admin({"role": "worker"})
     assert error.value.status_code == 403
+
+
+def test_editable_metadata_cannot_elevate_profile_role(monkeypatch):
+    monkeypatch.setattr(security.supabase.auth, "get_user", lambda token: SimpleNamespace(
+        user=SimpleNamespace(id="worker-1", email="worker@example.invalid", user_metadata={"role": "super_admin"})))
+    monkeypatch.setattr(security, "client_for_token", lambda token: ProfileClient("worker"))
+    user = security.get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials="caller-token"))
+    assert user["role"] == "worker"
+    with pytest.raises(HTTPException) as error:
+        security.require_admin(user)
+    assert error.value.status_code == 403

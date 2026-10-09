@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from core.supabase_client import supabase_db
 from core.auth import get_current_user
@@ -34,7 +35,7 @@ def get_insights(user=Depends(get_current_user)):
 
         for p in projects:
             # Milestone rate
-            m_res = supabase_db.table("milestones").select("*").eq("project_id", p["id"]).execute()
+            m_res = supabase_db.table("milestones").select("*").eq("project_id", p["id"])
             milestones = m_res.data
             if milestones:
                 completed = sum(1 for m in milestones if m.get("status") == "Completed")
@@ -45,7 +46,7 @@ def get_insights(user=Depends(get_current_user)):
             # Attendance rate
             att_res = supabase_db.table("attendance").select("*, labour!inner(assigned_project_id)").eq("labour.assigned_project_id", p["id"]).gte("date", two_weeks_ago).execute()
             att_records = att_res.data
-            lab_res = supabase_db.table("labour").select("id").eq("assigned_project_id", p["id"]).execute()
+            lab_res = supabase_db.table("labour").select("id").eq("assigned_project_id", p["id"])
             worker_count = len(lab_res.data)
             
             if worker_count > 0:
@@ -86,7 +87,7 @@ def get_insights(user=Depends(get_current_user)):
             total_budget += p.get("total_budget", 0)
             
             # Estimate actual spend (mock based on invoices)
-            inv_res = supabase_db.table("invoices").select("amount").eq("project_id", p["id"]).execute()
+            inv_res = supabase_db.table("invoices").select("amount").eq("project_id", p["id"])
             actual_spend = sum(float(i.get("amount", 0)) for i in inv_res.data)
             total_spend += actual_spend
             
@@ -98,7 +99,7 @@ def get_insights(user=Depends(get_current_user)):
                 "resource_score": attendance_rate,
                 "recommendation": rec,
                 "confidence": 88
-            }).execute()
+            }])
 
         num_proj = len(projects)
         avg_delay_risk = total_risk / num_proj

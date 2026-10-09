@@ -47,11 +47,12 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes for check-in."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "newArchEnabled": false
+    "newArchEnabled": true
   }
 }

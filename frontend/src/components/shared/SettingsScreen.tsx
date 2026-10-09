@@ -26,7 +26,7 @@ const roleConfig: Record<string, { color: string; label: string }> = {
   Worker: { color: '#06B6D4', label: 'Worker' },
 };
 
-export default function SettingsScreen({ profileHref }: { profileHref?: string }) {
+export default function SettingsScreen({ profileHref, showNotificationPreferences = true }: { profileHref?: string; showNotificationPreferences?: boolean }) {
   const { user, role, signOut } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const router = useRouter();
@@ -84,10 +84,10 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
 
   const handlePasswordReset = async () => {
     const email = profile?.email || user?.email;
-    if (!email) return;
+    if (!email || passwordLoading) return;
     setPasswordLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, typeof window !== 'undefined' ? { redirectTo: `${window.location.origin}/reset-password` } : undefined);
       if (error) throw error;
       showToast(`Reset link sent to ${email}`, 'success');
     } catch (e: any) {
@@ -119,7 +119,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
   // Section wrapper
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 4 }}>{title}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 4 }]}>{title}</Text>
       <View style={{ backgroundColor: cardTheme, borderRadius: 20, borderWidth: 1, borderColor: borderTheme, overflow: 'hidden', shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 12 }}>
         {children}
       </View>
@@ -132,8 +132,8 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
         <Ionicons name={icon} size={17} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: textTheme }}>{title}</Text>
-        <Text style={{ fontSize: 12, color: textSubTheme, marginTop: 1 }}>{subtitle}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{title}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: textSubTheme, marginTop: 1 }]}>{subtitle}</Text>
       </View>
       <Switch
         value={value}
@@ -148,19 +148,19 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
   const ActionRow = ({ icon, iconBg, iconColor, title, subtitle, onPress, loading = false }: any) => (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={({ pressed }) => [({
         flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 16, paddingVertical: 14,
         borderBottomWidth: 1, borderBottomColor: borderTheme,
         backgroundColor: pressed ? (isDark ? '#334155' : '#F8F9FB') : 'transparent',
-      })}
+      }), { minHeight: 44, minWidth: 44 }]}
     >
       <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? '#334155' : iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
         {loading ? <ActivityIndicator size="small" color={iconColor} /> : <Ionicons name={icon} size={17} color={iconColor} />}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: textTheme }}>{title}</Text>
-        {subtitle && <Text style={{ fontSize: 12, color: textSubTheme, marginTop: 1 }}>{subtitle}</Text>}
+        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{title}</Text>
+        {subtitle && <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: textSubTheme, marginTop: 1 }]}>{subtitle}</Text>}
       </View>
       <Ionicons name="chevron-forward" size={16} color={textSubTheme} />
     </Pressable>
@@ -187,12 +187,12 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
               name={toast.type === 'success' ? 'checkmark-circle' : toast.type === 'error' ? 'alert-circle' : 'information-circle'}
               size={18} color="white"
             />
-            <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>{toast.msg}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontWeight: '700', fontSize: 13 }]}>{toast.msg}</Text>
           </View>
         </Animated.View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{ maxWidth: 580, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 28, paddingBottom: 48 }}>
 
           {/* Account Hero */}
@@ -214,25 +214,25 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
                     <Image source={{ uri: profile.avatar_url }} style={{ width: 60, height: 60 }} resizeMode="cover" />
                   </View>
                 ) : (
-                  <Text style={{ color: rc.color, fontSize: 22, fontWeight: '800' }}>{initials}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontSize: 22, fontWeight: '800' }]}>{initials}</Text>
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
-                <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>{profile?.email || user?.email}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontSize: 17, fontWeight: '800' }]}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#94A3B8', fontSize: 12, marginTop: 2 }]}>{profile?.email || user?.email}</Text>
                 <View style={{
                   alignSelf: 'flex-start', marginTop: 8, borderRadius: 10,
                   backgroundColor: rc.color + '25', borderWidth: 1, borderColor: rc.color + '50',
                   paddingHorizontal: 10, paddingVertical: 3,
                 }}>
-                  <Text style={{ color: rc.color, fontSize: 11, fontWeight: '700' }}>{rc.label}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontSize: 11, fontWeight: '700' }]}>{rc.label}</Text>
                 </View>
               </View>
               <Pressable
                 onPress={() => profileHref ? router.push(profileHref as any) : null}
-                style={{ backgroundColor: '#ffffff15', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#ffffff20' }}
+                style={[{ backgroundColor: '#ffffff15', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#ffffff20' }, { minHeight: 44, minWidth: 44 }]}
               >
-                <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Edit Profile</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontSize: 12, fontWeight: '600' }]}>Edit Profile</Text>
               </Pressable>
             </View>
           </LinearGradient>
@@ -244,10 +244,10 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
                 <Ionicons name={isDark ? 'moon' : 'sunny'} size={17} color={isDark ? '#818CF8' : '#F59E0B'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: '#0F172A' }]}>
                   {isDark ? 'Dark Mode' : 'Light Mode'}
                 </Text>
-                <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 1 }}>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: '#94A3B8', marginTop: 1 }]}>
                   {isDark ? 'Switch to light theme' : 'Switch to dark theme'}
                 </Text>
               </View>
@@ -262,7 +262,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
           </Section>
 
           {/* Notifications */}
-          <Section title="Notifications">
+          {showNotificationPreferences && <Section title="Notifications">
             <ToggleRow icon="mail-outline" iconBg="#EFF6FF" iconColor="#3B82F6"
               title="Email Notifications" subtitle="Receive updates via email"
               value={prefs.email_notifs} onToggle={() => { setPrefs(p => ({ ...p, email_notifs: !p.email_notifs })); showToast('Preference updated', 'info'); }} />
@@ -278,7 +278,7 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
             <ToggleRow icon="document-text-outline" iconBg="#F5F3FF" iconColor="#8B5CF6"
               title="Weekly Reports" subtitle="Auto-send summary every Monday"
               value={prefs.report_emails} onToggle={() => { setPrefs(p => ({ ...p, report_emails: !p.report_emails })); showToast('Preference updated', 'info'); }} />
-          </Section>
+          </Section>}
 
           {/* Security */}
           <Section title="Security">
@@ -305,8 +305,8 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
                 paddingHorizontal: 16, paddingVertical: 13,
                 borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: borderTheme,
               }}>
-                <Text style={{ fontSize: 14, color: textSubTheme }}>{label}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: textTheme }}>{value}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, color: textSubTheme }]}>{label}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 14, fontWeight: '600', color: textTheme }]}>{value}</Text>
               </View>
             ))}
           </Section>
@@ -315,13 +315,13 @@ export default function SettingsScreen({ profileHref }: { profileHref?: string }
           <Section title="Danger Zone">
             <Pressable
               onPress={handleSignOut}
-              style={({ pressed }) => ({
+              style={({ pressed }) => [({
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
                 paddingVertical: 18, backgroundColor: pressed ? (isDark ? '#7F1D1D' : '#FEF2F2') : 'transparent',
-              })}
+              }), { minHeight: 44, minWidth: 44 }]}
             >
               {signingOut ? <ActivityIndicator size="small" color="#EF4444" /> : <Ionicons name="log-out-outline" size={20} color="#EF4444" />}
-              <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 15 }}>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#EF4444', fontWeight: '700', fontSize: 15 }]}>
                 {signingOut ? 'Signing out...' : 'Sign Out'}
               </Text>
             </Pressable>

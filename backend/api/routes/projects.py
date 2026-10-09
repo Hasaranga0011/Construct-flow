@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
 from typing import List, Optional
 from ..models import ProjectCreate, ProjectUpdate, ProjectResponse
+from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token, get_auth_client
 from core.security import get_current_user
+from core.attendance_setup import ensure_project_attendance, setup_client
 import os
 import requests
 
@@ -22,7 +24,7 @@ def get_projects(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class BulkProjectRequest(BaseModel):
     ids: List[str]
@@ -41,7 +43,7 @@ def get_bulk_project_names(req: BulkProjectRequest):
 @router.get("/debug_schema")
 def debug_schema(request: Request):
     client = get_auth_client(request)
-    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}).execute().data
+    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}]).data
 
 def send_client_assignment_email(email: str, project_name: str):
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
@@ -88,7 +90,7 @@ def save_project(client, data, project_id=None):
     # rolls back the project change as part of the same database transaction.
     result = client.rpc("save_project_with_assignments", {
         "p_project_id": project_id, "p_data": data,
-    }).execute()
+    }])
     if not result.data:
         raise HTTPException(status_code=400, detail="Failed to save project")
     return result.data
@@ -98,7 +100,7 @@ def notify_assigned_client(client, project):
     if not project.get("client_id"):
         return
     try:
-        profile = client.table("profiles").select("email").eq("id", project["client_id"]).execute()
+        profile = client.table("profiles").select("email").eq("id", project["client_id"])
         if profile.data and profile.data[0].get("email"):
             send_client_assignment_email(profile.data[0]["email"], project["name"])
     except Exception:
@@ -137,7 +139,7 @@ def create_project(project: ProjectCreate, request: Request):
     
     if notifications:
         try:
-            client.table("notifications").insert(notifications).execute()
+            create_notifications(notifications)
         except Exception:
             import logging
             logging.exception("Project created but PM notification failed")
@@ -145,14 +147,14 @@ def create_project(project: ProjectCreate, request: Request):
     # Sync site_manager_sites and site_workers
     try:
         if project.site_managers is not None:
-            client.table("site_manager_sites").delete().eq("project_id", saved["id"]).execute()
+            client.table("site_manager_sites").delete().eq("project_id", saved["id"])
             if project.site_managers:
                 import uuid
                 sm_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "site_manager_id": sm_id} for sm_id in project.site_managers]
                 client.table("site_manager_sites").insert(sm_inserts).execute()
         
         if project.workers is not None:
-            client.table("site_workers").delete().eq("project_id", saved["id"]).execute()
+            client.table("site_workers").delete().eq("project_id", saved["id"])
             if project.workers:
                 import uuid
                 w_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "worker_id": w_id} for w_id in project.workers]
@@ -179,13 +181,14 @@ def create_project(project: ProjectCreate, request: Request):
                 # Re-insert notifications for suppliers
                 if notifications:
                     try:
-                        client.table("notifications").insert(notifications).execute()
+                        create_notifications(notifications)
                     except Exception:
                         pass
     except Exception:
         import logging
         logging.exception("Failed to sync site_manager_sites, site_workers or suppliers")
 
+    ensure_project_attendance(setup_client(), saved["id"])
     notify_assigned_client(client, saved)
     return saved
 
@@ -231,7 +234,7 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request):
                         "type": "general",
                         "is_read": False,
                     } for s_id in project.suppliers]
-                    client.table("notifications").insert(notifs).execute()
+                    create_notifications(notifs)
                 except:
                     pass
 
@@ -239,12 +242,13 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request):
         import logging
         logging.exception("Failed to sync site_manager_sites, site_workers or suppliers")
 
+    ensure_project_attendance(setup_client(), project_id)
     if data.get("client_id"):
         notify_assigned_client(client, saved)
     return saved
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 def authorized_project_client(project_id, user, *, write):
     if not write and user["role"] not in {"super_admin", "pm", "client"}:
@@ -262,10 +266,22 @@ def authorized_project_client(project_id, user, *, write):
         return client
     if not write and user["role"] == "client" and project.get("client_id") == user["id"]:
         return client
-    result = client.table("project_role_assignments").select("user_id").eq("project_id", project_id).eq("user_id", user["id"]).eq("role", user["role"]).execute()
+    result = client.table("project_role_assignments").select("user_id").eq("project_id", project_id).eq("user_id", user["id"]).eq("role", user["role"])
+    if not result.data and user["role"] == "site_manager":
+        result = client.table("site_manager_sites").select("id").eq("project_id", project_id).eq("site_manager_id", user["id"])
     if not result.data:
         raise HTTPException(status_code=403, detail="Access denied: not your project")
     return client
+
+
+@router.post("/{project_id}/attendance-setup")
+def prepare_attendance(project_id: str, current_user: dict = Depends(get_current_user)):
+    # Check role and persisted project assignment BEFORE privileged setup writes.
+    authorized_project_client(project_id, current_user, write=True)
+    try:
+        return ensure_project_attendance(setup_client(), project_id)
+    except Exception as error:
+        raise HTTPException(status_code=409, detail=f"Attendance setup failed: {error}")
 
 
 class MilestoneCreate(BaseModel):
@@ -284,7 +300,7 @@ def create_milestone(project_id: str, payload: MilestoneCreate, current_user: di
             "due_date": payload.due_date,
             "planned_date": payload.due_date,  # Added to satisfy legacy table constraint
             "status": "Pending"
-        }).execute()
+        }])
         return res.data[0]
     except HTTPException:
         raise
@@ -293,6 +309,8 @@ def create_milestone(project_id: str, payload: MilestoneCreate, current_user: di
 
 class MilestoneUpdate(BaseModel):
     status: str
+    completion_percentage: Optional[float] = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    description: Optional[str] = None
     media_urls: Optional[List[str]] = None
 
 @router.patch("/{project_id}/milestones/{milestone_id}")
@@ -300,7 +318,14 @@ def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdat
     supabase = authorized_project_client(project_id, current_user, write=True)
     try:
         # Update milestone status
-        res = supabase.table("milestones").update({"status": payload.status}).eq("id", milestone_id).eq("project_id", project_id).execute()
+        updates = {"status": payload.status}
+        if payload.completion_percentage is not None:
+            updates["completion_percentage"] = payload.completion_percentage
+        elif payload.status == "Completed":
+            updates["completion_percentage"] = 100
+        if payload.description is not None:
+            updates["description"] = payload.description
+        res = supabase.table("milestones").update(updates).eq("id", milestone_id).eq("project_id", project_id).execute()
 
         if not res.data:
             raise HTTPException(status_code=404, detail="Milestone not found")
@@ -322,8 +347,8 @@ def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdat
         try:
             proj = supabase.table("projects").select("client_id, name").eq("id", project_id).execute()
             if proj.data and proj.data[0].get("client_id"):
-                supabase.table("notifications").insert({
-                    "user_id": "11111111-1111-1111-1111-111111111111",
+                create_notifications([{
+                    "user_id": current_user["id"],
                     "project_id": project_id,
                     "target_user_id": proj.data[0]["client_id"],
                     "target_role": "client",
@@ -331,7 +356,7 @@ def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdat
                     "message": f"A milestone has been updated to '{payload.status}' on your project '{proj.data[0].get('name', '')}'.",
                     "type": "general",
                     "is_read": False,
-                }).execute()
+                }])
         except Exception:
             import logging
             logging.exception("Milestone updated but client notification failed")
@@ -412,7 +437,14 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
             if r.get("site_id") in project_site_ids
         )
 
-        actual_spend = actual_po + actual_payroll
+        # Actual: project expenses
+        expense_res = supabase.table("project_expenses") \
+            .select("amount") \
+            .eq("project_id", project_id) \
+            .execute()
+        actual_expenses = sum(float(r.get("amount") or 0) for r in (expense_res.data or []))
+
+        actual_spend = actual_po + actual_payroll + actual_expenses
         remaining_budget = total_budget - committed_cost - actual_spend
 
         result = {
@@ -422,6 +454,7 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
             "actual_spend": actual_spend,
             "actual_po": actual_po,
             "actual_payroll": actual_payroll,
+            "actual_expenses": actual_expenses,
             "remaining_budget": remaining_budget,
         }
 
@@ -446,7 +479,7 @@ def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_
     try:
         notifications = [
             {
-                "user_id": "11111111-1111-1111-1111-111111111111",
+                "user_id": current_user["id"],
                 "project_id": project_id,
                 "target_role": "super_admin",
                 "title": f"Budget {threshold_pct}% Exceeded",
@@ -457,7 +490,7 @@ def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_
         ]
         if pm_id:
             notifications.append({
-                "user_id": "11111111-1111-1111-1111-111111111111",
+                "user_id": current_user["id"],
                 "project_id": project_id,
                 "target_user_id": pm_id,
                 "target_role": "pm",
@@ -466,7 +499,7 @@ def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_
                 "type": "general",
                 "is_read": False,
             })
-        supabase.table("notifications").insert(notifications).execute()
+        create_notifications(notifications)
     except Exception:
         logging.exception("Failed to insert budget overrun notifications")
 

@@ -130,6 +130,11 @@ app.include_router(ai.router,        prefix="/api", dependencies=secure_dependen
 app.include_router(documents.router, prefix="/api", dependencies=secure_dependency)
 app.include_router(media.router,     prefix="/api", dependencies=secure_dependency)
 
+# Static uploads (Local fallback)
+from fastapi.staticfiles import StaticFiles
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Health
 @app.get("/")
 def read_root():
@@ -138,3 +143,4 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+

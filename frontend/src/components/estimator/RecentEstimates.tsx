@@ -1,5 +1,6 @@
+import { getApiUrl } from '../../lib/apiUrl';
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, Platform, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { sendSystemNotification } from '../../utils/notifications';
 
@@ -58,69 +59,74 @@ const EstimateRow = ({
     <View className="flex-col py-4 border-b border-gray-50">
       <View className="flex-row items-center w-full">
         <View className="w-1/4">
-          <Text className="text-brand-text font-bold text-sm">{title}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{title}</Text>
         </View>
         <View className="w-1/4">
-          <Text className="text-gray-500 text-xs">{date}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{date}</Text>
         </View>
         <View className="w-1/5">
-          <Text className="text-brand-text font-bold text-sm">{cost}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{cost}</Text>
         </View>
         <View className="w-1/5">
           <View className={`px-2 py-1 rounded self-start ${statusBadgeColor}`}>
-            <Text className={`text-[10px] font-bold uppercase ${statusTextColor}`}>{status}</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${statusTextColor}`}>{status}</Text>
           </View>
         </View>
         <View className="flex-1 items-end flex-row justify-end gap-2">
           {status === 'Pending' && (
             <>
-              <Pressable onPress={() => onApprove(id)} className="bg-brand-success px-2 py-1 rounded">
-                <Text className="text-white text-xs font-semibold">Approve</Text>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onApprove(id)} className="bg-brand-success px-2 py-1 rounded">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-semibold">Approve</Text>
               </Pressable>
-              <Pressable onPress={() => onReject(id)} className="bg-red-500 px-2 py-1 rounded">
-                <Text className="text-white text-xs font-semibold">Reject</Text>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onReject(id)} className="bg-red-500 px-2 py-1 rounded">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-semibold">Reject</Text>
               </Pressable>
             </>
           )}
-          <Pressable onPress={async () => {
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={async () => {
             try {
               const { data: sessionData } = await supabase.auth.getSession();
               const token = sessionData?.session?.access_token;
               if (!token) {
-                alert('Please log in to view PDF');
+                Alert.alert('Estimate PDF', 'Please log in to view PDF');
                 return;
               }
-              const response = await fetch(`http://localhost:8000/api/documents/estimation/${id}/pdf`, {
+              const response = await fetch(`${getApiUrl()}/documents/estimation/${id}/pdf`, {
                 headers: {
                   'Authorization': `Bearer ${token}`
                 }
               });
               if (!response.ok) {
-                alert('Failed to generate PDF');
+                Alert.alert('Estimate PDF', 'Failed to generate PDF');
                 return;
               }
-              const blob = await response.blob();
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `Estimate_${id.substring(0, 8)}.pdf`;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              window.URL.revokeObjectURL(url);
+              if (Platform.OS === 'web') {
+                const url = URL.createObjectURL(await response.blob());
+                const link = document.createElement('a');
+                link.href = url; link.download = `Estimate_${id.substring(0, 8)}.pdf`;
+                document.body.appendChild(link); link.click(); link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+              } else {
+                const { File, Paths } = await import('expo-file-system');
+                const Sharing = await import('expo-sharing');
+                if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable.');
+                const file = new File(Paths.cache, `Estimate_${id.substring(0, 8)}.pdf`);
+                file.write(new Uint8Array(await response.arrayBuffer()));
+                await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf' });
+              }
             } catch (err) {
               console.error(err);
-              alert('An error occurred while generating the PDF.');
+              Alert.alert('Estimate PDF', 'An error occurred while generating the PDF.');
             }
           }}>
-            <Text className="text-brand-orange text-xs font-semibold pl-2">View PDF</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-semibold pl-2">View PDF</Text>
           </Pressable>
         </View>
       </View>
       {inputs && (
         <View className="flex-row mt-2 items-center">
-          <Text className="text-[10px] text-gray-400 font-medium">Context: </Text>
-          <Text className="text-[10px] text-gray-500">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-400 font-medium">Context: </Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500">
             {inputs.sq_ft} sq.ft • {inputs.floors} floors • {inputs.site} • {inputs.timeline} Schedule
           </Text>
         </View>
@@ -241,28 +247,28 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 ml-6 min-h-[300px]">
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-lg font-bold text-brand-text">Recent Estimates</Text>
-        <Pressable>
-          <Text className="text-brand-orange text-sm font-semibold">View all {'>'}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Recent Estimates</Text>
+        <Pressable style={{ minHeight: 44, minWidth: 44 }}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">View all {'>'}</Text>
         </Pressable>
       </View>
 
       <View className="flex-row py-2 border-b border-gray-100 mb-2">
-        <Text className="w-1/4 text-xs font-semibold text-gray-400 uppercase">Project Name</Text>
-        <Text className="w-1/4 text-xs font-semibold text-gray-400 uppercase">Date</Text>
-        <Text className="w-1/5 text-xs font-semibold text-gray-400 uppercase">Estimated Cost</Text>
-        <Text className="w-1/5 text-xs font-semibold text-gray-400 uppercase">Status</Text>
-        <Text className="flex-1 text-xs font-semibold text-gray-400 uppercase text-right"></Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-400 uppercase">Project Name</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-400 uppercase">Date</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-400 uppercase">Estimated Cost</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-400 uppercase">Status</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-400 uppercase text-right"></Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {loading ? (
           <View className="py-10 items-center">
             <ActivityIndicator color="#F97316" />
           </View>
         ) : estimations.length === 0 ? (
           <View className="py-10 items-center">
-            <Text className="text-gray-400">No estimations generated yet.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No estimations generated yet.</Text>
           </View>
         ) : (
           estimations.map((est) => (

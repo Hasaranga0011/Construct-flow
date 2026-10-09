@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
-import { GlobalSearchDropdown } from '../../components/common/GlobalSearchDropdown';
+import { SearchInput } from '../../components/common/SearchInput';
 import { SupplierOrdersTable } from '../../components/supplier/SupplierOrdersTable';
 import { SupplierAlertsPanel } from '../../components/supplier/SupplierAlertsPanel';
 import { SupplierPendingDeliveries } from '../../components/supplier/SupplierPendingDeliveries';
@@ -70,7 +70,6 @@ export default function SupplierDashboardScreen() {
 
   const getSuggestions = useCallback((q: string) => buildOrderSuggestions(orders, q), [orders]);
 
-  const handleOrderAction = () => { refresh(); };
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `Rs. ${(amount / 1000000).toFixed(1)}M`;
@@ -94,7 +93,7 @@ export default function SupplierDashboardScreen() {
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Scoped search: in normal flow, scrolls with the page */}
           <View style={{ zIndex: 5, position: 'relative' }} className="mb-6">
-            <GlobalSearchDropdown
+            <SearchInput
               placeholder="Search your orders by PO, material or project..."
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -103,11 +102,11 @@ export default function SupplierDashboardScreen() {
             />
             <View className="flex-row items-center mt-2">
               <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-              <Text className="text-[11px] text-gray-500">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
                 Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}
               </Text>
               {searchQuery.trim() !== '' && (
-                <Text className="text-[11px] text-brand-orange ml-3">Panels filtered by "{searchQuery}"</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-brand-orange ml-3">Panels filtered by &quot;{searchQuery}&quot;</Text>
               )}
             </View>
           </View>
@@ -151,10 +150,10 @@ export default function SupplierDashboardScreen() {
           {/* Assigned Projects Section */}
           <View className="mb-6">
             <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold text-gray-800">Projects I Supply</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800">Projects I Supply</Text>
               {selectedProjectId && (
-                 <Pressable onPress={() => setSelectedProjectId(null)}>
-                   <Text className="text-brand-orange font-bold text-sm">Clear Filter</Text>
+                 <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setSelectedProjectId(null)}>
+                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">Clear Filter</Text>
                  </Pressable>
               )}
             </View>
@@ -162,7 +161,7 @@ export default function SupplierDashboardScreen() {
             {assignedProjects.length === 0 ? (
               <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 items-center justify-center">
                 <Ionicons name="business-outline" size={48} color="#D1D5DB" className="mb-4" />
-                <Text className="text-gray-500 font-medium">Not currently assigned to any projects.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-medium">Not currently assigned to any projects.</Text>
               </View>
             ) : (
               <View className="flex-row flex-wrap -mx-2">
@@ -171,24 +170,24 @@ export default function SupplierDashboardScreen() {
                     <Pressable 
                       onPress={() => setSelectedProjectId(proj.id === selectedProjectId ? null : proj.id)}
                       className={`bg-white rounded-2xl shadow-sm border p-4 ${proj.id === selectedProjectId ? 'border-brand-orange bg-orange-50' : 'border-gray-100'}`}
-                      style={{ minHeight: 130 }}
+                      style={[{ minHeight: 130 }, { minHeight: 44, minWidth: 44 }]}
                     >
                       <View className="flex-row items-start mb-3">
                         <View className={`w-9 h-9 rounded-full items-center justify-center mr-3 ${proj.id === selectedProjectId ? 'bg-orange-100' : 'bg-blue-50'}`}>
                           <Ionicons name="construct" size={16} color={proj.id === selectedProjectId ? "#F97316" : "#3B82F6"} />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text className="font-bold text-gray-800" numberOfLines={1}>{proj.name}</Text>
-                          <Text className="text-xs text-gray-400" numberOfLines={2}>{proj.location}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">{proj.name}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400">{proj.location}</Text>
                         </View>
                       </View>
                       <View className="flex-row justify-between mb-1">
-                        <Text className="text-sm text-gray-500">Open Orders:</Text>
-                        <Text className="text-sm font-bold text-gray-800">{proj.openCount}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">Open Orders:</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-800">{proj.openCount}</Text>
                       </View>
                       <View className="flex-row justify-between">
-                        <Text className="text-sm text-gray-500">Last Delivery:</Text>
-                        <Text className="text-sm font-medium text-gray-800" numberOfLines={1}>{proj.lastDelivery}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">Last Delivery:</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-medium text-gray-800">{proj.lastDelivery}</Text>
                       </View>
                     </Pressable>
                   </View>
@@ -200,16 +199,15 @@ export default function SupplierDashboardScreen() {
           {/* Center Row: Orders & Alerts */}
           <View className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
             {/* Main Content Area (Orders) */}
-            <View className="flex-[2] w-full">
+            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
               <SupplierOrdersTable
                 orders={panelStats.incoming}
-                onOrderAction={handleOrderAction}
                 onOpenOrder={(id) => router.push(`/supplier/orders/${id}` as any)}
               />
             </View>
             
             {/* Side Panel (Late Alerts & Deliveries) */}
-            <View className="flex-[1] w-full">
+            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
               <SupplierPendingDeliveries orders={panelStats.pendingDeliveries} onOpenOrder={(id) => router.push(`/supplier/orders/${id}` as any)} />
               <SupplierAlertsPanel orders={panelStats.late} />
             </View>

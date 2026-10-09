@@ -297,3 +297,135 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - Rebuilt the Check-In worker modal, replacing unused `api/attendance` calls with direct Supabase `labour` table inserts.
   - Created dynamic Attendance Logs partitioned per project site (`/admin/attendance/[id]`).
   - Overhauled Payroll Generation (`/admin/payroll`) to instantly calculate wages based on `labour` table hours (Rs. 3,500 base, 1.5x Overtime) completely client-side for rapid dashboarding.
+
+## Responsive screen verification (2026-10-08)
+
+Web checks used populated long-text fixtures. Each line below means the screen rendered with one header, the expected menu, no document overflow, no clipped visible control/text, no browser exception, scrollable regions exercised, and visible inputs focused at 360/390/768/1024/1440 px. A viewport check does not prove every server mutation or physical-device interaction.
+
+- `/admin/ai-estimator` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/attendance` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/attendance/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/attendance/sites/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/client` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/estimator` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/insights` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/labour` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/orders` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/orders/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/orders/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/stock` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/materials/stock/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/notifications` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/payroll` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/payroll/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/payroll/generate` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/edit` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/expenses` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/expenses/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/milestones` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/milestones/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/00000000-0000-0000-0000-000000000001/milestones/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/projects/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/reports` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/reports/materials` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/reports/payroll` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/reports/projects` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/suppliers` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/suppliers/00000000-0000-0000-0000-000000000001/orders` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/suppliers/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/00000000-0000-0000-0000-000000000001/edit` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/clients` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/pms` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/site-managers` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/suppliers` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin/users/workers` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/documents` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/financials` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/invoices` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/issues` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/media` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/messages` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/messages/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/notifications` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project/00000000-0000-0000-0000-000000000001/reports` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project/estimates` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project/map` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project/milestones` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/project/milestones/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/client/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/ai-estimator` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/client` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/estimator` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/labour` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/materials` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/materials/orders/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/materials/orders/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/notifications` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/payroll` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects/00000000-0000-0000-0000-000000000001/expenses` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects/00000000-0000-0000-0000-000000000001/milestones` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects/00000000-0000-0000-0000-000000000001/milestones/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/projects/00000000-0000-0000-0000-000000000001/reports` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/suppliers` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/pm/team` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/attendance` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/issues` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/materials` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/milestones` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/notifications` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/reports` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/reports/create` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/site-manager/team` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/deliveries` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/orders/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/orders/history` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/supplier/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/attendance` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/dashboard` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/payroll` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/profile` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/salary/00000000-0000-0000-0000-000000000001` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/worker/settings` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+
+Auth/public pages (same five widths, including full vertical form scrolling where needed):
+
+- `/` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/admin-login` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/forgot-password` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/login` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/partner-login` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/partner-register` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/reset-password` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/team-login` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+- `/team-register` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
+
+Additional interaction checks: 65 passed for drawer, single header, account overlay, new-project modal and assignment dropdown. Site-manager and project-manager functional browser regressions are recorded in `frontend/reviews/RESPONSIVE_AUDIT.md`. Android and iOS JavaScript export passed; physical Expo Go devices, native keyboard/safe-area behavior, camera permission and iPad split view could not be observed in this environment.

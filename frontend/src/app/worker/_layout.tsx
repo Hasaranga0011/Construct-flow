@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { View, Platform, useWindowDimensions } from 'react-native';
 import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
-import { TopNav } from '../../components/common/TopNav';
 import { SidebarProvider } from '../../context/SidebarContext';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 
@@ -16,14 +15,13 @@ const WORKER_NAV_ITEMS: NavItem[] = [
 
 export default function WorkerLayout() {
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
+  const isDesktop = Platform.OS === 'web' && width >= 1024;
 
   return (
     <SidebarProvider>
       <View className="flex-1 flex-row bg-brand-light dark:bg-[#0F172A]">
         {isDesktop && <Sidebar navItems={WORKER_NAV_ITEMS} basePath="/worker" />}
         <View className="flex-1 min-w-0 min-h-0 overflow-hidden">
-          {!isDesktop && <TopNav shell />}
           <Slot />
         </View>
         {!isDesktop && <Sidebar navItems={WORKER_NAV_ITEMS} basePath="/worker" />}

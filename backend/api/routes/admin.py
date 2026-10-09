@@ -17,6 +17,7 @@ from pydantic import BaseModel, EmailStr
 from supabase import create_client
 
 from core.config import settings
+from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
 from core.security import get_current_user
 
@@ -163,7 +164,7 @@ def set_user_role(
     res = db.rpc("admin_set_user_role", {
         "p_user_id": user_id,
         "p_role": payload.role,
-    }).execute()
+    }])
     return res.data or {"ok": True}
 
 
@@ -178,7 +179,7 @@ def approve_supplier(
 ) -> Dict:
     _require_admin(current_user)
     db = client_for_token(current_user["token"])
-    res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}).execute()
+    res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}])
     if not res.data:
         raise HTTPException(status_code=404, detail="Supplier not found or already approved")
     return res.data

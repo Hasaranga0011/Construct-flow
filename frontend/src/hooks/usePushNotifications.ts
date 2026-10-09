@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
 import { supabase } from '../lib/supabase';
 
-Notifications.setNotificationHandler({
+const supportsRemotePush = Platform.OS !== 'web' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+// Avoid loading token auto-registration side effects in Expo Go and web.
+const Notifications: typeof import('expo-notifications') | null = supportsRemotePush ? require('expo-notifications') : null;
+
+if (Notifications) Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
@@ -21,7 +25,7 @@ export function usePushNotifications(userId: string | null) {
   const responseListener = useRef<any>(null);
 
   const requestToken = useCallback(async () => {
-    if (!userId || Platform.OS === 'web') return null;
+    if (!userId || !Notifications) return null;
     const token = await registerForPushNotificationsAsync();
     if (token) {
       const { error } = await supabase.from('profiles').update({ expo_push_token: token }).eq('id', userId);
@@ -32,7 +36,7 @@ export function usePushNotifications(userId: string | null) {
   }, [userId]);
 
   useEffect(() => {
-    if (!userId || Platform.OS === 'web') return;
+    if (!userId || !Notifications) return;
 
     registerForPushNotificationsAsync()
       .then(async (token) => {
@@ -69,6 +73,7 @@ export function usePushNotifications(userId: string | null) {
 }
 
 async function registerForPushNotificationsAsync() {
+  if (!Notifications) return null;
   let token;
 
   if (Platform.OS === 'android') {

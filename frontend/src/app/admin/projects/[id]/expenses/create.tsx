@@ -1,3 +1,4 @@
+import { getApiUrl } from '../../../../../lib/apiUrl';
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -5,8 +6,10 @@ import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { toast } from '../../../../../lib/toast';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function AdminCreateExpensePage() {
+  const { isMobile } = useResponsive();
   const { id: projectId } = useLocalSearchParams();
   const router = useRouter();
   
@@ -36,7 +39,7 @@ export default function AdminCreateExpensePage() {
         expense_date: form.expense_date
       };
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/projects/${projectId}/expenses`, {
+      const response = await fetch(`${getApiUrl()}/projects/${projectId}/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,18 +63,18 @@ export default function AdminCreateExpensePage() {
   };
 
   return (
-    <View className="flex-1 bg-brand-dark">
+    <View className="flex-1 bg-brand-light dark:bg-[#0F172A]">
       <TopNav title="Add Expense" showBackButton />
       
-      <ScrollView className="flex-1 p-6">
-        <View className="bg-white rounded-3xl p-6 shadow-sm mb-10">
+      <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
+        <View className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 shadow-sm mb-10 border border-gray-100 dark:border-gray-800">
           
           <View className="mb-4">
-            <Text className="text-gray-700 font-bold mb-2">Expense Title *</Text>
-            <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Expense Title *</Text>
+            <View className="flex-row items-center bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
               <Ionicons name="pricetag-outline" size={20} color="#9CA3AF" className="mr-3" />
-              <TextInput
-                className="flex-1 text-gray-800 font-medium"
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+                className="flex-1 text-gray-800 dark:text-white font-medium"
                 placeholder="e.g., Cement Bags, Site Equipment"
                 placeholderTextColor="#9CA3AF"
                 value={form.title}
@@ -81,11 +84,11 @@ export default function AdminCreateExpensePage() {
           </View>
 
           <View className="mb-4">
-            <Text className="text-gray-700 font-bold mb-2">Amount (Rs.) *</Text>
-            <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Amount (Rs.) *</Text>
+            <View className="flex-row items-center bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
               <Ionicons name="cash-outline" size={20} color="#EF4444" className="mr-3" />
-              <TextInput
-                className="flex-1 text-gray-800 font-medium"
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+                className="flex-1 text-gray-800 dark:text-white font-medium"
                 placeholder="0.00"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="numeric"
@@ -96,11 +99,11 @@ export default function AdminCreateExpensePage() {
           </View>
           
           <View className="mb-4">
-            <Text className="text-gray-700 font-bold mb-2">Expense Date *</Text>
-            <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Expense Date *</Text>
+            <View className="flex-row items-center bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
               <Ionicons name="calendar-outline" size={20} color="#9CA3AF" className="mr-3" />
-              <TextInput
-                className="flex-1 text-gray-800 font-medium"
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+                className="flex-1 text-gray-800 dark:text-white font-medium"
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor="#9CA3AF"
                 value={form.expense_date}
@@ -110,22 +113,22 @@ export default function AdminCreateExpensePage() {
           </View>
 
           <View className="mb-6">
-            <Text className="text-gray-700 font-bold mb-2">Description (Optional)</Text>
-            <View className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 min-h-[100px]">
-              <TextInput
-                className="flex-1 text-gray-800 font-medium text-left align-top"
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Description (Optional)</Text>
+            <View className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 min-h-[100px]">
+              <TextInput maxFontSizeMultiplier={1.3}
+                className="flex-1 text-gray-800 dark:text-white font-medium text-left align-top"
                 placeholder="Add any extra details about this expense..."
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={4}
                 value={form.description}
                 onChangeText={(t) => setForm({...form, description: t})}
-                style={{ textAlignVertical: 'top' }}
+                style={[{ textAlignVertical: 'top' }, { minHeight: 44, minWidth: 44 }]}
               />
             </View>
           </View>
 
-          <Pressable
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={handleSubmit}
             disabled={loading}
             className={`py-4 rounded-xl items-center flex-row justify-center ${loading ? 'bg-brand-orange/70' : 'bg-brand-orange'}`}
@@ -135,7 +138,7 @@ export default function AdminCreateExpensePage() {
             ) : (
               <Ionicons name="checkmark-circle-outline" size={24} color="white" className="mr-2" />
             )}
-            <Text className="text-white font-bold text-lg">Save Expense</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Save Expense</Text>
           </Pressable>
         </View>
       </ScrollView>

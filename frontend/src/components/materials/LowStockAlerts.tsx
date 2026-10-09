@@ -9,12 +9,12 @@ const AlertRow = ({ material, project, remaining }: { material: string, project:
   return (
     <View className="flex-row items-center justify-between py-3 border-b border-gray-50">
       <View>
-        <Text className="text-brand-text font-bold text-sm mb-0.5">{material}</Text>
-        <Text className="text-gray-500 text-xs">{project}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{material}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
       </View>
       <View className="items-end">
-        <Text className="text-brand-orange font-bold text-sm">{remaining}</Text>
-        <Text className="text-gray-400 text-[10px]">In stock</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">{remaining}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">In stock</Text>
       </View>
     </View>
   );
@@ -71,7 +71,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">
       <View className="flex-row items-center mb-4">
         <Ionicons name="warning" size={24} color="#F97316" className="mr-2" />
-        <Text className="text-lg font-bold text-brand-text">Low Stock Alerts</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Low Stock Alerts</Text>
       </View>
 
       <View className="flex-1">
@@ -81,7 +81,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
           </View>
         ) : alerts.length === 0 ? (
           <View className="py-4 items-center">
-            <Text className="text-gray-400 text-sm">No low stock items.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm">No low stock items.</Text>
           </View>
         ) : (
             alerts.map(m => {

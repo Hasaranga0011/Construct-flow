@@ -36,7 +36,7 @@ export default function WorkerAttendancePage() {
           if (isMounted) setLoading(false);
           return;
         }
-        
+
         if (isMounted) setWorkerQr(profileData?.qr_code || name || '');
 
         const { data, error } = await supabase
@@ -97,12 +97,12 @@ export default function WorkerAttendancePage() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-          
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+
           {/* QR Code Section */}
           <View className="bg-white rounded-2xl p-8 mb-8 shadow-sm border border-gray-100 items-center">
-            <Text className="text-lg font-bold text-gray-800 mb-6 text-center">Your Check-In QR</Text>
-            
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-6 text-center">Your Check-In QR</Text>
+
             <View className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               {workerQr ? (
                 <QRCode
@@ -119,44 +119,44 @@ export default function WorkerAttendancePage() {
               )}
             </View>
 
-            <Pressable 
+            <Pressable style={{ minHeight: 44, minWidth: 44 }}
               onPress={handleShareQR}
               className="mt-6 flex-row items-center bg-brand-orange px-6 py-3 rounded-full hover:bg-orange-600 transition-colors"
             >
               <Ionicons name="share-outline" size={20} color="white" />
-              <Text className="text-white font-bold ml-2">Share QR Code</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold ml-2">Share QR Code</Text>
             </Pressable>
           </View>
 
           {/* Summary Cards */}
           <View className="flex-row flex-wrap gap-3 md:gap-4 mb-8">
             <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 items-center">
-              <Text className="text-3xl font-bold text-green-600">{stats.present}</Text>
-              <Text className="text-gray-500 text-xs mt-1 font-semibold text-center">Present</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-green-600">{stats.present}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1 font-semibold text-center">Present</Text>
             </View>
             <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 items-center">
-              <Text className="text-3xl font-bold text-red-500">{stats.absent}</Text>
-              <Text className="text-gray-500 text-xs mt-1 font-semibold text-center">Absent</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-red-500">{stats.absent}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1 font-semibold text-center">Absent</Text>
             </View>
             <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 items-center">
-              <Text className="text-3xl font-bold text-brand-orange">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange">
                 {stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0}%
               </Text>
-              <Text className="text-gray-500 text-xs mt-1 font-semibold text-center">Rate</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1 font-semibold text-center">Rate</Text>
             </View>
           </View>
 
           {/* History Table */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-10">
             <View className="flex-row py-4 px-4 bg-gray-50 border-b border-gray-100">
-              <Text className="flex-1 text-[10px] font-bold text-gray-500 uppercase">Date</Text>
-              <Text className="w-24 text-[10px] font-bold text-gray-500 uppercase text-right">Status</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-[10px] font-bold text-gray-500 uppercase">Date</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-24 text-[10px] font-bold text-gray-500 uppercase text-right">Status</Text>
             </View>
 
             {records.length === 0 ? (
               <View className="p-8 items-center justify-center">
                 <Ionicons name="calendar-outline" size={48} color="#E5E7EB" />
-                <Text className="text-gray-400 mt-4 text-center">No attendance records found.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4 text-center">No attendance records found.</Text>
               </View>
             ) : (
               records.map((record, i) => {
@@ -164,16 +164,16 @@ export default function WorkerAttendancePage() {
                 return (
                   <View key={record.id} className={`flex-row items-center py-4 px-4 ${i < records.length - 1 ? 'border-b border-gray-50' : ''}`}>
                     <View className="flex-1">
-                      <Text className="font-semibold text-gray-800 text-sm">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-800 text-sm">
                         {new Date(record.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                       </Text>
-                      <Text className="text-gray-400 text-[10px] mt-0.5 truncate" numberOfLines={1}>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-0.5">
                         {record.projects?.name || 'Unknown Project'}
                       </Text>
                     </View>
                     <View className={`flex-row items-center ${style.bg} px-2 py-1 rounded-full w-24 justify-center`}>
                       <Ionicons name={style.icon} size={12} color={style.text.includes('green') ? '#16A34A' : style.text.includes('red') ? '#DC2626' : '#6B7280'} />
-                      <Text className={`${style.text} font-bold text-[10px] ml-1`}>{record.status}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${style.text} font-bold text-[10px] ml-1`}>{record.status}</Text>
                     </View>
                   </View>
                 );

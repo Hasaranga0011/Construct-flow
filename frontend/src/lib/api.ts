@@ -1,6 +1,6 @@
+import { getApiUrl } from './apiUrl';
 import { supabase } from './supabase';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -12,14 +12,14 @@ async function getAuthHeaders() {
 
 export const api = {
   get: async (path: string) => {
-    const res = await fetch(BASE_URL + path, { 
-      headers: await getAuthHeaders() 
+    const res = await fetch(getApiUrl() + path, {
+      headers: await getAuthHeaders()
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
   post: async (path: string, body: any) => {
-    const res = await fetch(BASE_URL + path, {
+    const res = await fetch(getApiUrl() + path, {
       method: 'POST',
       headers: await getAuthHeaders(),
       body: JSON.stringify(body)
@@ -28,7 +28,7 @@ export const api = {
     return res.json();
   },
   patch: async (path: string, body: any) => {
-    const res = await fetch(BASE_URL + path, {
+    const res = await fetch(getApiUrl() + path, {
       method: 'PATCH',
       headers: await getAuthHeaders(),
       body: JSON.stringify(body)
@@ -37,7 +37,7 @@ export const api = {
     return res.json();
   },
   put: async (path: string, body: any) => {
-    const res = await fetch(BASE_URL + path, {
+    const res = await fetch(getApiUrl() + path, {
       method: 'PUT',
       headers: await getAuthHeaders(),
       body: JSON.stringify(body)
@@ -46,7 +46,7 @@ export const api = {
     return res.json();
   },
   delete: async (path: string) => {
-    const res = await fetch(BASE_URL + path, {
+    const res = await fetch(getApiUrl() + path, {
       method: 'DELETE',
       headers: await getAuthHeaders()
     });

@@ -12,12 +12,15 @@ class Query:
     def select(self, *args): return self
     def eq(self, *args): return self
     def gte(self, *args): return self
+    def order(self, *args): return self
     def single(self): return self
     def update(self, data): self.client.updated = data; return self
     def execute(self):
         if self.name == "profiles": return SimpleNamespace(data={"id": "worker-1", "full_name": "Worker", "role": "worker"})
         if self.name == "workers": return SimpleNamespace(data={"id": "worker-record-1", "user_id": "worker-1"})
-        if self.name == "site_workers": return SimpleNamespace(data=[{"id": "assignment-1"}])
+        if self.name == "site_workers": return SimpleNamespace(data=[{"id": "assignment-1", "worker_id": "worker-record-1"}])
+        if self.name == "site_manager_sites": return SimpleNamespace(data=[{"project_id": "site"}])
+        if self.name == "sites": return SimpleNamespace(data=[{"id": "actual-site"}])
         return SimpleNamespace(data=[{"id": "attendance-1", "check_in_time": self.client.check_in}])
 
 class Client:
@@ -40,11 +43,20 @@ def test_cannot_send_message_as_someone_else():
         messages.send_message(messages.MessageCreate(project_id="p", sender_id="other", receiver_id="r", content="hello"), {"id":"me", "token":"unused"})
     assert error.value.status_code == 403
 
-def test_synthetic_estimate_does_not_claim_validated_confidence():
-    result = ai.predict_cost(ai.PredictRequest(square_footage=1500, location="Colombo", project_type="Residential", quality_tier="Standard"), {})
-    assert result.estimated_cost > 0
+def test_synthetic_estimate_does_not_claim_validated_confidence(monkeypatch):
+    monkeypatch.setattr(ai, "_cost_model", SimpleNamespace(predict=lambda frame: [1000000.0]))
+    monkeypatch.setattr(ai, "_cost_meta", {"data_source": "synthetic_demo"})
+    monkeypatch.setattr(ai, "_per_input_importance", lambda *args: [])
+    result = ai.predict_cost(ai.PredictRequest(
+        square_footage=1500, location="Colombo", project_type="Residential", quality_tier="Standard",
+        num_floors=1, site_condition="Flat", structure_type="Concrete",
+        finishing_flooring="Standard", finishing_sanitary="Standard",
+        finishing_electrical="Standard", target_timeline="12 months",
+    ), {})
+    assert result.estimated_cost == 1000000.0
     assert result.confidence_score is None
     assert result.model_source == "synthetic_demo"
+
 
 @pytest.mark.parametrize("length", ["bad", "-1"])
 def test_invalid_content_length_returns_400(length):

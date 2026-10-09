@@ -46,7 +46,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Initial fetch
     const fetchUnread = async () => {
       const { count } = await supabase
@@ -69,7 +69,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
         fetchUnread();
       })
       .subscribe();
-      
+
     return () => { supabase.removeChannel(channel); };
   }, [user, role]);
 
@@ -80,7 +80,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
   return (
     <>
       {isMobile && isOpen && (
-        <Pressable 
+        <Pressable style={{ minHeight: 44, minWidth: 44 }}
           className="absolute inset-0 z-40 bg-black/50"
           onPress={() => setIsOpen(false)}
         />
@@ -88,12 +88,12 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
       <View className={`w-[240px] h-full py-6 flex-col border-r ${isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100'} ${isMobile ? 'absolute z-50 left-0' : 'relative'}`}>
       {/* Logo Area */}
       <View className="px-4 mb-8">
-        <Text className={`font-bold text-xl ${isDark ? 'text-white' : 'text-brand-text'}`}>Construct<Text style={{ color: '#F97316' }}>Ai</Text></Text>
-        <Text className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>AI Construction Platform</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold text-xl ${isDark ? 'text-white' : 'text-brand-text'}`}>Construct<Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Ai</Text></Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>AI Construction Platform</Text>
       </View>
 
       {/* Navigation */}
-      <ScrollView className="flex-1 min-h-0 px-3" contentContainerStyle={{ paddingBottom: 12 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 min-h-0 px-3" contentContainerStyle={{ paddingBottom: 12 }}>
         {navItems.map((item) => {
           // Normalise paths for matching
           const fullHref = item.href.startsWith(`${basePath}/`)
@@ -104,27 +104,27 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
             ? pathname === fullHref
             : pathname === fullHref || pathname.startsWith(`${fullHref}/`);
           const IconFamily = item.IconFamily;
-          
+
           return (
             <Link key={item.label} href={fullHref as any} asChild onPress={() => setIsOpen(false)}>
-              <Pressable className={`flex-row items-center py-3 px-3 rounded-lg mb-1 ${isActive ? (isDark ? 'bg-gray-800' : 'bg-brand-orange bg-opacity-10') : 'hover:bg-gray-50 hover:bg-opacity-10'}`}>
-                <IconFamily 
-                  name={item.iconName as any} 
-                  size={18} 
-                  color={isActive ? (isDark ? '#F97316' : '#EA580C') : (isDark ? '#9CA3AF' : '#6B7280')} 
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} className={`flex-row items-center py-3 px-3 rounded-lg mb-1 ${isActive ? (isDark ? 'bg-gray-800' : 'bg-brand-orange bg-opacity-10') : 'hover:bg-gray-50 hover:bg-opacity-10'}`}>
+                <IconFamily
+                  name={item.iconName as any}
+                  size={18}
+                  color={isActive ? (isDark ? '#F97316' : '#EA580C') : (isDark ? '#9CA3AF' : '#6B7280')}
                   style={{ marginRight: 12 }}
                 />
-                <Text className={`text-sm flex-1 ${isActive ? (isDark ? 'text-white font-semibold' : 'text-brand-text font-semibold') : (isDark ? 'text-gray-300' : 'text-gray-600')}`}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm flex-1 ${isActive ? (isDark ? 'text-white font-semibold' : 'text-brand-text font-semibold') : (isDark ? 'text-gray-300' : 'text-gray-600')}`}>
                   {item.label}
                 </Text>
                 {/* Dynamic badge for Notifications, fallback to item.badge for others if any */}
                 {(item.label === 'Notifications' && unreadCount > 0) ? (
                   <View className="bg-brand-orange w-5 h-5 rounded-full items-center justify-center">
-                    <Text className="text-white text-[10px] font-bold">{unreadCount}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-[10px] font-bold">{unreadCount}</Text>
                   </View>
                 ) : (item.badge && item.label !== 'Notifications') ? (
                   <View className="bg-brand-orange w-5 h-5 rounded-full items-center justify-center">
-                    <Text className="text-white text-[10px] font-bold">{item.badge}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-[10px] font-bold">{item.badge}</Text>
                   </View>
                 ) : null}
               </Pressable>
@@ -138,14 +138,14 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
         <View className={`flex-row items-center justify-between pt-4 border-t ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
           <View className="flex-row items-center flex-1">
             <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
-              <Text className={`text-xs font-bold ${isDark ? 'text-white' : 'text-brand-text'}`}>{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold ${isDark ? 'text-white' : 'text-brand-text'}`}>{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
             </View>
             <View className="flex-1 pr-2">
-              <Text className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-brand-text'}`} numberOfLines={1}>{user?.user_metadata?.full_name || user?.email || 'User'}</Text>
-              <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-brand-text'}`}>{user?.user_metadata?.full_name || user?.email || 'User'}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
             </View>
           </View>
-          <Pressable onPress={handleLogout} className="p-2">
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={handleLogout} className="p-2">
             <Ionicons name="log-out-outline" size={20} color="#9CA3AF" />
           </Pressable>
         </View>

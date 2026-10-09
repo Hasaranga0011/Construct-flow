@@ -36,3 +36,25 @@ def test_receive_uses_atomic_database_operation(monkeypatch):
     result = orders.receive_po("po-1", {"role": "super_admin", "id": "admin-1", "token": "token"})
     assert result["status"] == "Delivered"
     assert client.calls == [("receive_purchase_order", {"p_order_id": "po-1"})]
+
+
+def test_supplier_cannot_receive_goods(monkeypatch):
+    with pytest.raises(HTTPException) as error:
+        orders.receive_po("po-1", {"role": "supplier", "id": "supplier-1", "token": "token"})
+    assert error.value.status_code == 403
+
+
+@pytest.mark.parametrize("code,status", [("42501", 403), ("P0002", 404), ("P0001", 409)])
+def test_database_transition_errors_preserve_http_status(monkeypatch, code, status):
+    class DatabaseFailure(Exception):
+        pass
+    failure = DatabaseFailure("Transition rejected")
+    failure.code = code
+    client = Client({"supplier_id": "supplier-1"})
+    def rpc(*args):
+        raise failure
+    client.rpc = rpc
+    monkeypatch.setattr(orders, "client_for_token", lambda token: client)
+    with pytest.raises(HTTPException) as error:
+        orders.deliver_po("po-1", {"role": "supplier", "id": "supplier-1", "token": "token"})
+    assert error.value.status_code == status

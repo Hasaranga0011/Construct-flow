@@ -81,15 +81,15 @@ export const MonthlyAttendanceChart = () => {
     return (
       <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
         <Ionicons name="people-outline" size={48} color="#D1D5DB" />
-        <Text className="text-gray-400 mt-2">No attendance data for the last 30 days.</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">No attendance data for the last 30 days.</Text>
       </View>
     );
   }
 
   return (
     <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
-      <Text className="text-lg font-bold text-brand-text mb-1">Monthly Attendance Trend</Text>
-      <Text className="text-gray-500 text-xs mb-6">Daily checked-in workers over the last 30 days</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Monthly Attendance Trend</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mb-6">Daily checked-in workers over the last 30 days</Text>
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}

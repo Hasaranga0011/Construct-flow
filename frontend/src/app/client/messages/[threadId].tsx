@@ -197,12 +197,12 @@ export default function ClientMessagesThreadPage() {
       {/* Channel tab strip */}
       <View className="bg-white border-b border-gray-100 flex-row px-4">
         {CHANNELS.map(ch => (
-          <Pressable
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             key={ch.key}
             onPress={() => setActiveChannel(ch.key)}
             className={`mr-6 py-3 border-b-2 ${activeChannel === ch.key ? 'border-brand-orange' : 'border-transparent'}`}
           >
-            <Text className={`text-sm font-semibold ${activeChannel === ch.key ? 'text-brand-orange' : 'text-gray-400'}`}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${activeChannel === ch.key ? 'text-brand-orange' : 'text-gray-400'}`}>
               {ch.label}
             </Text>
           </Pressable>
@@ -210,7 +210,7 @@ export default function ClientMessagesThreadPage() {
       </View>
 
       {/* Messages list */}
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         ref={scrollRef}
         className="flex-1 p-4"
         showsVerticalScrollIndicator={false}
@@ -221,12 +221,12 @@ export default function ClientMessagesThreadPage() {
           </View>
         ) : error && messages.length === 0 ? (
           <View className="bg-red-50 border border-red-200 rounded-2xl p-5 items-center mt-10">
-            <Text className="text-red-700 text-center">{error}</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-center">{error}</Text>
           </View>
         ) : messages.length === 0 ? (
           <View className="items-center py-20">
             <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
-            <Text className="text-gray-500 mt-4 text-center">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-4 text-center">
               No messages in this conversation yet.{'\n'}Start chatting with your {CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}.
             </Text>
           </View>
@@ -236,8 +236,8 @@ export default function ClientMessagesThreadPage() {
           return (
             <View key={message.id} className={`mb-4 ${isSender ? 'self-end' : 'self-start'} max-w-[80%]`}>
               <View className={`p-3 rounded-2xl ${isSender ? 'bg-brand-orange rounded-tr-sm' : 'bg-white rounded-tl-sm shadow-sm border border-gray-100'}`}>
-                <Text className={isSender ? 'text-white' : 'text-gray-800'}>{text}</Text>
-                <Text className={`text-[10px] mt-1 ${isSender ? 'text-orange-100' : 'text-gray-400'}`}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800'}>{text}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] mt-1 ${isSender ? 'text-orange-100' : 'text-gray-400'}`}>
                   {formatTime(message.created_at)}
                 </Text>
               </View>
@@ -248,7 +248,7 @@ export default function ClientMessagesThreadPage() {
 
       {/* Input bar */}
       <View className="p-4 bg-white border-t border-gray-100 flex-row items-center">
-        <TextInput
+        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
           className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm mr-2 text-brand-text outline-none"
           placeholder={receiverId ? `Message your ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}...` : 'No contact assigned to this project yet'}
           value={input}
@@ -257,7 +257,7 @@ export default function ClientMessagesThreadPage() {
           onSubmitEditing={sendMessage}
           returnKeyType="send"
         />
-        <Pressable
+        <Pressable style={{ minHeight: 44, minWidth: 44 }}
           onPress={sendMessage}
           disabled={sending || !input.trim() || !receiverId}
           className={`w-11 h-11 rounded-full items-center justify-center ${sending || !input.trim() || !receiverId ? 'bg-gray-300' : 'bg-brand-orange'}`}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
 import { TopNav } from '../../../components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
 
@@ -13,6 +13,8 @@ type SupplierSummary = {
 };
 
 export default function PMSuppliersPage() {
+	const [loadError, setLoadError] = useState('');
+	const [retry, setRetry] = useState(0);
 	const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
 	const [loading, setLoading] = useState(true);
 
@@ -21,25 +23,29 @@ export default function PMSuppliersPage() {
 
 		const loadSuppliers = async () => {
 			try {
+                setLoading(true);
+                setLoadError('');
 				const { data: sessionData } = await supabase.auth.getSession();
 				const pmId = sessionData.session?.user.id;
-				if (!pmId) return;
+				if (!pmId) throw new Error('Please sign in again.');
 
-				const { data: projects } = await supabase
+				const { data: projects, error: projectError } = await supabase
 					.from('projects')
 					.select('id')
 					.eq('pm_id', pmId);
-				const projectIds = (projects || []).map(project => project.id);
+				if (projectError) throw projectError;
+                const projectIds = (projects || []).map(project => project.id);
 				if (projectIds.length === 0) {
 					if (mounted) setSuppliers([]);
 					return;
 				}
 
-				const { data: orders } = await supabase
+				const { data: orders, error: orderError } = await supabase
 					.from('purchase_orders')
 					.select('supplier_id, total_price')
 					.in('project_id', projectIds);
-				const orderRows = orders || [];
+				if (orderError) throw orderError;
+                const orderRows = orders || [];
 				const supplierIds = [...new Set(orderRows.map(order => order.supplier_id).filter(Boolean))];
 
 				if (supplierIds.length === 0) {
@@ -47,12 +53,13 @@ export default function PMSuppliersPage() {
 					return;
 				}
 
-				const { data: supplierRows } = await supabase
+				const { data: supplierRows, error: supplierError } = await supabase
 					.from('suppliers')
 					.select('supplier_id, company_name, contact_person, email')
 					.in('supplier_id', supplierIds);
 
-				const summaries = (supplierRows || []).map(supplier => {
+				if (supplierError) throw supplierError;
+                const summaries = (supplierRows || []).map(supplier => {
 					const supplierOrders = orderRows.filter(order => order.supplier_id === supplier.supplier_id);
 					return {
 						id: supplier.supplier_id,
@@ -65,32 +72,34 @@ export default function PMSuppliersPage() {
 				});
 
 				if (mounted) setSuppliers(summaries);
-			} finally {
+			} catch (error: any) {
+                if (mounted) setLoadError(error.message || 'Unable to load suppliers');
+            } finally {
 				if (mounted) setLoading(false);
 			}
 		};
 
 		loadSuppliers();
 		return () => { mounted = false; };
-	}, []);
+	}, [retry]);
 
 	return (
 		<View className="flex-1 bg-brand-light">
 			<TopNav title="Suppliers for Your Projects" showAction={false} />
-			<ScrollView className="flex-1 p-4 md:p-6" showsVerticalScrollIndicator={false}>
-				<Text className="text-2xl font-bold text-brand-text mb-2">Project Suppliers</Text>
-				<Text className="text-gray-500 mb-6">Supplier activity is limited to purchase orders for projects you manage.</Text>
-				{loading ? <ActivityIndicator color="#F97316" /> : suppliers.length === 0 ? (
+			<ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-6" showsVerticalScrollIndicator={false}>
+				<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-2">Project Suppliers</Text>
+				<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-6">Supplier activity is limited to purchase orders for projects you manage.</Text>
+				{loadError ? <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetry(v => v + 1)}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600">{loadError} ? Tap to retry</Text></Pressable> : loading ? <ActivityIndicator color="#F97316" /> : suppliers.length === 0 ? (
 					<View className="bg-white rounded-xl border border-gray-100 p-8 items-center">
-						<Text className="text-gray-500">No suppliers are linked to your projects yet.</Text>
+						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No suppliers are linked to your projects yet.</Text>
 					</View>
 				) : suppliers.map(supplier => (
 					<View key={supplier.id} className="bg-white rounded-xl border border-gray-100 p-5 mb-4 shadow-sm">
-						<Text className="text-lg font-bold text-brand-text">{supplier.company_name || 'Supplier'}</Text>
-						<Text className="text-gray-500 mt-1">{supplier.contact_person || supplier.email || 'Contact details unavailable'}</Text>
+						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">{supplier.company_name || 'Supplier'}</Text>
+						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{supplier.contact_person || supplier.email || 'Contact details unavailable'}</Text>
 						<View className="flex-row flex-wrap gap-4 mt-4">
-							<Text className="text-gray-600">Orders: <Text className="font-bold text-brand-text">{supplier.orderCount}</Text></Text>
-							<Text className="text-gray-600">Order value: <Text className="font-bold text-brand-text">Rs. {supplier.orderValue.toLocaleString()}</Text></Text>
+							<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">Orders: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{supplier.orderCount}</Text></Text>
+							<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">Order value: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">Rs. {supplier.orderValue.toLocaleString()}</Text></Text>
 						</View>
 					</View>
 				))}

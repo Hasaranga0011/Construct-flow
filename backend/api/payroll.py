@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from datetime import datetime
@@ -16,7 +17,7 @@ def get_payroll(user=Depends(get_current_user)):
     try:
         query = supabase_db.table("payroll").select("*, labour(name, trade)")
         if user["role"] == "worker":
-            lab_res = supabase_db.table("labour").select("id").eq("user_id", user["id"]).execute()
+            lab_res = supabase_db.table("labour").select("id").eq("user_id", user["id"])
             if lab_res.data:
                 query = query.eq("worker_id", lab_res.data[0]["id"])
         
@@ -68,16 +69,16 @@ def generate_payroll(req: PayrollGenerate, user=Depends(get_current_user)):
                     "total_days": total_days,
                     "amount": total_pay,
                     "status": "pending"
-                }).execute()
+                }])
                 generated_count += 1
                 
         if generated_count > 0:
-            supabase_db.table("notifications").insert({
+            create_notifications([{
                 "title": "Payroll Generated",
                 "message": f"{generated_count} payroll records ready for approval for {month_str}",
                 "type": "general",
                 "target_role": "super_admin"
-            }).execute()
+            }])
             
         return {"message": "Payroll generated", "count": generated_count}
     except Exception as e:
@@ -94,12 +95,12 @@ def approve_payroll(payroll_id: str, user=Depends(get_current_user)):
             worker_id = res.data[0].get("worker_id")
             lab_res = supabase_db.table("labour").select("user_id").eq("id", worker_id).execute()
             if lab_res.data and lab_res.data[0].get("user_id"):
-                supabase_db.table("notifications").insert({
+                create_notifications([{
                     "title": "Payroll Approved",
                     "message": "Your payroll for this month has been approved.",
                     "type": "general",
                     "user_id": lab_res.data[0]["user_id"]
-                }).execute()
+                }])
                 
         return {"message": "Payroll approved", "data": res.data[0] if res.data else None}
     except Exception as e:

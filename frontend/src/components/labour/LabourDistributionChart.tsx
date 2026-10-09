@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 const Bar = ({ label, percentage, count }: { label: string, percentage: number, count: number }) => (
   <View className="items-center justify-end flex-1 mx-2 h-full">
     {/* Label at top */}
-    <Text className="text-brand-text font-semibold text-xs mb-1">{count}</Text>
+    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-xs mb-1">{count}</Text>
     
     {/* The Bar */}
     <View 
@@ -14,7 +14,7 @@ const Bar = ({ label, percentage, count }: { label: string, percentage: number, 
     />
     
     {/* X-axis Label */}
-    <Text className="text-gray-500 text-[10px] text-center mt-2 h-8 leading-tight">
+    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-[10px] text-center mt-2 h-8 leading-tight">
       {label}
     </Text>
   </View>
@@ -70,15 +70,15 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1">
       <View className="mb-4">
-        <Text className="text-lg font-bold text-brand-text">Labour Distribution</Text>
-        <Text className="text-brand-text-muted text-xs">Total assigned workers per project site</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Labour Distribution</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">Total assigned workers per project site</Text>
       </View>
 
       <View className="flex-1 flex-row items-end justify-around pt-4 pb-2 border-b border-gray-100">
         {loading ? (
           <ActivityIndicator color="#F97316" className="self-center flex-1" />
         ) : data.length === 0 ? (
-          <Text className="text-gray-400 self-center flex-1 text-center">No projects.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 self-center flex-1 text-center">No projects.</Text>
         ) : (
           data.slice(0, 4).map((d, i) => (
             <Bar key={i} label={d.label} count={d.count} percentage={(d.count / maxCount) * 90} />

@@ -5,10 +5,10 @@ export const ClientWorkerCount = ({ count = 24 }: { count?: number }) => {
   return (
     <View className="flex-row items-center justify-between">
       <View>
-        <Text className="text-3xl font-extrabold text-brand-text mb-1">{count}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-extrabold text-brand-text mb-1">{count}</Text>
         <View className="flex-row items-center">
           <View className="w-2 h-2 rounded-full bg-brand-success mr-1.5" />
-          <Text className="text-brand-text-muted text-xs font-semibold uppercase">Currently On Site</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs font-semibold uppercase">Currently On Site</Text>
         </View>
       </View>
       
@@ -30,7 +30,7 @@ export const ClientWorkerCount = ({ count = 24 }: { count?: number }) => {
           className="w-11 h-11 rounded-full border-2 border-white bg-brand-orange items-center justify-center"
           style={{ marginLeft: -15 }}
         >
-          <Text className="text-white text-xs font-bold">+{count - 3}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">+{count - 3}</Text>
         </View>
       </View>
     </View>

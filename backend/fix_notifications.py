@@ -1,48 +1,67 @@
-import os
-import glob
-import re
+import os, glob, re
 
-def fix_notifications(directory):
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                original_content = content
-                
-                # Replace enum types
-                content = content.replace('"type": "info"', '"type": "general"')
-                content = content.replace('"type": "success"', '"type": "general"')
-                content = content.replace('"type": "warning"', '"type": "delay_risk"')
-                content = content.replace('"type": "error"', '"type": "delay_risk"')
-                
-                # Add user_id to insert({
-                content = re.sub(
-                    r'(supabase\.table\([\'"]notifications[\'"]\)\.insert\(\{)',
-                    r'\1\n            "user_id": current_user["id"],',
-                    content
-                )
-                content = re.sub(
-                    r'(client\.table\([\'"]notifications[\'"]\)\.insert\(\{)',
-                    r'\1\n            "user_id": current_user["id"],',
-                    content
-                )
-                
-                # For lists of notifications:
-                # We look for dictionaries that have "target_role" inside a list passed to insert
-                # But it's easier to just blindly add user_id: current_user["id"] inside the dictionaries
-                content = re.sub(
-                    r'(\{\s*"project_id":)',
-                    r'{\n                "user_id": current_user["id"] if "current_user" in locals() else "11111111-1111-1111-1111-111111111111",\1',
-                    content
-                )
+def replace_in_file(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
 
-                if content != original_content:
-                    with open(path, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    print(f"Fixed {file}")
+    # If already using create_notifications, skip
+    if 'create_notifications' in content and 'table("notifications").insert' not in content:
+        return
 
-fix_notifications('d:/PROJECTS/Construct-flow/backend/api/routes')
-print('Done')
+    orig = content
+    # import create_notifications
+    if 'core.notification_helper' not in content:
+        content = content.replace('from core.database import', 'from core.notification_helper import create_notifications, create_notification\nfrom core.database import')
+        if 'from core.notification_helper import' not in content:
+            content = 'from core.notification_helper import create_notifications, create_notification\n' + content
+
+    # Replace insert(dict).execute()
+    # It might be multiline for the dict. Let's just find `.table("notifications").insert(` and try to parse it.
+    
+    # Simple regex replacing `admin_supabase.table("notifications").insert(X).execute()`
+    # but X could be anything, even containing parenthesis.
+    
+    # We can just replace:
+    # 1. `admin_supabase.table("notifications").insert(` -> `create_notifications(`
+    # 2. `supabase.table("notifications").insert(` -> `create_notifications(`
+    # 3. `client.table("notifications").insert(` -> `create_notifications(`
+    # And then we need to remove the trailing `.execute()` on those lines.
+
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        if 'table("notifications").insert(' in line:
+            # We want to replace the `x.table("notifications").insert(` with `create_notifications(`
+            line = re.sub(r'[\w_]+\.table\("notifications"\)\.insert\(', 'create_notifications(', line)
+            # Remove `.execute()` at the end
+            line = line.replace(').execute()', ')')
+            # If inserting a dict, we wrap it in a list so create_notifications handles it.
+            # create_notifications({ ... }) -> create_notifications([{ ... }])
+            if 'create_notifications({' in line:
+                line = line.replace('create_notifications({', 'create_notifications([{')
+                # need to find the matching closing bracket, which might be on another line.
+                # Actually, `create_notifications([` is safer. Let's just use `create_notification` for dicts?
+                # For this simple script, let's just do it manually via regex if it's single line.
+            lines[i] = line
+            
+    # For multiline inserts like purchase_orders.py:
+    # admin_supabase.table("notifications").insert({
+    #       ...
+    # }).execute()
+    
+    content = '\n'.join(lines)
+    content = content.replace('}).execute()', '}])')
+    content = content.replace('create_notifications({', 'create_notifications([{')
+    
+    # Array multiline inserts:
+    # admin_supabase.table("notifications").insert([
+    #       ...
+    # ]).execute()
+    content = content.replace(']).execute()', '])')
+    
+    if orig != content:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"Updated {path}")
+
+for f in glob.glob('d:/PROJECTS/Construct-flow/backend/api/routes/*.py'):
+    replace_in_file(f)

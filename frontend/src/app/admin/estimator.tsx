@@ -39,7 +39,7 @@ export default function EstimatorScreen() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="AI Estimator" actionLabel="+ New Project" showAction={false} />
       
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         {/* Top Stat Cards Row */}
         <View className="flex-row flex-wrap justify-between mb-6 -mx-1 md:-mx-2">
           <StatCard 
@@ -65,11 +65,11 @@ export default function EstimatorScreen() {
 
         {/* Bottom Section Layout */}
         <View className={`gap-6 pb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-          <View className="flex-[4] w-full">
+          <View className={isMobile ? "w-full" : "flex-[4] w-full"}>
             <CostBreakdown refreshTrigger={refreshTrigger} />
           </View>
           
-          <View className="flex-[5] w-full">
+          <View className={isMobile ? "w-full" : "flex-[5] w-full"}>
             <RecentEstimates refreshTrigger={refreshTrigger} />
           </View>
         </View>

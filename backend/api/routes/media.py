@@ -1,32 +1,41 @@
+from core.notification_helper import create_notifications, create_notification
 import os
-import hashlib
 import time
+import uuid
+import pathlib
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from core.security import get_current_user
-import httpx
-from dotenv import load_dotenv
-
-load_dotenv()
+from core.config import settings
+from supabase import create_client
 
 router = APIRouter(
     prefix="/media",
     tags=["Media Upload"]
 )
 
-CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
-CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
-CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
-
-# Allowed MIME types and maximum file size
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+STORAGE_BUCKET = "project-images"
+
+
+def _get_storage_client():
+    """Initialize Supabase client with service role key or fallback key."""
+    url = settings.SUPABASE_URL
+    key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+    if not url or not key:
+        return None
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        print(f"Error creating Supabase storage client: {e}")
+        return None
 
 
 def generate_cloudinary_signature(params: dict, api_secret: str) -> str:
-    """Generate Cloudinary upload signature."""
+    """Deprecated: Retained for backward compatibility with legacy tests."""
+    import hashlib
     sorted_params = "&".join([f"{k}={v}" for k, v in sorted(params.items())])
-    signature_str = sorted_params + api_secret
-    return hashlib.sha256(signature_str.encode()).hexdigest()
+    return hashlib.sha256((sorted_params + api_secret).encode()).hexdigest()
 
 
 @router.post("/upload")
@@ -37,14 +46,18 @@ async def upload_site_photo(
     caption: str = Form(""),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload a site photo to Cloudinary and return the secure URL."""
+    """
+    Upload a site photo directly to free Supabase Storage (with local disk fallback).
+    Supports direct device uploads and live camera captures.
+    """
 
     # ── File type validation ────────────────────────────────────────────────
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    content_type = file.content_type or "image/jpeg"
+    if content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Unsupported file type '{file.content_type}'. "
+                f"Unsupported file type '{content_type}'. "
                 "Only image/jpeg, image/png, and image/webp are allowed."
             )
         )
@@ -57,71 +70,76 @@ async def upload_site_photo(
             detail=f"File too large. Maximum allowed size is 10 MB (received {len(file_bytes) // (1024*1024)} MB)."
         )
 
-    # ── Cloudinary credentials check ────────────────────────────────────────
-    if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Cloudinary credentials not configured. "
-                "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend .env"
+    # Determine file extension
+    ext = "jpg"
+    if "png" in content_type:
+        ext = "png"
+    elif "webp" in content_type:
+        ext = "webp"
+    elif file.filename and "." in file.filename:
+        ext = file.filename.rsplit(".", 1)[-1].lower()
+
+    timestamp = int(time.time())
+    unique_suffix = uuid.uuid4().hex[:8]
+    storage_path = f"site_uploads/{project_id}/{timestamp}_{unique_suffix}.{ext}"
+
+    # ── 1. Upload to Supabase Storage (Free cloud tier) ─────────────────────
+    supabase = _get_storage_client()
+    if supabase:
+        try:
+            supabase.storage.from_(STORAGE_BUCKET).upload(
+                path=storage_path,
+                file=file_bytes,
+                file_options={"content-type": content_type, "upsert": "true"}
             )
-        )
+            public_url = supabase.storage.from_(STORAGE_BUCKET).get_public_url(storage_path)
 
-    try:
-        timestamp = int(time.time())
-        folder = f"constructflow/projects/{project_id}"
+            return {
+                "url": public_url,
+                "public_id": storage_path,
+                "project_id": project_id,
+                "site_id": site_id,
+                "caption": caption,
+                "storage_provider": "supabase"
+            }
+        except Exception as sb_err:
+            print(f"Supabase storage upload error: {sb_err}. Falling back to local storage.")
 
-        params = {
-            "folder": folder,
-            "timestamp": timestamp,
-        }
-        signature = generate_cloudinary_signature(params, CLOUDINARY_API_SECRET)
+    # ── 2. Local Storage Fallback (100% Free, Offline-ready) ─────────────────
+    upload_dir = pathlib.Path("uploads") / "site_uploads" / str(project_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    local_filename = f"{timestamp}_{unique_suffix}.{ext}"
+    local_file_path = upload_dir / local_filename
+    with open(local_file_path, "wb") as f:
+        f.write(file_bytes)
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload",
-                data={
-                    "api_key": CLOUDINARY_API_KEY,
-                    "timestamp": timestamp,
-                    "folder": folder,
-                    "signature": signature,
-                    "context": f"caption={caption}|project_id={project_id}",
-                },
-                files={"file": (file.filename, file_bytes, file.content_type)},
-                timeout=30.0
-            )
-
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Cloudinary upload failed: {response.text}"
-            )
-
-        result = response.json()
-
-        return {
-            "url": result.get("secure_url"),
-            "public_id": result.get("public_id"),
-            "project_id": project_id,
-            "site_id": site_id,
-            "caption": caption,
-            "width": result.get("width"),
-            "height": result.get("height"),
-        }
-
-    except HTTPException:
-        raise
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Cloudinary upload timed out.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    local_url = f"/uploads/site_uploads/{project_id}/{local_filename}"
+    return {
+        "url": local_url,
+        "public_id": f"local_{storage_path}",
+        "project_id": project_id,
+        "site_id": site_id,
+        "caption": caption,
+        "storage_provider": "local"
+    }
 
 
 @router.get("/health")
 def media_health(current_user: dict = Depends(get_current_user)):
-    """Check if Cloudinary credentials are configured."""
-    configured = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+    """Check storage provider configuration status."""
+    supabase = _get_storage_client()
+    supabase_ok = False
+    if supabase:
+        try:
+            buckets = supabase.storage.list_buckets()
+            supabase_ok = any(b.name == STORAGE_BUCKET for b in buckets)
+        except Exception:
+            supabase_ok = False
+
     return {
-        "cloudinary_configured": configured,
-        "cloud_name": CLOUDINARY_CLOUD_NAME if configured else "NOT SET"
+        "storage_provider": "supabase",
+        "bucket": STORAGE_BUCKET,
+        "supabase_configured": bool(settings.SUPABASE_URL and (settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY)),
+        "bucket_accessible": supabase_ok,
+        "status": "healthy"
     }

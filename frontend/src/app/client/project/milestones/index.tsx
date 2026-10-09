@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { useAuth } from '../../../../context/AuthContext';
+import { MilestoneRow } from '@/components/common/MilestoneRow';
+import { useResponsive } from '@/hooks/useResponsive';
 
 type Project = { id: string; name: string };
 type Milestone = { id: string; project_id: string; title: string; description?: string | null; due_date?: string | null; completion_percentage?: number | null; status?: string | null };
@@ -12,6 +14,7 @@ type Milestone = { id: string; project_id: string; title: string; description?: 
 export default function ClientProjectMilestonesPage() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(projectId || null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -58,13 +61,38 @@ export default function ClientProjectMilestonesPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Project Milestones" showAction={false} />
-      <View className="flex-1 p-6">
-        {projects.length > 0 && <View className="flex-row mb-5"><FlatList data={projects} horizontal showsHorizontalScrollIndicator={false} keyExtractor={item => item.id} renderItem={({ item }) => <Pressable onPress={() => setActiveProjectId(item.id)} className={`mr-5 pb-3 border-b-2 ${activeProjectId === item.id ? 'border-brand-orange' : 'border-transparent'}`}><Text className={`font-bold ${activeProjectId === item.id ? 'text-brand-orange' : 'text-gray-500'}`}>{item.name}</Text></Pressable>} /></View>}
-        {error ? <View className="bg-red-50 border border-red-200 rounded-2xl p-5"><Text className="text-red-700">{error}</Text></View> : loading ? <View className="gap-3"><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /></View> : milestones.length === 0 ? <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center"><Ionicons name="flag-outline" size={48} color="#D1D5DB" /><Text className="text-gray-500 mt-4">No milestones have been created for this project.</Text></View> : <FlatList data={milestones} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
-          const progress = Number(item.completion_percentage || 0);
-          const completed = item.status === 'Completed' || progress >= 100;
-          return <View className="flex-row bg-white rounded-xl border border-gray-100 p-5 mb-4"><View className={`w-11 h-11 rounded-full items-center justify-center mr-4 ${completed ? 'bg-green-100' : 'bg-orange-100'}`}><Ionicons name={completed ? 'checkmark' : 'time'} size={22} color={completed ? '#16A34A' : '#F97316'} /></View><View className="flex-1"><Text className="text-lg font-bold text-gray-800">{item.title}</Text><Text className="text-gray-500 mt-1">{item.description || 'No description provided'}</Text><View className="flex-row justify-between mt-3"><Text className="text-gray-400 text-xs">Due {item.due_date ? new Date(item.due_date).toLocaleDateString('en-GB') : 'Not set'}</Text><Text className="text-brand-orange text-xs font-bold">{progress}%</Text></View><View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-2"><View className={`h-full bg-brand-orange rounded-full ${progress <= 0 ? 'w-0' : progress < 25 ? 'w-1/4' : progress < 50 ? 'w-1/2' : progress < 75 ? 'w-3/4' : 'w-full'}`} /></View></View></View>;
-        }} />}
+      <View className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
+        {projects.length > 0 && <View className="flex-row mb-5"><FlatList keyboardShouldPersistTaps="handled" data={projects} horizontal showsHorizontalScrollIndicator={false} keyExtractor={item => item.id} renderItem={({ item }) => <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveProjectId(item.id)} className={`mr-5 pb-3 border-b-2 ${activeProjectId === item.id ? 'border-brand-orange' : 'border-transparent'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold ${activeProjectId === item.id ? 'text-brand-orange' : 'text-gray-500'}`}>{item.name}</Text></Pressable>} /></View>}
+        {error ? <View className="bg-red-50 border border-red-200 rounded-2xl p-5"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{error}</Text></View> : loading ? <View className="gap-3"><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /></View> : milestones.length === 0 ? <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center"><Ionicons name="flag-outline" size={48} color="#D1D5DB" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-4">No milestones have been created for this project.</Text></View> : (
+          <View className={`bg-white rounded-3xl shadow-sm border border-gray-100 ${isMobile ? 'p-4' : 'p-8'}`}>
+            <FlatList 
+              keyboardShouldPersistTaps="handled" 
+              data={milestones} 
+              keyExtractor={(item) => item.id} 
+              showsVerticalScrollIndicator={false} 
+              renderItem={({ item, index }) => {
+                const progress = Number(item.completion_percentage || 0);
+                return (
+                  <MilestoneRow 
+                    ms={item} 
+                    isLast={index === milestones.length - 1} 
+                    showAction={false}
+                  >
+                    <View className="mt-4 mb-2">
+                      <View className="flex-row justify-between mt-3 mb-1">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">Progress</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold">{progress}%</Text>
+                      </View>
+                      <View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-2">
+                        <View className={`h-full bg-brand-orange rounded-full`} style={{ width: `${progress}%` }} />
+                      </View>
+                    </View>
+                  </MilestoneRow>
+                );
+              }} 
+            />
+          </View>
+        )}
       </View>
     </View>
   );

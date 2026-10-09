@@ -22,3 +22,6 @@ input, textarea, [contenteditable] {
   -moz-user-select: text !important;
   -ms-user-select: text !important;
 }
+
+/* Keep unbroken addresses and identifiers inside their text container. */
+[dir="auto"] { overflow-wrap: anywhere; }

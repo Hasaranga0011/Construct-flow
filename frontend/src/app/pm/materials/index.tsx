@@ -1,378 +1,81 @@
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ModalViewport } from '@/components/common/ModalViewport';
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../context/AuthContext';
 import { TopNav } from '@/components/common/TopNav';
+import { supabase } from '@/lib/supabase';
+import { managedProjects } from '@/services/pmData';
+import { firstRelation } from '@/utils/relations';
+import { notify } from '@/utils/notify';
+import { formatMoney } from '@/utils/format';
+import { sendSystemNotification } from '@/utils/notifications';
 
-export default function PMApprovalQueue() {
-  const { user } = useAuth();
+export default function PMMaterialsPage() {
   const router = useRouter();
-  const [requests, setRequests] = useState<any[]>([]);
+  const [tab, setTab] = useState<'queue' | 'stock' | 'orders'>('queue');
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actioningId, setActioningId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Reject Modal State
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
-
-  const [activeTab, setActiveTab] = useState<'queue' | 'stock' | 'orders'>('queue');
-  const [stockData, setStockData] = useState<any[]>([]);
-  const [ordersData, setOrdersData] = useState<any[]>([]);
-
-  const loadRequests = async () => {
-    setLoading(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [reject, setReject] = useState<any>(null);
+  const [reason, setReason] = useState('');
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
-      const pmId = sessionData.session.user.id;
-
-      // 1. Fetch PM's projects directly (no pm_projects junction table)
-      const { data: pmProjects } = await supabase.from('projects').select('id').eq('pm_id', pmId);
-      const projectIds = pmProjects?.map(p => p.id) || [];
-
-      if (projectIds.length === 0) {
-        setRequests([]);
-        setStockData([]);
-        setLoading(false);
-        return;
-      }
-
-      if (activeTab === 'queue') {
-        let query = supabase
-          .from('material_requests')
-          .select('*, projects(name), profiles:requested_by(full_name)')
-          .in('project_id', projectIds)
-          .order('created_at', { ascending: false });
-
-        if (searchQuery) query = query.ilike('item_name', `%${searchQuery}%`);
-        const { data, error } = await query;
-        if (error && error.code !== '42P01') throw error;
-        setRequests(data || []);
-      } else if (activeTab === 'stock') {
-        // Fetch materials for PM's projects
-        let query = supabase
-          .from('materials')
-          .select('*, projects(name)')
-          .in('project_id', projectIds)
-          .order('created_at', { ascending: false });
-          
-        if (searchQuery) query = query.ilike('item_name', `%${searchQuery}%`);
-        const { data, error } = await query;
-        if (error && error.code !== '42P01') throw error;
-        setStockData(data || []);
-      } else if (activeTab === 'orders') {
-        let query = supabase
-          .from('purchase_orders')
-          .select('*, projects(name), suppliers(full_name)')
-          .in('project_id', projectIds)
-          .order('created_at', { ascending: false });
-
-        if (searchQuery) query = query.ilike('po_number', `%${searchQuery}%`);
-        const { data, error } = await query;
-        if (error && error.code !== '42P01') throw error;
-        setOrdersData(data || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadRequests();
-  }, [searchQuery, activeTab]);
-
-  const handleApprove = async (req: any) => {
-    setActioningId(req.id);
+      const projects = await managedProjects();
+      if (!projects.length) { setRows([]); return; }
+      const table = tab === 'queue' ? 'material_requests' : tab === 'stock' ? 'materials' : 'purchase_orders';
+      const result = await supabase.from(table).select('*').in('project_id', projects.map(p => p.id)).order('created_at', { ascending: false });
+      if (result.error) throw result.error;
+      setRows((result.data || []).map(row => ({ ...row, project: projects.find(p => p.id === row.project_id), profiles: firstRelation(row.profiles) })));
+    } catch (e: any) { setError(e.message || 'Unable to load materials.'); }
+    finally { setLoading(false); }
+  }, [tab]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const decide = async (request: any, status: 'Approved' | 'Rejected') => {
+    if (busy) return;
+    if (status === 'Rejected' && !reason.trim()) { notify('Reason required', 'Explain why this request is rejected.'); return; }
+    setBusy(request.id);
     try {
-      await supabase.from('material_requests').update({ status: 'Approved' }).eq('id', req.id);
-      
-      // Notify Supplier
-      await supabase.from('notifications').insert({
-        project_id: req.project_id,
-        target_role: 'Supplier',
-        title: 'New Approved Order',
-        message: `Project Manager approved ${req.quantity} ${req.unit} of ${req.item_name}. Ready for fulfillment.`,
-      });
-
-      // Notify Site Manager
-      if (req.requested_by) {
-        await supabase.from('notifications').insert({
-          target_user_id: req.requested_by,
-          title: 'Material Request Approved',
-          message: `Your request for ${req.item_name} was approved!`,
-        });
+      const result = await supabase.from('material_requests').update({ status, ...(status === 'Rejected' ? { notes: reason.trim() } : {}) }).eq('id', request.id).eq('project_id', request.project_id).eq('status', 'Pending Approval').select('id').single();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('This request changed. Refresh and try again.');
+      const { data: { session } } = await supabase.auth.getSession();
+      let notificationFailed = false;
+      if (request.requested_by) {
+        await sendSystemNotification(
+          `Material Request ${status}`,
+          `${request.item_name}: ${status}${status === 'Rejected' ? '. ' + reason.trim() : '. A purchase order can now be arranged.'}`,
+          'site_manager',
+          request.requested_by,
+          null,
+          'general',
+          request.project_id
+        );
       }
-
-      Alert.alert('Approved', 'Request has been forwarded to the Supplier.');
-      loadRequests();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setActioningId(null);
-    }
+      setReject(null); setReason(''); await load();
+      notify(status, notificationFailed ? 'Decision saved, but the requester notification could not be sent.' : status === 'Approved' ? 'Request approved. Create a purchase order to arrange supply.' : 'Request rejected.');
+    } catch (e: any) { notify('Unable to save decision', e.message); }
+    finally { setBusy(null); }
   };
-
-  const handleRejectConfirm = async () => {
-    if (!selectedReqId || !rejectReason) {
-      Alert.alert('Error', 'Please provide a reason for rejection.');
-      return;
-    }
-
-    setActioningId(selectedReqId);
-    try {
-      const req = requests.find(r => r.id === selectedReqId);
-      await supabase.from('material_requests').update({ status: 'Rejected', notes: rejectReason }).eq('id', selectedReqId);
-      
-      if (req?.requested_by) {
-        await supabase.from('notifications').insert({
-          target_user_id: req.requested_by,
-          title: 'Material Request Rejected',
-          message: `Your request for ${req.item_name} was rejected. Reason: ${rejectReason}`,
-        });
-      }
-
-      setShowRejectModal(false);
-      setRejectReason('');
-      setSelectedReqId(null);
-      loadRequests();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setActioningId(null);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Pending Approval': return 'bg-yellow-100 text-yellow-800';
-      case 'Approved': return 'bg-blue-100 text-blue-800';
-      case 'Ordered': return 'bg-purple-100 text-purple-800';
-      case 'Delivered': return 'bg-green-100 text-green-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  return (
-    <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Materials Management" 
-        showAction={false} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
-      />
-
-      {/* Tabs */}
-      <View className="flex-row px-8 mt-6">
-        <Pressable 
-          onPress={() => setActiveTab('queue')}
-          className={`pb-3 mr-8 border-b-2 ${activeTab === 'queue' ? 'border-brand-orange' : 'border-transparent'}`}
-        >
-          <Text className={`font-bold text-base ${activeTab === 'queue' ? 'text-brand-orange' : 'text-gray-500'}`}>Approval Queue</Text>
-        </Pressable>
-        <Pressable 
-          onPress={() => setActiveTab('stock')}
-          className={`pb-3 mr-8 border-b-2 ${activeTab === 'stock' ? 'border-brand-orange' : 'border-transparent'}`}
-        >
-          <Text className={`font-bold text-base ${activeTab === 'stock' ? 'text-brand-orange' : 'text-gray-500'}`}>Site Stock</Text>
-        </Pressable>
-        <Pressable 
-          onPress={() => setActiveTab('orders')}
-          className={`pb-3 border-b-2 ${activeTab === 'orders' ? 'border-brand-orange' : 'border-transparent'}`}
-        >
-          <Text className={`font-bold text-base ${activeTab === 'orders' ? 'text-brand-orange' : 'text-gray-500'}`}>Purchase Orders</Text>
-        </Pressable>
-      </View>
-
-      <View className="flex-1 p-8">
-        {loading ? (
-          <ActivityIndicator size="large" color="#F97316" className="mt-10" />
-        ) : (
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
-            <View className="flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
-              <Text className="w-1/5 text-xs font-bold text-gray-500 uppercase">Item</Text>
-              <Text className="w-1/6 text-xs font-bold text-gray-500 uppercase">{activeTab === 'queue' ? 'Project' : 'Site'}</Text>
-              <Text className="w-1/6 text-xs font-bold text-gray-500 uppercase">Quantity</Text>
-              <Text className="w-1/6 text-xs font-bold text-gray-500 uppercase">{activeTab === 'queue' ? 'Status' : 'Last Updated'}</Text>
-              {activeTab === 'queue' && <Text className="w-1/4 text-xs font-bold text-gray-500 uppercase text-right">Actions</Text>}
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {activeTab === 'queue' ? (
-                requests.length === 0 ? (
-                  <View className="p-10 items-center justify-center">
-                    <Ionicons name="checkmark-done-circle-outline" size={48} color="#D1D5DB" />
-                    <Text className="text-gray-400 mt-4">No pending requests to approve.</Text>
-                  </View>
-                ) : (
-                  requests.map(req => (
-                    <View key={req.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <View className="w-1/5">
-                        <Text className="font-bold text-brand-text">{req.item_name}</Text>
-                        <Text className="text-xs text-gray-400 mt-1">By: {req.profiles?.full_name || 'Site Manager'}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-gray-500 text-sm truncate">{req.projects?.name || 'Unknown'}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-brand-text font-semibold">{req.quantity} {req.unit}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <View className={`self-start px-2.5 py-1 rounded-md ${getStatusColor(req.status).split(' ')[0]}`}>
-                          <Text className={`text-xs font-bold ${getStatusColor(req.status).split(' ')[1]}`}>{req.status}</Text>
-                        </View>
-                      </View>
-                      <View className="w-1/4 flex-row justify-end space-x-2 gap-2">
-                        {req.status === 'Pending Approval' ? (
-                          <>
-                            <Pressable 
-                              onPress={() => {
-                                setSelectedReqId(req.id);
-                                setShowRejectModal(true);
-                              }}
-                              disabled={actioningId === req.id}
-                              className="bg-white border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50"
-                            >
-                              <Text className="text-red-600 font-semibold text-xs">Reject</Text>
-                            </Pressable>
-                            <Pressable 
-                              onPress={() => handleApprove(req)}
-                              disabled={actioningId === req.id}
-                              className="bg-brand-orange px-4 py-2 rounded-lg hover:bg-orange-600 flex-row items-center"
-                            >
-                              {actioningId === req.id ? (
-                                <ActivityIndicator size="small" color="white" />
-                              ) : (
-                                <Text className="text-white font-semibold text-xs">Approve</Text>
-                              )}
-                            </Pressable>
-                          </>
-                        ) : (
-                          <Text className="text-gray-400 text-xs italic">{req.notes || 'Processed'}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ))
-                )
-              ) : activeTab === 'stock' ? (
-                stockData.length === 0 ? (
-                  <View className="p-10 items-center justify-center">
-                    <Ionicons name="cube-outline" size={48} color="#D1D5DB" />
-                    <Text className="text-gray-400 mt-4">No site stock data found.</Text>
-                  </View>
-                ) : (
-                  stockData.map(stock => (
-                    <View key={stock.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <View className="w-1/5">
-                        <Text className="font-bold text-brand-text">{stock.item_name}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-gray-500 text-sm truncate">{stock.projects?.name || 'Unknown'}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-brand-text font-semibold">{stock.current_stock ?? 0} {stock.unit}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-gray-500 text-xs">
-                          {stock.created_at ? new Date(stock.created_at).toLocaleDateString() : '—'}
-                        </Text>
-                      </View>
-                    </View>
-                  ))
-                )
-              ) : (
-                <View>
-                  <View className="flex-row justify-between items-center mb-4 mt-2 px-6">
-                    <Text className="text-sm font-semibold text-gray-500">All Purchase Orders</Text>
-                    <Pressable 
-                      onPress={() => router.push('/pm/materials/orders/create' as any)}
-                      className="bg-brand-orange px-4 py-2 rounded-lg flex-row items-center"
-                    >
-                      <Ionicons name="add" size={16} color="white" />
-                      <Text className="text-white font-bold text-xs ml-1">Create PO</Text>
-                    </Pressable>
-                  </View>
-                  {ordersData.length === 0 ? (
-                    <View className="p-10 items-center justify-center">
-                      <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
-                      <Text className="text-gray-400 mt-4">No purchase orders found.</Text>
-                    </View>
-                  ) : (
-                    ordersData.map(order => (
-                    <View key={order.id} className="flex-row items-center py-4 px-6 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <View className="w-1/5">
-                        <Text className="font-bold text-brand-text">{order.po_number}</Text>
-                        <Text className="text-xs text-gray-400 mt-1">Total: {order.total_price}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-gray-500 text-sm truncate">{order.projects?.name || 'Unknown'}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <Text className="text-brand-text font-semibold">{order.suppliers?.full_name || 'Supplier'}</Text>
-                      </View>
-                      <View className="w-1/6">
-                        <View className={`self-start px-2.5 py-1 rounded-md ${getStatusColor(order.status).split(' ')[0]}`}>
-                          <Text className={`text-xs font-bold ${getStatusColor(order.status).split(' ')[1]}`}>{order.status}</Text>
-                        </View>
-                        {order.actual_delivery && (
-                          <Text className="text-xs text-gray-400 mt-1">Del: {order.actual_delivery}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ))
-                )}
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
-      </View>
-
-      {/* Reject Modal */}
-      <Modal visible={showRejectModal} transparent animationType="fade" onRequestClose={() => setShowRejectModal(false)}>
-        <ModalViewport>
-          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 0 }} className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl max-h-full">
-            <View className="p-4 border-b border-gray-100 flex-row justify-between items-center bg-gray-50">
-              <Text className="text-lg font-bold text-red-600">Reject Request</Text>
-              <Pressable onPress={() => !actioningId && setShowRejectModal(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </Pressable>
-            </View>
-            
-            <View className="p-6">
-              <Text className="text-sm font-semibold text-gray-700 mb-2">Reason for Rejection</Text>
-              <TextInput
-                className="border border-gray-200 rounded-xl p-3 text-brand-text bg-gray-50 mb-6"
-                placeholder="E.g. Exceeds current budget."
-                value={rejectReason}
-                onChangeText={setRejectReason}
-                multiline
-                numberOfLines={3}
-              />
-
-              <Pressable 
-                onPress={handleRejectConfirm}
-                disabled={actioningId !== null || !rejectReason}
-                className={`py-3 rounded-xl flex-row items-center justify-center ${actioningId !== null || !rejectReason ? 'bg-red-300' : 'bg-red-600 hover:bg-red-700'}`}
-              >
-                {actioningId !== null ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text className="text-white font-bold text-sm">Confirm Rejection</Text>
-                )}
-              </Pressable>
-            </View>
-          </ScrollView>
-        </ModalViewport>
-      </Modal>
-
+  const visible = rows.filter(row => `${row.item_name || row.name || row.po_number || ''} ${row.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
+  return <View className="flex-1 bg-brand-light">
+    <TopNav title="Materials Management" actionLabel="Refresh" onActionPress={load} />
+    <View className="px-4 pt-4"><TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} value={search} onChangeText={setSearch} placeholder="Search item, order or project" className="bg-white border border-gray-200 rounded-xl p-3 mb-3" />
+      <View className="flex-row flex-wrap gap-2 mb-3">{([['queue','Approval Queue'],['stock','Site Stock'],['orders','Purchase Orders']] as const).map(([value,label]) => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={value} onPress={() => setTab(value)} className={`rounded-lg px-3 py-3 ${tab === value ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={tab === value ? 'text-white font-bold' : 'text-gray-600'}>{label}</Text></Pressable>)}</View>
+      {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-3">{error}</Text>}
     </View>
-  );
+    <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
+      {tab === 'orders' && <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/materials/orders/create')} className="bg-brand-orange rounded-xl p-4 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Create PO</Text></Pressable>}
+      {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-5">No records match this view.</Text> : visible.map(row => <View key={row.id} className="bg-white rounded-xl p-5 mb-3">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{row.item_name || row.name || row.po_number}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{row.project?.name || 'Project'}</Text>
+        {tab === 'stock' ? <><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-3">Stock: {row.current_stock ?? 'Not recorded'} {row.unit}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-2">Minimum: {row.minimum_threshold ?? 'Not recorded'}</Text></> : <><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-3">Quantity: {row.quantity ?? row.quantity_ordered} {row.unit}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold mt-2">{row.status}</Text></>}
+        {tab === 'queue' && row.status === 'Pending Approval' && <View className="flex-row gap-3 mt-4"><Pressable style={{ minHeight: 44, minWidth: 44 }} disabled={!!busy} onPress={() => { setReject(row); setReason(''); }} className="border border-red-200 rounded-lg px-5 py-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 font-bold">Reject</Text></Pressable><Pressable style={{ minHeight: 44, minWidth: 44 }} disabled={!!busy} onPress={() => decide(row, 'Approved')} className="bg-brand-orange rounded-lg px-5 py-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">{busy === row.id ? 'Saving...' : 'Approve'}</Text></Pressable></View>}
+        {tab === 'queue' && !!row.notes && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-3">{row.notes}</Text>}
+        {tab === 'orders' && <><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-2">Total: {row.total_price == null ? 'Not recorded' : formatMoney(Number(row.total_price))}</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`/pm/materials/orders/${row.id}`)} className="bg-gray-100 rounded-lg p-3 mt-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold">View Order</Text></Pressable></>}
+      </View>)}
+    </ScrollView>
+    <Modal visible={!!reject} transparent onRequestClose={() => !busy && setReject(null)}><ModalViewport><ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold mb-4">Reject Request</Text><TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} multiline value={reason} onChangeText={setReason} placeholder="Reason for rejection" className="border border-gray-200 rounded-xl p-4 mb-4 min-h-[100px]" /><Pressable style={{ minHeight: 44, minWidth: 44 }} disabled={!!busy} onPress={() => decide(reject, 'Rejected')} className="bg-brand-orange p-4 rounded-xl"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">Confirm Rejection</Text></Pressable><Pressable style={{ minHeight: 44, minWidth: 44 }} disabled={!!busy} onPress={() => setReject(null)} className="p-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-center">Cancel</Text></Pressable></ScrollView></ModalViewport></Modal>
+  </View>;
 }

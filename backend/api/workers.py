@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -5,8 +6,6 @@ from core.supabase_client import supabase_db
 from core.auth import get_current_user
 import qrcode
 from io import BytesIO
-import cloudinary
-import cloudinary.uploader
 from core.config import settings
 
 router = APIRouter()
@@ -20,12 +19,6 @@ class WorkerCreate(BaseModel):
     site_id: Optional[str] = None
     assigned_project_id: Optional[str] = None
 
-if settings.CLOUDINARY_CLOUD_NAME:
-    cloudinary.config(
-        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-        api_key=settings.CLOUDINARY_API_KEY,
-        api_secret=settings.CLOUDINARY_API_SECRET
-    )
 
 @router.post("/")
 def create_worker(req: WorkerCreate, user=Depends(get_current_user)):
@@ -84,22 +77,24 @@ def get_worker(worker_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 def _generate_qr_url(worker_id: str) -> str:
-    if not settings.CLOUDINARY_CLOUD_NAME:
-        # Fallback if cloudinary not configured
-        return f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={worker_id}"
-        
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(worker_id)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     
     img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
+    img.save(img_byte_arr)
+    data = img_byte_arr.getvalue()
     
-    upload_res = cloudinary.uploader.upload(
-        img_byte_arr, 
-        folder="constructflow/qr_codes",
-        public_id=f"qr_{worker_id}"
-    )
-    return upload_res.get("secure_url")
+    try:
+        path = f"qr_codes/qr_{worker_id}.png"
+        supabase_db.storage.from_("project-images").upload(
+            path,
+            data,
+            {"content-type": "image/png", "upsert": "true"}
+        )
+        return supabase_db.storage.from_("project-images").get_public_url(path)
+    except Exception as e:
+        print(f"Supabase QR storage fallback: {e}")
+        return f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={worker_id}"
+

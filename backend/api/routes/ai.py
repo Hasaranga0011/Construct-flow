@@ -18,6 +18,7 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
 from core.security import get_current_user
 
@@ -252,8 +253,8 @@ def predict_cost(
 ):
     """
     Predict construction cost using the persisted RandomForestRegressor.
-    Returns per-prediction feature contributions and a confidence score
-    derived from the spread of individual tree predictions.
+    Returns per-prediction feature contributions. Per-estimate confidence is
+    unavailable without calibration; tree agreement is not calibrated accuracy.
     """
     _require_cost_model()
 
@@ -277,13 +278,15 @@ def predict_cost(
     X_df = pd.DataFrame(input_data)
 
     predicted_cost  = float(_cost_model.predict(X_df)[0])
-    confidence      = _prediction_interval(_cost_model, X_df)
+    model_source    = _cost_meta.get("data_source", "unverified")
+    # Tree agreement is not calibrated confidence, especially for synthetic data.
+    confidence      = None
     contributions   = _per_input_importance(_cost_model, X_df, input_data)
 
     return PredictResponse(
         estimated_cost=max(predicted_cost, 0),
         confidence_score=confidence,
-        model_source=_cost_meta.get("model_type", "RandomForestRegressor"),
+        model_source=model_source,
         model_trained_on=_cost_meta.get("trained_at"),
         training_samples=_cost_meta.get("dataset_size"),
         feature_contributions=contributions,

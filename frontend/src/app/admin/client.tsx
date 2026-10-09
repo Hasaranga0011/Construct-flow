@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { useTableRealtime } from '../../hooks/useTableRealtime';
-import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { SearchInput } from '@/components/common/SearchInput';
 
 export default function ClientPortalScreen() {
   const [stats, setStats] = useState({
@@ -23,6 +23,7 @@ export default function ClientPortalScreen() {
   
   const [isModalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchClients, setSearchClients] = useState<any[]>([]);
   const { isMobile } = useResponsive();
   
   const { tick, lastUpdated } = useTableRealtime(['profiles', 'projects', 'invoices', 'client_activity', 'shared_documents']);
@@ -36,12 +37,13 @@ export default function ClientPortalScreen() {
 
         // Fetch counts
         const [clientsReq, projectsReq, invoicesReq] = await Promise.all([
-          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'client'),
+          supabase.from('profiles').select('id, full_name, email, role', { count: 'exact' }).eq('role', 'client'),
           supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active'),
           supabase.from('invoices').select('id', { count: 'exact', head: true }).in('status', ['Unpaid', 'Overdue'])
         ]);
 
         if (isMounted) {
+          setSearchClients(clientsReq.data || []);
           setStats({
             activeClients: clientsReq.count || 0,
             sharedProjects: projectsReq.count || 0,
@@ -77,16 +79,16 @@ export default function ClientPortalScreen() {
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
-        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text className="text-2xl font-bold text-brand-text">All Clients</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Clients</Text>
             <View className="flex-row items-center">
               <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-              <Text className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
             </View>
             
-            <GlobalSearchDropdown 
+            <SearchInput items={searchClients} entityLabel="clients" 
               placeholder="Search clients..." 
               value={searchQuery}
               onChangeText={setSearchQuery}

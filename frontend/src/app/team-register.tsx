@@ -88,16 +88,16 @@ export default function RegisterScreen() {
         <View className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
 
         <View className="z-10 w-full px-8 xl:px-16 max-w-xl">
-          <Text className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Start Building Today</Text>
-          <Text className="text-white font-extrabold text-5xl leading-tight mb-6">Gain complete control over your projects.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Start Building Today</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-5xl leading-tight mb-6">Gain complete control over your projects.</Text>
 
           <View className="mb-6 flex-row items-center bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
             <View className="w-12 h-12 bg-orange-500/20 rounded-full items-center justify-center mr-4">
                <FontAwesome5 name="chart-line" size={20} color="#F97316" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-lg">Real-Time Tracking</Text>
-              <Text className="text-gray-400 text-sm">Monitor costs, labor, and materials.</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Real-Time Tracking</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm">Monitor costs, labor, and materials.</Text>
             </View>
           </View>
 
@@ -106,8 +106,8 @@ export default function RegisterScreen() {
                <FontAwesome5 name="users-cog" size={20} color="#3B82F6" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-lg">Role-Based Access</Text>
-              <Text className="text-gray-400 text-sm">Separate views for admins, managers & clients.</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Role-Based Access</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm">Separate views for admins, managers & clients.</Text>
             </View>
           </View>
 
@@ -116,8 +116,8 @@ export default function RegisterScreen() {
                <FontAwesome5 name="robot" size={20} color="#10B981" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-lg">AI Estimations</Text>
-              <Text className="text-gray-400 text-sm">Generate quick, accurate quotes using AI.</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">AI Estimations</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm">Generate quick, accurate quotes using AI.</Text>
             </View>
           </View>
 
@@ -128,7 +128,7 @@ export default function RegisterScreen() {
         {/* ── Construct Ai Logo ── */}
         <Pressable
           onPress={() => router.push('/')}
-          style={{ alignSelf: 'flex-start', width: '100%', maxWidth: 280, marginBottom: 24 }}
+          style={[{ alignSelf: 'flex-start', width: '100%', maxWidth: 280, marginBottom: 24 }, { minHeight: 44, minWidth: 44 }]}
           accessibilityLabel="ConstructAi home"
         >
           <Image
@@ -138,20 +138,20 @@ export default function RegisterScreen() {
           />
         </Pressable>
         <View className="w-full">
-          <Text className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Team Registration</Text>
-          <Text className="text-gray-500 text-base">Join ConstructAi today to manage your team.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Team Registration</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-base">Join ConstructAi today to manage your team.</Text>
         </View>
       </View>
 
       {errorMsg ? (
         <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
-          <Text className="text-red-600 text-sm text-center">{errorMsg}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-sm text-center">{errorMsg}</Text>
         </View>
       ) : null}
 
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">Full Name</Text>
-        <TextInput
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Full Name</Text>
+        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
           className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
           placeholder="John Doe"
           value={fullName}
@@ -160,8 +160,8 @@ export default function RegisterScreen() {
       </View>
 
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">Email</Text>
-        <TextInput
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email</Text>
+        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
           className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
           placeholder="name@company.com"
           value={email}
@@ -172,9 +172,9 @@ export default function RegisterScreen() {
       </View>
 
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">Password</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Password</Text>
         <View className="w-full flex-row items-center border border-gray-300 rounded-xl bg-gray-50 pr-2">
-          <TextInput
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="flex-1 p-4 text-brand-text outline-none"
             placeholder="••••••••"
             value={password}
@@ -182,16 +182,16 @@ export default function RegisterScreen() {
             secureTextEntry={!showPassword}
             returnKeyType="next"
           />
-          <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
             <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
           </Pressable>
         </View>
       </View>
 
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">Confirm Password</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Confirm Password</Text>
         <View className="w-full flex-row items-center border border-gray-300 rounded-xl bg-gray-50 pr-2">
-          <TextInput
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="flex-1 p-4 text-brand-text outline-none"
             placeholder="••••••••"
             value={confirmPassword}
@@ -200,7 +200,7 @@ export default function RegisterScreen() {
             returnKeyType="done"
             onSubmitEditing={handleRegister}
           />
-          <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}>
             <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color="#9CA3AF" />
           </Pressable>
         </View>
@@ -208,15 +208,15 @@ export default function RegisterScreen() {
 
 
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">Role</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Role</Text>
         <View className="flex-row gap-2">
           {['worker', 'site_manager', 'pm'].map((r) => (
-            <Pressable
+            <Pressable style={{ minHeight: 44, minWidth: 44 }}
               key={r}
               onPress={() => setRole(r)}
               className={`flex-1 p-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center`}
             >
-              <Text className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
                 {r.replace('_', ' ')}
               </Text>
             </Pressable>
@@ -225,7 +225,7 @@ export default function RegisterScreen() {
       </View>
 
 
-      <Pressable
+      <Pressable style={{ minHeight: 44, minWidth: 44 }}
         onPress={handleRegister}
         disabled={loading}
         className={`w-full bg-brand-orange py-4 rounded-xl items-center justify-center shadow-md hover:bg-orange-600 transition-colors ${loading ? 'opacity-70' : ''}`}
@@ -233,32 +233,32 @@ export default function RegisterScreen() {
         {loading ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text className="text-white font-bold text-lg">Sign Up</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Sign Up</Text>
         )}
       </Pressable>
 
       <View className="flex-row items-center justify-center my-6">
         <View className="flex-1 h-px bg-gray-200" />
-        <Text className="px-4 text-gray-400 font-medium text-sm">Or Sign Up With</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="px-4 text-gray-400 font-medium text-sm">Or Sign Up With</Text>
         <View className="flex-1 h-px bg-gray-200" />
       </View>
 
       <View className="flex-row mb-6">
-        <Pressable onPress={handleGoogleAuth} className="w-full flex-row items-center justify-center py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
+        <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={handleGoogleAuth} className="w-full flex-row items-center justify-center py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
           <Image
             source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png' }}
             style={{ width: 20, height: 20, marginRight: 10 }}
             resizeMode="contain"
           />
-          <Text className="text-brand-text font-semibold text-base">Continue with Google</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-base">Continue with Google</Text>
         </Pressable>
       </View>
 
       <View className="flex-row flex-wrap justify-center pb-8">
-        <Text className="text-gray-500">Already have an account? </Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Already have an account? </Text>
         <Link href="/team-login" asChild>
-          <Pressable>
-            <Text className="text-brand-orange font-bold hover:underline">Sign In</Text>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Sign In</Text>
           </Pressable>
         </Link>
       </View>

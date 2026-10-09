@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from core.supabase_client import supabase_db
 from core.auth import get_current_user

@@ -62,26 +62,26 @@ export const ClientMediaGallery = () => {
 
   return (
     <View className="flex-1 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="border-b border-gray-100 mb-6">
+      <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="border-b border-gray-100 mb-6">
         {categories.map(category => (
-          <Pressable key={category} onPress={() => setActiveCategory(category)} className={`mr-6 pb-3 border-b-2 ${activeCategory === category ? 'border-brand-orange' : 'border-transparent'}`}>
-            <Text className={`font-semibold capitalize ${activeCategory === category ? 'text-brand-orange' : 'text-gray-500'}`}>{category === 'all' ? 'All media' : category}</Text>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} key={category} onPress={() => setActiveCategory(category)} className={`mr-6 pb-3 border-b-2 ${activeCategory === category ? 'border-brand-orange' : 'border-transparent'}`}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold capitalize ${activeCategory === category ? 'text-brand-orange' : 'text-gray-500'}`}>{category === 'all' ? 'All media' : category}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
       {loading ? <View className="py-12 items-center"><ActivityIndicator color="#F97316" /></View> : error ? (
-        <Text className="text-red-600 text-center py-10">{error}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-center py-10">{error}</Text>
       ) : filteredMedia.length === 0 ? (
-        <View className="py-12 items-center"><Ionicons name="images-outline" size={44} color="#D1D5DB" /><Text className="text-gray-500 mt-3">No project media available.</Text></View>
+        <View className="py-12 items-center"><Ionicons name="images-outline" size={44} color="#D1D5DB" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-3">No project media available.</Text></View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View className="flex-row flex-wrap -mx-2">
             {filteredMedia.map(item => (
               <View key={item.id} className="w-full md:w-1/3 px-2 mb-4">
                 <View className="rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
                   <Image source={{ uri: item.url }} className="w-full h-40" resizeMode="cover" />
-                  <View className="p-3"><Text className="font-bold text-brand-text" numberOfLines={1}>{item.caption || item.category || 'Progress photo'}</Text><Text className="text-gray-400 text-xs mt-1">{new Date(item.created_at).toLocaleDateString('en-GB')}</Text></View>
+                  <View className="p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{item.caption || item.category || 'Progress photo'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-1">{new Date(item.created_at).toLocaleDateString('en-GB')}</Text></View>
                 </View>
               </View>
             ))}

@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -48,7 +49,7 @@ async def generate_estimation(req: EstimationRequest, user=Depends(get_current_u
                 "total_cost": mock_data["total_cost"],
                 "timeline_days": mock_data["timeline_days"],
                 "ai_generated": True
-            }).execute()
+            }])
             return {"data": {**mock_data, "id": res.data[0]["quotation_id"]}}
 
         # Actual Claude API call

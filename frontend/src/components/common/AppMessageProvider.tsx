@@ -55,17 +55,17 @@ export const AppMessageProvider = () => {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => setMessage(null)}>
       <ModalViewport>
-        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="w-full max-w-sm max-h-full rounded-2xl bg-white shadow-2xl">
-          <Text className="text-xl font-bold text-gray-900">{message.title}</Text>
-          {!!message.message && <Text className="mt-2 text-sm leading-5 text-gray-500">{message.message}</Text>}
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="w-full max-w-sm max-h-full rounded-2xl bg-white shadow-2xl">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-900">{message.title}</Text>
+          {!!message.message && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-2 text-sm leading-5 text-gray-500">{message.message}</Text>}
           <View className="mt-6 flex-row flex-wrap justify-end gap-3">
             {message.buttons.map((button, index) => (
-              <Pressable
+              <Pressable style={{ minHeight: 44, minWidth: 44 }}
                 key={`${button.text}-${index}`}
                 onPress={() => closeWith(button)}
                 className={`rounded-lg px-4 py-3 ${button.style === 'destructive' ? 'bg-red-500' : index === message.buttons.length - 1 ? 'bg-brand-orange' : 'border border-gray-200'}`}
               >
-                <Text className={`font-semibold ${button.style === 'destructive' || index === message.buttons.length - 1 ? 'text-white' : 'text-gray-700'}`}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold ${button.style === 'destructive' || index === message.buttons.length - 1 ? 'text-white' : 'text-gray-700'}`}>
                   {button.text}
                 </Text>
               </Pressable>

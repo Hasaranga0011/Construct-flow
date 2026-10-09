@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -65,7 +66,7 @@ def create_request(req: MaterialRequest, user=Depends(get_current_user)):
             "target_role": "super_admin",
             "is_read": False
         }
-        supabase_db.table("notifications").insert(notification).execute()
+        create_notifications(notification)
         
         return {"message": "Request created", "data": res.data[0]}
     except Exception as e:
@@ -87,11 +88,11 @@ def update_request(request_id: str, req: MaterialRequestUpdate, user=Depends(get
         
         # If approved, deduct from stock (simple logic for now, production should be transactional)
         if req.status == 'Approved':
-            mat_res = supabase_db.table("materials").select("global_stock_quantity").eq("id", request["material_id"]).execute()
+            mat_res = supabase_db.table("materials").select("global_stock_quantity").eq("id", request["material_id"])
             if mat_res.data:
                 current_qty = mat_res.data[0].get("global_stock_quantity", 0)
                 new_qty = max(0, current_qty - request["quantity"])
-                supabase_db.table("materials").update({"global_stock_quantity": new_qty}).eq("id", request["material_id"]).execute()
+                supabase_db.table("materials").update({"global_stock_quantity": new_qty}).eq("id", request["material_id"])
                 
         return {"message": f"Request marked as {req.status}", "data": update_res.data[0]}
     except HTTPException:

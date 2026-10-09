@@ -100,36 +100,36 @@ export default function ClientinvoicesPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Client Invoices" showAction={false} />
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-        <Text className="text-2xl font-bold text-brand-text mb-2">Project Financial Records</Text>
-        <Text className="text-gray-500 mb-6">Delivered orders and recorded project expenses.</Text>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-2">Project Financial Records</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-6">Delivered orders and recorded project expenses.</Text>
         {loading ? (
           <View className="gap-3">
             {[1, 2, 3].map(item => <View key={item} className="bg-gray-100 rounded-2xl h-24 animate-pulse" />)}
           </View>
         ) : error ? (
           <View className="bg-red-50 border border-red-200 rounded-2xl p-6 items-center">
-            <Text className="text-red-700 text-center">{error}</Text>
-            <Pressable onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4">
-              <Text className="text-white font-bold">Retry</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-center">{error}</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetryKey(value => value + 1)} className="bg-brand-orange px-5 py-3 rounded-lg mt-4">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Retry</Text>
             </Pressable>
           </View>
         ) : rows.length === 0 ? (
           <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center">
             <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
-            <Text className="text-gray-700 font-bold mt-4">No financial records yet</Text>
-            <Text className="text-gray-500 text-center mt-2">Delivered purchase orders and approved project expenses will appear here.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold mt-4">No financial records yet</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-2">Delivered purchase orders and approved project expenses will appear here.</Text>
           </View>
         ) : (
           rows.map(row => (
             <View key={`${row.source}-${row.id}`} className="bg-white rounded-2xl border border-gray-100 p-5 mb-3">
               <View className="flex-row justify-between items-start">
                 <View className="flex-1 pr-4">
-                  <Text className="text-brand-text font-bold">{row.title}</Text>
-                  <Text className="text-gray-500 text-sm mt-1">{row.projectName}</Text>
-                  <Text className="text-gray-400 text-xs mt-2">{row.source} · {formatDate(row.date)}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{row.title}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-1">{row.projectName}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-2">{row.source} · {formatDate(row.date)}</Text>
                 </View>
-                <Text className="text-brand-orange font-bold text-lg">{formatCurrency(row.amount)}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-lg">{formatCurrency(row.amount)}</Text>
               </View>
             </View>
           ))

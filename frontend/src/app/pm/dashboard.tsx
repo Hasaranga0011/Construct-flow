@@ -1,6 +1,6 @@
 // Modified for Expo Go mobile compatibility
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, ActivityIndicator } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { CostTimelineChart } from '../../components/dashboard/CostTimelineChart';
@@ -21,6 +21,7 @@ export default function DashboardScreen() {
     lowStockAlerts: 0,
     totalBudget: 0,
   });
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   
   const [isModalVisible, setModalVisible] = useState(false);
@@ -30,6 +31,7 @@ export default function DashboardScreen() {
 
   const loadStats = useCallback(async () => {
     try {
+      setError('');
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) return;
       
@@ -39,10 +41,10 @@ export default function DashboardScreen() {
       // Fetch PM's projects directly via pm_id foreign key
       const projectsReq = await supabase
         .from('projects')
-        .select('id, total_budget, estimated_cost', { count: 'exact' })
-        .eq('status', 'active')
+        .select('*', { count: 'exact' })
         .eq('pm_id', userId);
 
+      if (projectsReq.error) throw projectsReq.error;
       const assignedProjectIds = projectsReq.data?.map(p => p.id) || [];
 
       let totalBudget = 0;
@@ -51,38 +53,17 @@ export default function DashboardScreen() {
       let labourCount = 0;
 
       if (projectsReq.data) {
-        activeProjectsCount = projectsReq.count || 0;
-        totalBudget = projectsReq.data.reduce((sum, item) => sum + (Number(item.total_budget || item.estimated_cost) || 0), 0);
+        activeProjectsCount = projectsReq.data.filter(p => ['active', 'in progress', 'ongoing'].includes(String(p.status).toLowerCase())).length;
+        totalBudget = projectsReq.data.reduce((sum, item) => sum + (Number(item.total_budget ?? item.estimated_cost) || 0), 0);
       }
 
       if (assignedProjectIds.length > 0) {
-        const materialsReq = await supabase
-          .from('material_requests')
-          .select('id, project_id', { count: 'exact' })
-          .eq('status', 'Pending Approval')
-          .in('project_id', assignedProjectIds);
-
-        lowStockAlerts = materialsReq.count || 0;
-
-        // Use canonical attendance table (not legacy labour) for workers-on-site count.
-        const today = new Date().toISOString().split('T')[0];
-        // Get site_manager_sites IDs for these projects to filter attendance.
-        const siteAssignmentsReq = await supabase
-          .from('site_manager_sites')
-          .select('id')
-          .in('project_id', assignedProjectIds);
-        const siteIds = siteAssignmentsReq.data?.map(s => s.id) || [];
-
-        if (siteIds.length > 0) {
-          const attReq = await supabase
-            .from('attendance')
-            .select('id', { count: 'exact', head: true })
-            .in('site_id', siteIds)
-            .eq('date', today)
-            .not('check_in_time', 'is', null)
-            .is('check_out_time', null);
-          labourCount = attReq.count || 0;
-        }
+        const materialsReq = await supabase.from('materials').select('current_stock, minimum_threshold').in('project_id', assignedProjectIds);
+        if (materialsReq.error) throw materialsReq.error;
+        lowStockAlerts = (materialsReq.data || []).filter(m => m.current_stock != null && m.minimum_threshold != null && Number(m.current_stock) < Number(m.minimum_threshold)).length;
+        const attReq = await supabase.from('attendance').select('id', { count: 'exact', head: true }).in('site_id', assignedProjectIds).eq('date', new Date().toISOString().slice(0, 10)).not('check_in_time', 'is', null).is('check_out_time', null);
+        if (attReq.error) throw attReq.error;
+        labourCount = attReq.count || 0;
       }
 
       setStats({
@@ -92,7 +73,7 @@ export default function DashboardScreen() {
         totalBudget: totalBudget,
       });
     } catch (error) {
-      console.warn('Failed to load PM dashboard stats:', error);
+      setError(error instanceof Error ? error.message : 'Unable to load dashboard data.');
     } finally {
       setLoading(false);
     }
@@ -142,12 +123,13 @@ export default function DashboardScreen() {
         onSearch={setSearchQuery}
       />
       
+      {!!error && <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} className="text-red-600 p-4" onPress={loadStats}>{error} Tap to retry.</Text>}
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           {/* Top Stat Cards Row */}
           <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
             <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
@@ -185,23 +167,23 @@ export default function DashboardScreen() {
           {/* Center Row: Chart & Delay Risk */}
           <View className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
             {/* Main Content Area (Chart) */}
-            <View className="flex-[2] w-full">
-              <CostTimelineChart />
+            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+              <CostTimelineChart pmId={currentUserId} />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className="flex-[1] w-full">
+            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
               <DelayRiskPanel pmId={currentUserId} />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
           <View className={isMobile ? "flex-col gap-6 pb-6" : "flex-row gap-6 pb-6"}>
-            <View className="flex-[2] w-full">
+            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} pmId={currentUserId} />
             </View>
             
-            <View className="flex-[1] w-full">
+            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
               <RecentAlertsPanel pmId={currentUserId} />
             </View>
           </View>

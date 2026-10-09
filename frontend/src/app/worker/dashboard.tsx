@@ -69,29 +69,29 @@ export default function WorkerDashboard() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-6 lg:p-8" showsVerticalScrollIndicator={false}>
 
           {/* Profile Header */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-8 mb-6 flex-col sm:flex-row items-center">
             <View className="w-16 h-16 bg-brand-orange rounded-full items-center justify-center mb-4 sm:mb-0 sm:mr-6">
-              <Text className="text-white text-3xl font-bold">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-3xl font-bold">
                 {(profile?.full_name || 'W').charAt(0).toUpperCase()}
               </Text>
             </View>
             <View className="flex-1">
-              <Text className="text-2xl font-bold text-gray-800">{profile?.full_name || 'Worker'}</Text>
-              <Text className="text-gray-500 capitalize mt-1">{profile?.role?.replace('_', ' ') || 'Worker'}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800">{profile?.full_name || 'Worker'}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 capitalize mt-1">{profile?.role?.replace('_', ' ') || 'Worker'}</Text>
             </View>
             <View className="items-center bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl">
-              <Text className="text-3xl font-bold text-brand-orange">{totalDays}</Text>
-              <Text className="text-xs text-orange-600 font-semibold">Days Present</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange">{totalDays}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-orange-600 font-semibold">Days Present</Text>
             </View>
           </View>
 
           {/* Worker QR Code */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 items-center">
-            <Text className="text-lg font-bold text-gray-800 mb-2">Your Worker ID Card</Text>
-            <Text className="text-gray-500 text-sm text-center mb-6">Show this QR code to your Site Manager to be scanned in.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-2">Your Worker ID Card</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm text-center mb-6">Show this QR code to your Site Manager to be scanned in.</Text>
 
             {profile?.qr_code ? (
               <View className="border-4 border-gray-800 p-3 rounded-xl mb-4 bg-white">
@@ -100,23 +100,23 @@ export default function WorkerDashboard() {
             ) : (
               <View className="w-44 h-44 border border-dashed border-gray-300 rounded-xl items-center justify-center mb-4">
                 <Ionicons name="qr-code-outline" size={48} color="#D1D5DB" />
-                <Text className="text-gray-400 text-xs text-center mt-2 px-4">QR code has not been assigned yet.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs text-center mt-2 px-4">QR code has not been assigned yet.</Text>
               </View>
             )}
 
-            <Text className="text-brand-text font-bold text-base">Worker ID</Text>
-            <Text className="text-gray-400 text-xs mt-1 font-mono">{profile?.id?.slice(0, 20)}...</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">Worker ID</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-1 font-mono">{profile?.id?.slice(0, 20)}...</Text>
           </View>
 
           {/* Recent Attendance */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <View className="p-6 border-b border-gray-100">
-              <Text className="text-lg font-bold text-gray-800">Recent Check-Ins</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800">Recent Check-Ins</Text>
             </View>
             {recentAttendance.length === 0 ? (
               <View className="p-10 items-center justify-center">
                 <Ionicons name="calendar-outline" size={48} color="#E5E7EB" />
-                <Text className="text-gray-400 mt-4">No attendance recorded yet.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4">No attendance recorded yet.</Text>
               </View>
             ) : (
               recentAttendance.map((record, i) => (
@@ -125,11 +125,11 @@ export default function WorkerDashboard() {
                     <Ionicons name="checkmark" size={18} color="#22C55E" />
                   </View>
                   <View className="flex-1">
-                    <Text className="font-bold text-gray-800">{record.projects?.name || 'Unknown Project'}</Text>
-                    <Text className="text-gray-500 text-xs mt-0.5">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">{record.projects?.name || 'Unknown Project'}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-0.5">{new Date(record.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</Text>
                   </View>
                   <View className="bg-green-100 px-2.5 py-1 rounded-full">
-                    <Text className="text-green-600 font-bold text-xs">Present</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-600 font-bold text-xs">Present</Text>
                   </View>
                 </View>
               ))

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Text, TextInput } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TopNav } from '@/components/common/TopNav';
@@ -9,7 +9,7 @@ import { PayrollSummary } from '../../../components/labour/PayrollSummary';
 import { LabourDistributionChart } from '../../../components/labour/LabourDistributionChart';
 import { CheckInWorkerModal } from '../../../components/labour/CheckInWorkerModal';
 import { supabase } from '../../../lib/supabase';
-import { GlobalSearchDropdown } from '@/components/common/GlobalSearchDropdown';
+import { SearchInput } from '@/components/common/SearchInput';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 import { useTableRealtime } from '../../../hooks/useTableRealtime';
@@ -27,8 +27,9 @@ export default function LabourForceScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [workers, setWorkers] = useState<any[]>([]);
   const { isMobile } = useResponsive();
-  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects', 'salary_slips']);
+  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects', 'salary_slips', 'workers', 'site_workers']);
   const liveTrigger = refreshTrigger + tick;
 
   useEffect(() => {
@@ -40,11 +41,13 @@ export default function LabourForceScreen() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        const [workersReq, checkinsReq, sitesReq, labourReq] = await Promise.all([
-          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker'),
+        const [workersReq, checkinsReq, sitesReq, labourReq, recordsReq, assignmentsReq] = await Promise.all([
+          supabase.from('profiles').select('id, full_name, email, role', { count: 'exact' }).eq('role', 'worker'),
           supabase.from('legacy_labour').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
-          supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('legacy_labour').select('hours_worked').eq('date', today).eq('status', 'Present')
+          supabase.from('projects').select('id, name, status'),
+          supabase.from('legacy_labour').select('hours_worked').eq('date', today).eq('status', 'Present'),
+          supabase.from('workers').select('*'),
+          supabase.from('site_workers').select('worker_id, project_id')
         ]);
         
         let overtimeHrs = 0;
@@ -56,10 +59,19 @@ export default function LabourForceScreen() {
         }
 
         if (isMounted) {
+          const projectsById = new Map((sitesReq.data || []).map(p => [p.id, p.name]));
+          setWorkers((workersReq.data || []).map(profile => {
+            const record = (recordsReq.data || []).find(w => w.user_id === profile.id || w.id === profile.id);
+            const sites = [...new Set((assignmentsReq.data || [])
+              .filter(a => a.worker_id === record?.id || a.worker_id === profile.id)
+              .map(a => projectsById.get(a.project_id)).filter(Boolean))];
+            return { ...profile, search_detail: [record?.skill_type || profile.role,
+              sites.length ? sites.join(', ') : (assignmentsReq.error ? 'Site unavailable' : 'No assigned site'), profile.email].filter(Boolean).join(' | ') };
+          }));
           setStats({
             totalWorkers: workersReq.count || 0,
             checkedInToday: checkinsReq.count || 0,
-            activeSites: sitesReq.count || 0, 
+            activeSites: (sitesReq.data || []).filter(p => ['active', 'in progress'].includes(String(p.status).toLowerCase())).length, 
             pendingPayroll: Math.round(overtimeHrs), 
           });
         }
@@ -92,17 +104,19 @@ export default function LabourForceScreen() {
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
-        <ScrollView className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text className="text-2xl font-bold text-brand-text">All Workers</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Workers</Text>
             <View className="flex-row items-center">
               <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-              <Text className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
             </View>
             
-            <GlobalSearchDropdown 
-              placeholder="Search workers..." 
+            <SearchInput 
+              placeholder="Search workers..."
+              entityLabel="workers"
+              items={workers} 
               value={searchQuery} 
               onChangeText={setSearchQuery} 
               className={isMobile ? "w-full" : "w-64"}
@@ -111,7 +125,7 @@ export default function LabourForceScreen() {
                 searchColumn: 'full_name',
                 secondaryColumn: 'email',
                 titleColumn: 'full_name',
-                subtitleColumn: 'email',
+                subtitleColumn: 'search_detail',
                 routePrefix: '/admin/users/',
                 filterColumn: 'role',
                 filterValue: 'worker'
@@ -146,13 +160,13 @@ export default function LabourForceScreen() {
 
           {/* Quick Actions */}
           <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 24 }}>
-            <Pressable onPress={() => router.push('/admin/attendance')} className="bg-indigo-50 px-4 py-3 rounded-lg border border-indigo-100 flex-row items-center">
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/attendance')} className="bg-indigo-50 px-4 py-3 rounded-lg border border-indigo-100 flex-row items-center">
               <Ionicons name="time-outline" size={20} color="#4F46E5" />
-              <Text className="text-indigo-700 font-bold ml-2">Attendance Logs</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-indigo-700 font-bold ml-2">Attendance Logs</Text>
             </Pressable>
-            <Pressable onPress={() => router.push('/admin/payroll')} className="bg-green-50 px-4 py-3 rounded-lg border border-green-100 flex-row items-center">
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/payroll')} className="bg-green-50 px-4 py-3 rounded-lg border border-green-100 flex-row items-center">
               <Ionicons name="cash-outline" size={20} color="#10B981" />
-              <Text className="text-green-700 font-bold ml-2">Payroll Generation</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-700 font-bold ml-2">Payroll Generation</Text>
             </Pressable>
           </View>
 

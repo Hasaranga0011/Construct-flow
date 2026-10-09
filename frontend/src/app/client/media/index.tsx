@@ -68,14 +68,14 @@ export default function ClientMediaPage() {
           {/* Project Selector */}
           {projects.length > 0 && (
             <View className="bg-white px-6 pt-4 border-b border-gray-200">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                 {projects.map(project => (
-                  <Pressable
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
                     key={project.id}
                     onPress={() => setSelectedProjectId(project.id)}
                     className={`mr-6 pb-3 border-b-2 ${selectedProjectId === project.id ? 'border-brand-orange' : 'border-transparent'}`}
                   >
-                    <Text className={`font-bold text-base ${selectedProjectId === project.id ? 'text-brand-orange' : 'text-gray-500'}`}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold text-base ${selectedProjectId === project.id ? 'text-brand-orange' : 'text-gray-500'}`}>
                       {project.name}
                     </Text>
                   </Pressable>
@@ -84,22 +84,22 @@ export default function ClientMediaPage() {
             </View>
           )}
 
-          <ScrollView className="flex-1 p-8" showsVerticalScrollIndicator={false}>
+          <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-8" showsVerticalScrollIndicator={false}>
 
             {error ? (
               <View className="items-center justify-center py-20">
                 <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                <Text className="text-red-600 mt-4 text-center">{error}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mt-4 text-center">{error}</Text>
               </View>
             ) : projects.length === 0 ? (
               <View className="flex-1 items-center justify-center py-20">
                 <Ionicons name="images-outline" size={48} color="#E5E7EB" />
-                <Text className="text-gray-400 mt-4 font-medium">No projects with media available.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4 font-medium">No projects with media available.</Text>
               </View>
             ) : (
               <>
                 <View className="flex-row justify-between items-center mb-6">
-                  <Text className="text-xl font-bold text-gray-800">Site Progress Photos</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">Site Progress Photos</Text>
                 </View>
 
                 {/* Photo Grid */}
@@ -108,14 +108,14 @@ export default function ClientMediaPage() {
                     <View key={photo.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full md:w-[31%]">
                       <Image source={{ uri: photo.url }} className="w-full h-36 bg-gray-100" resizeMode="cover" />
                       <View className="p-3">
-                        <Text className="font-bold text-gray-800 text-sm">{photo.caption || photo.category || 'Progress photo'}</Text>
-                        <View className="flex-row items-center mt-2"><Ionicons name="calendar-outline" size={12} color="#9CA3AF" /><Text className="text-gray-400 text-xs ml-1">{new Date(photo.created_at).toLocaleDateString('en-GB')}</Text></View>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm">{photo.caption || photo.category || 'Progress photo'}</Text>
+                        <View className="flex-row items-center mt-2"><Ionicons name="calendar-outline" size={12} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs ml-1">{new Date(photo.created_at).toLocaleDateString('en-GB')}</Text></View>
                       </View>
                     </View>
                   ))}
                 </View>
 
-                {photos.filter(photo => photo.project_id === selectedProjectId).length === 0 && <Text className="text-gray-400 text-center py-12">No progress photos have been uploaded for this project.</Text>}
+                {photos.filter(photo => photo.project_id === selectedProjectId).length === 0 && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-center py-12">No progress photos have been uploaded for this project.</Text>}
 
                 {/* Upload Notice Banner */}
               </>

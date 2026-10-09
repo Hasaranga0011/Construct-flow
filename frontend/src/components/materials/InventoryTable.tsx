@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useDebounce } from '../../hooks/useDebounce';
 
 const InventoryRow = ({ 
   material, 
@@ -45,20 +44,20 @@ const InventoryRow = ({
     return (
       <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+          <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 15, fontWeight: '700', color: '#111827', flex: 1 }]}>
             {material}
           </Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
+          <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, fontWeight: '600', color: '#374151' }]}>
             {quantity} {unit}
           </Text>
         </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+          <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: '#6B7280', flex: 1 }]}>
             Project: {project}
           </Text>
           <View style={{ backgroundColor: mobileStatus.bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-            <Text style={{ color: mobileStatus.text, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>
+            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: mobileStatus.text, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }]}>
               {status}
             </Text>
           </View>
@@ -73,17 +72,17 @@ const InventoryRow = ({
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Material Name */}
       <View className="w-1/5">
-        <Text className="text-brand-text font-semibold text-sm truncate" numberOfLines={1}>{material}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{material}</Text>
       </View>
 
       {/* Project */}
       <View className="w-1/5 pr-2">
-        <Text className="text-gray-500 text-xs truncate" numberOfLines={1}>{project}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
       </View>
 
       {/* Quantity */}
       <View className="w-1/6">
-        <Text className="text-brand-text text-sm font-medium">{quantity} {unit}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">{quantity} {unit}</Text>
       </View>
 
       {/* Stock Level Bar */}
@@ -94,19 +93,19 @@ const InventoryRow = ({
             style={{ width: `${Math.max(0, Math.min(100, stockLevel))}%` }} 
           />
         </View>
-        <Text className="text-gray-400 text-[10px] mt-1">{Math.round(stockLevel)}%</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">{Math.round(stockLevel)}%</Text>
       </View>
 
       {/* Status */}
       <View className="w-1/6">
         <View className={`px-2 py-1 rounded self-start ${statusStyle.split(' ')[0]}`}>
-          <Text className={`text-[10px] font-bold uppercase ${statusStyle.split(' ')[1]}`}>{status}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${statusStyle.split(' ')[1]}`}>{status}</Text>
         </View>
       </View>
 
       {/* Time */}
       <View className="flex-1 flex-row justify-end">
-        <Text className="text-gray-400 text-xs">{time}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">{time}</Text>
       </View>
     </View>
   );
@@ -116,7 +115,6 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
   const { isMobile } = useResponsive();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
     let isMounted = true;
@@ -144,9 +142,6 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
           query = query.eq('projects.status', 'active');
         }
 
-        if (debouncedSearchQuery) {
-          query = query.ilike('name', `%${debouncedSearchQuery}%`);
-        }
 
         const { data, error } = await query;
 
@@ -163,38 +158,40 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
     loadMaterials();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, debouncedSearchQuery, projectId]);
+  }, [refreshTrigger, projectId]);
+
+  const filteredMaterials = materials.filter(m => String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">
+    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[400px]'}`}>
       <View className="mb-6">
-        <Text className="text-lg font-bold text-brand-text mb-1">Material Inventory</Text>
-        <Text className="text-brand-text-muted text-xs">Stock levels across all active projects</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Material Inventory</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">Stock levels across all active projects</Text>
       </View>
 
       {/* Table Header */}
       {!isMobile && (
         <View className="flex-row py-3 border-b border-gray-200">
-          <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</Text>
-          <Text className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</Text>
-          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
-          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</Text>
-          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</Text>
-          <Text className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</Text>
         </View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className="flex-1">
         {loading ? (
           <View className="py-10 items-center justify-center">
             <ActivityIndicator color="#F97316" />
           </View>
-        ) : materials.length === 0 ? (
+        ) : filteredMaterials.length === 0 ? (
           <View className="py-10 items-center justify-center">
-            <Text className="text-gray-400">No materials found.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No materials found.</Text>
           </View>
         ) : (
-          materials.map((m: any) => {
+          filteredMaterials.map((m: any) => {
             const projectName = m.projects?.name || 'Unknown';
             
             const globalStock = m.current_stock || 0;

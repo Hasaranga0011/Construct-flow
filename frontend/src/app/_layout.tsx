@@ -23,7 +23,7 @@ const DASHBOARD_MAP: Record<string, string> = {
 };
 
 const AUTH_PAGES = ['team-login', 'team-register', 'partner-login', 'partner-register', 'admin-login', 'forgot-password', 'reset-password'];
-const ROLE_PORTALS = ['admin', 'pm', 'site-manager', 'client', 'worker', 'supplier', 'site'];
+const ROLE_PORTALS = ['admin', 'pm', 'site-manager', 'client', 'worker', 'supplier'];
 
 function InitialLayout() {
   const { session, role, isLoading, signOut } = useAuth();
@@ -85,9 +85,8 @@ function InitialLayout() {
 
 
     if (session && inRolePortal && role) {
-      const portalRole = firstSegment === 'site' ? 'site-manager' : firstSegment;
       const expectedPortal = normalizeRole(role) === 'site_manager' ? 'site-manager' : normalizeRole(role);
-      if (expectedPortal && portalRole !== expectedPortal) {
+      if (expectedPortal && firstSegment !== expectedPortal) {
         const dest = DASHBOARD_MAP[normalizeRole(role) ?? ''];
         if (dest) router.replace(dest as any);
         return;
@@ -99,7 +98,7 @@ function InitialLayout() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-brand-dark items-center justify-center">
+      <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
         <ActivityIndicator size="large" color="#F97316" />
       </View>
     );
@@ -110,21 +109,20 @@ function InitialLayout() {
 
   if (session && inRolePortal && !DASHBOARD_MAP[normalizeRole(role) ?? '']) {
     return <View className="flex-1 items-center justify-center p-6 bg-white">
-      <Text className="text-lg text-gray-900 mb-4">Your account does not have an authorized role. Contact your administrator.</Text>
-      <Pressable onPress={() => void signOut()} className="bg-brand-orange px-6 py-3 rounded-lg"><Text className="text-white">Sign out</Text></Pressable>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg text-gray-900 mb-4">Your account does not have an authorized role. Contact your administrator.</Text>
+      <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => void signOut()} className="bg-brand-orange px-6 py-3 rounded-lg"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white">Sign out</Text></Pressable>
     </View>;
   }
   const expectedPortal = normalizeRole(role) === 'site_manager' ? 'site-manager' : normalizeRole(role);
-  const actualPortal = firstSegment === 'site' ? 'site-manager' : firstSegment;
-  if (inRolePortal && (!session || actualPortal !== expectedPortal)) {
+  if (inRolePortal && (!session || firstSegment !== expectedPortal)) {
     return (
-      <View className="flex-1 bg-brand-dark items-center justify-center">
+      <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
         <ActivityIndicator size="large" color="#F97316" />
       </View>
     );
   }
 
-  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={inRolePortal && Platform.OS === 'ios' ? 'padding' : undefined}><Slot /></KeyboardAvoidingView>;
+  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={inRolePortal && Platform.OS !== 'web' ? Platform.OS === 'ios' ? 'padding' : 'height' : undefined}><Slot /></KeyboardAvoidingView>;
 }
 
 export default function RootLayout() {

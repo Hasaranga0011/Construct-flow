@@ -40,13 +40,13 @@ export default function ForgotPasswordScreen() {
     <AuthPageLayout hero={
       <View className="w-1/2 py-12 bg-brand-dark relative overflow-hidden items-center justify-center">
         {/* Background Image with Overlay */}
-        <Image 
-          source={{ uri: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1200' }} 
+        <Image
+          source={{ uri: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1200' }}
           className="absolute w-full h-full opacity-20"
           resizeMode="cover"
         />
         <View className="absolute inset-0 bg-brand-dark/90" />
-        
+
         {/* Abstract Shapes */}
         <View className="absolute -top-32 -right-32 w-96 h-96 bg-brand-orange/20 rounded-full blur-3xl" />
         <View className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
@@ -55,9 +55,9 @@ export default function ForgotPasswordScreen() {
           <View className="w-16 h-16 bg-brand-orange/20 rounded-2xl items-center justify-center mb-8 border border-brand-orange/30">
             <Ionicons name="lock-closed" size={32} color="#F97316" />
           </View>
-          <Text className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Secure Recovery</Text>
-          <Text className="text-white font-extrabold text-5xl leading-tight mb-6">Regain access to your workspace.</Text>
-          <Text className="text-gray-400 text-lg leading-relaxed mb-12">Your data is secured with enterprise-grade encryption. Once verified, you can quickly get back to managing your projects and team.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold tracking-widest text-sm uppercase mb-4">Secure Recovery</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-5xl leading-tight mb-6">Regain access to your workspace.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg leading-relaxed mb-12">Your data is secured with enterprise-grade encryption. Once verified, you can quickly get back to managing your projects and team.</Text>
         </View>
       </View>
     }>
@@ -65,35 +65,35 @@ export default function ForgotPasswordScreen() {
             {/* ── Construct Ai Logo ── */}
             <Pressable
               onPress={() => router.push('/')}
-              style={{ alignSelf: 'flex-start', width: '100%', maxWidth: 280, marginBottom: 24 }}
+              style={[{ alignSelf: 'flex-start', width: '100%', maxWidth: 280, marginBottom: 24 }, { minHeight: 44, minWidth: 44 }]}
             >
-              <Image 
-                source={require('../../assets/images/main-logo.png')} 
-                style={{ width: '100%', aspectRatio: 4 }} 
-                resizeMode="contain" 
+              <Image
+                source={require('../../assets/images/main-logo.png')}
+                style={{ width: '100%', aspectRatio: 4 }}
+                resizeMode="contain"
               />
             </Pressable>
             <View className="w-full">
-              <Text className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
-              <Text className="text-gray-500 text-base leading-relaxed">Enter your email address and we&apos;ll send you a secure link to reset your password.</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-base leading-relaxed">Enter your email address and we&apos;ll send you a secure link to reset your password.</Text>
             </View>
           </View>
 
           {errorMsg ? (
             <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
-              <Text className="text-red-600 text-sm text-center">{errorMsg}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-sm text-center">{errorMsg}</Text>
             </View>
           ) : null}
 
           {successMsg ? (
             <View className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
-              <Text className="text-green-700 text-sm text-center font-medium">{successMsg}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-700 text-sm text-center font-medium">{successMsg}</Text>
             </View>
           ) : null}
 
           <View className="mb-8">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">Email Address</Text>
-            <TextInput
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email Address</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
               placeholder="name@company.com"
               value={email}
@@ -103,7 +103,7 @@ export default function ForgotPasswordScreen() {
             />
           </View>
 
-          <Pressable 
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={handleResetPassword}
             disabled={loading || !!successMsg}
             className={`w-full bg-brand-orange py-4 rounded-xl items-center justify-center shadow-md hover:bg-orange-600 transition-colors mb-8 ${loading || !!successMsg ? 'opacity-70' : ''}`}
@@ -111,15 +111,15 @@ export default function ForgotPasswordScreen() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white font-bold text-lg">Send Reset Link</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Send Reset Link</Text>
             )}
           </Pressable>
 
           <View className="flex-row flex-wrap justify-center">
-            <Text className="text-gray-500">Remember your password? </Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Remember your password? </Text>
             <Link href="/login" asChild>
-              <Pressable>
-                <Text className="text-brand-orange font-bold hover:underline">Back to Login</Text>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Back to Login</Text>
               </Pressable>
             </Link>
           </View>

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from pydantic import BaseModel, Field
 from ..models import EstimationCreate, EstimationResponse
+from core.notification_helper import create_notifications, create_notification
 from core.database import get_auth_client
 
 router = APIRouter(
@@ -74,7 +75,8 @@ def predict_cost(req: PredictRequest, request: Request):
             "confidence_score": None
         }
         
-        from core.database import get_auth_client
+        from core.notification_helper import create_notifications, create_notification
+from core.database import get_auth_client
         auth_client = get_auth_client(request)
         db_response = auth_client.table("estimations").insert(estimation_data).execute()
         

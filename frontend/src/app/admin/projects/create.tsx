@@ -1,3 +1,4 @@
+import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,7 +16,7 @@ export default function AdminProjectsCreatePage() {
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -35,7 +36,7 @@ export default function AdminProjectsCreatePage() {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const fetchUsers = async () => {
       try {
         const { data: pmData } = await supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']);
@@ -44,7 +45,7 @@ export default function AdminProjectsCreatePage() {
         const { data: workerData } = await supabase.from('profiles').select('*').in('role', ['worker', 'Worker']);
         const { data: supplierData } = await supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']);
         const { data: adminData } = await supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']);
-        
+
         if (isMounted) {
           if (pmData) setPms(pmData);
           if (clientData) setClients(clientData);
@@ -57,7 +58,7 @@ export default function AdminProjectsCreatePage() {
         console.error("Failed to fetch users", err);
       }
     };
-    
+
     fetchUsers();
     return () => { isMounted = false; };
   }, []);
@@ -67,7 +68,7 @@ export default function AdminProjectsCreatePage() {
       alert('Please fill out all required fields');
       return;
     }
-    
+
     setLoading(true);
     try {
       const payload = {
@@ -86,8 +87,8 @@ export default function AdminProjectsCreatePage() {
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
       };
-      
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/projects`, {
+
+      const response = await fetch(`${getApiUrl()}/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,14 +96,14 @@ export default function AdminProjectsCreatePage() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || 'Failed to create project');
       }
-      
+
       const newProject = await response.json();
-      
+
       Alert.alert('Success', 'Project created successfully!');
       router.push(`/admin/projects/${newProject.id}`);
     } catch (err: any) {
@@ -115,35 +116,35 @@ export default function AdminProjectsCreatePage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Create New Project" showAction={false} />
-      <ScrollView className="flex-1 p-6">
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6">
         <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-3xl mx-auto w-full">
-          
-          <Text className="text-xl font-bold text-gray-800 mb-6">Project Details</Text>
-          
+
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6">Project Details</Text>
+
           {/* Form Fields */}
           <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Project Name *</Text>
-            <TextInput 
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Project Name *</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
               placeholder="e.g. Skyline Towers"
               value={formData.name}
               onChangeText={(t) => setFormData({...formData, name: t})}
             />
           </View>
-          
+
           <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Short Location *</Text>
-            <TextInput 
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Short Location *</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
               placeholder="e.g. Colombo 03"
               value={formData.location}
               onChangeText={(t) => setFormData({...formData, location: t})}
             />
           </View>
-          
+
           <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Full Address</Text>
-            <TextInput 
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Full Address</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
               placeholder="e.g. 123 Galle Rd, Colombo"
               value={formData.address}
@@ -153,8 +154,8 @@ export default function AdminProjectsCreatePage() {
 
           <View className="flex-row space-x-4 mb-4">
             <View className="flex-1">
-              <Text className="text-gray-700 font-medium mb-2">Start Date (YYYY-MM-DD) *</Text>
-              <TextInput 
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Start Date (YYYY-MM-DD) *</Text>
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
                 placeholder="2025-01-01"
                 value={formData.start_date}
@@ -162,8 +163,8 @@ export default function AdminProjectsCreatePage() {
               />
             </View>
             <View className="flex-1">
-              <Text className="text-gray-700 font-medium mb-2">End Date (YYYY-MM-DD) *</Text>
-              <TextInput 
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">End Date (YYYY-MM-DD) *</Text>
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
                 placeholder="2026-01-01"
                 value={formData.end_date}
@@ -172,7 +173,7 @@ export default function AdminProjectsCreatePage() {
             </View>
           </View>
 
-          <Text className="text-xl font-bold text-gray-800 mb-6 mt-4">Assignments</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6 mt-4">Assignments</Text>
           <ProjectAssignmentDropdown label="Assign Administrators" users={admins} multiple selectedIds={formData.admins} onChange={(admins) => setFormData({ ...formData, admins })} />
           <ProjectAssignmentDropdown label="Assign Project Manager" users={pms} selectedIds={formData.pm_id ? [formData.pm_id] : []} onChange={(ids) => setFormData({ ...formData, pm_id: ids[0] || '' })} />
           <ProjectAssignmentDropdown label="Assign Client" users={clients} selectedIds={formData.client_id ? [formData.client_id] : []} onChange={(ids) => setFormData({ ...formData, client_id: ids[0] || '' })} />
@@ -180,14 +181,14 @@ export default function AdminProjectsCreatePage() {
           <ProjectAssignmentDropdown label="Assign Workers" users={availableWorkers} multiple selectedIds={formData.workers} onChange={(workers) => setFormData({ ...formData, workers })} />
           <ProjectAssignmentDropdown label="Assign Suppliers" users={suppliers} multiple selectedIds={formData.suppliers} onChange={(suppliers) => setFormData({ ...formData, suppliers })} />
 
-          <TouchableOpacity 
+          <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
             onPress={handleSubmit}
             disabled={loading}
             className="bg-brand-orange py-4 rounded-xl items-center flex-row justify-center"
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg">Create Project</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Create Project</Text>}
           </TouchableOpacity>
-          
+
         </View>
       </ScrollView>
     </View>

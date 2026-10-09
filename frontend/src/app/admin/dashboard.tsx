@@ -12,7 +12,7 @@ import { ActiveProjectsTable } from '../../components/dashboard/ActiveProjectsTa
 import { RecentAlertsPanel } from '../../components/dashboard/RecentAlertsPanel';
 import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
-import { GlobalSearchDropdown } from '../../components/common/GlobalSearchDropdown';
+import { SearchInput } from '../../components/common/SearchInput';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -115,11 +115,11 @@ export default function DashboardScreen() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
             
-            <GlobalSearchDropdown 
+            <SearchInput 
               placeholder="Search projects..." 
               value={searchQuery} 
               onChangeText={setSearchQuery} 
@@ -176,43 +176,43 @@ export default function DashboardScreen() {
           {/* Center Row: Chart & Delay Risk */}
           <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
             {/* Main Content Area (Chart) */}
-            <View className="flex-[2] w-full">
+            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
               <CostTimelineChart />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className="flex-[1] w-full">
+            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
               <DelayRiskPanel />
             </View>
           </View>
 
           {/* New Charts Grid Row 1 */}
           <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className="flex-1 w-full">
+            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
               <BudgetUtilizationChart />
             </View>
-            <View className="flex-1 w-full">
+            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
               <MaterialsStockChart />
             </View>
           </View>
 
           {/* New Charts Grid Row 2 */}
           <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className="flex-1 w-full">
+            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
               <PurchaseOrderPipelineChart />
             </View>
-            <View className="flex-1 w-full">
+            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
               <MonthlyAttendanceChart />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
           <View className={`pb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className="flex-[2] w-full">
+            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
-            <View className="flex-[1] w-full">
+            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
               <RecentAlertsPanel />
             </View>
           </View>

@@ -1,6 +1,6 @@
+import { getApiUrl } from '../lib/apiUrl';
 import { supabase } from '../lib/supabase';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 const apiCache = new Map<string, { data: any, timestamp: number, promise?: Promise<any> }>();
 const CACHE_TTL = 60000; // 60 seconds
@@ -15,7 +15,7 @@ async function executeFetch(endpoint: string, options: RequestInit) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`${getApiUrl()}${endpoint}`, {
     ...options,
     headers,
   });
@@ -196,7 +196,7 @@ export const api = {
   // ----------------------------------------------------------------
   siteReports: {
     create: (data: any) => fetchWithAuth('/site-reports/', { method: 'POST', body: JSON.stringify(data) }),
-    getByProject: (projectId: string) => fetchWithAuth(`/site-reports/${projectId}`),
+    getByProject: (projectId: string, fresh = false) => fresh ? executeFetch(`/site-reports/${projectId}`, {}) : fetchWithAuth(`/site-reports/${projectId}`),
   },
 
   // ----------------------------------------------------------------
@@ -226,7 +226,7 @@ export const api = {
       // Note: do NOT set Content-Type here; browser sets it with boundary for multipart
       return supabase.auth.getSession().then(({ data: { session } }) => {
         const token = session?.access_token;
-        return fetch(`${API_URL}/media/upload`, {
+        return fetch(`${getApiUrl()}/media/upload`, {
           method: 'POST',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
           body: formData,

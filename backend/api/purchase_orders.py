@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from datetime import datetime
@@ -24,7 +25,7 @@ def get_purchase_orders(user=Depends(get_current_user)):
         
         if user["role"] == "supplier":
             # Find supplier id
-            sup_res = supabase_db.table("suppliers").select("supplier_id").eq("user_id", user["id"]).execute()
+            sup_res = supabase_db.table("suppliers").select("supplier_id").eq("user_id", user["id"])
             if sup_res.data:
                 query = query.eq("supplier_id", sup_res.data[0]["supplier_id"])
                 
@@ -66,12 +67,12 @@ def create_purchase_order(req: POCreate, user=Depends(get_current_user)):
         res = supabase_db.table("purchase_orders").insert(data).execute()
         
         # Notify supplier
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "New Purchase Order",
             "message": f"PO {po_number} received from ConstructFlow",
             "type": "general",
             "target_role": "supplier" # Note: in prod we should use user_id of the supplier
-        }).execute()
+        }])
         
         return {"message": "PO created successfully", "data": res.data[0]}
     except Exception as e:
@@ -89,12 +90,12 @@ def approve_po(po_id: str, user=Depends(get_current_user)):
     try:
         res = supabase_db.table("purchase_orders").update({"status": "Confirmed"}).eq("id", po_id).execute()
         order = res.data[0]
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "PO Approved",
             "message": f"PO {order.get('po_number')} confirmed by supplier",
             "type": "general",
             "target_role": "pm"
-        }).execute()
+        }])
         return {"message": "PO approved", "data": order}
     except Exception as e:
         print(f"Approve PO error: {e}")
@@ -105,12 +106,12 @@ def reject_po(po_id: str, user=Depends(get_current_user)):
     try:
         res = supabase_db.table("purchase_orders").update({"status": "Rejected"}).eq("id", po_id).execute()
         order = res.data[0]
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "PO Rejected",
             "message": f"PO {order.get('po_number')} was rejected by supplier",
             "type": "general",
             "target_role": "pm"
-        }).execute()
+        }])
         return {"message": "PO rejected", "data": order}
     except Exception as e:
         print(f"Reject PO error: {e}")
@@ -126,12 +127,12 @@ def suggest_po(po_id: str, req: SuggestData, user=Depends(get_current_user)):
             # We don't have supplier_notes in schema, skip it for now or just log it
         }).eq("id", po_id).execute()
         order = res.data[0]
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "PO Suggestion",
             "message": f"Supplier suggested changes for PO {order.get('po_number')}",
             "type": "general",
             "target_role": "pm"
-        }).execute()
+        }])
         return {"message": "Suggestion submitted", "data": order}
     except Exception as e:
         print(f"Suggest PO error: {e}")
@@ -145,12 +146,12 @@ def deliver_po(po_id: str, user=Depends(get_current_user)):
             "actual_delivery": datetime.now().date().isoformat()
         }).eq("id", po_id).execute()
         order = res.data[0]
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "Delivery Sent",
             "message": f"PO {order.get('po_number')} has been dispatched by supplier.",
             "type": "general",
             "target_role": "site_manager"
-        }).execute()
+        }])
         return {"message": "PO marked as delivered", "data": order}
     except Exception as e:
         print(f"Deliver PO error: {e}")
@@ -160,7 +161,7 @@ def deliver_po(po_id: str, user=Depends(get_current_user)):
 def receive_po(po_id: str, user=Depends(get_current_user)):
     try:
         # Call the secure SQL RPC that increments stock
-        res = supabase_db.rpc("deliver_purchase_order", {"p_order_id": po_id}).execute()
+        res = supabase_db.rpc("deliver_purchase_order", {"p_order_id": po_id}])
         # The RPC handles stock increment and notifications. But since the RPC was originally named "deliver_purchase_order",
         # it marks the status as "Delivered" inside the RPC. We want it to be "Received". We will update it.
         # Actually, let's just do it directly here for simplicity and safety, since RPC might have RLS issues if called via service key.
@@ -170,18 +171,18 @@ def receive_po(po_id: str, user=Depends(get_current_user)):
         order = res.data[0]
         
         if order.get("material_id") and order.get("quantity_ordered"):
-            mat_res = supabase_db.table("materials").select("global_stock_quantity").eq("id", order["material_id"]).execute()
+            mat_res = supabase_db.table("materials").select("global_stock_quantity").eq("id", order["material_id"])
             if mat_res.data:
                 curr_qty = mat_res.data[0].get("global_stock_quantity", 0)
                 new_qty = curr_qty + order["quantity_ordered"]
-                supabase_db.table("materials").update({"global_stock_quantity": new_qty}).eq("id", order["material_id"]).execute()
+                supabase_db.table("materials").update({"global_stock_quantity": new_qty}).eq("id", order["material_id"])
                 
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "Goods Received",
             "message": f"PO {order.get('po_number')} goods have been received on site.",
             "type": "general",
             "target_role": "pm"
-        }).execute()
+        }])
         
         return {"message": "PO received and stock updated", "data": order}
     except Exception as e:
@@ -192,12 +193,12 @@ def upload_invoice(po_id: str, req: InvoiceUpload, user=Depends(get_current_user
     try:
         res = supabase_db.table("purchase_orders").update({"invoice_url": req.invoice_url}).eq("id", po_id).execute()
         
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "Invoice Uploaded",
             "message": f"Invoice uploaded for PO {res.data[0].get('po_number')}",
             "type": "general",
             "target_role": "super_admin"
-        }).execute()
+        }])
         
         return {"message": "Invoice uploaded successfully", "data": res.data[0]}
     except Exception as e:

@@ -105,7 +105,7 @@ export const CostBreakdown = ({
     return (
       <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 items-center justify-center min-h-[300px]">
         <Ionicons name="calculator-outline" size={40} color="#E5E7EB" />
-        <Text className="text-gray-400 mt-3 text-sm text-center">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-3 text-sm text-center">
           No estimates generated yet.{'\n'}Use the AI Estimator to create one.
         </Text>
       </View>
@@ -143,21 +143,21 @@ export const CostBreakdown = ({
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1">
       {/* Header */}
       <View className="flex-row justify-between items-center mb-1">
-        <Text className="text-lg font-bold text-brand-text">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">
           {contribs.length > 0 ? 'Feature Contributions' : 'Cost Breakdown'}
         </Text>
-        <Pressable className="flex-row items-center border border-gray-200 px-3 py-1.5 rounded-full">
+        <Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-row items-center border border-gray-200 px-3 py-1.5 rounded-full">
           <Ionicons name="time-outline" size={14} color="#6B7280" />
-          <Text className="text-gray-600 text-xs font-semibold ml-1.5">Live Estimate</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-xs font-semibold ml-1.5">Live Estimate</Text>
         </Pressable>
       </View>
 
       {contribs.length > 0 ? (
-        <Text className="text-gray-400 text-xs mb-4">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-4">
           Which factors drove this specific prediction, ranked by contribution
         </Text>
       ) : (
-        <Text className="text-gray-400 text-xs mb-4">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-4">
           Latest model estimate from saved history
         </Text>
       )}
@@ -165,23 +165,23 @@ export const CostBreakdown = ({
       {/* Total Cost + Confidence */}
       <View className="flex-row items-center mb-6">
         <View className="flex-1">
-          <Text className="text-gray-500 text-xs font-semibold uppercase mb-1">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-1">
             Estimated Total Cost
           </Text>
-          <Text className="text-3xl font-bold text-brand-orange">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange">
             {formatCurrency(cost)}
           </Text>
-          <Text className="text-gray-400 text-[10px] mt-1">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">
             This is an estimate — confirm with a quantity surveyor.
           </Text>
         </View>
 
         <View className={`px-3 py-2 rounded-xl ${confidenceBg} ml-4 items-center`}>
-          <Text className="text-gray-400 text-[10px] uppercase mb-0.5">Confidence</Text>
-          <Text className={`font-bold text-sm ${confidenceText}`}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] uppercase mb-0.5">Confidence</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold text-sm ${confidenceText}`}>
             {confidenceVal != null ? `${Math.round(confidenceVal)}%` : '—'}
           </Text>
-          <Text className={`text-[10px] font-semibold ${confidenceText}`}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-semibold ${confidenceText}`}>
             {confidenceLabel}
           </Text>
         </View>
@@ -193,8 +193,8 @@ export const CostBreakdown = ({
           {contribs.slice(0, 5).map((feat, i) => (
             <View key={feat.name} className="mb-3">
               <View className="flex-row justify-between mb-1">
-                <Text className="text-sm text-gray-700">{feat.name}</Text>
-                <Text className="text-sm font-bold text-brand-text">{feat.value}%</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-700">{feat.name}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-brand-text">{feat.value}%</Text>
               </View>
               <View className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <View
@@ -208,8 +208,8 @@ export const CostBreakdown = ({
               </View>
             </View>
           ))}
-          <Text className="text-gray-400 text-[10px] mt-2">
-            Contribution percentages reflect this prediction's feature weights from the trained RandomForest.
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-2">
+            Contribution percentages reflect this prediction&apos;s feature weights from the trained RandomForest.
           </Text>
         </View>
       ) : (
@@ -223,11 +223,11 @@ export const CostBreakdown = ({
           ].map(item => (
             <View key={item.label} className="flex-row items-center w-[48%] mb-2">
               <View className="w-3 h-3 rounded-sm mr-2" style={{ backgroundColor: item.color }} />
-              <Text className="text-xs text-gray-600 flex-1">{item.label}</Text>
-              <Text className="text-xs font-bold text-brand-text">{item.pct}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-600 flex-1">{item.label}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-text">{item.pct}</Text>
             </View>
           ))}
-          <Text className="text-gray-400 text-[10px] mt-2 w-full">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-2 w-full">
             Illustrative split — generate a new estimate to see model-specific contributions.
           </Text>
         </View>

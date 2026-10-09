@@ -1,3 +1,5 @@
+import { notify } from '@/utils/notify';
+import { positiveQuantity, validReportDate } from '@/utils/siteWorkflow';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -68,9 +70,9 @@ export default function AdminMaterialsOrdersCreatePage() {
         // Fetch Materials
         const { data: matData, error: matErr } = await supabase
           .from('materials')
-          .select('id, name')
+          .select('id, name, project_id, unit')
           .order('name');
-        
+
         // If materials fetch fails (e.g. RLS or table doesn't exist), just ignore
         const validMaterials = matErr ? [] : (matData || []);
 
@@ -90,7 +92,7 @@ export default function AdminMaterialsOrdersCreatePage() {
         if (isMounted && Platform.OS !== 'web') {
           Alert.alert('Error loading data', err.message);
         } else if (isMounted && Platform.OS === 'web') {
-          console.error('Error loading data', err.message);
+          notify('Error loading data', err.message);
         }
       } finally {
         if (isMounted) setInitialLoading(false);
@@ -101,10 +103,11 @@ export default function AdminMaterialsOrdersCreatePage() {
     return () => { isMounted = false; };
   }, []);
 
-  
+
   const handleCreateMaterial = async () => {
+    if (!selectedProject || !materialQuery.trim()) { notify('Project required', 'Select a project and enter a material name first.'); return; }
     try {
-      const { data, error } = await supabase.from('materials').insert([{ name: materialQuery }]).select().single();
+      const { data, error } = await supabase.from('materials').insert([{ name: materialQuery.trim(), project_id: selectedProject?.id, unit: selectedUnit, current_stock: 0, minimum_threshold: 0 }]).select().single();
       if (error) throw error;
       setMaterials([...materials, data].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedMaterial(data);
@@ -127,20 +130,21 @@ export default function AdminMaterialsOrdersCreatePage() {
       }));
       const { error } = await supabase.from('project_role_assignments').insert(inserts);
       if (error) throw error;
-      
+
       const newAssignments = [...assignments, ...inserts];
       setAssignments(newAssignments);
-      Alert.alert('Success', 'Suppliers assigned to project!');
+      notify('Success', 'Suppliers assigned to project!');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to assign suppliers');
+      notify('Error', err.message || 'Failed to assign suppliers');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!selectedSupplier || !selectedProject || !quantity) {
-      const msg = 'Please select a supplier, project, and quantity.';
+    if (loading) return;
+    if (!selectedSupplier || !selectedProject || !selectedMaterial || (selectedMaterial.project_id && selectedMaterial.project_id !== selectedProject?.id) || !positiveQuantity(quantity) || !validReportDate(expectedDate)) {
+      const msg = 'Select a supplier, project and material, enter a positive quantity and a valid delivery date (YYYY-MM-DD).';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
       return;
@@ -150,11 +154,11 @@ export default function AdminMaterialsOrdersCreatePage() {
     try {
       // Generate a random PO Number
       const poNumber = `PO-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      
-      const q = parseFloat(quantity);
+
+      const q = Number(quantity);
 
       // Construct items string
-      const itemsString = selectedMaterial 
+      const itemsString = selectedMaterial
         ? `${q} ${selectedUnit} of ${selectedMaterial.name}`
         : `${q} ${selectedUnit} of Material`;
 
@@ -177,7 +181,7 @@ export default function AdminMaterialsOrdersCreatePage() {
 
       const { error } = await supabase.from('purchase_orders').insert([orderData]);
       if (error) throw error;
-      
+
       // Dispatch notification
       await sendSystemNotification(
         'Purchase Order Created',
@@ -188,7 +192,7 @@ export default function AdminMaterialsOrdersCreatePage() {
 
       if (Platform.OS === 'web') window.alert('Order created successfully!');
       else Alert.alert('Success', 'Order created successfully!');
-      
+
       router.back();
 
     } catch (err: any) {
@@ -211,38 +215,38 @@ export default function AdminMaterialsOrdersCreatePage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Create New Order" showAction={false} />
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <View className="max-w-[600px] w-full mx-auto">
 
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-            <Text className="text-xl font-bold text-gray-800 mb-6">Order Details</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6">Order Details</Text>
 
             {/* Project Dropdown */}
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Assign to Project</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Assign to Project</Text>
             <View className="relative z-[60] mb-4">
-              <Pressable 
+              <Pressable style={{ minHeight: 44, minWidth: 44 }}
                 onPress={() => { setShowProjectDrop(!showProjectDrop); setShowSupplierDrop(false); setShowMaterialDrop(false); }}
                 className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
               >
-                <Text className={selectedProject ? "text-gray-800" : "text-gray-400"}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={selectedProject ? "text-gray-800" : "text-gray-400"}>
                   {selectedProject ? selectedProject.name : 'Select project first...'}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
               </Pressable>
-              
+
               {showProjectDrop && (
                 <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[60]">
-                  <ScrollView nestedScrollEnabled={true}>
+                  <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
                     {projects.length === 0 ? (
-                      <Text className="p-4 text-gray-500">No projects found.</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="p-4 text-gray-500">No projects found.</Text>
                     ) : (
                       projects.map(proj => (
-                        <Pressable 
-                          key={proj.id} 
-                          onPress={() => { setSelectedProject(proj); setSelectedSupplier(null); setShowProjectDrop(false); }}
+                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                          key={proj.id}
+                          onPress={() => { setSelectedProject(proj); setSelectedMaterial(null); setMaterialQuery(''); setSelectedSupplier(null); setShowProjectDrop(false); }}
                           className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
                         >
-                          <Text className="text-gray-800">{proj.name}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{proj.name}</Text>
                         </Pressable>
                       ))
                     )}
@@ -252,27 +256,27 @@ export default function AdminMaterialsOrdersCreatePage() {
             </View>
 
             {/* Supplier Dropdown */}
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Select Supplier</Text>
-            
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Select Supplier</Text>
+
             {!selectedProject ? (
               <View className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4">
-                <Text className="text-gray-400">Please select a project first</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">Please select a project first</Text>
               </View>
             ) : (() => {
               const projectSupplierIds = assignments.filter(a => a.project_id === selectedProject.id).map(a => a.user_id);
               const availableSuppliers = suppliers.filter(s => projectSupplierIds.includes(s.id));
-              
+
               if (availableSuppliers.length === 0) {
                 return (
                   <View className="bg-orange-50 border border-orange-100 p-4 rounded-lg mb-4 z-[50]">
-                    <Text className="text-orange-800 font-bold mb-2">No suppliers assigned</Text>
-                    <Text className="text-sm text-orange-700 mb-4">You must assign at least one supplier to {selectedProject.name} before ordering.</Text>
-                    <ProjectAssignmentDropdown 
-                      label="Assign Suppliers Now" 
-                      users={suppliers} 
-                      multiple 
-                      selectedIds={[]} 
-                      onChange={handleAssignSuppliers} 
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-800 font-bold mb-2">No suppliers assigned</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-orange-700 mb-4">You must assign at least one supplier to {selectedProject.name} before ordering.</Text>
+                    <ProjectAssignmentDropdown
+                      label="Assign Suppliers Now"
+                      users={suppliers}
+                      multiple
+                      selectedIds={[]}
+                      onChange={handleAssignSuppliers}
                     />
                   </View>
                 );
@@ -280,27 +284,27 @@ export default function AdminMaterialsOrdersCreatePage() {
 
               return (
                 <View className="relative z-[50] mb-4">
-                  <Pressable 
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
                     onPress={() => { setShowSupplierDrop(!showSupplierDrop); setShowProjectDrop(false); setShowMaterialDrop(false); }}
                     className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
                   >
-                    <Text className={selectedSupplier ? "text-gray-800" : "text-gray-400"}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={selectedSupplier ? "text-gray-800" : "text-gray-400"}>
                       {selectedSupplier ? selectedSupplier.full_name : 'Select an assigned supplier...'}
                     </Text>
                     <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
                   </Pressable>
-                  
+
                   {showSupplierDrop && (
                     <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[50]">
-                      <ScrollView nestedScrollEnabled={true}>
+                      <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
                         {availableSuppliers.map(sup => (
-                          <Pressable 
-                            key={sup.id} 
+                          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                            key={sup.id}
                             onPress={() => { setSelectedSupplier(sup); setShowSupplierDrop(false); }}
                             className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
                           >
-                            <Text className="text-gray-800 font-medium">{sup.full_name}</Text>
-                            <Text className="text-xs text-gray-500">{sup.email || 'No email'}</Text>
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium">{sup.full_name}</Text>
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">{sup.email || 'No email'}</Text>
                           </Pressable>
                         ))}
                       </ScrollView>
@@ -311,10 +315,10 @@ export default function AdminMaterialsOrdersCreatePage() {
             })()}
 
             {/* Material Dropdown */}
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Material</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Material</Text>
             <View className="relative z-40 mb-4">
               <View className="flex-row justify-between items-center border border-gray-200 rounded-lg bg-gray-50 pr-4">
-                <TextInput
+                <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                   className="flex-1 px-4 py-3 text-sm text-gray-800"
                   placeholder="Search or type new material..."
                   value={materialQuery}
@@ -331,30 +335,30 @@ export default function AdminMaterialsOrdersCreatePage() {
                 />
                 <Ionicons name="chevron-down" size={20} color="#9CA3AF" onPress={() => { setShowMaterialDrop(!showMaterialDrop); setShowSupplierDrop(false); setShowProjectDrop(false); }} />
               </View>
-              
+
               {showMaterialDrop && (
                 <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-40">
-                  <ScrollView nestedScrollEnabled={true}>
-                    {materials.filter(m => m.name.toLowerCase().includes(materialQuery.toLowerCase())).map(mat => (
-                        <Pressable 
-                          key={mat.id} 
+                  <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
+                    {materials.filter(m => (!m.project_id || m.project_id === selectedProject?.id) && m.name.toLowerCase().includes(materialQuery.toLowerCase())).map(mat => (
+                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                          key={mat.id}
                           onPress={() => { setSelectedMaterial(mat); setMaterialQuery(mat.name); setShowMaterialDrop(false); }}
                           className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
                         >
-                          <Text className="text-gray-800">{mat.name}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{mat.name}</Text>
                         </Pressable>
                     ))}
                     {materialQuery.trim() !== '' && !materials.some(m => m.name.toLowerCase() === materialQuery.trim().toLowerCase()) && (
-                        <Pressable 
+                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
                           onPress={handleCreateMaterial}
                           className="px-4 py-3 border-b border-gray-100 bg-orange-50 hover:bg-orange-100 flex-row items-center"
                         >
                           <Ionicons name="add-circle-outline" size={18} color="#F97316" style={{marginRight: 8}} />
-                          <Text className="text-brand-orange font-bold">Create "{materialQuery}"</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold">Create &quot;{materialQuery}&quot;</Text>
                         </Pressable>
                     )}
                     {materials.length === 0 && materialQuery.trim() === '' && (
-                      <Text className="p-4 text-gray-500">No materials in database. Type to create one.</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="p-4 text-gray-500">No materials in database. Type to create one.</Text>
                     )}
                   </ScrollView>
                 </View>
@@ -364,8 +368,8 @@ export default function AdminMaterialsOrdersCreatePage() {
             {/* Pricing & Quantities */}
             <View className="flex-row gap-4 mb-4 z-20">
               <View className="flex-[0.5]">
-                <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Quantity</Text>
-                <TextInput
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Quantity</Text>
+                <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                   className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
                   placeholder="e.g. 100"
                   value={quantity}
@@ -373,27 +377,27 @@ export default function AdminMaterialsOrdersCreatePage() {
                   keyboardType="numeric"
                 />
               </View>
-              
+
               <View className="flex-[0.5]">
-                <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Unit</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Unit</Text>
                 <View className="relative">
-                  <Pressable 
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
                     onPress={() => { setShowUnitDrop(!showUnitDrop); setShowMaterialDrop(false); setShowSupplierDrop(false); setShowProjectDrop(false); }}
                     className="flex-row justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"
                   >
-                    <Text className="text-gray-800">{selectedUnit}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{selectedUnit}</Text>
                     <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
                   </Pressable>
                   {showUnitDrop && (
                     <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-50">
-                      <ScrollView nestedScrollEnabled={true}>
+                      <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
                         {['Bags', 'Cubes', 'Tons', 'Liters', 'Units', 'Pieces'].map(u => (
-                          <Pressable 
-                            key={u} 
+                          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                            key={u}
                             onPress={() => { setSelectedUnit(u); setShowUnitDrop(false); }}
                             className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
                           >
-                            <Text className="text-gray-800">{u}</Text>
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{u}</Text>
                           </Pressable>
                         ))}
                       </ScrollView>
@@ -403,8 +407,8 @@ export default function AdminMaterialsOrdersCreatePage() {
               </View>
             </View>
 
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Expected Delivery Date</Text>
-            <TextInput
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Expected Delivery Date</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 mb-6 bg-gray-50 z-10"
               placeholder="YYYY-MM-DD"
               value={expectedDate}
@@ -412,14 +416,14 @@ export default function AdminMaterialsOrdersCreatePage() {
             />
 
             {/* Submit */}
-            <Pressable
+            <Pressable style={{ minHeight: 44, minWidth: 44 }}
               onPress={handleSubmit}
               disabled={loading}
               className="bg-brand-orange rounded-xl py-4 items-center shadow-sm z-10"
             >
               {loading
                 ? <ActivityIndicator color="white" />
-                : <Text className="text-white font-bold text-base">Submit Order</Text>
+                : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Submit Order</Text>
               }
             </Pressable>
 

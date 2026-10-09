@@ -180,7 +180,8 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || saving) return;
+    if (!form.full_name.trim()) { showToast('Full name is required.', 'error'); return; }
     setSaving(true);
     try {
       const { error } = await supabase.from('profiles').update(form).eq('id', user.id);
@@ -196,7 +197,8 @@ export default function ProfileScreen() {
   };
 
   const rc = roleConfig[role || 'admin'] || roleConfig.admin;
-  const displayName = profile?.full_name || form.full_name || user?.user_metadata?.full_name || 'Your Name';
+  const metadataName: unknown = user?.user_metadata?.full_name;
+  const displayName = profile?.full_name || form.full_name || (typeof metadataName === 'string' ? metadataName : '') || 'Your Name';
   const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -206,7 +208,7 @@ export default function ProfileScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8F9FB', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color="#F97316" />
-        <Text style={{ color: isDark ? '#64748B' : '#94A3B8', marginTop: 12, fontSize: 14 }}>Loading profile...</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: isDark ? '#64748B' : '#94A3B8', marginTop: 12, fontSize: 14 }]}>Loading profile...</Text>
       </View>
     );
   }
@@ -233,12 +235,12 @@ export default function ProfileScreen() {
             shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20,
           }}>
             <Ionicons name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'} size={18} color="white" />
-            <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>{toast.msg}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontWeight: '700', fontSize: 13 }]}>{toast.msg}</Text>
           </View>
         </Animated.View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{ maxWidth: 580, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 48 }}>
 
           {/* Hero Card */}
@@ -253,7 +255,7 @@ export default function ProfileScreen() {
               <View style={{ position: 'absolute', bottom: -20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#ffffff08' }} />
 
               {/* Avatar */}
-              <Pressable onPress={handlePickAvatar} style={{ position: 'relative', marginBottom: 16 }}>
+              <Pressable onPress={handlePickAvatar} style={[{ position: 'relative', marginBottom: 16 }, { minHeight: 44, minWidth: 44 }]}>
                 <View style={{
                   width: 96, height: 96, borderRadius: 48,
                   borderWidth: 3, borderColor: rc.color + '70',
@@ -268,7 +270,7 @@ export default function ProfileScreen() {
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text style={{ fontSize: 34, fontWeight: '800', color: rc.color }}>{initials}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 34, fontWeight: '800', color: rc.color }]}>{initials}</Text>
                   )}
                 </View>
                 {/* Upload indicator */}
@@ -285,14 +287,14 @@ export default function ProfileScreen() {
                 </View>
               </Pressable>
 
-              <Text style={{ color: '#94A3B8', fontSize: 11, marginBottom: 12 }}>Tap photo to change</Text>
-              <Text style={{ color: 'white', fontSize: 22, fontWeight: '800' }}>{displayName}</Text>
-              <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>{profile?.email || user?.email}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#94A3B8', fontSize: 11, marginBottom: 12 }]}>Tap photo to change</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontSize: 22, fontWeight: '800' }]}>{displayName}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#94A3B8', fontSize: 13, marginTop: 4 }]}>{profile?.email || user?.email}</Text>
               <View style={{
                 backgroundColor: rc.color + '25', borderColor: rc.color + '60', borderWidth: 1,
                 borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginTop: 12
               }}>
-                <Text style={{ color: rc.color, fontSize: 12, fontWeight: '700' }}>{rc.label}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontSize: 12, fontWeight: '700' }]}>{rc.label}</Text>
               </View>
             </LinearGradient>
 
@@ -308,8 +310,8 @@ export default function ProfileScreen() {
                   borderRightWidth: i < arr.length - 1 ? 1 : 0, borderRightColor: borderTheme
                 }}>
                   <Ionicons name={s.icon as any} size={16} color={rc.color} />
-                  <Text style={{ color: textSubTheme, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>{s.label}</Text>
-                  <Text style={{ color: textTheme, fontWeight: '700', fontSize: 12, marginTop: 2 }}>{s.value}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: textSubTheme, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }]}>{s.label}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: textTheme, fontWeight: '700', fontSize: 12, marginTop: 2 }]}>{s.value}</Text>
                 </View>
               ))}
             </View>
@@ -319,29 +321,29 @@ export default function ProfileScreen() {
           <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, marginBottom: 20, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: textTheme }}>Personal Information</Text>
-                <Text style={{ fontSize: 12, color: textSubTheme, marginTop: 2 }}>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: '800', color: textTheme }]}>Personal Information</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 12, color: textSubTheme, marginTop: 2 }]}>
                   {editMode ? 'Editing — tap Save when done' : 'Tap Edit to update your details'}
                 </Text>
               </View>
               {!editMode ? (
                 <Pressable
                   onPress={() => setEditMode(true)}
-                  style={{ backgroundColor: rc.bg, borderColor: rc.color + '40', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                  style={[{ backgroundColor: rc.bg, borderColor: rc.color + '40', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, { minHeight: 44, minWidth: 44 }]}
                 >
                   <Ionicons name="pencil" size={13} color={rc.color} />
-                  <Text style={{ color: rc.color, fontWeight: '700', fontSize: 13 }}>Edit</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: rc.color, fontWeight: '700', fontSize: 13 }]}>Edit</Text>
                 </Pressable>
               ) : (
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Pressable onPress={() => { setEditMode(false); setForm({ full_name: profile?.full_name || '', contact_number: profile?.contact_number || '', bio: profile?.bio || '', company_name: profile?.company_name || '' }); }}
-                    style={{ backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }}>
-                    <Text style={{ color: '#64748B', fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+                    style={[{ backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }, { minHeight: 44, minWidth: 44 }]}>
+                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#64748B', fontWeight: '600', fontSize: 13 }]}>Cancel</Text>
                   </Pressable>
-                  <Pressable onPress={handleSave}
-                    style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Pressable disabled={saving} onPress={handleSave}
+                    style={[{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, { minHeight: 44, minWidth: 44 }]}>
                     {saving ? <ActivityIndicator size="small" color="white" /> : <Ionicons name="checkmark" size={14} color="white" />}
-                    <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>{saving ? 'Saving...' : 'Save'}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'white', fontWeight: '700', fontSize: 13 }]}>{saving ? 'Saving...' : 'Save'}</Text>
                   </Pressable>
                 </View>
               )}
@@ -353,7 +355,7 @@ export default function ProfileScreen() {
               { label: 'Organization', field: 'company_name', icon: 'business-outline', placeholder: 'Company or firm name' },
             ].map(({ label, field, icon, placeholder }) => (
               <View key={field} style={{ marginBottom: 18 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>{label}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }]}>{label}</Text>
                 <View style={{
                   flexDirection: 'row', alignItems: 'center',
                   backgroundColor: editMode ? (isDark ? '#334155' : '#FAFBFF') : inputBg,
@@ -361,8 +363,8 @@ export default function ProfileScreen() {
                   borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
                 }}>
                   <Ionicons name={icon as any} size={16} color={editMode ? rc.color : textSubTheme} />
-                  <TextInput
-                    style={{ flex: 1, marginLeft: 10, fontSize: 14, color: textTheme, fontWeight: '500', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+                  <TextInput maxFontSizeMultiplier={1.3}
+                    style={[{ flex: 1, marginLeft: 10, fontSize: 14, color: textTheme, fontWeight: '500', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }, { minHeight: 44, minWidth: 44 }]}
                     value={form[field as keyof typeof form]}
                     onChangeText={v => setForm(p => ({ ...p, [field]: v }))}
                     placeholder={placeholder}
@@ -374,14 +376,14 @@ export default function ProfileScreen() {
             ))}
 
             <View style={{ marginBottom: 4 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Bio</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, fontWeight: '700', color: textSubTheme, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }]}>Bio</Text>
               <View style={{
                 backgroundColor: editMode ? (isDark ? '#334155' : '#FAFBFF') : inputBg,
                 borderWidth: 1.5, borderColor: editMode ? rc.color + '50' : borderTheme,
                 borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
               }}>
-                <TextInput
-                  style={{ fontSize: 14, color: textTheme, minHeight: 80, textAlignVertical: 'top', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }}
+                <TextInput maxFontSizeMultiplier={1.3}
+                  style={[{ fontSize: 14, color: textTheme, minHeight: 80, textAlignVertical: 'top', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) }, { minHeight: 44, minWidth: 44 }]}
                   value={form.bio}
                   onChangeText={v => setForm(p => ({ ...p, bio: v }))}
                   placeholder="A short bio about yourself..."
@@ -396,7 +398,7 @@ export default function ProfileScreen() {
 
           {/* Account Details Card */}
           <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme, marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }}>Account Details</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }]}>Account Details</Text>
             {[
               { label: 'Email Address', value: profile?.email || user?.email || '—', icon: 'mail-outline', note: 'Read-only' },
               { label: 'User ID', value: (user?.id || '').slice(0, 18) + '...', icon: 'finger-print-outline', note: undefined },
@@ -407,12 +409,12 @@ export default function ProfileScreen() {
                   <Ionicons name={icon as any} size={17} color={textSubTheme} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, color: textSubTheme, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>
-                  <Text style={{ fontSize: 13, color: textTheme, fontWeight: '600', marginTop: 2 }}>{value}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, color: textSubTheme, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }]}>{label}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: textTheme, fontWeight: '600', marginTop: 2 }]}>{value}</Text>
                 </View>
                 {note && (
                   <View style={{ backgroundColor: borderTheme, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 10, color: textSubTheme, fontWeight: '600' }}>{note}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 10, color: textSubTheme, fontWeight: '600' }]}>{note}</Text>
                   </View>
                 )}
               </View>
@@ -422,15 +424,15 @@ export default function ProfileScreen() {
           {/* Assigned Projects Card */}
           {assignedProjects.length > 0 && (
              <View style={{ backgroundColor: cardTheme, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 16, borderWidth: 1, borderColor: borderTheme }}>
-               <Text style={{ fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }}>Assigned Projects</Text>
+               <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: '800', color: textTheme, marginBottom: 20 }]}>Assigned Projects</Text>
                {assignedProjects.map(proj => (
                  <View key={proj.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: borderTheme }}>
                    <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: inputBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
                      <Ionicons name="construct" size={17} color={rc.color} />
                    </View>
                    <View style={{ flex: 1 }}>
-                     <Text style={{ fontSize: 13, color: textTheme, fontWeight: '600' }}>{proj.name}</Text>
-                     <Text style={{ fontSize: 11, color: textSubTheme, fontWeight: '500', marginTop: 2 }}>{proj.location}</Text>
+                     <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: textTheme, fontWeight: '600' }]}>{proj.name}</Text>
+                     <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 11, color: textSubTheme, fontWeight: '500', marginTop: 2 }]}>{proj.location}</Text>
                    </View>
                  </View>
                ))}

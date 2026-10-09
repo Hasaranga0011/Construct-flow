@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
 from core.security import get_current_user
-from datetime import datetime, timezone
+from datetime import date as Date, datetime, timezone
 
 router = APIRouter(
     prefix="/site-reports",
@@ -22,10 +23,25 @@ class SiteReportCreate(BaseModel):
     site_id: Optional[str] = None
     date: str                              # YYYY-MM-DD
     work_completed: str
-    workers_present_count: Optional[int] = None
+    workers_present_count: Optional[int] = Field(default=None, ge=0)
     materials_used: Optional[List[MaterialUsed]] = None
     photos: Optional[List[str]] = None    # Cloudinary URLs
     blockers: Optional[str] = None
+
+    @field_validator("date")
+    @classmethod
+    def valid_date(cls, value):
+        if Date.fromisoformat(value).isoformat() != value:
+            raise ValueError("Date must use YYYY-MM-DD")
+        return value
+
+    @field_validator("work_completed")
+    @classmethod
+    def nonempty_work(cls, value):
+        if not value.strip():
+            raise ValueError("Work completed is required")
+        return value.strip()
+
 
 
 @router.post("/")
@@ -46,10 +62,36 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
         if not assignment.data:
             raise HTTPException(status_code=403, detail="You are not assigned to this project")
 
+    actual_site_id = None
+    if payload.site_id:
+        sms = supabase.table("site_manager_sites").select("id, project_id, site_manager_id").eq("id", payload.site_id).execute()
+        if sms.data:
+            assignment_data = sms.data[0]
+            if assignment_data.get("project_id") != payload.project_id or (
+                current_user["role"] == "site_manager" and assignment_data.get("site_manager_id") != current_user["id"]
+            ):
+                raise HTTPException(status_code=403, detail="Site assignment does not match this report")
+        else:
+            phys = supabase.table("sites").select("id, project_id").eq("id", payload.site_id).execute()
+            if phys.data:
+                if phys.data[0].get("project_id") != payload.project_id:
+                    raise HTTPException(status_code=403, detail="Site does not match this project")
+                actual_site_id = phys.data[0]["id"]
+            else:
+                raise HTTPException(status_code=403, detail="Site assignment does not match this report")
+
+    if not actual_site_id:
+        try:
+            project_sites = supabase.table("sites").select("id").eq("project_id", payload.project_id).order("id").execute()
+            if project_sites.data:
+                actual_site_id = project_sites.data[0]["id"]
+        except Exception:
+            pass
+
     try:
         report_data = {
             "project_id": payload.project_id,
-            "site_id": payload.site_id,
+            "site_id": actual_site_id,
             "site_manager_id": current_user["id"],
             "date": payload.date,
             "work_completed": payload.work_completed,
@@ -75,7 +117,7 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
                 notifications_to_add = []
                 if project.get("pm_id"):
                     notifications_to_add.append({
-                        "user_id": "11111111-1111-1111-1111-111111111111",
+                        "user_id": current_user["id"],
                         "project_id": payload.project_id,
                         "target_user_id": project["pm_id"],
                         "target_role": "pm",
@@ -86,7 +128,7 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
                     })
                 if project.get("client_id"):
                     notifications_to_add.append({
-                        "user_id": "11111111-1111-1111-1111-111111111111",
+                        "user_id": current_user["id"],
                         "project_id": payload.project_id,
                         "target_user_id": project["client_id"],
                         "target_role": "client",
@@ -96,7 +138,7 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
                         "is_read": False,
                     })
                 if notifications_to_add:
-                    supabase.table("notifications").insert(notifications_to_add).execute()
+                    create_notifications(notifications_to_add)
         except Exception:
             import logging
             logging.exception("Site report notification failed")
@@ -105,7 +147,10 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        err_msg = str(e)
+        if "site_reports_unique_day" in err_msg or "23505" in err_msg:
+            raise HTTPException(status_code=409, detail="A report has already been submitted for this project today.")
+        raise HTTPException(status_code=500, detail=err_msg)
 
 
 @router.get("/{project_id}")

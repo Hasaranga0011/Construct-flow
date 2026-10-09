@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
+from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token, supabase as admin_supabase
 from core.security import get_current_user, require_manager_or_admin
 from datetime import datetime
@@ -108,7 +109,7 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
                     "unit": order.unit or "Units",
                     "current_stock": 0,
                     "minimum_threshold": 10
-                }).execute()
+                }])
                 if mat_res.data:
                     material_id = mat_res.data[0]["id"]
                     
@@ -137,7 +138,7 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
         # Trigger notification to supplier
         if order.supplier_id:
             try:
-                admin_supabase.table("notifications").insert({
+                create_notifications([{
                     "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": order.project_id,
                     "target_role": "supplier",
@@ -145,7 +146,7 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
                     "title": "New Material Order",
                     "message": f"You have received a new purchase order: {po_number}",
                     "type": "general"
-                }).execute()
+                }])
             except Exception as notif_err:
                 print(f"Failed to send notification to supplier: {notif_err}")
             
@@ -168,6 +169,7 @@ def approve_po(po_id: str, data: PurchaseOrderApprove, current_user: dict = Depe
         
         log_json = append_event(order, {
             "role": current_user["role"],
+            "user_id": current_user.get("id"),
             "action": "approved",
             "unit_price": final_price,
             "quantity": qty
@@ -187,14 +189,14 @@ def approve_po(po_id: str, data: PurchaseOrderApprove, current_user: dict = Depe
             
         order = res.data[0]
         # Notify Admin/Manager
-        admin_supabase.table("notifications").insert({
+        create_notifications([{
             "user_id": "11111111-1111-1111-1111-111111111111",
             "project_id": order.get("project_id"),
             "target_role": "pm",
             "title": "Order Approved",
             "message": f"Supplier has approved purchase order {order.get('po_number')}",
             "type": "general"
-        }).execute()
+        }])
         
         return res.data[0]
     except HTTPException:
@@ -211,6 +213,7 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
     try:
         log_json = append_event(order, {
             "role": current_user["role"],
+            "user_id": current_user.get("id"),
             "action": "rejected"
         })
         res = supabase.table("purchase_orders").update({
@@ -259,7 +262,7 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
             },
         ]
         try:
-            admin_supabase.table("notifications").insert(notifications_to_insert).execute()
+            create_notifications(notifications_to_insert)
         except Exception:
             import logging
             logging.exception("Rejection notifications failed")
@@ -279,6 +282,7 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
     try:
         log_json = append_event(order, {
             "role": current_user["role"],
+            "user_id": current_user.get("id"),
             "action": "suggested",
             "suggested_quantity": suggestion.suggested_quantity,
             "suggested_date": suggestion.suggested_date,
@@ -309,7 +313,7 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
 
         # Counter-offer notification + shortage-risk warning.
         try:
-            admin_supabase.table("notifications").insert([
+            create_notifications([
                 {
                     "user_id": "11111111-1111-1111-1111-111111111111",
                     "project_id": project_id,
@@ -333,7 +337,7 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
                     "type": "general",
                     "is_read": False,
                 },
-            ]).execute()
+            ])
         except Exception:
             import logging
             logging.exception("Suggest notifications failed")
@@ -344,149 +348,48 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/{po_id}/deliver")
-def deliver_po(po_id: str, current_user: dict = Depends(get_current_user)):
+def _transition_order(po_id: str, current_user: dict, operation: str):
+    client = client_for_token(current_user["token"])
+    check_order_access(client, po_id, current_user)
     try:
-        client = client_for_token(current_user["token"])
-        order = check_order_access(client, po_id, current_user)
-        
-        if order.get("status") not in {"Confirmed"}:
-            raise HTTPException(status_code=409, detail="Only Confirmed orders can be marked as Delivered")
-            
-        # Ensure material_id is a valid UUID before triggering the status update
-        material_id = order.get("material_id")
-        is_valid_uuid = False
-        try:
-            if material_id:
-                uuid.UUID(str(material_id))
-                is_valid_uuid = True
-        except ValueError:
-            pass
-            
-        if not is_valid_uuid:
-            # If not a UUID (e.g. text name like "Bricks"), try to find it or create it
-            mat_name = str(material_id) if material_id else order.get("items", f"Material for {order.get('po_number')}")
-            # Try to lookup first
-            existing = client.table("materials").select("id").eq("name", mat_name).eq("project_id", order.get("project_id")).execute()
-            if existing.data:
-                material_id = existing.data[0]["id"]
-            else:
-                mat_res = client.table("materials").insert({
-                    "project_id": order.get("project_id"),
-                    "name": mat_name,
-                    "unit": order.get("unit", "Units"),
-                    "current_stock": 0,
-                    "minimum_threshold": 10
-                }).execute()
-                if mat_res.data:
-                    material_id = mat_res.data[0]["id"]
-            
-            if material_id:
-                # Update the order with the valid UUID before marking delivered
-                client.table("purchase_orders").update({"material_id": material_id}).eq("id", po_id).execute()
-        
-        log_json = append_event(order, {
-            "role": current_user["role"],
-            "action": "delivered"
-        })
-        
-        res = client.table("purchase_orders").update({
-            "status": "Delivered",
-            "supplier_notes": log_json
-        }).eq("id", po_id).execute()
-        
-        if not res.data:
+        # The database locks the order and updates its status/stock in one transaction.
+        response = client.rpc(operation, {"p_order_id": po_id})
+        if not response.data:
             raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Record the actor in history
+        try:
+            order_res = client.table("purchase_orders").select("*").eq("id", po_id).execute()
+            if order_res.data:
+                log_json = append_event(order_res.data[0], {
+                    "role": current_user["role"],
+                    "user_id": current_user.get("id"),
+                    "action": operation
+                })
+                client.table("purchase_orders").update({"supplier_notes": log_json}).eq("id", po_id).execute()
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to append history log for {po_id}: {e}")
             
-        return res.data[0]
+        return response.data
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        code = getattr(exc, "code", None)
+        status = {"42501": 403, "P0002": 404, "P0001": 409, "23514": 409}.get(code, 500)
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
+@router.patch("/{po_id}/deliver")
+def deliver_po(po_id: str, current_user: dict = Depends(get_current_user)):
+    return _transition_order(po_id, current_user, "deliver_purchase_order")
 
 
 @router.patch("/{po_id}/receive")
 def receive_po(po_id: str, current_user: dict = Depends(get_current_user)):
-    """Confirm goods at the project/site and perform the single stock increment in Python."""
     if current_user["role"] not in {"super_admin", "pm", "site_manager"}:
         raise HTTPException(status_code=403, detail="Only the project team can receive goods")
-    client = client_for_token(current_user["token"])
-    order = check_order_access(client, po_id, current_user)
-    
-    if order.get("status") == "Received":
-        return order
-
-    if order.get("status") not in ["Delivered", "Pending Delivery"]:
-        raise HTTPException(status_code=400, detail="Order must be delivered or pending delivery before receipt confirmation")
-
-    # Handle material_id resolution (ensure it's a UUID)
-    material_id = order.get("material_id")
-    is_valid_uuid = False
-    try:
-        if material_id:
-            uuid.UUID(str(material_id))
-            is_valid_uuid = True
-    except ValueError:
-        pass
-
-    if not is_valid_uuid:
-        mat_name = str(material_id) if material_id else order.get("items", f"Material for {order.get('po_number')}")
-        existing = client.table("materials").select("id").eq("name", mat_name).eq("project_id", order.get("project_id")).execute()
-        if existing.data:
-            material_id = existing.data[0]["id"]
-        else:
-            mat_res = client.table("materials").insert({
-                "project_id": order.get("project_id"),
-                "name": mat_name,
-                "unit": order.get("unit", "Units"),
-                "current_stock": 0,
-                "minimum_threshold": 10
-            }).execute()
-            if mat_res.data:
-                material_id = mat_res.data[0]["id"]
-                
-        if material_id:
-            client.table("purchase_orders").update({"material_id": material_id}).eq("id", po_id).execute()
-
-    if not material_id:
-        raise HTTPException(status_code=400, detail="Failed to resolve material for this order")
-
-    # Safely increment stock
-    qty = order.get("quantity_ordered") or 0
-    if qty > 0:
-        mat_res = client.table("materials").select("current_stock").eq("id", material_id).execute()
-        if mat_res.data:
-            curr_qty = mat_res.data[0].get("current_stock") or 0
-            new_qty = curr_qty + qty
-            client.table("materials").update({"current_stock": new_qty}).eq("id", material_id).execute()
-
-    # Finalize status update
-    res = client.table("purchase_orders").update({
-        "status": "Received"
-    }).eq("id", po_id).execute()
-
-    order = res.data[0] if res.data else order
-
-    # Notify PM
-    try:
-        project_id = order.get("project_id")
-        proj = client.table("projects").select("pm_id, name").eq("id", project_id).execute()
-        if proj.data and proj.data[0].get("pm_id"):
-            admin_supabase.table("notifications").insert({
-                "user_id": "11111111-1111-1111-1111-111111111111",
-                "project_id": project_id,
-                "target_user_id": proj.data[0]["pm_id"],
-                "target_role": "pm",
-                "title": "Goods Received",
-                "message": f"PO {order.get('po_number')} has been confirmed received and stock updated.",
-                "type": "general",
-                "is_read": False,
-            }).execute()
-    except Exception:
-        import logging
-        logging.exception("Goods-received notification failed")
-
-    return order
+    return _transition_order(po_id, current_user, "receive_purchase_order")
 
 
 @router.post("/check-late")
@@ -535,7 +438,7 @@ def check_late_orders(supabase):
                 })
                 
         if notifications:
-            admin_supabase.table("notifications").insert(notifications).execute()
+            create_notifications(notifications)
             
         return {"checked": len(res.data), "alerts_sent": len(notifications)}
     except HTTPException:

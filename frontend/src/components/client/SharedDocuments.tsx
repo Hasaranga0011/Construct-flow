@@ -9,13 +9,13 @@ const DocumentRow = ({ filename, project, time }: { filename: string, project: s
       <View className="flex-row items-center flex-1">
         <Ionicons name="document-text" size={16} color="#9CA3AF" className="mr-3" />
         <View className="flex-1 mr-2">
-          <Text className="text-brand-text font-bold text-sm mb-0.5" numberOfLines={1}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">
             {filename}
           </Text>
-          <Text className="text-gray-500 text-xs">{project}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
         </View>
       </View>
-      <Text className="text-gray-400 text-xs ml-2">{time}</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs ml-2">{time}</Text>
     </View>
   );
 };
@@ -72,15 +72,15 @@ export const SharedDocuments = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1">
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-lg font-bold text-brand-text">Shared Documents</Text>
-        <Text className="text-gray-500 text-xs font-medium">{documents.length} files</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Shared Documents</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-medium">{documents.length} files</Text>
       </View>
 
       <View>
         {loading ? (
-          <Text className="text-gray-500 text-sm mt-4 text-center">Loading...</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-4 text-center">Loading...</Text>
         ) : documents.length === 0 ? (
-          <Text className="text-gray-500 text-sm mt-4 text-center">No shared documents yet.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-4 text-center">No shared documents yet.</Text>
         ) : (
           documents.map(doc => (
             <DocumentRow 

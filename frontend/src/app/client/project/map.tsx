@@ -12,8 +12,8 @@ export default function ClientProjectMapPage() {
       <View className={`flex-1 ${isMobile ? 'p-0' : 'p-6'}`}>
         <View className="flex-1 bg-gray-200 justify-center items-center rounded-2xl overflow-hidden border border-gray-100">
           <Ionicons name="map-outline" size={64} color="#9CA3AF" />
-          <Text className="text-xl font-bold text-gray-500 mt-4">Interactive Map View</Text>
-          <Text className="text-gray-400 mt-2">Map integrations will appear here</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-500 mt-4">Interactive Map View</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">Map integrations will appear here</Text>
         </View>
       </View>
     </View>

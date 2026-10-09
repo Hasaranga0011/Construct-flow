@@ -74,9 +74,9 @@ export const PredictionCard = ({
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1">
       {/* Header */}
       <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-lg font-bold text-brand-text">{title}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">{title}</Text>
         <View className={`px-2 py-1 rounded ${accuracyBadgeColor}`}>
-          <Text className={`text-[10px] font-bold uppercase ${accuracyTextColor}`}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${accuracyTextColor}`}>
             {accuracy}
           </Text>
         </View>
@@ -84,26 +84,26 @@ export const PredictionCard = ({
 
       {/* One-line model explanation */}
       {modelExplanation && (
-        <Text className="text-gray-400 text-xs mb-5 leading-4">{modelExplanation}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-5 leading-4">{modelExplanation}</Text>
       )}
 
       {/* Main Content */}
       <View className="mb-6">
-        <Text className="text-gray-500 text-xs font-semibold uppercase mb-1">Project</Text>
-        <Text className="text-2xl font-bold text-brand-text mb-4">{project}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-1">Project</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-4">{project}</Text>
 
-        <Text className="text-gray-500 text-xs font-semibold uppercase mb-1">AI Prediction</Text>
-        <Text className={`text-lg font-bold ${predictionColorClass} mb-4`}>{prediction}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-1">AI Prediction</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-lg font-bold ${predictionColorClass} mb-4`}>{prediction}</Text>
 
         {factors.length > 0 && (
           <>
-            <Text className="text-gray-500 text-xs font-semibold uppercase mb-2">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-2">
               Key Factors (ranked)
             </Text>
             {factors.map((factor, index) => (
               <View key={index} className="flex-row items-center mb-1.5">
                 <View className="w-1.5 h-1.5 rounded-full bg-brand-orange mr-2" />
-                <Text className="text-gray-600 text-sm">{factor}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{factor}</Text>
               </View>
             ))}
           </>
@@ -112,11 +112,11 @@ export const PredictionCard = ({
 
       {/* Footer Action */}
       <View className="mt-auto pt-4 border-t border-gray-100">
-        <Pressable
+        <Pressable style={{ minHeight: 44, minWidth: 44 }}
           onPress={onAction}
           className="border border-brand-orange py-3 rounded-lg items-center justify-center"
         >
-          <Text className="text-brand-orange font-semibold text-sm">{actionLabel}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold text-sm">{actionLabel}</Text>
         </Pressable>
       </View>
     </View>

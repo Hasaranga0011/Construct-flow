@@ -1,8 +1,10 @@
+import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
+import { notify, confirmAction } from '@/utils/notify';
 
 const ROLES = [
   { label: 'Admin', value: 'admin' },
@@ -53,7 +55,7 @@ export default function AdminUsersEditPage() {
           }
         }
       } catch (err: any) {
-        Alert.alert('Error', err.message || 'Failed to fetch user profile.');
+        notify('Error', err.message || 'Failed to fetch user profile.');
       } finally {
         if (isMounted) setInitialLoading(false);
       }
@@ -63,49 +65,35 @@ export default function AdminUsersEditPage() {
     return () => { isMounted = false; };
   }, [id]);
 
-  const handleDelete = () => {
-    const doDelete = async () => {
-      setIsDeleting(true);
-      try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/admin/users/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Failed to delete user');
-        }
-        
-        if (Platform.OS === 'web') {
-          window.alert('User has been removed successfully.');
-        } else {
-          Alert.alert('Deleted', 'User has been removed successfully.');
-        }
-        router.back();
-      } catch (err: any) {
-        const msg = err.message || 'Failed to delete user. Please ensure the backend function exists.';
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Error', msg);
-      } finally {
-        setIsDeleting(false);
-      }
-    };
+  const handleDelete = async () => {
+    const confirmed = await confirmAction('Delete User', 'Are you sure you want to completely delete this user account? This cannot be undone.');
+    if (!confirmed) return;
 
-    Alert.alert(
-      "Delete User",
-      "Are you sure you want to completely delete this user account? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: doDelete }
-      ]
-    );
+    setIsDeleting(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const response = await fetch(`${getApiUrl()}/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to delete user');
+      }
+      
+      notify('Success', 'User has been removed successfully.');
+      router.back();
+    } catch (err: any) {
+      notify('Error', err.message || 'Failed to delete user.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSave = async () => {
     if (!fullName) {
-      Alert.alert('Error', 'Name is required.');
+      notify('Error', 'Name is required.');
       return;
     }
 
@@ -129,11 +117,11 @@ export default function AdminUsersEditPage() {
         })
         .eq('id', id);
 
-      Alert.alert('Success', 'User profile updated successfully!');
+      notify('Success', 'User profile updated successfully!');
       router.back();
 
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong while saving.');
+      notify('Error', err.message || 'Something went wrong while saving.');
     } finally {
       setSaving(false);
     }
@@ -150,30 +138,30 @@ export default function AdminUsersEditPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Manage User" showAction={false} />
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <View className="max-w-[600px] w-full mx-auto">
 
           {/* Basic Info */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
-            <Text className="text-lg font-bold text-gray-800 mb-4">Basic Information</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4">Basic Information</Text>
 
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Full Name</Text>
-            <TextInput
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Full Name</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 mb-4 bg-gray-50"
               placeholder="Enter full name"
               value={fullName}
               onChangeText={setFullName}
             />
 
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</Text>
-            <TextInput
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-400 mb-4 bg-gray-100"
               value={email || 'No email associated'}
               editable={false}
             />
 
-            <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Contact Number</Text>
-            <TextInput
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Contact Number</Text>
+            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
               className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
               placeholder="Enter contact number (optional)"
               value={contactNumber}
@@ -184,10 +172,10 @@ export default function AdminUsersEditPage() {
 
           {/* Role Selection */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
-            <Text className="text-lg font-bold text-gray-800 mb-4">Assign Role</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4">Assign Role</Text>
             <View className="flex-row flex-wrap gap-2">
               {ROLES.map(role => (
-                <Pressable
+                <Pressable style={{ minHeight: 44, minWidth: 44 }}
                   key={role.value}
                   onPress={() => setSelectedRole(role.value)}
                   className={`px-4 py-2 rounded-lg border ${
@@ -196,7 +184,7 @@ export default function AdminUsersEditPage() {
                       : 'bg-white border-gray-200'
                   }`}
                 >
-                  <Text className={`text-sm font-semibold ${
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${
                     selectedRole === role.value ? 'text-white' : 'text-gray-600'
                   }`}>
                     {role.label}
@@ -209,12 +197,12 @@ export default function AdminUsersEditPage() {
           {/* Worker Specific Fields */}
           {selectedRole === 'worker' && (
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
-              <Text className="text-lg font-bold text-gray-800 mb-4">Worker Details</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4">Worker Details</Text>
 
-              <Text className="text-xs font-semibold text-gray-500 uppercase mb-2">Worker Type</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-2">Worker Type</Text>
               <View className="flex-row flex-wrap gap-2 mb-4">
                 {WORKER_TYPES.map(type => (
-                  <Pressable
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
                     key={type}
                     onPress={() => setWorkerType(type)}
                     className={`px-3 py-2 rounded-lg border ${
@@ -223,7 +211,7 @@ export default function AdminUsersEditPage() {
                         : 'bg-white border-gray-200'
                     }`}
                   >
-                    <Text className={`text-xs font-semibold ${
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${
                       workerType === type ? 'text-white' : 'text-gray-600'
                     }`}>
                       {type}
@@ -232,8 +220,8 @@ export default function AdminUsersEditPage() {
                 ))}
               </View>
 
-              <Text className="text-xs font-semibold text-gray-500 uppercase mb-1">Daily Rate (LKR)</Text>
-              <TextInput
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Daily Rate (LKR)</Text>
+              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
                 placeholder="e.g. 2500"
                 value={dailyRate}
@@ -244,26 +232,26 @@ export default function AdminUsersEditPage() {
           )}
 
           {/* Submit */}
-          <Pressable
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={handleSave}
             disabled={saving || isDeleting}
             className="bg-brand-orange rounded-xl py-4 items-center mb-4 shadow-sm"
           >
             {saving
               ? <ActivityIndicator color="white" />
-              : <Text className="text-white font-bold text-base">Save Changes</Text>
+              : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Save Changes</Text>
             }
           </Pressable>
 
           {/* Delete */}
-          <Pressable
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={handleDelete}
             disabled={saving || isDeleting}
             className="bg-white border border-red-200 rounded-xl py-4 items-center mb-8 shadow-sm"
           >
             {isDeleting
               ? <ActivityIndicator color="#ef4444" />
-              : <Text className="text-red-500 font-bold text-base">Delete User</Text>
+              : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500 font-bold text-base">Delete User</Text>
             }
           </Pressable>
         

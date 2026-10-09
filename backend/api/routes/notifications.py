@@ -1,20 +1,47 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import os
 import httpx
 from dotenv import load_dotenv
+from core.security import get_current_user
+from core.notification_helper import create_notification
 
 load_dotenv()
 
 router = APIRouter(
     prefix="/notifications",
-    tags=["Email Notifications"]
+    tags=["Email and System Notifications"]
 )
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "ConstructFlow <noreply@constructflow.lk>")
 
+class SystemNotificationPayload(BaseModel):
+    title: str
+    message: str
+    target_role: Optional[str] = None
+    target_user_id: Optional[str] = None
+    link: Optional[str] = None
+    type: Optional[str] = "general"
+    project_id: Optional[str] = None
+
+@router.post("/system")
+async def send_system_notification(payload: SystemNotificationPayload, current_user: dict = Depends(get_current_user)):
+    """Send an in-app system notification, verifying caller JWT."""
+    create_notification(
+        type=payload.type,
+        user_id=current_user["id"],
+        title=payload.title,
+        message=payload.message,
+        target_role=payload.target_role,
+        target_user_id=payload.target_user_id,
+        link=payload.link,
+        project_id=payload.project_id,
+        is_read=False,
+        sent_via="in_app"
+    )
+    return {"success": True}
 
 class EmailPayload(BaseModel):
     to: str
@@ -104,24 +131,16 @@ async def notify_material_rejected(
       </div>
       <div style="padding: 32px; background: white; border: 1px solid #e5e7eb;">
         <h2 style="color: #1F2937;">Material Request Rejected</h2>
-        <p style="color: #6B7280;">Your material request has been reviewed:</p>
-        <div style="background: #FEF2F2; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #EF4444;">
+        <p style="color: #6B7280;">Your material request could not be approved at this time:</p>
+        <div style="background: #F9FAFB; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0;"><strong>Item:</strong> {item_name}</p>
-          <p style="margin: 4px 0;"><strong>Reason:</strong> {reason}</p>
+          <p style="margin: 4px 0; color: #EF4444;"><strong>Reason:</strong> {reason}</p>
         </div>
-        <p style="color: #6B7280;">Please contact your Project Manager for further details or to re-submit a revised request.</p>
+      </div>
+      <div style="padding: 16px; background: #F9FAFB; border-radius: 0 0 12px 12px; text-align: center;">
+        <p style="color: #9CA3AF; font-size: 12px;">ConstructFlow — Construction Management System</p>
       </div>
     </div>
     """
     result = await send_email(requester_email, f"Request Rejected: {item_name}", html)
     return {"success": True, "result": result}
-
-
-@router.get("/email/health")
-def email_health():
-    """Check if Resend is configured."""
-    configured = bool(RESEND_API_KEY)
-    return {
-        "resend_configured": configured,
-        "from_email": FROM_EMAIL if configured else "NOT SET"
-    }

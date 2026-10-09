@@ -1,3 +1,4 @@
+import { getApiUrl } from '../../../../lib/apiUrl';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,8 +24,8 @@ export default function AdminSupplierCreatePage() {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-      
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api'}/clients/invite`, {
+
+      const response = await fetch(`${getApiUrl()}/clients/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +44,7 @@ export default function AdminSupplierCreatePage() {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to create supplier.');
       }
-      
+
       // Update the contact_number on the created profile (invite API doesn't take phone currently)
       const resJson = await response.json();
       if (resJson.user_id) {
@@ -65,46 +66,46 @@ export default function AdminSupplierCreatePage() {
       <TopNav title="Create Supplier" showAction={false} />
       <ScrollView className="flex-1 p-6" keyboardShouldPersistTaps="handled">
         <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 max-w-2xl w-full mx-auto">
-          <Text className="text-xl font-bold text-brand-text mb-6">Supplier Details</Text>
-          {error && <Text className="text-red-600 mb-4">{error}</Text>}
-          
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Contact Name *</Text>
-          <TextInput 
-            value={fullName} 
-            onChangeText={setFullName} 
-            placeholder="John Doe" 
-            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" 
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mb-6">Supplier Details</Text>
+          {error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
+
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Contact Name *</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="John Doe"
+            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
           />
-          
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Email Address *</Text>
-          <TextInput 
-            value={email} 
-            onChangeText={setEmail} 
-            placeholder="supplier@example.com" 
-            autoCapitalize="none" 
-            keyboardType="email-address" 
-            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" 
+
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email Address *</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="supplier@example.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
           />
-          
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Phone Number *</Text>
-          <TextInput 
-            value={phone} 
-            onChangeText={setPhone} 
-            placeholder="+94 77 123 4567" 
-            keyboardType="phone-pad" 
-            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4" 
+
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Phone Number *</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+94 77 123 4567"
+            keyboardType="phone-pad"
+            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
           />
-          
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Company Name *</Text>
-          <TextInput 
-            value={companyName} 
-            onChangeText={setCompanyName} 
-            placeholder="ABC Construction Supplies" 
-            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-6" 
+
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Company Name *</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
+            value={companyName}
+            onChangeText={setCompanyName}
+            placeholder="ABC Construction Supplies"
+            className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-6"
           />
-          
-          <Pressable onPress={submit} disabled={submitting} className={`rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}>
-            {submitting ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-base">Create Supplier</Text>}
+
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={submit} disabled={submitting} className={`rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}>
+            {submitting ? <ActivityIndicator color="white" /> : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Create Supplier</Text>}
           </Pressable>
         </View>
       </ScrollView>

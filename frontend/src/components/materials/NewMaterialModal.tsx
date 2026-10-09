@@ -1,3 +1,4 @@
+import { DateField } from '../common/DateField';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
@@ -21,11 +22,11 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
   const [quantity, setQuantity] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [unit, setUnit] = useState('Bags');
-  
+
   const [projects, setProjects] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [dbSuppliers, setDbSuppliers] = useState<any[]>([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -42,10 +43,10 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
           supabase.from('projects').select('id, name').eq('status', 'active'),
           supabase.from('materials').select('id, name')
         ]);
-        
+
         if (projectsReq.error) throw projectsReq.error;
         if (materialsReq.error) throw materialsReq.error;
-        
+
         if (isMounted) {
           setProjects(projectsReq.data || []);
           setMaterials(materialsReq.data || []);
@@ -74,7 +75,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
           .eq('project_id', projectId)
           .eq('role', 'supplier')
           .eq('profiles.is_approved', true);
-          
+
         if (error) throw error;
         if (isMounted) {
           // Flatten the response
@@ -124,7 +125,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
       setProjectId(null);
       setQuantity('');
       setExpectedDate('');
-      
+
       toast.success('Order created!');
       onSuccess();
     } catch (e: any) {
@@ -138,11 +139,11 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <ModalViewport>
         <View className="bg-white max-h-full w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
-          
+
           {/* Header */}
           <View className="flex-row justify-between items-center p-6 border-b border-gray-100 bg-brand-light">
-            <Text className="text-xl font-bold text-brand-text">New Purchase Order</Text>
-            <Pressable onPress={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">New Purchase Order</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
               <Ionicons name="close" size={24} color="#6B7280" />
             </Pressable>
           </View>
@@ -150,7 +151,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
             {errorMsg ? (
               <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
-                <Text className="text-red-600 text-sm text-center">{errorMsg}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-sm text-center">{errorMsg}</Text>
               </View>
             ) : null}
 
@@ -161,10 +162,10 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
             ) : (
               <>
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Assign to Project (Select First)</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Assign to Project (Select First)</Text>
+                  <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
                     {projects.map(p => (
-                      <Pressable
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }}
                         key={p.id}
                         onPress={() => {
                           setProjectId(p.id);
@@ -173,36 +174,36 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                         }}
                         className={`px-4 py-2 rounded-full border ${projectId === p.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
                       >
-                        <Text className={`text-sm font-semibold ${projectId === p.id ? 'text-white' : 'text-gray-600'}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${projectId === p.id ? 'text-white' : 'text-gray-600'}`}>
                           {p.name}
                         </Text>
                       </Pressable>
                     ))}
                     {projects.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">No active projects found.</Text>
+                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">No active projects found.</Text>
                     )}
                   </ScrollView>
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Supplier</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Supplier</Text>
+                  <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
                     {dbSuppliers.map(sup => (
-                      <Pressable
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }}
                         key={sup.id}
                         onPress={() => { setSupplierId(sup.id); setSupplierName(sup.full_name); }}
                         className={`px-4 py-2 rounded-full border ${supplierId === sup.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
                       >
-                        <Text className={`text-sm font-semibold ${supplierId === sup.id ? 'text-white' : 'text-gray-600'}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${supplierId === sup.id ? 'text-white' : 'text-gray-600'}`}>
                           {sup.full_name}
                         </Text>
                       </Pressable>
                     ))}
                     {dbSuppliers.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">{projectId ? 'No suppliers assigned to this project.' : 'Select a project first.'}</Text>
+                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">{projectId ? 'No suppliers assigned to this project.' : 'Select a project first.'}</Text>
                     )}
                   </ScrollView>
-                  <TextInput
+                  <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                     className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="Or type a custom supplier name..."
                     value={supplierName}
@@ -211,24 +212,24 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Material</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Material</Text>
+                  <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
                     {materials.map(m => (
-                      <Pressable
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }}
                         key={m.id}
                         onPress={() => { setMaterialId(m.id); setMaterialName(m.name); }}
                         className={`px-4 py-2 rounded-full border ${materialId === m.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
                       >
-                        <Text className={`text-sm font-semibold ${materialId === m.id ? 'text-white' : 'text-gray-600'}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${materialId === m.id ? 'text-white' : 'text-gray-600'}`}>
                           {m.name}
                         </Text>
                       </Pressable>
                     ))}
                     {materials.length === 0 && (
-                       <Text className="text-gray-400 text-sm italic">No materials found.</Text>
+                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">No materials found.</Text>
                     )}
                   </ScrollView>
-                  <TextInput
+                  <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                     className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="Or type a custom material name..."
                     value={materialName}
@@ -237,8 +238,8 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Quantity</Text>
-                  <TextInput
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Quantity</Text>
+                  <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                     className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="0"
                     keyboardType="numeric"
@@ -248,21 +249,21 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Unit Type</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Unit Type</Text>
+                  <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
                     {['Cubes', 'Packets', 'Liters', 'Bags', 'Tons', 'Meters', 'Pieces'].map(u => (
-                      <Pressable
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }}
                         key={u}
                         onPress={() => setUnit(u)}
                         className={`px-4 py-2 rounded-full border ${unit === u ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
                       >
-                        <Text className={`text-sm font-semibold ${unit === u ? 'text-white' : 'text-gray-600'}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${unit === u ? 'text-white' : 'text-gray-600'}`}>
                           {u}
                         </Text>
                       </Pressable>
                     ))}
                   </ScrollView>
-                  <TextInput
+                  <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                     className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="Or type a custom unit..."
                     value={unit}
@@ -271,23 +272,8 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Expected Delivery Date</Text>
-                  {Platform.OS === 'web' ? (
-                    // @ts-ignore
-                    <input 
-                      type="date"
-                      className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors outline-none"
-                      value={expectedDate}
-                      onChange={(e) => setExpectedDate(e.target.value)}
-                    />
-                  ) : (
-                    <TextInput
-                      className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-                      placeholder="YYYY-MM-DD"
-                      value={expectedDate}
-                      onChangeText={setExpectedDate}
-                    />
-                  )}
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Expected Delivery Date</Text>
+                  <DateField label="Expected delivery date" mode="date" value={expectedDate} onChange={setExpectedDate} />
                 </View>
 
 
@@ -296,14 +282,14 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
 
             {/* Footer Buttons */}
             <View className="flex-row gap-4 pt-4 border-t border-gray-100 pb-2">
-              <Pressable 
+              <Pressable style={{ minHeight: 44, minWidth: 44 }}
                 onPress={onClose}
                 disabled={loading}
                 className="flex-1 bg-gray-100 py-4 rounded-xl items-center justify-center hover:bg-gray-200 transition-colors"
               >
-                <Text className="text-gray-600 font-bold text-base">Cancel</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 font-bold text-base">Cancel</Text>
               </Pressable>
-              <Pressable 
+              <Pressable style={{ minHeight: 44, minWidth: 44 }}
                 onPress={handleCreate}
                 disabled={loading || fetchingData}
                 className={`flex-1 bg-brand-orange py-4 rounded-xl items-center justify-center shadow-sm hover:bg-orange-600 transition-colors ${loading || fetchingData ? 'opacity-70' : ''}`}
@@ -311,7 +297,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-white font-bold text-base">Create Order</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Create Order</Text>
                 )}
               </Pressable>
             </View>

@@ -128,10 +128,12 @@ Do not commit real credentials. Create local environment files from the followin
 EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
 EXPO_PUBLIC_API_URL=http://localhost:8000/api
+# Optional when Expo Go uses a hosted backend or Metro tunnel:
+EXPO_PUBLIC_NATIVE_API_URL=https://<backend-host>/api
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=<optional-google-maps-key>
 ```
 
-`EXPO_PUBLIC_API_URL` must be reachable from the device. `localhost` points to the device itself on a physical phone; use the host machine's LAN IP instead, for example `http://192.168.1.20:8000/api`.
+`EXPO_PUBLIC_API_URL` can remain localhost for the web browser. In Expo Go, the app resolves that address to the Metro host's LAN IP. Set `EXPO_PUBLIC_NATIVE_API_URL` to a Railway/HTTPS backend URL or explicit LAN URL when Metro uses a tunnel or the backend runs elsewhere. Supabase must use a reachable HTTPS URL.
 
 ### `backend/.env`
 
@@ -163,7 +165,7 @@ PowerShell:
 & ".\.venv\Scripts\Activate.ps1"
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 If the virtual environment does not exist yet:
@@ -396,7 +398,7 @@ Run `npm start -- --clear` from `frontend`, confirm that `package.json` is in th
 
 ### API requests fail from Expo Go
 
-Do not use `localhost` in the phone's frontend environment. Set `EXPO_PUBLIC_API_URL` to the development machine's LAN IP, bind Uvicorn to the network interface if needed, and ensure Windows Firewall allows port 8000.
+Run Metro in LAN mode and Uvicorn with `--host 0.0.0.0`. The phone and computer must share a network and Windows Firewall must allow port 8000. If Metro is tunneled, set `EXPO_PUBLIC_NATIVE_API_URL` to the deployed backend HTTPS URL or a phone-reachable LAN URL. The native resolver rejects unresolved localhost instead of sending requests to the phone itself.
 
 ### Supabase reports RLS violations
 

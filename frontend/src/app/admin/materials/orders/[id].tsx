@@ -1,14 +1,19 @@
+import { notify, confirmAction } from '@/utils/notify';
+import { positiveQuantity, validReportDate } from '@/utils/siteWorkflow';
+import { firstRelation } from '@/utils/relations';
 import { ModalViewport } from '@/components/common/ModalViewport';
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Modal, TextInput } from 'react-native';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { api } from '../../../../services/api';
-import { ChatWidget } from '../../../../components/shared/ChatWidget';
-import { Modal, TextInput } from 'react-native';
+import { OrderItemRow } from '@/components/materials/OrderItemRow';
+import { useResponsive } from '@/hooks/useResponsive';
+
+const displayDate = (value: string | null | undefined, pattern = 'MMM dd, yyyy') => value && Number.isFinite(new Date(value).getTime()) ? format(new Date(value), pattern) : 'Not recorded';
 
 const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
   const [qty, setQty] = useState('');
@@ -31,34 +36,34 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <ModalViewport>
         <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md max-h-full">
-          <Text className="text-xl font-bold text-brand-text mb-4">Counter-Offer</Text>
-          <Text className="text-gray-500 mb-4 text-sm">Propose a different quantity, date, or price to the supplier.</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mb-4">Counter-Offer</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4 text-sm">Propose a different quantity, date, or price to the supplier.</Text>
 
-          <Text className="font-semibold text-gray-700 mb-1">Suggested Quantity</Text>
-          <TextInput 
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Suggested Quantity</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
             keyboardType="numeric"
             value={qty}
             onChangeText={setQty}
           />
 
-          <Text className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
-          <TextInput 
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
             value={date}
             onChangeText={setDate}
           />
 
-          <Text className="font-semibold text-gray-700 mb-1">Suggested Unit Price (LKR)</Text>
-          <TextInput 
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Suggested Unit Price (LKR)</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
             keyboardType="numeric"
             value={price}
             onChangeText={setPrice}
           />
 
-          <Text className="font-semibold text-gray-700 mb-1">Notes to Supplier</Text>
-          <TextInput 
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Notes to Supplier</Text>
+          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
             className="border border-gray-300 rounded-lg p-3 mb-6 text-brand-text h-20"
             multiline
             value={notes}
@@ -66,14 +71,14 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
           />
 
           <View className="flex-row justify-end space-x-3">
-            <Pressable onPress={onClose} className="px-4 py-2">
-              <Text className="text-gray-500 font-bold">Cancel</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={onClose} className="px-4 py-2">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-bold">Cancel</Text>
             </Pressable>
-            <Pressable 
-              onPress={() => onSubmit(order.id, parseFloat(qty), date, parseFloat(price), notes)} 
+            <Pressable style={{ minHeight: 44, minWidth: 44 }}
+              onPress={() => onSubmit(order.id, parseFloat(qty), date, parseFloat(price), notes)}
               className="bg-brand-warning px-6 py-2 rounded-lg"
             >
-              <Text className="text-white font-bold">Submit Counter</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Submit Counter</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -86,6 +91,9 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
 export default function AdminMaterialsOrdersIdPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const isPM = usePathname().startsWith('/pm/');
+  const { isMobile } = useResponsive();
+  const [loadError, setLoadError] = useState('');
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -93,73 +101,52 @@ export default function AdminMaterialsOrdersIdPage() {
   const [suggestModalVisible, setSuggestModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState('');
 
-  useEffect(() => { 
-    supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); 
-    supabase.from('projects').select('id, name').then(({data}) => setProjects(data || []));
-  }, []);
-
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
+    setLoading(true); setLoadError('');
     try {
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select(`
-          *,
-          project:projects(name)
-        `)
-        .eq('id', id)
-        .single();
-        
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Please sign in again.');
+      let projectQuery = supabase.from('projects').select('id, name');
+      if (isPM) projectQuery = projectQuery.eq('pm_id', session.user.id);
+      const available = await projectQuery;
+      if (available.error) throw available.error;
+      setProjects(available.data || []);
+      let query = supabase.from('purchase_orders').select('*, project:projects(name)').eq('id', id);
+      if (isPM) query = query.in('project_id', (available.data || []).map(p => p.id));
+      const { data, error } = await query.single();
       if (error) throw error;
-      setOrder(data);
+      setOrder({ ...data, project: firstRelation(data.project) });
     } catch (err: any) {
-      if (Platform.OS === 'web') console.error(err);
-      else Alert.alert('Error', 'Failed to fetch order details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrder();
-  }, [id]);
+      setOrder(null); setLoadError(err.message || 'Unable to load order details.');
+    } finally { setLoading(false); }
+  }, [id, isPM]);
+  useEffect(() => { void fetchOrder(); }, [fetchOrder]);
 
   const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received') => {
-    const proceed = await new Promise((resolve) => {
-      Alert.alert(
-        'Confirm Action',
-        `Are you sure you want to mark this order as ${newStatus}?`,
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-          { text: 'Yes', onPress: () => resolve(true) }
-        ]
-      );
-    });
-    if (!proceed) return;
-
+    if (actionLoading || !await confirmAction('Confirm Action', `Mark this order as ${newStatus}?`)) return;
     setActionLoading(true);
     try {
       if (!id) throw new Error('Order id is required');
-      if (newStatus === 'Confirmed') await api.purchaseOrders.approve(id);
+      if (newStatus === 'Confirmed') await api.purchaseOrders.approve(id, {});
       if (newStatus === 'Rejected') await api.purchaseOrders.reject(id);
       if (newStatus === 'Delivered') await api.purchaseOrders.deliver(id);
       if (newStatus === 'Received') await api.purchaseOrders.receive(id);
-      
-      if (Platform.OS === 'web') window.alert(`Order marked as ${newStatus}!`);
-      else Alert.alert('Success', `Order marked as ${newStatus}!`);
-      
+
+      notify('Success', `Order marked as ${newStatus}!`);
+
       // Refresh data
       fetchOrder();
     } catch (err: any) {
-      if (Platform.OS === 'web') window.alert('Failed to update status');
-      else Alert.alert('Error', 'Failed to update status');
+      notify('Error', err.message || 'Failed to update status');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleSuggestSubmit = async (orderId: string, qty: number, date: string, price: number, notes: string) => {
+    if (actionLoading) return;
+    if (!positiveQuantity(String(qty)) || !validReportDate(date) || !Number.isFinite(price) || price < 0) { notify('Invalid offer', 'Enter a positive quantity, valid date and non-negative unit price.'); return; }
     try {
       setActionLoading(true);
       setSuggestModalVisible(false);
@@ -171,7 +158,7 @@ export default function AdminMaterialsOrdersIdPage() {
       });
       fetchOrder();
     } catch (e: any) {
-      Alert.alert('Error', 'Failed to submit suggestion');
+      notify('Error', e.message || 'Failed to submit suggestion');
     } finally {
       setActionLoading(false);
     }
@@ -184,9 +171,9 @@ export default function AdminMaterialsOrdersIdPage() {
       if (error) throw error;
       setAssignModalVisible(false);
       fetchOrder();
-      Alert.alert('Success', 'Project assigned successfully.');
+      notify('Success', 'Project assigned successfully.');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to assign project');
+      notify('Error', e.message || 'Failed to assign project');
     } finally {
       setActionLoading(false);
     }
@@ -205,9 +192,10 @@ export default function AdminMaterialsOrdersIdPage() {
       <View className="flex-1 bg-brand-light">
         <TopNav title="Order Not Found" showAction={false} />
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-500">The requested order could not be found.</Text>
-          <Pressable onPress={() => router.back()} className="mt-4 bg-brand-orange px-6 py-2 rounded-lg">
-            <Text className="text-white font-bold">Go Back</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{loadError || 'The requested order could not be found.'}</Text>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={fetchOrder} className="p-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Retry</Text></Pressable>
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.back()} className="mt-4 bg-brand-orange px-6 py-2 rounded-lg">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Go Back</Text>
           </Pressable>
         </View>
       </View>
@@ -235,106 +223,108 @@ export default function AdminMaterialsOrdersIdPage() {
         negotiationLog = parsed;
       }
     }
-  } catch (e) {}
+  } catch {}
 
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title={`Order ${order.po_number}`} showAction={false} />
-      
-      <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+
+      <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-4 md:p-6'}`} showsVerticalScrollIndicator={false}>
         <View className="max-w-[700px] w-full mx-auto">
-          
-          <Pressable onPress={() => router.back()} className="flex-row items-center mb-6 self-start">
+
+          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.back()} className="flex-row items-center mb-6 self-start">
             <Ionicons name="arrow-back" size={20} color="#6B7280" />
-            <Text className="text-gray-500 font-semibold ml-2">Back to Orders</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-semibold ml-2">Back to Orders</Text>
           </Pressable>
 
           {/* Main Details Card */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6">
-            <View className="flex-row justify-between items-start mb-8 pb-6 border-b border-gray-100">
+          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-8 mb-6">
+            <View className="flex-row flex-wrap gap-3 justify-between items-start mb-8 pb-6 border-b border-gray-100">
               <View>
-                <Text className="text-3xl font-bold text-gray-800 mb-2">{order.po_number}</Text>
-                <Text className="text-gray-500 flex-row items-center">
-                  <Ionicons name="calendar-outline" size={14} /> Created on {format(new Date(order.created_at), 'MMM dd, yyyy')}
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-gray-800 mb-2">{order.po_number}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 flex-row items-center">
+                  <Ionicons name="calendar-outline" size={14} /> Created on {displayDate(order.created_at)}
                 </Text>
               </View>
               <View className={`px-4 py-2 rounded-lg border ${getStatusColor(order.status)}`}>
-                <Text className="font-bold uppercase tracking-wide text-xs">{order.status}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold uppercase tracking-wide text-xs">{order.status}</Text>
               </View>
             </View>
 
             <View className="flex-row flex-wrap mb-8">
-              <View className="w-1/2 mb-6">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Supplier</Text>
+              <View className="w-full md:w-1/2 mb-6">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Supplier</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-3">
                     <FontAwesome5 name="truck" size={12} color="#3B82F6" />
                   </View>
-                  <Text className="text-gray-800 font-medium text-base">{order.supplier_name || 'Unknown'}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-base">{order.supplier_name || 'Unknown'}</Text>
                 </View>
               </View>
 
-              <View className="w-1/2 mb-6">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Site</Text>
+              <View className="w-full md:w-1/2 mb-6">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Site</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
                     <FontAwesome5 name="hard-hat" size={12} color="#10B981" />
                   </View>
-                  <Text className="text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
                   {!order.project && (
-                    <Pressable onPress={() => setAssignModalVisible(true)} className="bg-gray-200 px-3 py-1 rounded-full">
-                      <Text className="text-xs text-gray-700 font-bold">Assign</Text>
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setAssignModalVisible(true)} className="bg-gray-200 px-3 py-1 rounded-full">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-700 font-bold">Assign</Text>
                     </Pressable>
                   )}
                 </View>
               </View>
 
-              <View className="w-1/2">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Expected Delivery</Text>
-                <Text className="text-gray-800 font-medium text-base">
-                  {order.expected_date ? format(new Date(order.expected_date), 'MMM dd, yyyy') : 'TBD'}
+              <View className="w-full md:w-1/2 mb-4">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Expected Delivery</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-base">
+                  {displayDate(order.expected_date)}
                 </Text>
               </View>
 
-              <View className="w-1/2">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Cost</Text>
-                <Text className="text-brand-orange font-bold text-xl">
-                  Rs. {(order.total_price || 0).toLocaleString()}
-                </Text>
+              <View className="w-full md:w-1/2 mb-4">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Cost</Text>
+                {(!order.total_price || order.total_price === 0) && (order.status === 'Pending' || order.status === 'Suggested') ? (
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm mt-1">Awaiting supplier price</Text>
+                ) : (
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xl">
+                    Rs. {(order.total_price || 0).toLocaleString()}
+                  </Text>
+                )}
               </View>
             </View>
 
             {/* Items Ordered Section */}
             <View className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-              <Text className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">Items Ordered</Text>
-              <View className="flex-row justify-between items-center py-3 border-b border-gray-200 mb-2">
-                <Text className="text-gray-800 font-medium flex-1">{order.items}</Text>
-                <Text className="text-gray-500 w-24 text-right">Qty: {order.quantity_ordered}</Text>
-                <Text className="text-gray-800 font-bold w-32 text-right">Rs. {(order.unit_price || 0).toLocaleString()}</Text>
-              </View>
-              <View className="flex-row justify-between items-center pt-2">
-                <Text className="text-gray-500 font-bold">Total</Text>
-                <Text className="text-brand-orange font-bold text-lg">Rs. {(order.total_price || 0).toLocaleString()}</Text>
-              </View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">Items Ordered</Text>
+              <OrderItemRow 
+                itemName={order.items}
+                quantity={order.quantity_ordered}
+                unitPrice={order.unit_price}
+                totalPrice={order.total_price}
+                status={order.status}
+              />
             </View>
 
             {negotiationLog.length > 0 && (
               <View className="mt-8">
-                <Text className="text-lg font-bold text-gray-800 mb-4">Negotiation History</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4">Negotiation History</Text>
                 <View className="border-l-2 border-gray-200 ml-3 pl-4">
                   {negotiationLog.map((event, idx) => (
                     <View key={idx} className="mb-4 relative">
                       <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
-                      <Text className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'Supplier' : 'You'}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mb-1">{displayDate(event.timestamp, 'MMM dd, yyyy h:mm a')} • {event.role === 'supplier' ? 'Supplier' : 'You'}</Text>
                       <View className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                        <Text className="font-bold text-gray-700 capitalize mb-1">{event.action}</Text>
-                        {event.quantity && <Text className="text-sm text-gray-600">Qty: {event.quantity}</Text>}
-                        {event.suggested_quantity && <Text className="text-sm text-gray-600">Qty: {event.suggested_quantity}</Text>}
-                        {event.unit_price && <Text className="text-sm text-gray-600">Price: Rs. {event.unit_price}</Text>}
-                        {event.suggested_price && <Text className="text-sm text-gray-600">Price: Rs. {event.suggested_price}</Text>}
-                        {event.date && <Text className="text-sm text-gray-600">Date: {event.date}</Text>}
-                        {event.suggested_date && <Text className="text-sm text-gray-600">Date: {event.suggested_date}</Text>}
-                        {event.note && <Text className="text-sm text-gray-500 italic mt-2">"{event.note}"</Text>}
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-700 capitalize mb-1">{event.action}</Text>
+                        {event.quantity && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Qty: {event.quantity}</Text>}
+                        {event.suggested_quantity && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Qty: {event.suggested_quantity}</Text>}
+                        {event.unit_price && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Price: Rs. {event.unit_price}</Text>}
+                        {event.suggested_price && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Price: Rs. {event.suggested_price}</Text>}
+                        {event.date && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Date: {event.date}</Text>}
+                        {event.suggested_date && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Date: {event.suggested_date}</Text>}
+                        {event.note && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500 italic mt-2">&quot;{event.note}&quot;</Text>}
                       </View>
                     </View>
                   ))}
@@ -345,47 +335,62 @@ export default function AdminMaterialsOrdersIdPage() {
           </View>
 
           {/* Action Buttons Section */}
-          {!isCompleted && (
-            <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex-row justify-between items-center">
-              <View className="flex-1 mr-4">
-                <Text className="text-lg font-bold text-gray-800 mb-1">Update Order Status</Text>
-                <Text className="text-gray-500 text-sm">Review the details above before confirming or rejecting this order.</Text>
+          {!isCompleted && order.status !== 'Pending Delivery' && (
+            <View className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 flex-col ${isMobile ? 'gap-6' : 'md:flex-row md:justify-between md:items-center'}`}>
+              <View className={isMobile ? "w-full" : "flex-1 mr-4"}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-1">Update Order Status</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">
+                  {order.status === 'Pending' ? 'Cancel this order if it is no longer required.' : 'Review the details above before acting on this order.'}
+                </Text>
               </View>
-              
-              <View className="flex-row gap-3">
-                {order.status === 'Delivered' ? <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Received')}
-                  className="bg-brand-success px-6 py-3 rounded-lg"
-                >
-                  <Text className="text-white font-bold">Confirm Receipt</Text>
-                </Pressable> : <Pressable
-                  disabled={actionLoading}
-                  onPress={() => handleUpdateStatus('Rejected')}
-                  className="bg-red-50 border border-red-200 px-6 py-3 rounded-lg"
-                >
-                  <Text className="text-red-600 font-bold">Reject Order</Text>
-                </Pressable>}
+
+              <View className={isMobile ? "flex-col w-full gap-3" : "flex-row gap-3"}>
+                {order.status === 'Pending' && (
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                    disabled={actionLoading}
+                    onPress={() => handleUpdateStatus('Cancelled')}
+                    className={`bg-red-50 border border-red-200 px-6 py-3 rounded-lg items-center justify-center ${isMobile ? 'w-full' : ''}`}
+                  >
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 font-bold text-center">Cancel Order</Text>
+                  </Pressable>
+                )}
                 
-                {order.status === 'Suggested' ? (
+                {order.status === 'Delivered' && (
+                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                    disabled={actionLoading}
+                    onPress={() => handleUpdateStatus('Received')}
+                    className={`bg-brand-success px-6 py-3 rounded-lg items-center justify-center ${isMobile ? 'w-full' : ''}`}
+                  >
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">Confirm Receipt</Text>
+                  </Pressable>
+                )}
+                
+                {order.status === 'Suggested' && (
                   <>
-                    <Pressable
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                      disabled={actionLoading}
+                      onPress={() => handleUpdateStatus('Rejected')}
+                      className={`bg-red-50 border border-red-200 px-6 py-3 rounded-lg flex-row items-center justify-center ${isMobile ? 'w-full' : ''}`}
+                    >
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 font-bold text-center">Decline</Text>
+                    </Pressable>
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       disabled={actionLoading}
                       onPress={() => setSuggestModalVisible(true)}
-                      className="bg-yellow-500 shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                      className={`bg-yellow-500 shadow-sm px-6 py-3 rounded-lg flex-row items-center justify-center ${isMobile ? 'w-full' : ''}`}
                     >
-                      <Text className="text-white font-bold">Counter Supplier</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">Counter back</Text>
                     </Pressable>
-                    <Pressable
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       disabled={actionLoading}
                       onPress={() => handleUpdateStatus('Confirmed')}
-                      className="bg-brand-success shadow-sm px-6 py-3 rounded-lg flex-row items-center"
+                      className={`bg-brand-success shadow-sm px-6 py-3 rounded-lg flex-row items-center justify-center ${isMobile ? 'w-full' : ''}`}
                     >
                       {actionLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
-                      <Text className="text-white font-bold">Accept Counter</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">Accept counter-offer</Text>
                     </Pressable>
                   </>
-                ) : null}
+                )}
               </View>
             </View>
           )}
@@ -393,31 +398,31 @@ export default function AdminMaterialsOrdersIdPage() {
         </View>
       </ScrollView>
 
-      <SuggestModal 
+      <SuggestModal
         visible={suggestModalVisible}
         order={order}
         onClose={() => setSuggestModalVisible(false)}
         onSubmit={handleSuggestSubmit}
       />
-      
+
       <Modal visible={assignModalVisible} transparent animationType="fade" onRequestClose={() => setAssignModalVisible(false)}>
         <ModalViewport>
           <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ padding: 24 }} className="bg-white rounded-2xl w-full max-w-md max-h-full">
-            <Text className="text-xl font-bold text-gray-800 mb-4">Assign Project</Text>
-            <Text className="text-gray-500 mb-4">Select a project for this unassigned order:</Text>
-            <ScrollView className="max-h-60 mb-4">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-4">Assign Project</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4">Select a project for this unassigned order:</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" className="max-h-60 mb-4">
               {projects.map(p => (
-                <Pressable 
-                  key={p.id} 
+                <Pressable style={{ minHeight: 44, minWidth: 44 }}
+                  key={p.id}
                   onPress={() => handleAssignProject(p.id)}
                   className="py-3 border-b border-gray-100"
                 >
-                  <Text className="text-gray-800">{p.name}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{p.name}</Text>
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable onPress={() => setAssignModalVisible(false)} className="self-end px-4 py-2 bg-gray-200 rounded-lg">
-              <Text className="text-gray-700 font-bold">Cancel</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setAssignModalVisible(false)} className="self-end px-4 py-2 bg-gray-200 rounded-lg">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold">Cancel</Text>
             </Pressable>
           </ScrollView>
         </ModalViewport>

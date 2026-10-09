@@ -74,15 +74,15 @@ export const PurchaseOrderPipelineChart = () => {
     return (
       <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
         <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
-        <Text className="text-gray-400 mt-2">No purchase orders found.</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">No purchase orders found.</Text>
       </View>
     );
   }
 
   return (
     <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
-      <Text className="text-lg font-bold text-brand-text mb-1">Purchase Order Pipeline</Text>
-      <Text className="text-gray-500 text-xs mb-6">Distribution of POs by status across all projects</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Purchase Order Pipeline</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mb-6">Distribution of POs by status across all projects</Text>
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}

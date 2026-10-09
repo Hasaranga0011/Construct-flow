@@ -28,29 +28,57 @@ export const isNotificationForUser = (
       || getNotificationRoleAliases(role).includes(notification.target_role || '')));
 
 import { supabase } from '../lib/supabase';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+const getApiUrl = () => {
+  if (Platform.OS === 'web') return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  const localhost = debuggerHost?.split(':')[0] || '10.0.2.2';
+  return process.env.EXPO_PUBLIC_API_URL || `http://${localhost}:8000`;
+};
 
 export const sendSystemNotification = async (
   title: string,
   message: string,
   target_role: string = 'Admin',
   target_user_id: string | null = null,
-  link: string | null = null
+  link: string | null = null,
+  type: string = 'general',
+  project_id: string | null = null
 ) => {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id || '11111111-1111-1111-1111-111111111111';
+    const token = sessionData?.session?.access_token;
     
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      type: 'general',
+    if (!token) {
+      console.warn('Cannot send notification: no token');
+      return;
+    }
+
+    const payload = {
       title,
       message,
       target_role,
       target_user_id,
       link,
-      is_read: false,
-      sent_via: 'in_app'
+      type,
+      project_id
+    };
+
+    const API_URL = getApiUrl();
+    const response = await fetch(`${API_URL}/notifications/system`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      console.warn('Failed to send notification via API:', await response.text());
+    }
   } catch (error) {
     console.warn('Failed to send notification', error);
   }

@@ -15,8 +15,8 @@ export default function AuthPageLayout({ children, hero }: AuthPageLayoutProps) 
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ height: viewportHeight, minHeight: 0, width: '100%', backgroundColor: '#fff' }}
+      behavior={Platform.OS === 'web' ? undefined : Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, minHeight: 0, width: '100%', backgroundColor: '#fff' }}
     >
       <ScrollView
         testID="auth-page-scroll"

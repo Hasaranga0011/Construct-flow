@@ -50,6 +50,33 @@ The matrix checks rendered portal chrome, document width, controls outside the v
 ## Remaining verification limits
 
 - Android SDK `adb devices -l` returned no connected devices/emulators. No iOS runtime was available. Native keyboard interaction, touch gestures, large accessibility fonts, iPad split view and device safe areas still need physical/simulator QA.
-- Focused lint passed with zero errors and two pre-existing unused-code warnings in the landing page.
-- Whole-project TypeScript checking retains eight existing errors: order receive argument, stock/project relation shapes, client/PM report relation shapes, supplier dashboard prop, obsolete `/home` tab link, and an implicit parameter type in ProfileScreen. Responsive components introduce no additional type errors.
+- Follow-up full frontend lint: zero errors, 120 warnings (mostly unused variables/imports and hook dependencies). Warnings are not suppressed.
+- Follow-up whole-project TypeScript: **zero errors**. Fixed all eight previous errors: approval payload (the earlier audit incorrectly called this a receipt argument), relation shapes, obsolete supplier callback/tab, and profile metadata typing.
 - Passing a viewport matrix cannot establish that every possible device, data value and OS/browser combination has zero defects. No deployment or native store release was performed.
+
+## Error-fix follow-up (2026-10-06)
+
+- Fixed all 8 TypeScript errors and all 24 ESLint errors found by the follow-up checks. Node-only lint globals are scoped to tooling files; JSX quotes are escaped without changing visible text.
+- To-one database joins now normalize object, array and missing responses before UI rendering/search. No unsafe type assertions were added.
+- Backend authorization now reads the authenticated caller's protected profile; editable metadata cannot elevate roles.
+- Delivery/receipt use database RPC transactions rather than separate Python stock and status writes. Database rejection codes retain meaningful HTTP statuses.
+- Cost estimates no longer label tree agreement as calibrated confidence; provenance comes from metadata and defaults to `unverified`. The synthetic-estimate regression uses the current required request fields and a deterministic model fixture.
+- Frontend relation/approval regressions passed. Backend suite: **48 passed**, with 13 dependency/deprecation warnings. No live database writes were performed by these tests.
+
+**Deployment prerequisite:** apply `backend/migrations/20261006_receipt_stock_boundary.sql` before deploying the changed order endpoints. It reinstalls the atomic RPCs and removes the delivery-time inventory trigger so receipt is the sole stock increment. The migration passed 7 isolated in-memory PostgreSQL (PGlite) checks, including repeatable application, authorization, idempotent delivery/receipt, legacy material resolution and rollback on failure. Run `node backend/tests/receipt_boundary.mjs` to reproduce. It has not been applied to a live database. It does not reconcile stock already double-counted by earlier deployments.
+
+Remaining warnings: frontend has 120 lint warnings; backend tests report dependency/lifecycle deprecations and persisted scikit-learn 1.9.0 models loaded under 1.9.1. These are separate from the corrected compilation/lint errors and failing tests.
+
+## Site manager follow-up (2026-10-07)
+
+See [SITE_MANAGER_FLOW_AUDIT.md](SITE_MANAGER_FLOW_AUDIT.md) for functional fixes, 61 backend test passes, 10 browser workflow scenarios, 33 viewport checks, native bundle verification and current project-wide TypeScript limitations. The user reports the receipt-stock migration has been applied.
+
+## Whole-app responsive follow-up (2026-10-08)
+
+The shared portal layouts now show one compact header and drawer below 1024 px; native always uses the drawer. Text wraps and scales to 1.3, touch controls meet the 44 px target, forms keep keyboard access, and shared modals and assignment/search overlays remain inside the viewport. Data-heavy views use compact cards where needed. Auth forms retain their logo and scroll at normal browser zoom. Admin project and attendance site details now have distinct routes. The app resolves a native API host from the Metro LAN address, with an explicit `EXPO_PUBLIC_NATIVE_API_URL` option for tunnel use. Native date inputs use the Expo-compatible date picker.
+
+The populated-fixture web matrix passed for 113 portal screens at 360, 390, 768, 1024 and 1440 px: 593 recorded checks including targeted rechecks, with zero failures, browser exceptions, outside controls, or controls below 44 px. Nine auth/public screens passed the same five widths (45 checks). Sixty-five separate drawer, header, account, modal and dropdown interactions passed. The site-manager flow passed 24 functional and viewport checks, including manual attendance, QR image/camera decoding and team removal; the project-manager flow passed 26 functional and viewport checks. See the per-screen verification lines in the root AGENT.md. These browser checks use synthetic populated data and mocked APIs; they do not verify live production permissions or every data state.
+
+Android and iOS JavaScript bundles exported successfully. TypeScript, Expo dependency alignment and ESLint were rerun after source changes. No physical Android/iOS device or iOS simulator was available here, so native keyboard behavior, camera permission prompts, notch/safe-area variants, font scaling on device and iPad split view still require device QA. The LAN API also needs a reachable backend bound to the network interface for physical Expo Go testing.
+
+Final static checks: `npx tsc --noEmit` passed; `npx expo install --check` passed; `npx expo lint` finished with zero errors and 91 warnings (mostly pre-existing unused imports/variables and hook dependencies). Final-source Android and iOS exports passed after the last route changes.

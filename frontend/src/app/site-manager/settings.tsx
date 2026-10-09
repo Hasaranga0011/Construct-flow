@@ -7,7 +7,7 @@ export default function SMSettingsPage() {
   return (
     <View className="flex-1 bg-brand-light dark:bg-brand-dark">
       <TopNav title="Settings" showAction={false} />
-      <SettingsScreen profileHref="/site-manager/profile" />
+      <SettingsScreen showNotificationPreferences={false} profileHref="/site-manager/profile" />
     </View>
   );
 }

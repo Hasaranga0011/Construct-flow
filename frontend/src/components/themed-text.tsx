@@ -12,8 +12,8 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   const theme = useTheme();
 
   return (
-    <Text
-      style={[
+    <Text maxFontSizeMultiplier={1.3}
+      style={[{ flexShrink: 1, minWidth: 0 }, [
         { color: theme[themeColor ?? 'text'] },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
@@ -24,7 +24,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
         style,
-      ]}
+      ]]}
       {...rest}
     />
   );

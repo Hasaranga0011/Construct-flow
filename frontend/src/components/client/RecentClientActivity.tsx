@@ -24,8 +24,8 @@ const ActivityRow = ({
         <IconFamily name={iconName} size={14} color={iconColor} />
       </View>
       <View className="flex-1">
-        <Text className="text-brand-text font-bold text-sm mb-0.5">{action}</Text>
-        <Text className="text-gray-500 text-xs">{project} · {time}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{action}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project} · {time}</Text>
       </View>
     </View>
   );
@@ -90,7 +90,7 @@ export const RecentClientActivity = ({ refreshTrigger = 0 }: { refreshTrigger?: 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6 min-h-[250px]">
       <View className="flex-row items-center mb-6">
-        <Text className="text-lg font-bold text-brand-text mr-2">Recent Client Activity</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mr-2">Recent Client Activity</Text>
         <FontAwesome5 name="chart-line" size={14} color="#9CA3AF" />
       </View>
 
@@ -101,7 +101,7 @@ export const RecentClientActivity = ({ refreshTrigger = 0 }: { refreshTrigger?: 
           </View>
         ) : activities.length === 0 ? (
           <View className="py-4 items-center justify-center">
-            <Text className="text-gray-400">No recent activity.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No recent activity.</Text>
           </View>
         ) : (
           activities.map((a, i) => {

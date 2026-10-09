@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -71,7 +72,7 @@ def check_out(req: CheckOutRequest, user=Depends(get_current_user)):
             "hours_worked": hours_worked,
             "overtime_hours": overtime_hours
         }
-        update_res = supabase_db.table("attendance").update(update_data).eq("id", record["id"]).execute()
+        update_res = supabase_db.table("attendance").update(update_data).eq("id", record["id"])
         
         return {
             "message": "Checked out successfully",

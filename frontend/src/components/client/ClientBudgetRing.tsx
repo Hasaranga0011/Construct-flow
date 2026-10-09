@@ -18,8 +18,8 @@ export const ClientBudgetRing = ({ spent, total }: { spent: number, total: numbe
           }} 
         />
         <View className="items-center z-10" style={{ transform: [{ rotate: '45deg' }] }}>
-          <Text className="text-xl font-bold text-brand-text">{percentage}%</Text>
-          <Text className="text-[10px] text-gray-500 uppercase">Used</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">{percentage}%</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500 uppercase">Used</Text>
         </View>
       </View>
     </View>

@@ -74,12 +74,12 @@ export const ClientVariationOrders = () => {
     <View className="bg-white rounded-xl p-6 shadow-sm border border-brand-orange/30 flex-1">
       <View className="flex-row justify-between items-center mb-6">
         <View>
-          <Text className="text-lg font-bold text-brand-text mb-1">Variation Orders</Text>
-          <Text className="text-gray-500 text-xs">Scope changes requiring approval</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Variation Orders</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">Scope changes requiring approval</Text>
         </View>
         {pendingCount > 0 && (
           <View className="bg-orange-50 px-3 py-1 rounded-full">
-            <Text className="text-brand-orange text-xs font-bold">{pendingCount} Pending</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold">{pendingCount} Pending</Text>
           </View>
         )}
       </View>
@@ -87,40 +87,40 @@ export const ClientVariationOrders = () => {
       {loading ? (
         <ActivityIndicator color="#F97316" />
       ) : orders.length === 0 ? (
-        <Text className="text-gray-400">No variation orders.</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No variation orders.</Text>
       ) : (
         orders.map(order => (
           order.status === 'Pending' ? (
             <View key={order.id} className="border border-gray-100 rounded-lg p-5 bg-gray-50 mb-4">
               <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1 pr-2">
-                  <Text className="font-bold text-brand-text text-base mb-1">{order.title}</Text>
-                  <Text className="text-gray-500 text-xs">VO-{order.id.slice(0,6).toUpperCase()} • Pending Approval</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text text-base mb-1">{order.title}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">VO-{order.id.slice(0,6).toUpperCase()} • Pending Approval</Text>
                 </View>
-                <Text className="font-extrabold text-brand-orange text-lg">+Rs. {Number(order.amount).toLocaleString()}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-extrabold text-brand-orange text-lg">+Rs. {Number(order.amount).toLocaleString()}</Text>
               </View>
               
               {order.description && (
-                <Text className="text-gray-600 text-sm leading-relaxed mb-5">{order.description}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm leading-relaxed mb-5">{order.description}</Text>
               )}
               
               <View className="flex-row gap-3">
-                <Pressable onPress={() => handleAction(order.id, 'Rejected')} className="flex-1 bg-white border border-gray-300 py-2.5 rounded-lg items-center hover:bg-gray-100 transition-colors">
-                  <Text className="text-gray-700 font-bold">Reject</Text>
+                <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => handleAction(order.id, 'Rejected')} className="flex-1 bg-white border border-gray-300 py-2.5 rounded-lg items-center hover:bg-gray-100 transition-colors">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold">Reject</Text>
                 </Pressable>
-                <Pressable onPress={() => handleAction(order.id, 'Approved')} className="flex-1 bg-brand-success py-2.5 rounded-lg items-center shadow-sm hover:bg-green-600 transition-colors">
-                  <Text className="text-white font-bold">Sign & Approve</Text>
+                <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => handleAction(order.id, 'Approved')} className="flex-1 bg-brand-success py-2.5 rounded-lg items-center shadow-sm hover:bg-green-600 transition-colors">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Sign & Approve</Text>
                 </Pressable>
               </View>
             </View>
           ) : (
             <View key={order.id} className="border border-gray-100 rounded-lg p-4 flex-row justify-between items-center opacity-70 mb-2">
               <View className="flex-1 pr-2">
-                <Text className="font-semibold text-gray-700 mb-1">{order.title}</Text>
-                <Text className="text-gray-400 text-xs">VO-{order.id.slice(0,6).toUpperCase()} • {order.status}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">{order.title}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">VO-{order.id.slice(0,6).toUpperCase()} • {order.status}</Text>
               </View>
               <View className="items-end">
-                <Text className="font-bold text-gray-600 mb-1">+Rs. {Number(order.amount).toLocaleString()}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-600 mb-1">+Rs. {Number(order.amount).toLocaleString()}</Text>
                 {order.status === 'Approved' || order.status === 'Implemented' ? (
                   <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
                 ) : (

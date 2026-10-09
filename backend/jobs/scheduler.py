@@ -1,3 +1,4 @@
+from core.notification_helper import create_notifications
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from core.supabase_client import supabase_db
@@ -5,7 +6,7 @@ from datetime import datetime
 
 async def _log_job_start(job_name: str) -> str:
     try:
-        res = supabase_db.table("job_runs").insert({"job_name": job_name, "status": "Running"}).execute()
+        res = supabase_db.table("job_runs").insert({"job_name": job_name, "status": "Running"}])
         return res.data[0]["id"] if res.data else None
     except:
         return None
@@ -32,10 +33,10 @@ async def stock_alert_job():
             title = f"⚠ Low Stock: {item.get('item_name')}"
             message = f"Only {item.get('global_stock_quantity')} {item.get('unit')} remaining. Reorder immediately."
             
-            supabase_db.table("notifications").insert([
+            create_notifications([
                 {"title": title, "message": message, "type": "general", "target_role": "super_admin", "is_read": False},
                 {"title": title, "message": message, "type": "general", "target_role": "pm", "is_read": False}
-            ]).execute()
+            ])
         await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Stock alert job error: {e}")
@@ -54,10 +55,10 @@ async def delay_check_job():
             title = f"🚨 High Delay Risk: {proj_name}"
             message = f"{p.get('delay_risk_score')}% delay probability. Immediate review needed."
             
-            supabase_db.table("notifications").insert([
+            create_notifications([
                 {"title": title, "message": message, "type": "general", "target_role": "super_admin"},
                 {"title": title, "message": message, "type": "general", "target_role": "pm"}
-            ]).execute()
+            ])
         await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Delay check job error: {e}")
@@ -70,12 +71,12 @@ async def payroll_job():
         now = datetime.now()
         month_str = f"{now.year}-{now.month:02d}"
         
-        supabase_db.table("notifications").insert({
+        create_notifications([{
             "title": "💰 Payroll Generation Time",
             "message": f"Please generate payroll records for {month_str}",
             "type": "general",
             "target_role": "super_admin"
-        }).execute()
+        }])
         await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Payroll job error: {e}")
