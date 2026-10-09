@@ -1,13 +1,16 @@
 import { firstRelation } from '@/utils/relations';
+import { assignedWorkers } from '@/services/siteData';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
 import { TopNav } from '../../../components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { supabase } from '../../../lib/supabase';
+import { useRouter } from 'expo-router';
 
 type TeamMember = { id: string; full_name?: string | null; email?: string | null; role?: string | null };
 
 export default function PMTeamPage() {
+	const router = useRouter();
 	const [members, setMembers] = useState<TeamMember[]>([]);
 	const [error, setError] = useState('');
 	const [refresh, setRefresh] = useState(0);
@@ -32,16 +35,19 @@ export default function PMTeamPage() {
 					return;
 				}
 
-				const [{ data: projectWorkers, error: workerError }, { data: managers, error: managerError }] = await Promise.all([
-					supabase.from('site_workers').select('workers(user_id)').in('project_id', projectIds),
+				const [{ data: managers, error: managerError }, workers] = await Promise.all([
 					supabase.from('site_manager_sites').select('site_manager_id').in('project_id', projectIds),
+					assignedWorkers(projectIds)
 				]);
-				if (workerError) throw workerError;
 				if (managerError) throw managerError;
+				
+				const workerUserIds = workers.map(w => w.profiles?.id).filter(Boolean);
+				
 				const memberIds = [...new Set([
-					...(projectWorkers || []).map(w => firstRelation(w.workers)?.user_id),
+					...workerUserIds,
 					...(managers || []).map(manager => manager.site_manager_id),
 				].filter(Boolean))];
+				
 				if (memberIds.length === 0) {
 					if (mounted) setMembers([]);
 					return;
@@ -73,6 +79,13 @@ export default function PMTeamPage() {
 						onChangeText={setSearch} 
 						items={members} 
 						entityLabel="team" 
+						config={{
+							table: 'profiles',
+							searchColumn: 'full_name',
+							secondaryColumn: 'email',
+							titleColumn: 'full_name',
+							subtitleColumn: 'email'
+						}}
 					/>
 				</View>
 				{loading ? <ActivityIndicator color="#F97316" /> : members.filter(m => (m.full_name || '').toLowerCase().includes(search.toLowerCase()) || (m.email || '').toLowerCase().includes(search.toLowerCase())).length === 0 ? (
@@ -80,11 +93,11 @@ export default function PMTeamPage() {
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No team members match your search.</Text>
 					</View>
 				) : members.filter(m => (m.full_name || '').toLowerCase().includes(search.toLowerCase()) || (m.email || '').toLowerCase().includes(search.toLowerCase())).map(member => (
-					<View key={member.id} className="bg-white rounded-xl border border-gray-100 p-5 mb-3 shadow-sm">
+					<Pressable key={member.id} onPress={() => router.push(`/pm/team/${member.id}` as any)} className="bg-white rounded-xl border border-gray-100 p-5 mb-3 shadow-sm active:opacity-70">
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-brand-text">{member.full_name || 'Unnamed member'}</Text>
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-1">{member.email || 'No email available'}</Text>
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold uppercase mt-3">{(member.role || 'team member').replace('_', ' ')}</Text>
-					</View>
+					</Pressable>
 				))}
 			</ScrollView>
 		</View>

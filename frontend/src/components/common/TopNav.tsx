@@ -9,6 +9,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { ModalViewport } from './ModalViewport';
 import { useAuth } from '../../context/AuthContext';
+import { SearchInput } from './SearchInput';
 
 interface TopNavProps {
   shell?: boolean;
@@ -20,9 +21,12 @@ interface TopNavProps {
   showBackButton?: boolean;
   initialSearchQuery?: string;
   onSearch?: (value: string) => void;
+  searchItems?: any[];
+  searchEntityLabel?: string;
+  searchConfig?: any;
 }
 
-export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Project', onActionPress, role, showBackButton = false, initialSearchQuery = '', onSearch }: TopNavProps) => {
+export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Project', onActionPress, role, showBackButton = false, initialSearchQuery = '', onSearch, searchItems, searchEntityLabel = 'items', searchConfig }: TopNavProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { isDark } = useTheme();
@@ -105,8 +109,16 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
 
       {isMobile && showAction && onActionPress && <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
       {onSearch && (
-        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Search" placeholder="Search..." value={initialSearchQuery}
-          onChangeText={onSearch} className={`mx-4 my-2 px-4 py-3 rounded-lg border ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}`} />
+        <View className="mx-4 my-2 z-50">
+          <SearchInput 
+            placeholder="Search..." 
+            value={initialSearchQuery}
+            onChangeText={onSearch} 
+            items={searchItems}
+            entityLabel={searchEntityLabel}
+            config={searchConfig}
+          />
+        </View>
       )}
       {accountMenuOpen && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setAccountMenuOpen(false)}>

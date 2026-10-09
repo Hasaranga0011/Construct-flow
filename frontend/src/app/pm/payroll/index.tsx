@@ -36,8 +36,9 @@ export default function PMPayrollPage() {
           placeholder="Search worker or project..." 
           value={search} 
           onChangeText={setSearch} 
-          items={rows} 
+          items={slips} 
           entityLabel="payroll" 
+          getLocalResults={(query) => slips.filter(s => `${s.worker?.full_name || ''} ${s.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(s => ({ id: s.id, title: s.worker?.full_name || 'Worker', subtitle: s.project?.name || '' }))}
         />
       </View>
       <View className="flex-row flex-wrap gap-3 mb-4">{['All', 'Pending', 'Paid'].map(status => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={status} onPress={() => setFilter(status)} className={`px-4 py-3 rounded-lg ${filter === status ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={filter === status ? 'text-white font-bold' : 'text-gray-700'}>{status}</Text></Pressable>)}</View>

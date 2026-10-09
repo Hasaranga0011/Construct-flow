@@ -71,6 +71,7 @@ export default function PMMaterialsPage() {
           onChangeText={setSearch} 
           items={rows} 
           entityLabel="materials" 
+          getLocalResults={(query) => rows.filter(row => `${row.item_name || row.name || row.po_number || ''} ${row.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(row => ({ id: row.id, title: row.item_name || row.name || row.po_number || 'Material', subtitle: row.project?.name || '' }))}
         />
       </View>
       <View className="flex-row flex-wrap gap-2 mb-3">{([['queue','Approval Queue'],['stock','Site Stock'],['orders','Purchase Orders']] as const).map(([value,label]) => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={value} onPress={() => setTab(value)} className={`rounded-lg px-3 py-3 ${tab === value ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={tab === value ? 'text-white font-bold' : 'text-gray-600'}>{label}</Text></Pressable>)}</View>

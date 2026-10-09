@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
     ENABLE_SCHEDULER: bool = False
-    CORS_ORIGINS: str = "http://localhost:8081,http://localhost:19006,http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:8081,http://localhost:8082,http://localhost:19006,http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

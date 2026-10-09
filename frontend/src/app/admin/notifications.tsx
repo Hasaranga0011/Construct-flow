@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
+import { ModalViewport } from '../../components/common/ModalViewport';
 import { NotificationCard } from '../../components/notifications/NotificationCard';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNotifications } from '../../context/NotificationContext';
@@ -10,6 +11,7 @@ export default function NotificationsScreen() {
   const { notifications, loading, markAsRead, markAllAsRead } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
   
   const visibleNotifications = notifications.filter(n => {
     if (unreadOnly && n.is_read) return false;
@@ -89,7 +91,7 @@ export default function NotificationsScreen() {
                     isUnread={!n.is_read}
                     onActionPress={() => {
                       if (!n.is_read) markAsRead(n.id);
-                      Alert.alert(n.title, n.message, [{ text: 'Close', style: 'cancel' }]);
+                      setSelectedNotification(n);
                     }}
                   />
                 </Pressable>
@@ -99,6 +101,30 @@ export default function NotificationsScreen() {
         </View>
         
       </ScrollView>
+
+      {/* Notification Detail Modal */}
+      {selectedNotification && (
+        <Modal visible={!!selectedNotification} transparent animationType="fade" onRequestClose={() => setSelectedNotification(null)}>
+          <ModalViewport>
+            <View className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden mt-4">
+              <View className="flex-row justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text flex-1 pr-4">{selectedNotification.title}</Text>
+                <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setSelectedNotification(null)} className="p-2 -m-2 rounded-full hover:bg-gray-200">
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </Pressable>
+              </View>
+              <View className="p-6">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 text-base leading-relaxed mb-6">{selectedNotification.message}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm mb-6">{new Date(selectedNotification.created_at).toLocaleString()}</Text>
+                
+                <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setSelectedNotification(null)} className="bg-gray-100 rounded-xl py-3 items-center">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          </ModalViewport>
+        </Modal>
+      )}
     </View>
   );
 }

@@ -16,6 +16,7 @@ export default function PMClientPortalScreen() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [clientProfiles, setClientProfiles] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,6 +39,11 @@ export default function PMClientPortalScreen() {
           projects.forEach(p => {
             if (p.client_id) clientIds.add(p.client_id);
           });
+        }
+
+        if (clientIds.size > 0) {
+          const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', Array.from(clientIds));
+          if (isMounted) setClientProfiles(profiles || []);
         }
 
         if (isMounted) {
@@ -64,6 +70,9 @@ export default function PMClientPortalScreen() {
         showAction={false}
         initialSearchQuery={searchQuery}
         onSearch={setSearchQuery}
+        searchItems={clientProfiles}
+        searchEntityLabel="clients"
+        searchConfig={{ titleColumn: 'full_name', subtitleColumn: 'email', searchColumn: 'full_name' }}
       />
 
       {loadError ? <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetry(v => v + 1)} className="p-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600">{loadError} ? Tap to retry</Text></Pressable> : loading ? (

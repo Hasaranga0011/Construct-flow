@@ -30,6 +30,7 @@ export default function DashboardScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [allProjects, setAllProjects] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,15 +41,20 @@ export default function DashboardScreen() {
 
         // Fetch counts from various tables
         const today = new Date().toISOString().split('T')[0];
-        const [projectsReq, labourReq, materialsReq, budgetReq] = await Promise.all([
+        const [projectsReq, labourReq, materialsReq, budgetReq, allProjectsReq] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['active', 'Active', 'In Progress', 'in progress']),
           supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present').is('check_out_time', null),
           // Assuming materials has current_stock and minimum_threshold. Since we can't do raw sql in select, we can fetch them.
           // Wait, the prompt said: .lt('current_stock', supabase.raw('minimum_threshold')) - supabase.raw doesn't exist in JS client.
           // A better way is to fetch all and filter in JS if there's no SQL function, or call an RPC. For now, fetch all materials and filter:
           supabase.from('materials').select('current_stock, minimum_threshold'),
-          supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress'])
+          supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress']),
+          supabase.from('projects').select('id, name')
         ]);
+        
+        if (allProjectsReq.data) {
+          if (isMounted) setAllProjects(allProjectsReq.data);
+        }
 
         let lowStockCount = 0;
         if (materialsReq.data) {

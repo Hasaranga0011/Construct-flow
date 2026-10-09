@@ -121,6 +121,17 @@ export default function DashboardScreen() {
         onActionPress={() => setModalVisible(true)} 
         initialSearchQuery={searchQuery}
         onSearch={setSearchQuery}
+        searchConfig={{
+          table: 'projects',
+          searchColumn: 'name',
+          secondaryColumn: 'location',
+          titleColumn: 'name',
+          subtitleColumn: 'location',
+          routePrefix: '/pm/projects/',
+          filterColumn: 'pm_id',
+          filterValue: currentUserId
+        }}
+        searchEntityLabel="projects"
       />
       
       {!!error && <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} className="text-red-600 p-4" onPress={loadStats}>{error} Tap to retry.</Text>}

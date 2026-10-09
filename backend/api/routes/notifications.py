@@ -6,7 +6,10 @@ import httpx
 from dotenv import load_dotenv
 from core.security import get_current_user
 from core.notification_helper import create_notification
-from core.database import supabase as admin_supabase
+from core.config import settings
+from supabase import create_client
+
+admin_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 from typing import List
 
 load_dotenv()

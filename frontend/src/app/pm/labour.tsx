@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { managedProjects } from '@/services/pmData';
-import { firstRelation } from '@/utils/relations';
+import { assignedWorkers } from '@/services/siteData';
 
 export default function PMLabourScreen() {
   const router = useRouter();
@@ -20,15 +20,26 @@ export default function PMLabourScreen() {
       const projects = await managedProjects();
       if (!projects.length) { setRows([]); setStats({ workers: 0, present: 0, sites: 0, overtime: 0 }); return; }
       const ids = projects.map(p => p.id);
-      const [assigned, attendance] = await Promise.all([
-        supabase.from('site_workers').select('worker_id').in('project_id', ids),
-        supabase.from('attendance').select('*, workers(profiles!user_id(full_name))').in('site_id', ids).eq('date', new Date().toISOString().slice(0, 10)).order('check_in_time', { ascending: false }),
+      const [workersList, attendance] = await Promise.all([
+        assignedWorkers(ids),
+        supabase.from('attendance').select('*').in('site_id', ids).eq('date', new Date().toISOString().slice(0, 10)).order('check_in_time', { ascending: false }),
       ]);
-      if (assigned.error) throw assigned.error;
       if (attendance.error) throw attendance.error;
-      const records = (attendance.data || []).map(a => ({ ...a, person: firstRelation<any>(firstRelation<any>(a.workers)?.profiles), project: projects.find(p => p.id === a.site_id) }));
+      const records = (attendance.data || []).map(a => {
+        const workerInfo = workersList.find(w => w.workerRecordId === a.worker_id);
+        return { 
+          ...a, 
+          person: workerInfo?.profiles || null, 
+          project: projects.find(p => p.id === a.site_id) 
+        };
+      });
       setRows(records);
-      setStats({ workers: new Set((assigned.data || []).map(w => w.worker_id)).size, present: records.filter(a => a.check_in_time && !a.check_out_time).length, sites: projects.length, overtime: records.reduce((n, a) => n + Math.max(0, (Number(a.hours_worked) || 0) - 8), 0) });
+      setStats({ 
+        workers: workersList.length, 
+        present: records.filter(a => a.check_in_time && !a.check_out_time).length, 
+        sites: projects.length, 
+        overtime: records.reduce((n, a) => n + Math.max(0, (Number(a.hours_worked) || 0) - 8), 0) 
+      });
     } catch (e: any) { setError(e.message || 'Unable to load attendance.'); }
     finally { setLoading(false); }
   }, []);
@@ -45,6 +56,7 @@ export default function PMLabourScreen() {
         onChangeText={setSearch} 
         items={rows} 
         entityLabel="labour" 
+        getLocalResults={(query) => rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(a => ({ id: a.id, title: a.person?.full_name || 'Worker', subtitle: a.project?.name || '' }))}
       />
     </View>
     {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}

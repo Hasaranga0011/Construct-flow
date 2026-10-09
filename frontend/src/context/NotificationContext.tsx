@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { buildNotificationFilter, isNotificationForUser } from '../utils/notifications';
+import { getApiUrl } from '../lib/apiUrl';
 
 export interface AppNotification {
   id: string;
@@ -115,7 +117,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const markAsRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/notifications/mark-read`, {
+      const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -128,6 +130,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (e) {
       console.error('Error marking as read', e);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
     }
   };
 
@@ -136,7 +139,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
       if (unreadIds.length > 0) {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/notifications/mark-read`, {
+        const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -146,10 +149,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         });
         if (!response.ok) {
           setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
+        } else {
+          Alert.alert('Success', 'All notifications marked as read.');
         }
       }
     } catch (e) {
       console.error('Error marking all as read', e);
+      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+      setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
     }
   };
 
