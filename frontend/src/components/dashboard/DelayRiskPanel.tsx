@@ -55,7 +55,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
         const token = session?.access_token;
 
         const params = pmId ? `?pm_id=${pmId}` : '';
-        const data = await apiRequest(`/insights${params}`, {
+        const data = await apiRequest(`/ai/insights${params}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
