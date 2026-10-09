@@ -59,10 +59,10 @@ function injectVideoBackground(): () => void {
     s.id = 'cf-vbg-style';
     s.textContent = `
       :root{--vblur:${BLUR};--vdim:${DIM};}
-      #cf-vbg{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;overflow:hidden;
+      #cf-vbg{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;z-index:0;overflow:hidden;
         background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0c1a2e 100%);}
       #cf-vbg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
-        transform:scale(1.1);filter:blur(var(--vblur)) brightness(0.65);
+        filter:blur(var(--vblur)) brightness(0.65);
         opacity:0;transition:opacity 1s ease;}
       #cf-vbg.rdy video{opacity:1;}
       #cf-vbg video.rdy{opacity:1;}
@@ -192,11 +192,14 @@ export default function LandingPage() {
   const { session, role } = useAuth();
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [countersTriggered, setCountersTriggered] = useState(false);
   const [countersY, setCountersY] = useState(0);
   const { height: wh, width: ww } = useWindowDimensions();
   const isMobile = ww < 768;
   const isTablet = ww >= 768 && ww < 1024;
+  const isSmallPhone = ww < 480;
+  const isSm = ww >= 640;
   const cleanup = useRef<() => void>(() => {});
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -270,17 +273,17 @@ export default function LandingPage() {
         }}
       >
         <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <View className="w-9 h-9 sm:w-11 sm:h-11 bg-brand-orange rounded-xl items-center justify-center mr-3"
+          <View className="flex-row items-center flex-shrink" style={{ minWidth: 0 }}>
+            <View className="w-9 h-9 sm:w-11 sm:h-11 bg-brand-orange rounded-xl items-center justify-center mr-3 flex-shrink-0"
               style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
               <MaterialIcons name="precision-manufacturing" size={isMobile ? 20 : 24} color="white" />
             </View>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-xl tracking-tight">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-xl tracking-tight" numberOfLines={1}>
               Construct<Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Ai</Text>
             </Text>
           </View>
 
-          <View className="flex-row items-center hidden xl:flex">
+          <View className="flex-row items-center hidden xl:flex flex-shrink-0">
             {[{ label: 'Home', id: 'home' }, { label: 'Services', id: 'services' }, { label: 'Gallery', id: 'projects' }, { label: 'Contact', id: 'contact' }].map(item => (
               <Pressable style={{ minHeight: 44, minWidth: 44 }} key={item.id} className="mx-4 cursor-pointer" onPress={() => scrollTo(item.id)}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 font-semibold text-base hover:text-white transition-colors">{item.label}</Text>
@@ -288,27 +291,59 @@ export default function LandingPage() {
             ))}
           </View>
 
-          <View>
-            {session ? (
-              <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
-                <Pressable className="bg-brand-orange px-3 sm:px-6 py-2.5 rounded-full"
-                  style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10, minHeight: 44, minWidth: 44 }}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xs sm:text-base">Go to Dashboard</Text>
-                </Pressable>
-              </Link>
+          <View className="flex-row items-center flex-shrink-0">
+            {isSm ? (
+              session ? (
+                <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
+                  <Pressable className="bg-brand-orange px-3 sm:px-6 py-2.5 rounded-full"
+                    style={{ shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 10, minHeight: 44, minWidth: 44 }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xs sm:text-base">Go to Dashboard</Text>
+                  </Pressable>
+                </Link>
+              ) : (
+                <PortalToggle />
+              )
             ) : (
-              <PortalToggle />
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setMobileMenuOpen(!mobileMenuOpen)} className="items-center justify-center p-2 rounded-lg bg-gray-800/50 border border-gray-700 ml-2">
+                <Ionicons name={mobileMenuOpen ? 'close' : 'menu'} size={24} color="white" />
+              </Pressable>
             )}
           </View>
         </View>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && !isSm && (
+          <View className="absolute top-full left-0 right-0 w-full mt-2 bg-[#0B1120] border-t border-gray-800 shadow-2xl px-4 py-4 rounded-b-2xl">
+            {session ? (
+              <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
+                <Pressable onPress={() => setMobileMenuOpen(false)} className="bg-brand-orange items-center justify-center rounded-xl mb-3" style={{ minHeight: 48, width: '100%' }}>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Go to Dashboard</Text>
+                </Pressable>
+              </Link>
+            ) : (
+              <>
+                <Link href="/team-login" asChild>
+                  <Pressable onPress={() => setMobileMenuOpen(false)} className="bg-brand-orange items-center justify-center rounded-xl mb-3" style={{ minHeight: 48, width: '100%' }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Team Portal</Text>
+                  </Pressable>
+                </Link>
+                <Link href="/partner-login" asChild>
+                  <Pressable onPress={() => setMobileMenuOpen(false)} className="border border-gray-600 bg-gray-800/50 items-center justify-center rounded-xl mb-2" style={{ minHeight: 48, width: '100%' }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Partner Portal</Text>
+                  </Pressable>
+                </Link>
+              </>
+            )}
+          </View>
+        )}
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
         {/* HERO */}
         <View className="pt-36 pb-32 px-6 md:px-12 relative overflow-hidden" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
-          <View style={{ position: 'absolute', top: -80, right: -80, width: 480, height: 480, borderRadius: 240, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
-          <View style={{ position: 'absolute', bottom: 80, left: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
+          <View style={{ position: 'absolute', top: 0, right: 0, width: '50%', maxWidth: 480, aspectRatio: 1, borderBottomLeftRadius: 480, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
+          <View style={{ position: 'absolute', bottom: 0, left: 0, width: '40%', maxWidth: 360, aspectRatio: 1, borderTopRightRadius: 360, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
 
           <View className="max-w-7xl mx-auto w-full flex-row flex-wrap items-center z-10">
 
@@ -330,17 +365,17 @@ export default function LandingPage() {
                 Complete construction management for Sri Lankan contractors — projects, materials, labour, payroll, client portals, and AI cost estimation in LKR. Trusted by teams from Colombo to Jaffna.
               </Text>
 
-              <View className="flex-row flex-wrap items-center mb-12">
+              <View style={{ flexDirection: isSmallPhone ? 'column' : 'row', flexWrap: isSmallPhone ? 'nowrap' : 'wrap', gap: 12, marginBottom: 48, width: '100%' }}>
                 <Link href="/team-login" asChild>
-                  <Pressable className="flex-row items-center px-8 py-4 rounded-full mr-4 mb-4"
-                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 24, elevation: 8, minHeight: 44, minWidth: 44 }}>
+                  <Pressable className="flex-row items-center justify-center rounded-full"
+                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 24, elevation: 8, minHeight: 52, width: isSmallPhone ? '100%' : 'auto', paddingHorizontal: 32 }}>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg mr-2">Team Portal</Text>
                     <Ionicons name="arrow-forward" size={20} color="white" />
                   </Pressable>
                 </Link>
                 <Link href="/partner-login" asChild>
-                  <Pressable className="px-8 py-4 rounded-full mb-4"
-                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.05)', minHeight: 44, minWidth: 44 }}>
+                  <Pressable className="items-center justify-center rounded-full"
+                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.05)', minHeight: 52, width: isSmallPhone ? '100%' : 'auto', paddingHorizontal: 32 }}>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Partner Portal</Text>
                   </Pressable>
                 </Link>
@@ -360,7 +395,7 @@ export default function LandingPage() {
             <View className="w-full lg:w-1/2">
               <View className="rounded-3xl p-6 md:p-8 relative overflow-hidden"
                 style={{ ...g, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 16 }}>
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(249,115,22,0.13)' }} />
+                <View style={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, borderBottomLeftRadius: 100, backgroundColor: 'rgba(249,115,22,0.13)', pointerEvents: 'none' }} />
 
                 <View className="flex-row items-center pb-4 mb-5" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
                   <View className="flex-row mr-3">
@@ -578,7 +613,7 @@ export default function LandingPage() {
                     <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: 'rgba(249,115,22,0.14)' }}>
                       <Ionicons name={c.icon} size={20} color="#F97316" />
                     </View>
-                    <View>
+                    <View className="flex-1 min-w-0">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">{c.label}</Text>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">{c.value}</Text>
                     </View>

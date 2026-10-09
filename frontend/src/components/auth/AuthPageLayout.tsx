@@ -34,7 +34,7 @@ export default function AuthPageLayout({ children, hero }: AuthPageLayoutProps) 
           paddingHorizontal: width < 768 ? 24 : 48,
           paddingVertical: 32,
         }}>
-          <View style={{ width: '100%', maxWidth: 448, flexShrink: 0 }}>
+          <View style={{ width: '100%', maxWidth: 448, flexShrink: 1 }}>
             {children}
           </View>
         </View>

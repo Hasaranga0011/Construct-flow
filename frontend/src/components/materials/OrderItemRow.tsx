@@ -40,11 +40,11 @@ export const OrderItemRow = ({ itemName, quantity, unitPrice, totalPrice, status
     <>
       <View className="flex-row gap-3 justify-between items-center py-3 border-b border-gray-200 mb-2">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium flex-1 min-w-0">{itemName}</Text>
-        <Text style={{ flexShrink: 0, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 w-24 text-right">Qty: {quantity}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 w-24 text-right">Qty: {quantity}</Text>
         {priceNode ? priceNode : isUnpriced ? (
-          <Text style={{ flexShrink: 0, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic w-40 text-right text-sm">Awaiting supplier price</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic w-40 text-right text-sm">Awaiting supplier price</Text>
         ) : (
-          <Text style={{ flexShrink: 0, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-bold w-32 text-right">Rs. {(unitPrice || 0).toLocaleString()}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-bold w-32 text-right">Rs. {(unitPrice || 0).toLocaleString()}</Text>
         )}
       </View>
       

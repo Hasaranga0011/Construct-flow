@@ -129,10 +129,10 @@ const EstimateRow = ({
         <View className="w-24 px-2">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{date}</Text>
         </View>
-        <View className="w-28 px-2" style={{ flexShrink: 0 }}>
+        <View className="w-28 px-2" style={{ flexShrink: 1 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm" numberOfLines={1}>{cost}</Text>
         </View>
-        <View className="w-28 px-2" style={{ flexShrink: 0 }}>
+        <View className="w-28 px-2" style={{ flexShrink: 1 }}>
           <StatusBadge status={status} />
         </View>
         <View className="w-48 items-center flex-row justify-end gap-2">
@@ -352,8 +352,8 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
         <View className="flex-row py-2 border-b border-gray-100 mb-2">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 pr-2 text-xs font-semibold text-gray-400 uppercase">Project Name</Text>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-24 px-2 text-xs font-semibold text-gray-400 uppercase">Date</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase" style={{ flexShrink: 0 }}>Estimated Cost</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase" style={{ flexShrink: 0 }}>Status</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase">Estimated Cost</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase">Status</Text>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-48 text-xs font-semibold text-gray-400 uppercase text-right"></Text>
         </View>
       )}
