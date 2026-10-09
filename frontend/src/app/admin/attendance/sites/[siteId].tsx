@@ -4,6 +4,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
+import { SearchInput } from '@/components/common/SearchInput';
+import { Toolbar, ToolbarSearch } from '@/components/ui';
 
 type Attendance = { id: string; worker_id: string; worker_name?: string; date: string; check_in_time: string | null; check_out_time: string | null; hours_worked: number | null };
 export default function AdminSiteAttendancePage() {
@@ -37,9 +39,40 @@ export default function AdminSiteAttendancePage() {
     const channel = supabase.channel(`admin-site-attendance:${siteId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `site_id=eq.${siteId}` }, () => setRefresh(value => value + 1)).subscribe();
     return () => { active = false; void supabase.removeChannel(channel); };
   }, [siteId, refresh]);
+
+  const [search, setSearch] = useState('');
+
+  const searchItems = records.map(r => ({
+    ...r,
+    search_detail: `Worker ID: ${r.worker_id.substring(0,8)}`,
+  }));
+
+  const filteredRecords = search 
+    ? records.filter(r => r.worker_name?.toLowerCase().includes(search.toLowerCase()) || r.worker_id.includes(search))
+    : records;
+
   return <View className="flex-1 bg-brand-light"><TopNav title="Site Attendance" showAction={false} />
     <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-      {loading ? <ActivityIndicator color="#F97316" /> : error ? <Text className="text-red-600">{error}</Text> : !records.length ? <View className="items-center py-16"><Ionicons name="calendar-outline" size={48} color="#D1D5DB" /><Text className="text-gray-500 mt-4">No attendance records for this site.</Text></View> : records.map(record => {
+      
+      <Toolbar>
+        <ToolbarSearch>
+          <SearchInput 
+            entityLabel="workers"
+            placeholder="Search by name or ID..."
+            value={search}
+            onChangeText={setSearch}
+            items={searchItems}
+            config={{
+              table: 'workers', // Client-side filter bypasses this
+              searchColumn: 'worker_name',
+              secondaryColumn: 'search_detail',
+              titleColumn: 'worker_name',
+              subtitleColumn: 'search_detail',
+            }}
+          />
+        </ToolbarSearch>
+      </Toolbar>
+      {loading ? <ActivityIndicator color="#F97316" /> : error ? <Text className="text-red-600">{error}</Text> : !filteredRecords.length ? <View className="items-center py-16"><Ionicons name="calendar-outline" size={48} color="#D1D5DB" /><Text className="text-gray-500 mt-4">No attendance records found.</Text></View> : filteredRecords.map(record => {
         const status = record.check_in_time ? record.check_out_time ? 'Checked out' : 'On site' : 'Pending';
         return <View key={record.id} className="bg-white rounded-lg border border-gray-100 p-4 mb-3 min-w-0">
           <Text maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{record.worker_name}</Text>

@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { useApi } from '@/hooks/useApi';
 
 const LOCATIONS = ['Colombo', 'Kandy', 'Galle', 'Other'];
 const TYPES = ['Residential', 'Commercial', 'Industrial'];
@@ -55,6 +56,8 @@ export default function AdminAiEstimatorPage() {
   const [qualityTier, setQualityTier] = useState('Standard');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  const { request: apiRequest, loading: apiLoading, error: apiError } = useApi();
   const [history, setHistory] = useState<any[]>([]);
   const [insights, setInsights] = useState<any>(null);
 
@@ -67,10 +70,11 @@ export default function AdminAiEstimatorPage() {
     setHistory(data || []);
 
     try {
-      const apiUrl = getApiUrl();
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${apiUrl}/ai/insights`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
-      if (res.ok) setInsights(await res.json());
+      const insightsData = await apiRequest('/ai/insights', {
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      setInsights(insightsData);
     } catch { /* Backend may not be running */ }
   };
 
@@ -84,11 +88,10 @@ export default function AdminAiEstimatorPage() {
     setLoading(true);
     setResult(null);
     try {
-      const apiUrl = getApiUrl();
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
 
-      const response = await fetch(`${apiUrl}/ai/predict-cost`, {
+      const data = await apiRequest('/ai/predict-cost', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,11 +105,6 @@ export default function AdminAiEstimatorPage() {
         }),
       });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || `API error: ${response.status}`);
-      }
-      const data = await response.json();
       setResult(data);
 
       await supabase.from('estimations').insert({

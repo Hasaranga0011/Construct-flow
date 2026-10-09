@@ -83,6 +83,23 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
     };
   }, [user, threadId, role]);
 
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchMissingProfiles = async () => {
+      const missingIds = [...new Set(messages.map(m => m.sender_id).filter(id => id && !profiles[id]))];
+      if (missingIds.length > 0) {
+        const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
+        if (data) {
+          const newProfiles = { ...profiles };
+          data.forEach(p => { newProfiles[p.id] = p.full_name || 'Unknown'; });
+          setProfiles(newProfiles);
+        }
+      }
+    };
+    fetchMissingProfiles();
+  }, [messages]);
+
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
@@ -134,11 +151,17 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
           </View>
         ) : messages.map(message => {
           const isSender = message.sender_id === user?.id;
+          const senderName = isSender ? 'You' : (profiles[message.sender_id] || (message.sender_role ? message.sender_role.replace('_', ' ') : 'Client'));
           return (
             <View key={message.id} className={`mb-4 ${isSender ? 'self-end' : 'self-start'} max-w-[80%]`}>
               <View className={`p-3 rounded-2xl ${isSender ? 'bg-brand-orange rounded-tr-sm' : 'bg-white dark:bg-[#1E293B] rounded-tl-sm shadow-sm border border-gray-100 dark:border-gray-800'}`}>
+                {!isSender && (
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1 capitalize">
+                    {senderName}
+                  </Text>
+                )}
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800 dark:text-gray-200'}>{message.message_text}</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] mt-1 ${isSender ? 'text-orange-100' : 'text-gray-400'}`}>{formatTime(message.created_at)}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] mt-1 ${isSender ? 'text-orange-100 text-right' : 'text-gray-400 text-left'}`}>{formatTime(message.created_at)}</Text>
               </View>
             </View>
           );

@@ -15,25 +15,39 @@ async function executeFetch(endpoint: string, options: RequestInit) {
     ...options.headers,
   };
 
-  const response = await fetch(`${getApiUrl()}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    let errMsg = 'API request failed';
-    if (errorData.detail) {
-       errMsg = typeof errorData.detail === 'string' 
-         ? errorData.detail 
-         : JSON.stringify(errorData.detail);
-    } else if (errorData.message) {
-       errMsg = errorData.message;
+  try {
+    const response = await fetch(`${getApiUrl()}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      let errMsg = 'API request failed';
+      if (errorData.detail) {
+         errMsg = typeof errorData.detail === 'string' 
+           ? errorData.detail 
+           : JSON.stringify(errorData.detail);
+      } else if (errorData.message) {
+         errMsg = errorData.message;
+      }
+      throw new Error(errMsg);
     }
-    throw new Error(errMsg);
-  }
 
-  return response.json();
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection.');
+    }
+    throw err;
+  }
 }
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {

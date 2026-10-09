@@ -296,11 +296,10 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
             
             slips_to_insert.append({
                 "worker_id": user_id,
-                "site_id": payload.site_id,
                 "period_start": payload.start_date,
                 "period_end": payload.end_date,
                 "total_days": stats["days"],
-                "total_overtime_hours": stats["overtime_hours"],
+                "overtime_hours": stats["overtime_hours"],
                 "total_amount": total_amount,
                 "status": "Pending"
             })

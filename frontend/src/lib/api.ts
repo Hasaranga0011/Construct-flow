@@ -10,47 +10,44 @@ async function getAuthHeaders() {
   };
 }
 
+async function fetchWithTimeout(path: string, options: RequestInit) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(getApiUrl() + path, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `API error: ${res.status}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection.');
+    }
+    throw err;
+  }
+}
+
 export const api = {
   get: async (path: string) => {
-    const res = await fetch(getApiUrl() + path, {
-      headers: await getAuthHeaders()
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return fetchWithTimeout(path, { headers: await getAuthHeaders() });
   },
   post: async (path: string, body: any) => {
-    const res = await fetch(getApiUrl() + path, {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return fetchWithTimeout(path, { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify(body) });
   },
   patch: async (path: string, body: any) => {
-    const res = await fetch(getApiUrl() + path, {
-      method: 'PATCH',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return fetchWithTimeout(path, { method: 'PATCH', headers: await getAuthHeaders(), body: JSON.stringify(body) });
   },
   put: async (path: string, body: any) => {
-    const res = await fetch(getApiUrl() + path, {
-      method: 'PUT',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return fetchWithTimeout(path, { method: 'PUT', headers: await getAuthHeaders(), body: JSON.stringify(body) });
   },
   delete: async (path: string) => {
-    const res = await fetch(getApiUrl() + path, {
-      method: 'DELETE',
-      headers: await getAuthHeaders()
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return fetchWithTimeout(path, { method: 'DELETE', headers: await getAuthHeaders() });
   }
 };

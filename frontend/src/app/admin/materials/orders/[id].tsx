@@ -262,15 +262,15 @@ export default function AdminMaterialsOrdersIdPage() {
                 </View>
               </View>
 
-              <View className="w-full md:w-1/2 mb-6">
+              <View className="w-full md:w-1/2 mb-6 pr-2">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Site</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
                     <FontAwesome5 name="hard-hat" size={12} color="#10B981" />
                   </View>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
                   {!order.project && (
-                    <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setAssignModalVisible(true)} className="bg-gray-200 px-3 py-1 rounded-full">
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setAssignModalVisible(true)} className="bg-gray-200 px-3 py-1 rounded-full shrink-0">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-700 font-bold">Assign</Text>
                     </Pressable>
                   )}
@@ -286,11 +286,11 @@ export default function AdminMaterialsOrdersIdPage() {
 
               <View className="w-full md:w-1/2 mb-4">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Cost</Text>
-                {(!order.total_price || order.total_price === 0) && (order.status === 'Pending' || order.status === 'Suggested') ? (
+                {(!order.total_price || order.total_price === 0) && (order.status === 'Pending' || order.status === 'Suggested' || order.status === 'Awaiting Quote') ? (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm mt-1">Awaiting supplier price</Text>
                 ) : (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xl">
-                    Rs. {(order.total_price || 0).toLocaleString()}
+                    Rs. {(order.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 )}
               </View>

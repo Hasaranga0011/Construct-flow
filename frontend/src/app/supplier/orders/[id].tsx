@@ -312,13 +312,13 @@ export default function AdminMaterialsOrdersIdPage() {
                 </Text>
               </View>
 
-              <View className="w-1/2">
+              <View className="w-full md:w-1/2">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Cost</Text>
-                {(!order.total_price || order.total_price === 0) && (order.status === 'Pending Delivery' && !unitPrice) ? (
+                {(!order.total_price || order.total_price === 0) && (order.status === 'Pending Delivery' || order.status === 'Pending' || order.status === 'Suggested' || order.status === 'Awaiting Quote') && !unitPrice ? (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm mt-1">Awaiting your price</Text>
                 ) : (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xl">
-                    Rs. {(order.status === 'Pending Delivery' ? ((parseFloat(unitPrice) || 0) * (order.quantity_ordered || 0)) : (order.total_price || 0)).toLocaleString()}
+                    Rs. {(order.status === 'Pending Delivery' ? ((parseFloat(unitPrice) || 0) * (order.quantity_ordered || 0)) : (order.total_price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 )}
               </View>

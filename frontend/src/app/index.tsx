@@ -306,7 +306,7 @@ export default function LandingPage() {
       <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
         {/* HERO */}
-        <View className="pt-36 pb-32 px-6 md:px-12 relative" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
+        <View className="pt-36 pb-32 px-6 md:px-12 relative overflow-hidden" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
           <View style={{ position: 'absolute', top: -80, right: -80, width: 480, height: 480, borderRadius: 240, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
           <View style={{ position: 'absolute', bottom: 80, left: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
 

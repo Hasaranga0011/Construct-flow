@@ -8,6 +8,8 @@ import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
 import { useTableRealtime } from '../../../hooks/useTableRealtime';
+import { SearchInput } from '@/components/common/SearchInput';
+import { Toolbar, ToolbarSearch } from '@/components/ui';
 
 export default function AdminPayrollIndex() {
   const router = useRouter();
@@ -135,23 +137,28 @@ export default function AdminPayrollIndex() {
 
         <View style={isMobile ? {} : { backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
-            <View>
+            <View className="mb-4 md:mb-0">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">Worker Balances</Text>
               <View className="flex-row items-center mt-1">
                 <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="flex-1 ml-2 text-sm text-brand-text outline-none bg-transparent"
-                placeholder="Search worker by name or NIC..."
-                placeholderTextColor="#9CA3AF"
-                value={search}
-                onChangeText={setSearch}
-              />
-            </View>
+            <Toolbar>
+              <ToolbarSearch>
+                <SearchInput entityLabel="workers" items={workers}
+                  placeholder="Search worker by name..."
+                  value={search}
+                  onChangeText={setSearch}
+                  className={isMobile ? "w-full" : "w-[256px]"}
+                  config={{
+                    table: 'profiles',
+                    searchColumn: 'full_name',
+                    titleColumn: 'full_name'
+                  }}
+                />
+              </ToolbarSearch>
+            </Toolbar>
           </View>
 
           {!isMobile && (

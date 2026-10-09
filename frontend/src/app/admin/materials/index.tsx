@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
+import { Toolbar, ToolbarSearch, ToolbarFilter, Select } from '@/components/ui';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -115,60 +116,37 @@ export default function MaterialsScreen() {
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
 
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Materials</Text>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, zIndex: 50, elevation: 50 }}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-4 md:mb-0">All Materials</Text>
 
-            <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, width: isMobile ? '100%' : 'auto', zIndex: 50 }}>
-              {/* Project Filter */}
-              <View className="relative w-full" style={!isMobile ? { width: 220 } : {}}>
-                <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                  onPress={() => setShowProjectDrop(!showProjectDrop)}
-                  className="flex-row justify-between items-center bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm h-10"
-                >
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={selectedProjectId ? "text-brand-text text-sm" : "text-gray-400 text-sm"}>
-                    {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name : 'All Projects'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
-                </Pressable>
-
-                {showProjectDrop && (
-                  <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-[60]">
-                    <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
-                      <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                        onPress={() => { setSelectedProjectId(''); setShowProjectDrop(false); }}
-                        className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-bold">All Projects</Text>
-                      </Pressable>
-                      {projects.map(proj => (
-                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                          key={proj.id}
-                          onPress={() => { setSelectedProjectId(proj.id); setShowProjectDrop(false); }}
-                          className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
-                        >
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 text-sm">{proj.name}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </View>
-
-              {/* Search */}
-              <SearchInput entityLabel="materials" items={searchMaterials.filter(m => !selectedProjectId || m.project_id === selectedProjectId)}
-                placeholder="Search materials..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                className={isMobile ? "w-full" : "w-[220px]"}
-                config={{
-                  table: 'materials',
-                  searchColumn: 'name',
-                  secondaryColumn: 'category',
-                  titleColumn: 'name',
-                  subtitleColumn: 'category'
-                }}
-              />
-            </View>
+            <Toolbar>
+              <ToolbarSearch>
+                <SearchInput entityLabel="materials" items={searchMaterials.filter(m => !selectedProjectId || m.project_id === selectedProjectId)}
+                  placeholder="Search materials..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  className="w-full"
+                  config={{
+                    table: 'materials',
+                    searchColumn: 'name',
+                    secondaryColumn: 'category',
+                    titleColumn: 'name',
+                    subtitleColumn: 'category'
+                  }}
+                />
+              </ToolbarSearch>
+              <ToolbarFilter>
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={setSelectedProjectId}
+                  options={[
+                    { value: '', label: 'All Projects' },
+                    ...projects.map(p => ({ value: p.id, label: p.name }))
+                  ]}
+                  placeholder="All Projects"
+                />
+              </ToolbarFilter>
+            </Toolbar>
           </View>
 
           {/* Top Stat Cards Row */}

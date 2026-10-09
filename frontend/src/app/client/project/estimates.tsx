@@ -5,6 +5,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { useApi } from '@/hooks/useApi';
 
 type Project = { id: string; name: string; location?: string | null };
 type Estimation = { id: string; project_name: string; estimated_cost: number; confidence_score?: number | null; status: string; created_at: string };
@@ -26,6 +27,8 @@ export default function ClientProjectEstimatesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { request: apiRequest } = useApi();
 
   useEffect(() => {
     if (!user) return;
@@ -68,14 +71,11 @@ export default function ClientProjectEstimatesPage() {
     setError(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/ai/predict-cost`, {
+      const responseData = await apiRequest('/ai/predict-cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session?.access_token || ''}` },
         body: JSON.stringify({ square_footage: area, location: project.location || 'Other', project_type: projectType, quality_tier: qualityTier }),
       });
-      const responseData = await response.json();
-      if (!response.ok) throw new Error(responseData.detail || 'Estimate request failed.');
       const { data: saved, error: saveError } = await supabase.from('estimations').insert({ project_name: project.name, estimated_cost: responseData.estimated_cost, confidence_score: responseData.confidence_score, status: 'Pending' }).select('id, project_name, estimated_cost, confidence_score, status, created_at').single();
       if (saveError) throw saveError;
       setResult(saved as Estimation);

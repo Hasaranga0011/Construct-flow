@@ -102,14 +102,37 @@ export default function ClientMediaPage() {
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">Site Progress Photos</Text>
                 </View>
 
-                {/* Photo Grid */}
-                <View className="flex-row flex-wrap gap-4">
-                  {photos.filter(photo => photo.project_id === selectedProjectId).map(photo => (
-                    <View key={photo.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full md:w-[48%] lg:w-[31%]">
-                      <Image source={{ uri: photo.file_url }} className="w-full h-48 bg-gray-100" resizeMode="cover" />
-                      <View className="p-4">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-sm mb-1">{photo.caption || photo.file_type || 'Progress photo'}</Text>
-                        <View className="flex-row items-center"><Ionicons name="time-outline" size={14} color="#9CA3AF" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1 font-medium">{new Date(photo.uploaded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</Text></View>
+                {/* Timeline Photo Grid */}
+                <View className="ml-4 md:ml-8 border-l-2 border-brand-orange pl-6 py-2 relative">
+                  {photos.filter(photo => photo.project_id === selectedProjectId).map((photo, index) => (
+                    <View key={photo.id} className="mb-10 relative">
+                      {/* Timeline dot */}
+                      <View className="absolute -left-[35px] top-4 w-4 h-4 rounded-full bg-brand-orange border-4 border-brand-light" />
+                      
+                      <View className="flex-row items-center mb-3">
+                        <View className="bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100 flex-row items-center">
+                          <Ionicons name="calendar-outline" size={14} color="#F97316" />
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs ml-1.5">
+                            {new Date(photo.uploaded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </Text>
+                        </View>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 font-bold ml-4 uppercase text-xs tracking-wider">
+                          Progress Update {index + 1}
+                        </Text>
+                      </View>
+
+                      <View className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-w-3xl">
+                        <Image source={{ uri: photo.file_url }} className="w-full h-64 md:h-96 bg-gray-100" resizeMode="cover" />
+                        <View className="p-5 flex-row justify-between items-start">
+                          <View className="flex-1 pr-4">
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 text-lg mb-1">{photo.caption || 'Site Progress'}</Text>
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">Visual analysis available for client review.</Text>
+                          </View>
+                          <View className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 items-center justify-center">
+                            <Ionicons name="analytics-outline" size={20} color="#6B7280" />
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-[10px] font-bold mt-1">ANALYZE</Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
                   ))}

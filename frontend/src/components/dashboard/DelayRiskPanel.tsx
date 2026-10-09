@@ -41,30 +41,22 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
 
   const [retryKey, setRetryKey] = useState(0);
 
+  const { request: apiRequest, loading: apiLoading, error: apiError } = useApi();
+
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     const loadRisks = async () => {
       setLoading(true);
       setError(null);
       try {
-        const apiUrl = getApiUrl();
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
 
         const params = pmId ? `?pm_id=${pmId}` : '';
-        const res = await fetch(`${apiUrl}/ai/insights${params}`, {
+        const data = await apiRequest(`/ai/insights${params}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          signal: controller.signal
         });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `API ${res.status}`);
-        }
-        const data = await res.json();
 
         if (isMounted) {
           // Use real per-project delay risks from the backend
@@ -85,14 +77,9 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
         }
       } catch (err: any) {
         if (isMounted) {
-          if (err.name === 'AbortError') {
-            setError('Request timed out. Server may be busy.');
-          } else {
-            setError(err.message || 'Insights unavailable');
-          }
+          setError(err.message || 'Insights unavailable');
         }
       } finally {
-        clearTimeout(timeoutId);
         if (isMounted) setLoading(false);
       }
     };
@@ -100,7 +87,6 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
     loadRisks();
     return () => {
       isMounted = false;
-      controller.abort();
     };
   }, [pmId, retryKey]);
 

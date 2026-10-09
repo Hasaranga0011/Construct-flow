@@ -12,6 +12,7 @@ import { NotificationProvider } from '../context/NotificationContext';
 
 import { normalizeRole } from '../utils/auth';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/apiUrl';
 
 
 const DASHBOARD_MAP: Record<string, string> = {
@@ -127,6 +128,10 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
+  console.log('=== APP STARTUP ===');
+  console.log('API Base URL Resolved To:', getApiUrl());
+  console.log('===================');
+  
   return (
     <SafeAreaProvider>
       <SafeAreaView className="flex-1" style={{ backgroundColor: 'transparent' }}>

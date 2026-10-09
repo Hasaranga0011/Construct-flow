@@ -173,7 +173,7 @@ export default function SupplierDetailPage() {
               </View>
               <View className="items-end">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-orange mb-1">
-                  {order.total_price != null ? formatMoney(order.total_price) : 'Rs. 0'}
+                  {order.total_price && order.total_price > 0 ? formatMoney(order.total_price) : 'Pending Price'}
                 </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{order.status}</Text>
               </View>
