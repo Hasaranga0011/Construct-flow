@@ -21,12 +21,15 @@ type Message = {
   created_at: string;
 };
 
-type Channel = 'pm' | 'super_admin' | 'site_manager';
+type Channel = 'All' | 'pm' | 'super_admin' | 'site_manager' | 'worker' | 'supplier';
 
 const CHANNELS: { key: Channel; label: string }[] = [
+  { key: 'All',          label: 'Group Chat' },
   { key: 'pm',           label: 'Project Manager' },
   { key: 'super_admin',  label: 'Admin' },
   { key: 'site_manager', label: 'Site Manager' },
+  { key: 'supplier',     label: 'Supplier' },
+  { key: 'worker',       label: 'Worker' },
 ];
 
 /**
@@ -85,15 +88,20 @@ export default function ClientMessagesThreadPage() {
         if (isMounted) setReceiverId(rId);
 
         // Fetch messages for this channel (both directions).
-        const msgRes = await supabase
+        let query = supabase
           .from('client_messages')
           .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
-          .eq('project_id', threadId)
-          .or(
+          .eq('project_id', threadId);
+
+        if (activeChannel === 'All') {
+          query = query.or(`receiver_role.eq.All,receiver_id.is.null`);
+        } else {
+          query = query.or(
             `and(sender_role.eq.client,receiver_role.eq.${activeChannel}),` +
             `and(sender_role.eq.${activeChannel},receiver_role.eq.client)`
-          )
-          .order('created_at', { ascending: true });
+          );
+        }
+        const msgRes = await query.order('created_at', { ascending: true });
         if (msgRes.error) throw msgRes.error;
         if (isMounted) setMessages((msgRes.data || []) as Message[]);
       } catch (loadError: any) {
@@ -116,9 +124,10 @@ export default function ClientMessagesThreadPage() {
       }, (payload) => {
         const msg = payload.new as Message;
         // Only accept messages that belong to this channel direction.
-        const isForThisChannel =
-          (msg.sender_role === 'client' && msg.receiver_role === activeChannel) ||
-          (msg.sender_role === activeChannel && msg.receiver_role === 'client');
+        const isForThisChannel = activeChannel === 'All'
+          ? (msg.receiver_role === 'All' || !msg.receiver_id)
+          : ((msg.sender_role === 'client' && msg.receiver_role === activeChannel) ||
+             (msg.sender_role === activeChannel && msg.receiver_role === 'client'));
         if (isForThisChannel && isMounted) {
           setMessages(current =>
             current.some(m => m.id === msg.id) ? current : [...current, msg]
@@ -160,14 +169,14 @@ export default function ClientMessagesThreadPage() {
 
   const sendMessage = async () => {
     const trimmed = input.trim();
-    if (!trimmed || !user || !threadId || !receiverId || sending) return;
+    if (!trimmed || !user || !threadId || (activeChannel !== 'All' && !receiverId) || sending) return;
     setSending(true);
     setError(null);
     try {
       const data = await api.messages.send({
         project_id: threadId,
         sender_id: user.id,
-        receiver_id: receiverId,
+        ...(activeChannel !== 'All' ? { receiver_id: receiverId } : {}),
         sender_role: 'client',
         receiver_role: activeChannel,
         content: trimmed,

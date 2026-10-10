@@ -39,18 +39,27 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
           const { data: smSites, error: smError } = await supabase.from('site_manager_sites').select('project_id, projects(id, name)').eq('site_manager_id', user.id);
           if (smError) throw smError;
           fetchedProjects = (smSites || []).map(s => s.projects) as any;
+        } else if (role === 'worker') {
+          const { data: wSites, error: wError } = await supabase.from('site_workers').select('project_id, projects(id, name)').eq('worker_id', user.id);
+          if (wError) throw wError;
+          fetchedProjects = (wSites || []).map(s => s.projects) as any;
+        } else if (role === 'supplier') {
+          const { data: sOrders, error: sError } = await supabase.from('purchase_orders').select('project_id, projects(id, name)').eq('supplier_id', user.id);
+          if (sError) throw sError;
+          const pMap = new Map();
+          (sOrders || []).forEach(o => { if (o.projects) pMap.set(o.project_id, o.projects); });
+          fetchedProjects = Array.from(pMap.values());
         }
 
         projectIds = fetchedProjects.map(p => p.id);
         
         let messageData: Message[] = [];
         if (projectIds.length > 0) {
-          const { data, error: msgError } = await supabase
-            .from('client_messages')
-            .select('*')
-            .in('project_id', projectIds)
-            .or(`and(sender_role.eq.client,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.client),and(sender_role.eq.worker,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.worker)`)
-            .order('created_at', { ascending: false });
+            const { data, error: msgError } = await supabase
+              .from('client_messages')
+              .select('*')
+              .in('project_id', projectIds)
+              .order('created_at', { ascending: false });
           if (msgError) throw msgError;
           messageData = data || [];
         }

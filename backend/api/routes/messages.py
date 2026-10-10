@@ -14,7 +14,7 @@ router = APIRouter(
 class MessageCreate(BaseModel):
     project_id: str
     sender_id: str
-    receiver_id: str
+    receiver_id: Optional[str] = None
     content: str
     sender_role: Optional[str] = None
     receiver_role: Optional[str] = None
@@ -36,16 +36,21 @@ def send_message(payload: MessageCreate, current_user: dict = Depends(get_curren
         project = proj.data[0]
 
         # Verify receiver is a participant (pm, client, admin, or site manager of the project).
-        receiver_profile = service_client.table("profiles").select("id, role").eq("id", payload.receiver_id).execute()
-        if not receiver_profile.data:
-            raise HTTPException(status_code=404, detail="Receiver not found")
+        receiver_role_val = payload.receiver_role
+        if payload.receiver_id:
+            receiver_profile = service_client.table("profiles").select("id, role").eq("id", payload.receiver_id).execute()
+            if not receiver_profile.data:
+                raise HTTPException(status_code=404, detail="Receiver not found")
+            receiver_role_val = receiver_role_val or receiver_profile.data[0].get("role")
+        else:
+            receiver_role_val = receiver_role_val or "All"
 
         data = {
             "project_id": payload.project_id,
             "sender_id": payload.sender_id,
             "receiver_id": payload.receiver_id,
             "sender_role": payload.sender_role or current_user.get("role"),
-            "receiver_role": payload.receiver_role or receiver_profile.data[0].get("role"),
+            "receiver_role": receiver_role_val,
             "message_text": payload.content,
             "is_read": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -71,7 +76,7 @@ def get_messages(
         query = supabase.table("client_messages") \
             .select("*, sender:profiles!sender_id(full_name, role)") \
             .eq("project_id", project_id) \
-            .or_(f"sender_id.eq.{current_user['id']},receiver_id.eq.{current_user['id']}") \
+            .or_(f"sender_id.eq.{current_user['id']},receiver_id.eq.{current_user['id']},receiver_id.is.null") \
             .order("created_at", desc=False)
 
         # Optional channel filter: client requests only their thread with a specific role.
@@ -84,7 +89,7 @@ def get_messages(
                     f"and(sender_role.eq.{sender_role},receiver_role.eq.{receiver_role}),"
                     f"and(sender_role.eq.{receiver_role},receiver_role.eq.{sender_role})"
                 ) \
-                .or_(f"sender_id.eq.{current_user['id']},receiver_id.eq.{current_user['id']}") \
+                .or_(f"sender_id.eq.{current_user['id']},receiver_id.eq.{current_user['id']},receiver_id.is.null") \
                 .order("created_at", desc=False)
 
         res = query.execute()

@@ -35,9 +35,11 @@ import {
   TextInput, useWindowDimensions, Platform, Animated,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { Video, ResizeMode } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
 import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
 import { getDashboardForRole } from '../utils/auth';
+import { getApiUrl } from '../lib/apiUrl';
 
 
 // ─── Tuneable constants (adjust here — no other file needs changing) ──────────
@@ -48,7 +50,7 @@ const LERP_FACTOR    = 0.10;    // easing factor (lower=smoother/more lag)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Resolve the bundled asset URL using Metro's require
-const videoAsset = require('../../images/homepage_scroll.mp4');
+const videoAsset = require('../../assets/images/homepage_scroll.mp4');
 const VIDEO_SRC = typeof videoAsset === 'string' ? videoAsset : Image.resolveAssetSource(videoAsset).uri;
 
 
@@ -206,7 +208,7 @@ export default function LandingPage() {
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/public-inquiry`, {
+      const response = await fetch(`${getApiUrl()}/public-inquiry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -282,7 +284,7 @@ export default function LandingPage() {
     backgroundColor: 'rgba(17,24,39,0.65)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
-    backdropFilter: 'blur(20px)',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(20px)' } : {})
   };
 
   const slProjects = [
@@ -306,18 +308,21 @@ export default function LandingPage() {
   return (
     <View className="flex-1" style={{ backgroundColor: Platform.OS === 'web' ? 'transparent' : '#0F172A' }}>
       {Platform.OS !== 'web' && (
-        <>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1541888086925-ebbc14b62db4?q=80&w=800' }}
-            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
-            resizeMode="cover"
+        <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, zIndex: -1 }}>
+          <Video
+            source={require('../../assets/images/homepage_scroll.mp4')}
+            style={{ width: ww, height: wh }}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isLooping
+            isMuted
           />
-          <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
-        </>
+          <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
+        </View>
       )}
 
       
-      <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+      <ScrollView bounces={false} keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
       {/* NAVBAR */}
       <View
@@ -326,7 +331,7 @@ export default function LandingPage() {
           paddingTop: isScrolled ? 12 : 24,
           paddingBottom: isScrolled ? 12 : 24,
           backgroundColor: isScrolled ? 'rgba(10,15,30,0.92)' : 'transparent',
-          backdropFilter: isScrolled ? 'blur(24px)' : 'none',
+          ...(Platform.OS === 'web' ? { backdropFilter: isScrolled ? 'blur(24px)' : 'none' } : {}),
           borderBottomWidth: isScrolled ? 1 : 0,
           borderBottomColor: 'rgba(255,255,255,0.07)',
         }}
@@ -557,16 +562,16 @@ export default function LandingPage() {
             <View className="flex-row flex-wrap -mx-4">
               {slProjects.map(proj => (
                 <View key={proj.name} className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                  <View className="rounded-3xl overflow-hidden h-full flex-col" style={{ ...g }}>
+                  <View className="rounded-3xl overflow-hidden flex-col" style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
                     <View style={{ width: '100%', height: 220, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' }}>
                       <Image source={typeof proj.img === 'string' ? { uri: proj.img } : proj.img} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     </View>
-                    <View className="p-6 flex-1 flex-col justify-between">
+                    <View className="p-6 flex-col justify-between">
                       <View>
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold text-xs tracking-widest uppercase mb-1">{proj.type}</Text>
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xl mb-4">{proj.name}</Text>
                       </View>
-                      <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center justify-between mt-4">
                         <View className="flex-row items-center">
                           <Ionicons name="location" size={13} color="#9CA3AF" />
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm ml-1">{proj.location}</Text>

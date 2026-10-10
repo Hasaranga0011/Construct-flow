@@ -192,7 +192,7 @@ export const api = {
     send: (data: {
       project_id: string;
       sender_id: string;
-      receiver_id: string;
+      receiver_id?: string;
       content: string;
       sender_role?: string;
       receiver_role?: string;

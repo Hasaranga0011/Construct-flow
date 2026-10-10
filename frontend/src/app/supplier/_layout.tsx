@@ -10,6 +10,7 @@ import { Text, Pressable } from 'react-native';
 const SUPPLIER_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',    href: '/dashboard',  IconFamily: FontAwesome5, iconName: 'chart-bar' },
   { label: 'My Deliveries',   href: '/deliveries', IconFamily: FontAwesome5, iconName: 'truck-loading' },
+  { label: 'Messages',     href: '/messages',   IconFamily: Ionicons,     iconName: 'chatbubbles' },
   { label: 'My Profile',   href: '/profile',    IconFamily: Ionicons,     iconName: 'person-circle-outline' },
   { label: 'Settings',     href: '/settings',   IconFamily: Ionicons,     iconName: 'settings-sharp' },
 ];

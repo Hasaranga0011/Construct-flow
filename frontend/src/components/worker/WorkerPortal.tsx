@@ -514,6 +514,36 @@ function QRModal({
           .catch(() => {});
     };
   }, []);
+  let svgRef: any = null;
+
+  const downloadQR = () => {
+    if (svgRef && svgRef.toDataURL) {
+      svgRef.toDataURL(async (data: string) => {
+        if (Platform.OS === 'web') {
+          const a = document.createElement('a');
+          a.href = `data:image/png;base64,${data}`;
+          a.download = `worker_qr_${profile.worker_code || profile.id}.png`;
+          a.click();
+        } else {
+          try {
+            const FileSystem = await import('expo-file-system');
+            const Sharing = await import('expo-sharing');
+            const fileUri = `${FileSystem.documentDirectory}worker_qr_${profile.worker_code || profile.id}.png`;
+            await FileSystem.writeAsStringAsync(fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (isAvailable) {
+              await Sharing.shareAsync(fileUri);
+            } else {
+              Alert.alert('Sharing not available', 'Unable to share or save the QR code on this device.');
+            }
+          } catch (e) {
+            Alert.alert('Error', 'Failed to save QR code.');
+          }
+        }
+      });
+    }
+  };
+
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-white">
@@ -531,11 +561,15 @@ function QRModal({
             <Text className="text-sm text-slate-500">Offline - Saved QR</Text>
           )}
           {profile?.qr_code ? (
-            <QRCode
-              value={profile.qr_code}
-              size={Math.max(120, Math.min(width * 0.8, height * 0.55, 600))}
-              backgroundColor="white"
-            />
+            <View>
+              <QRCode
+                value={profile.qr_code}
+                size={Math.max(120, Math.min(width * 0.8, height * 0.55, 600))}
+                backgroundColor="white"
+                getRef={(c) => (svgRef = c)}
+              />
+              <Button label="Download QR" onPress={downloadQR} style={{ marginTop: 16 }} />
+            </View>
           ) : (
             <Text>QR code has not been assigned yet.</Text>
           )}

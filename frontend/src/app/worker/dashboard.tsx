@@ -13,8 +13,39 @@ import { getApiUrl } from '@/lib/apiUrl';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
 import QRCode from 'react-native-qrcode-svg';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Alert } from 'react-native';
 
 function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
+  let svgRef: any = null;
+
+  const downloadQR = () => {
+    if (svgRef && svgRef.toDataURL) {
+      svgRef.toDataURL(async (data: string) => {
+        if (Platform.OS === 'web') {
+          const a = document.createElement('a');
+          a.href = `data:image/png;base64,${data}`;
+          a.download = `worker_qr_${profile.worker_code || profile.id}.png`;
+          a.click();
+        } else {
+          try {
+            const fileUri = `${FileSystem.documentDirectory}worker_qr_${profile.worker_code || profile.id}.png`;
+            await FileSystem.writeAsStringAsync(fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (isAvailable) {
+              await Sharing.shareAsync(fileUri);
+            } else {
+              Alert.alert('Sharing not available', 'Unable to share or save the QR code on this device.');
+            }
+          } catch (e) {
+            Alert.alert('Error', 'Failed to save QR code.');
+          }
+        }
+      });
+    }
+  };
+
   if (!profile) return null;
   return (
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
@@ -22,10 +53,13 @@ function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
         <Text className="text-2xl font-bold text-slate-900 mb-2">{profile.full_name}</Text>
         <Text className="text-cyan-600 font-semibold mb-6">{profile.worker_code || 'Pending'}</Text>
         <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={200} />
+          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={200} getRef={(c) => (svgRef = c)} />
         </View>
         <Text className="text-slate-500 text-sm text-center mt-6">Show this QR code to your Site Manager when arriving at or leaving the site.</Text>
-        <Pressable onPress={onClose} className="mt-8 bg-slate-100 px-8 py-3 rounded-xl w-full items-center">
+        <Pressable onPress={downloadQR} className="mt-8 bg-brand-orange px-8 py-3 rounded-xl w-full items-center">
+          <Text className="font-bold text-white">Download QR</Text>
+        </Pressable>
+        <Pressable onPress={onClose} className="mt-4 bg-slate-100 px-8 py-3 rounded-xl w-full items-center">
           <Text className="font-bold text-slate-700">Close</Text>
         </Pressable>
       </View>

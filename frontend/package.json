@@ -12,6 +12,7 @@
     "date-fns": "^2.30.0",
     "exceljs": "^4.4.0",
     "expo": "~54.0.37",
+    "expo-av": "^16.0.8",
     "expo-brightness": "~14.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.14",

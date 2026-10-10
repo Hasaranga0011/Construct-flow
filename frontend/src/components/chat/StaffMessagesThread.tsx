@@ -49,7 +49,6 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
           .from('client_messages')
           .select('*')
           .eq('project_id', threadId)
-          .or(`and(sender_role.eq.client,receiver_role.eq.${effectiveRole}),and(sender_role.eq.${effectiveRole},receiver_role.eq.client)`)
           .order('created_at', { ascending: true });
         if (msgRes.error) throw msgRes.error;
         if (isMounted) setMessages((msgRes.data || []) as Message[]);
@@ -71,7 +70,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
         filter: `project_id=eq.${threadId}`,
       }, (payload) => {
         const msg = payload.new as Message;
-        const isForThisChannel = (msg.sender_role === 'client' && msg.receiver_role === effectiveRole) || (msg.sender_role === effectiveRole && msg.receiver_role === 'client');
+        const isForThisChannel = true; // Group chat accepts all messages for this project_id
         if (isForThisChannel && isMounted) {
           setMessages(current => current.some(m => m.id === msg.id) ? current : [...current, msg]);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -94,7 +93,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
         const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
         if (data) {
           const newProfiles = { ...profiles };
-          data.forEach(p => { newProfiles[p.id] = p.full_name || 'Unknown'; });
+          data.forEach(p => { if (p.id) newProfiles[p.id] = p.full_name || 'Unknown'; });
           setProfiles(newProfiles);
         }
       }
@@ -110,16 +109,15 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
 
   const sendMessage = async () => {
     const trimmed = input.trim();
-    if (!trimmed || !user || !threadId || !clientId || sending) return;
+    if (!trimmed || !user || !threadId || sending) return;
     setSending(true);
     setError(null);
     try {
       const data = await api.messages.send({
         project_id: threadId,
         sender_id: user.id,
-        receiver_id: clientId,
-        sender_role: effectiveRole,
-        receiver_role: 'client',
+        sender_role: effectiveRole || undefined,
+        receiver_role: 'All',
         content: trimmed,
       });
       if (data) {
@@ -138,7 +136,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
 
   return (
     <KeyboardAvoidingView className="flex-1 bg-brand-light dark:bg-[#0F172A]" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <TopNav title={projectName + " (Client)"} showAction={false} />
+      <TopNav title={projectName + " Chat"} showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1 p-4" showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color="#F97316" className="mt-10" />

@@ -156,14 +156,23 @@ def handle_public_inquiry(inquiry: PublicInquiry):
     client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
     full_message = f"Name: {inquiry.name}\nEmail: {inquiry.email}\nProject: {inquiry.project_name or 'N/A'}\n\nMessage: {inquiry.message}"
     
-    res = client.table('notifications').insert({
-        "type": "general",
-        "title": f"New Inquiry: {inquiry.name}",
-        "message": full_message,
-        "target_role": "admin",
-        "is_read": False,
-        "sent_via": "in_app"
-    }).execute()
+    admins = client.table('profiles').select('id').in_('role', ['admin', 'super_admin', 'Super Admin', 'Admin']).execute()
+    
+    if admins.data:
+        notifications = []
+        for admin in admins.data:
+            notifications.append({
+                "user_id": admin['id'],
+                "type": "general",
+                "title": f"New Inquiry: {inquiry.name}",
+                "message": full_message,
+                "target_role": "admin",
+                "target_user_id": admin['id'],
+                "is_read": False,
+                "sent_via": "in_app"
+            })
+        if notifications:
+            client.table('notifications').insert(notifications).execute()
     
     return {"success": True}
 
@@ -182,6 +191,6 @@ def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(g
     res = client.table('profiles').select('role').eq('id', current_user['id']).single().execute()
     if res.data and res.data.get('role') in [None, '', 'worker', 'pending']:
         client.table('profiles').update({'role': payload.role}).eq('id', current_user['id']).execute()
-        client.auth.admin.update_user_by_id(current_user['id'], user_metadata={'role': payload.role})
+        client.auth.admin.update_user_by_id(current_user['id'], {"user_metadata": {'role': payload.role}})
         
     return {"success": True}

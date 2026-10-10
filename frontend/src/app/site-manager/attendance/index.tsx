@@ -296,7 +296,7 @@ export default function SMAttendancePage() {
                       className="bg-white border border-gray-200 px-5 py-3 rounded-xl flex-row items-center shadow-sm"
                     >
                       <Ionicons name="create-outline" size={20} color="#4B5563" style={{ marginRight: 8 }} />
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-base">Manual</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-base">Manual Check In/Out</Text>
                     </Pressable>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       onPress={() => setIsScanning(true)}
@@ -311,8 +311,9 @@ export default function SMAttendancePage() {
                 <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <View className="hidden lg:flex flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Worker</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-bold text-gray-500 uppercase">Status</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-bold text-gray-500 uppercase text-right">Hours</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-bold text-gray-500 uppercase">Status</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-bold text-gray-500 uppercase text-right">Hours</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-bold text-gray-500 uppercase text-right">Action</Text>
                   </View>
 
                   {projectWorkers.length === 0 ? (
@@ -344,7 +345,7 @@ export default function SMAttendancePage() {
                             </View>
                           </View>
 
-                          <View className="w-[22%]">
+                          <View className="w-[20%]">
                             {status === 'Pending' ? (
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 font-semibold italic text-sm">Pending</Text>
                             ) : status === 'Present' ? (
@@ -354,13 +355,28 @@ export default function SMAttendancePage() {
                             )}
                           </View>
 
-                          <View className="w-[22%] items-end">
+                          <View className="w-[15%] items-end justify-center">
                             {hours != null ? (
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{hours.toFixed(1)}h</Text>
                             ) : checkedIn ? (
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-semibold">Active</Text>
                             ) : (
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 text-sm">—</Text>
+                            )}
+                          </View>
+                          
+                          <View className="w-[20%] items-end justify-center pl-4">
+                            {!attRecord?.check_out_time ? (
+                              <Pressable 
+                                onPress={() => { setManualWorkerId(worker.id); setShowManualModal(true); }}
+                                className={`px-3 py-2 rounded-lg border ${checkedIn ? 'bg-amber-50 border-amber-200' : 'bg-brand-light border-gray-200'}`}
+                              >
+                                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold ${checkedIn ? 'text-amber-700' : 'text-gray-600'}`}>
+                                  {checkedIn ? 'Check Out' : 'Check In'}
+                                </Text>
+                              </Pressable>
+                            ) : (
+                                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs italic">Completed</Text>
                             )}
                           </View>
                         </View>
