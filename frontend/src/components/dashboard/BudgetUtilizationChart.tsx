@@ -86,7 +86,7 @@ export const BudgetUtilizationChart = () => {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 w-full min-h-[300px] items-center justify-center">
         <ActivityIndicator color="#F97316" size="large" />
       </View>
     );

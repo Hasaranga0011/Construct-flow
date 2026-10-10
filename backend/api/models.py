@@ -12,8 +12,8 @@ class ProjectBase(BaseModel):
     completion_percentage: int = Field(default=0, ge=0, le=100)
     total_budget: float = Field(default=0, ge=0, allow_inf_nan=False)
     spent_cost: float = 0.0
-    start_date: date
-    end_date: date
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     client_id: Optional[str] = None
     pm_id: Optional[str] = None
     latitude: Optional[float] = None

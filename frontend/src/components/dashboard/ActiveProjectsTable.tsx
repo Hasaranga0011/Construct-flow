@@ -11,72 +11,75 @@ import { Ionicons } from '@expo/vector-icons';
 const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) => void }) => {
   const { name, location, completion_percentage: progress, status } = project;
   const { isMobile } = useResponsive();
+  const isActive = ['active', 'Active', 'In Progress', 'in progress'].includes(status);
 
   if (isMobile) {
     return (
-      <View className="flex-col py-4 border-b border-gray-100 w-full">
-        <View className="flex-row justify-between items-start mb-2 w-full">
-          <View className="flex-row items-center flex-1 pr-2">
-            <View className="w-11 h-11 bg-orange-50 rounded-lg items-center justify-center mr-3">
+      <View style={{ flexDirection: 'column', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', width: '100%', minHeight: 120 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, width: '100%' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+            <View style={{ width: 44, height: 44, backgroundColor: '#FFF7ED', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
               <Ionicons name="business" size={20} color="#EA580C" />
             </View>
-            <View className="flex-1 min-w-0">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm flex-wrap">{name}</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs flex-wrap">{location}</Text>
+            <View style={{ flex: 1 }}>
+              <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontWeight: 'bold', fontSize: 14, marginBottom: 2 }}>{name}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={{ color: '#6B7280', fontSize: 12 }}>{location}</Text>
             </View>
           </View>
-          <View className={`mt-1 ${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-green-50' : 'bg-gray-100'} px-2 py-1 rounded self-start`}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-green-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>{status}</Text>
+          <View style={{ marginTop: 4, backgroundColor: isActive ? '#DCFCE7' : '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start' }}>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: isActive ? '#16A34A' : '#6B7280', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>{status}</Text>
           </View>
         </View>
-        <View className="w-full mb-3">
-          <View className="flex-row justify-between mb-1">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">Progress</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-bold">{progress}%</Text>
+        
+        <View style={{ width: '100%', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: '#6B7280', fontSize: 12 }}>Progress</Text>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontSize: 12, fontWeight: 'bold' }}>{progress}%</Text>
           </View>
-          <View className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
-            <View className="h-full bg-brand-orange rounded-full" style={{ width: `${progress}%` }} />
+          <View style={{ height: 6, backgroundColor: '#F3F4F6', borderRadius: 9999, width: '100%', overflow: 'hidden' }}>
+            <View style={{ height: '100%', backgroundColor: '#F97316', borderRadius: 9999, width: `${progress}%` }} />
           </View>
         </View>
-        <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onManage(project)} className="w-full py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors items-center justify-center">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-bold uppercase tracking-wider">Manage</Text>
+
+        <Pressable 
+          style={{ minHeight: 44, width: '100%', paddingVertical: 10, backgroundColor: '#F3F4F6', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+          onPress={() => onManage(project)}
+        >
+          <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Manage</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
-    <View className="flex-row items-center py-4 border-b border-gray-100">
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', width: '100%', minHeight: 76 }}>
       {/* Thumbnail */}
-      <View className="w-11 h-11 bg-gray-200 rounded-md mr-4 items-center justify-center">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 font-bold">{name.charAt(0)}</Text>
+      <View style={{ width: 44, height: 44, backgroundColor: '#E5E7EB', borderRadius: 6, marginRight: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: '#9CA3AF', fontWeight: 'bold' }}>{name.charAt(0)}</Text>
       </View>
       
       {/* Details */}
-      <View className="flex-1 justify-center pr-2">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{name}</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{location}</Text>
+      <View style={{ flex: 1, justifyContent: 'center', paddingRight: 8 }}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontWeight: '600', fontSize: 14 }}>{name}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: '#6B7280', fontSize: 12 }}>{location}</Text>
       </View>
       
       {/* Status Badge */}
-      <View className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-[#DCFCE7]' : 'bg-gray-100'} px-2 py-1 rounded mr-6`}>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-brand-success' : 'text-gray-500'} text-xs font-semibold`}>{status}</Text>
+      <View style={{ backgroundColor: isActive ? '#DCFCE7' : '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginRight: 24 }}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: isActive ? '#16A34A' : '#6B7280', fontSize: 12, fontWeight: '600' }}>{status}</Text>
       </View>
       
       {/* Progress */}
-      <View className="w-24 flex-row items-center mr-4">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm w-10">{progress}%</Text>
-        <View className="flex-1 h-2 bg-gray-100 rounded-full ml-2">
-          <View 
-            className="h-full bg-brand-orange rounded-full" 
-            style={{ width: `${progress}%` }} 
-          />
+      <View style={{ width: 96, flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontWeight: 'bold', fontSize: 14, width: 40 }}>{progress}%</Text>
+        <View style={{ flex: 1, height: 8, backgroundColor: '#F3F4F6', borderRadius: 9999, marginLeft: 8, overflow: 'hidden' }}>
+          <View style={{ height: '100%', backgroundColor: '#F97316', borderRadius: 9999, width: `${progress}%` }} />
         </View>
       </View>
 
       {/* Manage Button */}
-      <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onManage(project)} className="px-3 py-1.5 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-semibold">Manage</Text>
+      <Pressable style={{ minHeight: 44, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 4, justifyContent: 'center' }} onPress={() => onManage(project)}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: '#111827', fontSize: 12, fontWeight: '600' }}>Manage</Text>
       </Pressable>
     </View>
   );
@@ -160,7 +163,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
   };
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
+    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'w-full min-h-[300px]'}`}>
       <View className="flex-row justify-between items-center mb-4">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Active Projects</Text>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(pmId ? '/pm/projects' : '/admin/projects')}>

@@ -20,9 +20,6 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
 }
 
 export function getApiUrl(): string {
-  return resolveApiUrl(
-    Platform.OS === 'web' ? process.env.EXPO_PUBLIC_API_URL : process.env.EXPO_PUBLIC_NATIVE_API_URL || process.env.EXPO_PUBLIC_API_URL,
-    Platform.OS,
-    Constants.expoConfig?.hostUri,
-  );
+  // Temporarily hardcoded to force the correct LAN IP (bypassing any cached terminal environment variables)
+  return 'http://192.168.8.159:8000/api';
 }

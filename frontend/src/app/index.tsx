@@ -63,14 +63,15 @@ function injectVideoBackground(): () => void {
     s.id = 'cf-vbg-style';
     s.textContent = `
       :root{--vblur:${BLUR};--vdim:${DIM};}
-      #cf-vbg{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;z-index:0;overflow:hidden;
+      #cf-vbg{position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;z-index:0;overflow:hidden;pointer-events:none;
         background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0c1a2e 100%);}
-      #cf-vbg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
+      #cf-vbg video{position:absolute;top:50%;left:50%;width:100vw;height:100vh;
+        transform:translate(-50%,-50%) scale(1.05);object-fit:cover;object-position:center center;
         filter:blur(var(--vblur)) brightness(0.65);
-        opacity:0;transition:opacity 1s ease;}
+        opacity:1;}
       #cf-vbg.rdy video{opacity:1;}
       #cf-vbg video.rdy{opacity:1;}
-      #cf-vbg .dim{position:absolute;inset:0;z-index:1;
+      #cf-vbg .dim{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;
         background:linear-gradient(to bottom,
           rgba(0,0,0,calc(var(--vdim)*.5)) 0%,
           rgba(0,0,0,var(--vdim)) 50%,
@@ -330,16 +331,16 @@ export default function LandingPage() {
   return (
     <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
       {Platform.OS !== 'web' && (
-        <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, zIndex: -1 }}>
+        <View style={{ position: 'absolute', top: -150, bottom: -150, left: -150, right: -150, zIndex: -1, backgroundColor: '#0F172A' }}>
           <Video
             source={require('../../assets/images/homepage_scroll.mp4')}
-            style={{ width: ww, height: wh }}
+            style={{ width: '100%', height: '100%' }}
             resizeMode={ResizeMode.COVER}
             shouldPlay
             isLooping
             isMuted
           />
-          <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
         </View>
       )}
 

@@ -55,7 +55,7 @@ export const RecentAlertsPanel = ({ pmId, basePath }: { pmId?: string; basePath?
   };
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
+    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'w-full min-h-[300px]'}`}>
       <View className="flex-row justify-between items-center mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Recent Alerts</Text>
         {unreadCount > 0 && (

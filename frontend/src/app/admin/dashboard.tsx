@@ -180,45 +180,45 @@ export default function DashboardScreen() {
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', marginBottom: 24, gap: 24, width: '100%' }}>
             {/* Main Content Area (Chart) */}
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+            <View style={{ width: isMobile ? '100%' : '66.6%' }}>
               <CostTimelineChart />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : '33.3%' }}>
               <DelayRiskPanel />
             </View>
           </View>
 
           {/* New Charts Grid Row 1 */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', marginBottom: 24, gap: 24, width: '100%' }}>
+            <View style={{ width: isMobile ? '100%' : '50%' }}>
               <BudgetUtilizationChart />
             </View>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+            <View style={{ width: isMobile ? '100%' : '50%' }}>
               <MaterialsStockChart />
             </View>
           </View>
 
           {/* New Charts Grid Row 2 */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', marginBottom: 24, gap: 24, width: '100%' }}>
+            <View style={{ width: isMobile ? '100%' : '50%' }}>
               <PurchaseOrderPipelineChart />
             </View>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+            <View style={{ width: isMobile ? '100%' : '50%' }}>
               <MonthlyAttendanceChart />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className={`pb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', paddingBottom: 24, gap: 24, width: '100%' }}>
+            <View style={{ width: isMobile ? '100%' : '66.6%' }}>
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : '33.3%' }}>
               <RecentAlertsPanel />
             </View>
           </View>
