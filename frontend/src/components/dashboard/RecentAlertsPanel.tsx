@@ -22,7 +22,7 @@ const AlertItem = ({ title, subtext, iconColor }: { title: string, subtext: stri
   );
 };
 
-export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
+export const RecentAlertsPanel = ({ pmId, basePath }: { pmId?: string; basePath?: string }) => {
   const router = useRouter();
   const { isMobile } = useResponsive();
   
@@ -89,7 +89,7 @@ export const RecentAlertsPanel = ({ pmId }: { pmId?: string }) => {
 
       <Pressable style={{ minHeight: 44, minWidth: 44 }}
         className="pt-4 border-t border-gray-50 items-center justify-center"
-        onPress={() => router.push(pmId ? '/pm/notifications' : '/admin/notifications')}
+        onPress={() => router.push(basePath ? `${basePath}/notifications` : pmId ? '/pm/notifications' : '/admin/notifications')}
       >
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">View all notifications &rarr;</Text>
       </Pressable>

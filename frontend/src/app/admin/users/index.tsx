@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
+import { roleLabel } from '../../../utils/roles';
 
 export default function AdminUsersList() {
   const router = useRouter();
@@ -57,10 +58,7 @@ export default function AdminUsersList() {
 
   const formatRoleDisplay = (role: string) => {
     if (role === 'All') return 'All';
-    if (role === 'admin') return 'Admin';
-    if (role === 'pm') return 'Project Manager';
-    if (role === 'site_manager') return 'Site Manager';
-    return role.charAt(0).toUpperCase() + role.slice(1);
+    return roleLabel(role);
   };
 
   const getRoleColor = (role: string) => {

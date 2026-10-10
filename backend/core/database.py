@@ -21,3 +21,6 @@ def get_auth_client(request: Request) -> Client:
         raise HTTPException(status_code=401, detail="Authentication required")
     
     return client_for_token(token.strip())
+
+def get_service_client() -> Client:
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)

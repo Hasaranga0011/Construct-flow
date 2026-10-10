@@ -129,7 +129,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
 
           return (
             <Link key={item.label} href={fullHref as any} asChild onPress={() => isMobile && setIsOpen(false)}>
-              <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }} activeOpacity={0.7} className={`flex-row items-center py-3 px-3 rounded-lg mb-1 ${isActive ? (isMobile || isDark ? 'bg-gray-800' : 'bg-brand-orange bg-opacity-10') : (isMobile || isDark ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50 hover:bg-opacity-10')}`}>
+              <TouchableOpacity style={{ minHeight: 48, minWidth: 48 }} activeOpacity={0.7} className={`flex-row items-center py-3 px-3 rounded-lg mb-1 ${isActive ? (isMobile || isDark ? 'bg-gray-800' : 'bg-brand-orange bg-opacity-10') : (isMobile || isDark ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50 hover:bg-opacity-10')}`}>
                 <IconFamily
                   name={item.iconName as any}
                   size={18}
@@ -166,7 +166,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isMobile || isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
             </View>
           </View>
-          <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Log out" onPress={handleLogout} className="p-2 min-w-[44px] min-h-[44px] items-center justify-center">
+          <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Log out" onPress={handleLogout} className="p-2 min-w-[44px] min-h-[44px] items-center justify-center">
             <Ionicons name="log-out-outline" size={20} color="#9CA3AF" />
           </Pressable>
         </View>
@@ -195,7 +195,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
         <TouchableOpacity accessibilityLabel="Close navigation menu"
           onPress={() => setIsOpen(false)}
           activeOpacity={1}
-          style={[{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)' }, { minHeight: 44, minWidth: 44 }]}
+          style={[{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)' }, { minHeight: 48, minWidth: 48 }]}
         />
       </Animated.View>
       <Animated.View style={{ width: Math.min(260, width - 32), height: '100%', transform: [{ translateX: slideAnim }] }}>

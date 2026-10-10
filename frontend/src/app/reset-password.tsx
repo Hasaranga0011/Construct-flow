@@ -94,7 +94,7 @@ export default function ResetPasswordScreen() {
           >
             <Image 
               source={require('../../assets/images/main-logo.png')} 
-              style={{ width: '100%', aspectRatio: 4 }} 
+              style={{ width: 80, height: 80, marginBottom: 16 }} 
               resizeMode="contain" 
             />
           </Pressable>

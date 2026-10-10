@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { api } from '../../../services/api';
 
 type Message = {
   id: string;
@@ -56,6 +57,7 @@ export default function ClientMessagesThreadPage() {
       if (!isMounted) return;
       setLoading(true);
       setError(null);
+      setMessages([]); // Clear messages when switching channels
       try {
         // Fetch project + roles assigned to the project.
         const projectRes = await supabase
@@ -63,33 +65,22 @@ export default function ClientMessagesThreadPage() {
           .select('name, pm_id, client_id')
           .eq('id', threadId)
           .eq('client_id', user.id)
-          .single();
+          .maybeSingle();
         if (projectRes.error) throw projectRes.error;
 
         if (isMounted) setProjectName(projectRes.data?.name || 'Project Conversation');
 
+        // Use the new proxy endpoint to get contacts safely
+        const contacts = await api.messages.getContacts(threadId).catch(() => ({}));
+
         // Determine receiver_id based on active channel.
         let rId: string | null = null;
         if (activeChannel === 'pm') {
-          rId = projectRes.data?.pm_id || null;
+          rId = projectRes.data?.pm_id || contacts.pm || null;
         } else if (activeChannel === 'super_admin') {
-          // Pick the first super_admin profile.
-          const adminRes = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'super_admin')
-            .limit(1)
-            .single();
-          rId = adminRes.data?.id || null;
+          rId = contacts.super_admin || null;
         } else if (activeChannel === 'site_manager') {
-          // Pick the first site manager assigned to this project.
-          const smRes = await supabase
-            .from('site_manager_sites')
-            .select('site_manager_id')
-            .eq('project_id', threadId)
-            .limit(1)
-            .single();
-          rId = smRes.data?.site_manager_id || null;
+          rId = contacts.site_manager || null;
         }
         if (isMounted) setReceiverId(rId);
 
@@ -173,20 +164,15 @@ export default function ClientMessagesThreadPage() {
     setSending(true);
     setError(null);
     try {
-      const { data, error: sendError } = await supabase
-        .from('client_messages')
-        .insert({
-          project_id: threadId,
-          sender_id: user.id,
-          receiver_id: receiverId,
-          sender_role: 'client',
-          receiver_role: activeChannel,
-          message_text: trimmed,
-          is_read: false,
-        })
-        .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
-        .single();
-      if (sendError) throw sendError;
+      const data = await api.messages.send({
+        project_id: threadId,
+        sender_id: user.id,
+        receiver_id: receiverId,
+        sender_role: 'client',
+        receiver_role: activeChannel,
+        content: trimmed,
+      });
+      
       if (data) {
         setMessages(current =>
           current.some(m => m.id === data.id) ? current : [...current, data as Message]

@@ -27,7 +27,7 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
         let projectIds: string[] = [];
         let fetchedProjects: Project[] = [];
 
-        if (role === 'super_admin') {
+        if (role === 'super_admin' || role === 'admin') {
           const { data, error } = await supabase.from('projects').select('id, name').order('created_at', { ascending: false });
           if (error) throw error;
           fetchedProjects = data || [];
@@ -49,7 +49,7 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
             .from('client_messages')
             .select('*')
             .in('project_id', projectIds)
-            .or(`and(sender_role.eq.client,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.client)`)
+            .or(`and(sender_role.eq.client,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.client),and(sender_role.eq.worker,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.worker)`)
             .order('created_at', { ascending: false });
           if (msgError) throw msgError;
           messageData = data || [];

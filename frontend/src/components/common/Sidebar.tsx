@@ -10,6 +10,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import { useWindowDimensions } from 'react-native';
 import { LogoutConfirmationModal } from './LogoutConfirmationModal';
 import { buildNotificationFilter } from '../../utils/notifications';
+import { roleLabel } from '../../utils/roles';
 
 export type NavItem = {
   label: string;
@@ -142,7 +143,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
             </View>
             <View className="flex-1 pr-2">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-brand-text'}`}>{user?.user_metadata?.full_name || user?.email || 'User'}</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{roleLabel(role || '') || 'Loading...'}</Text>
             </View>
           </View>
           <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={handleLogout} className="p-2">

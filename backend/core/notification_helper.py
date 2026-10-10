@@ -44,7 +44,8 @@ def create_notifications(notifications: list):
         return
         
     try:
-        admin_supabase.table("notifications").insert(valid_notifs).execute()
+        from core.attendance_setup import setup_client
+        setup_client().table("notifications").insert(valid_notifs).execute()
     except Exception as e:
         logging.error(f"Failed to insert notifications: {e}")
         # Never raise an exception for a notification failure

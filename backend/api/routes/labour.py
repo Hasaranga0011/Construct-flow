@@ -5,6 +5,8 @@ from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
 from core.security import require_manager_or_admin, get_current_user
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from core.worker_payroll import calculate_payroll
 
 router = APIRouter(
     prefix="/labour",
@@ -15,10 +17,10 @@ def managed_project_ids(client, current_user: dict) -> Optional[List[str]]:
     if current_user["role"] == "super_admin":
         return None
     if current_user["role"] == "pm":
-        response = client.table("projects").select("id").eq("pm_id", current_user["id"])
+        response = client.table("projects").select("id").eq("pm_id", current_user["id"]).execute()
         return [row["id"] for row in (response.data or [])]
     if current_user["role"] == "site_manager":
-        response = client.table("site_manager_sites").select("project_id").eq("site_manager_id", current_user["id"])
+        response = client.table("site_manager_sites").select("project_id").eq("site_manager_id", current_user["id"]).execute()
         return [row["project_id"] for row in (response.data or [])]
     raise HTTPException(status_code=403, detail="Not enough privileges")
 
@@ -181,7 +183,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
             
         worker_profile_id = worker["id"]
 
-        worker_res = supabase.table("workers").select("id, user_id").eq("user_id", worker_profile_id).single().execute()
+        worker_res = supabase.table("workers").select("id, user_id, site_id").eq("user_id", worker_profile_id).single().execute()
         if not worker_res.data:
             raise HTTPException(status_code=409, detail="Worker profile is not linked to a worker record")
         worker_id = worker_res.data["id"]
@@ -191,16 +193,22 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
         allowed = managed_project_ids(supabase, current_user)
         if allowed is not None and project_id not in allowed:
             raise HTTPException(status_code=403, detail="This project is not assigned to you")
-        sites = supabase.table("sites").select("id").eq("project_id", project_id).order("id").execute()
+        site_query = supabase.table("sites").select("id").eq("project_id", project_id)
+        if current_user["role"] == "site_manager":
+            site_query = site_query.eq("site_manager_id", current_user["id"])
+        sites = site_query.order("id").execute()
         if not sites.data:
             raise HTTPException(status_code=409, detail="This project has no linked attendance site")
         site_id = sites.data[0]["id"]
+        assigned_site_id = worker_res.data.get("site_id")
+        if assigned_site_id and assigned_site_id != site_id:
+            raise HTTPException(status_code=403, detail="This worker is assigned to a different site. Ask the Project Manager to update their assignment.")
         assignment_res = supabase.table("site_workers").select("worker_id").eq("project_id", project_id).execute()
         if not any(row["worker_id"] in {worker_id, worker_profile_id} for row in (assignment_res.data or [])):
-            raise HTTPException(status_code=403, detail="Worker is not assigned to this project")
+            raise HTTPException(status_code=403, detail="This worker is not assigned to your site. Ask the Project Manager to update their assignment.")
 
         # 3. Check today's attendance record
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = datetime.now(ZoneInfo("Asia/Colombo")).date().isoformat()
         now_iso = datetime.now(timezone.utc).isoformat()
         att_res = supabase.table("attendance") \
             .select("id, check_in_time, check_out_time") \
@@ -235,8 +243,9 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
             
             upd_res = supabase.table("attendance").update({
                 "check_out_time": now_iso,
-                "hours_worked": round(diff_hours, 2)
-            }).eq("id", record["id"])
+                "hours_worked": round(diff_hours, 2),
+                "overtime_hours": round(max(diff_hours - 8, 0), 2)
+            }).eq("id", record["id"]).execute()
             
             return {"action": "check_out", "worker_name": worker["full_name"], "time": now_iso, "hours_worked": round(diff_hours, 2)}
             
@@ -254,62 +263,43 @@ class SalaryGenerateRequest(BaseModel):
 def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends(require_manager_or_admin)):
     supabase = client_for_token(current_user["token"])
     try:
-        # Fetch all attendance records for this site within the date range
-        att_res = supabase.table("attendance") \
-            .select("worker_id, hours_worked, workers(user_id)") \
-            .eq("site_id", payload.site_id) \
-            .gte("date", payload.start_date) \
-            .lte("date", payload.end_date) \
-            .execute()
-        if not att_res.data:
-            return {"generated": 0, "message": "No attendance records found"}
-            
-        # Group by worker
-        worker_stats = {}
-        for row in att_res.data:
-            wid = row.get("worker_id")
-            user_id = row.get("workers", {}).get("user_id") if row.get("workers") else None
-            if not wid or not user_id: continue
-            hrs = row.get("hours_worked") or 0
-            if user_id not in worker_stats:
-                worker_stats[user_id] = {"worker_id": wid, "days": 0, "overtime_hours": 0}
-                
-            worker_stats[user_id]["days"] += 1
-            if hrs > 8:
-                worker_stats[user_id]["overtime_hours"] += (hrs - 8)
-                
-        user_ids = list(worker_stats.keys())
-        prof_res = supabase.table("profiles").select("id, full_name, daily_rate").in_("id", user_ids).execute()
-        
-        profiles_by_id = {p["id"]: p for p in (prof_res.data or [])}
-        
+        from datetime import date
+        try:
+            start, end = date.fromisoformat(payload.start_date), date.fromisoformat(payload.end_date)
+            if end < start:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Choose a valid pay period")
+        allowed = managed_project_ids(supabase, current_user)
+        site_rows = supabase.table("sites").select("id,project_id").eq("id", payload.site_id).execute().data or []
+        project_id = site_rows[0]["project_id"] if site_rows else payload.site_id
+        if allowed is not None and project_id not in allowed:
+            raise HTTPException(status_code=403, detail="This project is not assigned to you")
+        records = supabase.table("attendance").select("*").eq("project_id", project_id).gte("date", payload.start_date).lte("date", payload.end_date).execute().data or []
+        user_ids = sorted({r["worker_id"] for r in records if r.get("status") == "Present"})
+        if not user_ids:
+            return {"generated": 0, "slips": []}
+        profiles = supabase.table("profiles").select("id,daily_rate").in_("id", user_ids).execute().data or []
         slips_to_insert = []
-        for user_id, stats in worker_stats.items():
-            prof = profiles_by_id.get(user_id)
-            if not prof: continue
-            daily_rate = prof.get("daily_rate") or 1000.0
-            base_salary = stats["days"] * daily_rate
-            # Assuming overtime rate is 1.5x hourly rate (daily_rate / 8)
-            hourly_rate = daily_rate / 8.0
-            overtime_pay = stats["overtime_hours"] * (hourly_rate * 1.5)
-            total_amount = base_salary + overtime_pay
-            
-            slips_to_insert.append({
-                "worker_id": user_id,
-                "period_start": payload.start_date,
-                "period_end": payload.end_date,
-                "total_days": stats["days"],
-                "overtime_hours": stats["overtime_hours"],
-                "total_amount": total_amount,
-                "status": "Pending"
-            })
-            
+        for profile in profiles:
+            uid = profile["id"]
+            existing = supabase.table("salary_slips").select("id").eq("worker_id", uid).eq("period_start", payload.start_date).eq("period_end", payload.end_date).execute().data
+            if existing:
+                continue
+            # Aggregate the worker's period within this manager's RLS scope.
+            own_records = supabase.table("attendance").select("*").eq("worker_id", uid).gte("date", payload.start_date).lte("date", payload.end_date).execute().data or []
+            pay = calculate_payroll(own_records, profile.get("daily_rate"))
+            slips_to_insert.append({"worker_id": uid, "month": payload.start_date,
+                "period_start": payload.start_date, "period_end": payload.end_date,
+                **{key: pay[key] for key in ("total_days", "total_hours", "overtime_hours", "basic_pay", "overtime_pay", "total_pay")},
+                "total_amount": pay["total_pay"], "daily_rate": pay["daily_rate"], "status": "Generated"})
+        user_ids = [s["worker_id"] for s in slips_to_insert]
         if slips_to_insert:
             supabase.table("salary_slips").insert(slips_to_insert).execute()
 
             # Notify each worker in-app and by email about their new salary slip.
             try:
-                profiles_res = supabase.table("profiles").select("id, email, full_name").in_("id", user_ids).execute()
+                profiles_res = supabase.table("profiles").select("id, email, full_name, notification_preferences").in_("id", user_ids).execute()
                 profile_by_user = {p["id"]: p for p in (profiles_res.data or [])}
                 notifications_to_insert = []
                 for uid in user_ids:
@@ -319,33 +309,38 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                         "title": "Salary Slip Ready",
                         "message": f"Your salary slip for {payload.start_date} to {payload.end_date} is ready. Log in to view it.",
                         "type": "general",
+                        "link": "/worker/payroll",
                         "is_read": False,
                     })
                     profile = profile_by_user.get(uid)
-                    if profile and profile.get("email"):
+                    if profile and profile.get("email") and (profile.get("notification_preferences") or {}).get("email", True):
                         try:
                             import httpx, os
                             resend_key = os.environ.get("RESEND_API_KEY", "")
                             if resend_key:
-                                name = profile.get("full_name", "there")
-                                httpx.post(
+                                from html import escape
+                                name = escape(profile.get("full_name") or "there")
+                                email_response = httpx.post(
                                     "https://api.resend.com/emails",
                                     headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
                                     json={
-                                        "from": "noreply@constructflow.lk",
+                                        "from": os.environ.get("RESEND_FROM_EMAIL", "noreply@constructflow.lk"),
                                         "to": [profile["email"]],
                                         "subject": "Your ConstructFlow Salary Slip is Ready",
                                         "html": (
                                             f"<p>Hi {name},</p>"
                                             f"<p>Your salary slip for <b>{payload.start_date} to {payload.end_date}</b> "
-                                            "has been generated. Log in to ConstructFlow to view and download it.</p>"
+                                            "has been generated.</p>"
+                                            f'<p><a href="{os.environ.get("FRONTEND_URL", "http://localhost:8081").rstrip("/")}/worker/payroll">View your payslip</a></p>'
                                         ),
                                     },
                                     timeout=10,
                                 )
+                                email_response.raise_for_status()
                         except Exception:
                             import logging
-                            logging.exception(f"Failed payroll email for worker {wid}")
+                            logging.exception("Failed payroll email for worker %s", uid)
+                notifications_to_insert = [n for n in notifications_to_insert if (profile_by_user.get(n["target_user_id"], {}).get("notification_preferences") or {}).get("in_app", True)]
                 if notifications_to_insert:
                     create_notifications(notifications_to_insert)
             except Exception:
@@ -357,3 +352,60 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/worker/payroll")
+def worker_payroll(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), current_user: dict = Depends(get_current_user)):
+    import calendar
+    if current_user["role"] != "worker":
+        raise HTTPException(status_code=403, detail="Worker access only")
+    try:
+        year, number = map(int, month.split("-"))
+        start, end = month + "-01", f"{month}-{calendar.monthrange(year, number)[1]}"
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Choose a valid month")
+    client = client_for_token(current_user["token"])
+    uid = current_user["id"]
+    records = client.table("attendance").select("*").eq("worker_id", uid).gte("date", start).lte("date", end).execute().data or []
+    profile = client.table("profiles").select("daily_rate").eq("id", uid).single().execute().data
+    slips = client.table("salary_slips").select("*").eq("worker_id", uid).eq("period_start", start).eq("period_end", end).order("created_at", desc=True).execute().data or []
+    if slips:
+        slip = slips[0]
+        return {**slip, "total_pay": slip.get("total_amount") if slip.get("total_amount") is not None else slip.get("total_pay"), "final": True, "slip_number": slip.get("slip_number")}
+    try:
+        return {**calculate_payroll(records, profile.get("daily_rate")), "final": False}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+
+@router.get("/worker/site")
+def worker_site(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "worker":
+        raise HTTPException(status_code=403, detail="Worker access only")
+    client = client_for_token(current_user["token"])
+    uid = current_user["id"]
+    workers = client.table("workers").select("id").eq("user_id", uid).execute().data or []
+    ids = list({uid, *[w["id"] for w in workers]})
+    assignments = client.table("site_workers").select("project_id,assigned_at").in_("worker_id", ids).order("assigned_at", desc=True).execute().data or []
+    if not assignments:
+        return None
+    project_id = assignments[0]["project_id"]
+    projects = client.table("projects").select("id,name,location,start_date,end_date").eq("id", project_id).execute().data or []
+    sites = client.table("sites").select("*").eq("project_id", project_id).eq("active", True).order("id").execute().data or []
+    if not projects or not sites:
+        return None
+    worker_sites = client.table("workers").select("site_id").eq("user_id", uid).execute().data or []
+    assigned_site_id = next((w["site_id"] for w in worker_sites if w.get("site_id")), None)
+    if assigned_site_id:
+        sites = [s for s in sites if s["id"] == assigned_site_id]
+        if not sites:
+            return None
+    site = sites[0]
+    manager = None
+    if site.get("site_manager_id"):
+        # Only expose contact fields for the already-authorized assigned site's manager.
+        # Workers cannot SELECT another profile directly through the Data API.
+        from core.attendance_setup import setup_client
+        managers = setup_client().table("profiles").select("full_name,contact_number").eq("id", site["site_manager_id"]).execute().data or []
+        manager = managers[0] if managers else None
+    return {"project": projects[0], "site": site, "manager": manager}

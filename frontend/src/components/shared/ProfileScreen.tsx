@@ -1,3 +1,4 @@
+import WorkerAccount from './WorkerAccount';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable, TextInput,
@@ -38,7 +39,7 @@ const roleConfig: Record<string, { color: string; bg: string; label: string }> =
   Worker: { color: '#06B6D4', bg: '#ECFEFF', label: 'Worker' },
 };
 
-export default function ProfileScreen() {
+function LegacyProfileScreen() {
   const { user, role } = useAuth();
   const { isDark } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -443,3 +444,5 @@ export default function ProfileScreen() {
     </View>
   );
 }
+
+export default function ProfileScreen(){const {role}=useAuth();return role?.toLowerCase()==='worker'?<WorkerAccount/>:<LegacyProfileScreen/>;}

@@ -28,6 +28,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { Alert } from 'react-native';
 import {
   View, Text, ScrollView, Pressable, Image,
   TextInput, useWindowDimensions, Platform, Animated,
@@ -72,6 +74,7 @@ function injectVideoBackground(): () => void {
           rgba(0,0,0,var(--vdim)) 50%,
           rgba(0,0,0,calc(var(--vdim)*1.5)) 100%);}
       body{margin:0;overflow-x:hidden;}
+      body, html, #root, [data-rnwstyle]{background-color: transparent !important;}
       body>[data-rnwstyle],body>#root{position:relative;z-index:1;}
     `;
     document.head.appendChild(s);
@@ -189,6 +192,49 @@ const PortalToggle = () => {
 };
 
 export default function LandingPage() {
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactProject, setContactProject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleContactSubmit = async () => {
+    if (!contactName || !contactEmail || !contactMessage) {
+      if (Platform.OS === 'web') { alert('Please fill in your name, email, and message.'); }
+      else { Alert.alert('Missing Fields', 'Please fill in your name, email, and message.'); }
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/public-inquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: contactName,
+          email: contactEmail,
+          project_name: contactProject,
+          message: contactMessage
+        })
+      });
+      
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      if (Platform.OS === 'web') { alert('Message Sent! Our team will get back to you shortly.'); }
+      else { Alert.alert('Message Sent', 'Our team will get back to you shortly.'); }
+      
+      setContactName('');
+      setContactEmail('');
+      setContactProject('');
+      setContactMessage('');
+    } catch (e: any) {
+      console.error(e);
+      if (Platform.OS === 'web') { alert('Failed to send message: ' + e.message); }
+      else { Alert.alert('Error', 'Failed to send message. Please try again.'); }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const { session, role } = useAuth();
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -240,12 +286,12 @@ export default function LandingPage() {
   };
 
   const slProjects = [
-    { img: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?q=80&w=600', type: 'Commercial Tower',   name: 'WTC Colombo Expansion',          location: 'Colombo 01',           budget: 'LKR 4.2Bn' },
-    { img: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=600', type: 'Luxury Residential', name: 'Cinnamon Life Residencies',      location: 'Beira Lake, Colombo',  budget: 'LKR 2.8Bn' },
-    { img: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?q=80&w=600', type: 'Infrastructure',    name: 'Colombo\u2013Kandy Expressway Ph.3', location: 'Kadugannawa, Kandy',   budget: 'LKR 18Bn'  },
-    { img: 'https://images.unsplash.com/photo-1551882547-ff40c0d129df?q=80&w=600', type: 'Hospitality',       name: 'Jetwing Galle Fort Hotel',       location: 'Galle Fort',           budget: 'LKR 650M'  },
-    { img: 'https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?q=80&w=600', type: 'Retail Complex',    name: 'One Galle Face Mall Ph.2',       location: 'Colombo 03',           budget: 'LKR 3.1Bn' },
-    { img: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=600', type: 'Industrial',        name: 'Hambantota Port Dry Zone',       location: 'Hambantota',           budget: 'LKR 9.4Bn' },
+    { img: require('../../assets/images/projects/proj1.jpg'), type: 'Commercial Tower',   name: 'WTC Colombo Expansion',          location: 'Colombo 01',           budget: 'LKR 4.2Bn' },
+    { img: require('../../assets/images/projects/proj2.jpg'), type: 'Luxury Residential', name: 'Cinnamon Life Residencies',      location: 'Beira Lake, Colombo',  budget: 'LKR 2.8Bn' },
+    { img: require('../../assets/images/projects/proj3.jpg'), type: 'Infrastructure',    name: 'Colombo–Kandy Expressway Ph.3', location: 'Kadugannawa, Kandy',   budget: 'LKR 18Bn'  },
+    { img: require('../../assets/images/projects/proj4.jpg'), type: 'Hospitality',       name: 'Jetwing Galle Fort Hotel',       location: 'Galle Fort',           budget: 'LKR 650M'  },
+    { img: require('../../assets/images/projects/proj5.jpg'), type: 'Retail Complex',    name: 'One Galle Face Mall Ph.2',       location: 'Colombo 03',           budget: 'LKR 3.1Bn' },
+    { img: require('../../assets/images/projects/proj1.jpg'), type: 'Industrial',        name: 'Hambantota Port Dry Zone',       location: 'Hambantota',           budget: 'LKR 9.4Bn' },
   ];
 
   const features = [
@@ -258,11 +304,24 @@ export default function LandingPage() {
   ];
 
   return (
-    <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
+    <View className="flex-1" style={{ backgroundColor: Platform.OS === 'web' ? 'transparent' : '#0F172A' }}>
+      {Platform.OS !== 'web' && (
+        <>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1541888086925-ebbc14b62db4?q=80&w=800' }}
+            style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.15 }}
+            resizeMode="cover"
+          />
+          <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
+        </>
+      )}
+
+      
+      <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
       {/* NAVBAR */}
       <View
-        className="absolute top-0 w-full z-50 px-6 md:px-10"
+        className="w-full px-6 md:px-10"
         style={{
           paddingTop: isScrolled ? 12 : 24,
           paddingBottom: isScrolled ? 12 : 24,
@@ -274,9 +333,8 @@ export default function LandingPage() {
       >
         <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
           <View className="flex-row items-center flex-shrink" style={{ minWidth: 0 }}>
-            <View className="w-9 h-9 sm:w-11 sm:h-11 bg-brand-orange rounded-xl items-center justify-center mr-3 flex-shrink-0"
-              style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
-              <MaterialIcons name="precision-manufacturing" size={isMobile ? 20 : 24} color="white" />
+            <View className="mr-3 flex-shrink-0" style={{ shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 14 }}>
+              <Image source={require('../../assets/images/main-logo.png')} style={{ width: 44, height: 44, borderRadius: 10 }} />
             </View>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-xl tracking-tight" numberOfLines={1}>
               Construct<Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Ai</Text>
@@ -286,7 +344,7 @@ export default function LandingPage() {
           <View className="flex-row items-center hidden xl:flex flex-shrink-0">
             {[{ label: 'Home', id: 'home' }, { label: 'Services', id: 'services' }, { label: 'Gallery', id: 'projects' }, { label: 'Contact', id: 'contact' }].map(item => (
               <Pressable style={{ minHeight: 44, minWidth: 44 }} key={item.id} className="mx-4 cursor-pointer" onPress={() => scrollTo(item.id)}>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 font-semibold text-base hover:text-white transition-colors">{item.label}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 font-extrabold text-base hover:text-white hover:scale-110 transition-transform">{item.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -338,7 +396,6 @@ export default function LandingPage() {
         )}
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
         {/* HERO */}
         <View className="pt-36 pb-32 px-6 md:px-12 relative overflow-hidden" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
@@ -500,13 +557,15 @@ export default function LandingPage() {
             <View className="flex-row flex-wrap -mx-4">
               {slProjects.map(proj => (
                 <View key={proj.name} className="w-full sm:w-1/2 md:w-1/3 px-4 mb-8">
-                  <View className="rounded-3xl overflow-hidden" style={{ ...g }}>
-                    <View style={{ height: 200, overflow: 'hidden' }}>
-                      <Image source={{ uri: proj.img }} className="w-full h-full" resizeMode="cover" />
+                  <View className="rounded-3xl overflow-hidden h-full flex-col" style={{ ...g }}>
+                    <View style={{ width: '100%', height: 220, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                      <Image source={typeof proj.img === 'string' ? { uri: proj.img } : proj.img} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     </View>
-                    <View className="p-6">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold text-xs tracking-widest uppercase mb-1">{proj.type}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xl mb-2">{proj.name}</Text>
+                    <View className="p-6 flex-1 flex-col justify-between">
+                      <View>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold text-xs tracking-widest uppercase mb-1">{proj.type}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xl mb-4">{proj.name}</Text>
+                      </View>
                       <View className="flex-row items-center justify-between">
                         <View className="flex-row items-center">
                           <Ionicons name="location" size={13} color="#9CA3AF" />
@@ -587,16 +646,27 @@ export default function LandingPage() {
             <View className="flex-row flex-wrap -mx-4">
               <View className="w-full md:w-1/2 px-4 mb-12 md:mb-0">
                 <View className="p-8 rounded-3xl" style={{ ...g }}>
-                  {['Your Name', 'Email Address', 'Company / Project Name'].map(ph => (
-                    <TextInput maxFontSizeMultiplier={1.3} key={ph} placeholder={ph} placeholderTextColor="rgba(156,163,175,0.65)"
-                      style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
-                  ))}
+                  <TextInput maxFontSizeMultiplier={1.3} placeholder="Your Name" placeholderTextColor="rgba(156,163,175,0.65)"
+                    value={contactName} onChangeText={setContactName}
+                    style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
+                  
+                  <TextInput maxFontSizeMultiplier={1.3} placeholder="Email Address" placeholderTextColor="rgba(156,163,175,0.65)"
+                    value={contactEmail} onChangeText={setContactEmail} keyboardType="email-address" autoCapitalize="none"
+                    style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
+                    
+                  <TextInput maxFontSizeMultiplier={1.3} placeholder="Company / Project Name" placeholderTextColor="rgba(156,163,175,0.65)"
+                    value={contactProject} onChangeText={setContactProject}
+                    style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
+
                   <TextInput maxFontSizeMultiplier={1.3} placeholder="Your message" placeholderTextColor="rgba(156,163,175,0.65)"
-                    multiline textAlignVertical="top"
+                    multiline textAlignVertical="top" value={contactMessage} onChangeText={setContactMessage}
                     style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', height: 120, marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
-                  <Pressable className="w-full py-4 rounded-xl items-center"
-                    style={[{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 16 }, { minHeight: 44, minWidth: 44 }]}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Send Message</Text>
+                  
+                  <Pressable className="w-full py-4 rounded-xl items-center" disabled={isSubmitting} onPress={handleContactSubmit}
+                    style={[{ backgroundColor: isSubmitting ? '#fb923c' : '#F97316', shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 16 }, { minHeight: 44, minWidth: 44 }]}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">
+                      {isSubmitting ? 'Sending...' : 'Send Message'}
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -630,7 +700,7 @@ export default function LandingPage() {
             <View className="max-w-6xl mx-auto flex-row flex-wrap justify-between pb-12 mb-8" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
               <View className="w-full md:w-1/3 mb-10 md:mb-0 pr-8">
                 <View className="flex-row items-center mb-5">
-                  <MaterialIcons name="precision-manufacturing" size={30} color="#F97316" />
+              <Image source={require('../../assets/images/main-logo.png')} style={{ width: 44, height: 44, borderRadius: 10 }} />
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-2xl tracking-tight ml-3">
                     Construct<Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Ai</Text>
                   </Text>
@@ -655,7 +725,7 @@ export default function LandingPage() {
                 <View key={col.title} className="w-full md:w-1/6 mb-8 md:mb-0">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base mb-5">{col.title}</Text>
                   {col.links.map(link => (
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} key={link} className="text-gray-500 mb-3 text-sm hover:text-white cursor-pointer transition-colors">{link}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} key={link} className="text-gray-500 mb-3 text-sm hover:text-white cursor-pointer transition-colors" onPress={() => scrollTo('home')}>{link}</Text>
                   ))}
                 </View>
               ))}
@@ -667,7 +737,17 @@ export default function LandingPage() {
           </View>
         </View>
 
+      
+      <Pressable 
+        style={{ minHeight: 44, minWidth: 44, position: 'absolute', right: 24, bottom: 24, zIndex: 9999 }} 
+        onPress={() => scrollRef.current?.scrollTo({y: 0, animated: true})} 
+        className="bg-brand-orange p-3 rounded-full shadow-2xl hover:scale-110 transition-transform cursor-pointer"
+      >
+        <Ionicons name="arrow-up" size={24} color="white" />
+      </Pressable>
+      
       </ScrollView>
+
     </View>
   );
 }

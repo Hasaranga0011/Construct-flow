@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
+import { Platform,  View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+
+WebBrowser.maybeCompleteAuthSession();
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { roleLabel } from '../utils/roles';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
@@ -60,14 +65,54 @@ export default function RegisterScreen() {
     }
   };
 
-  const handleGoogleAuth = async () => {
+    const handleGoogleAuth = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      setLoading(true);
+      setErrorMsg('');
+      
+      // Save selected role to local storage so it survives the OAuth redirect
+      if (typeof role !== 'undefined' && role) {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.setItem('pending_google_role', role);
+      }
+
+      const redirectTo = Linking.createURL('auth/callback');
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: { 
+          redirectTo, 
+          skipBrowserRedirect: Platform.OS !== 'web' 
+        },
       });
-      if (error) throw error;
+      
+      if (error || !data?.url) throw error ?? new Error('No OAuth URL returned');
+
+      if (Platform.OS !== 'web') {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (res.type === 'success' && res.url) {
+          const url = new URL(res.url);
+          const hashStr = url.hash ? url.hash.replace('#', '?') : url.search;
+          const params = new URLSearchParams(hashStr);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          } else {
+             const code = params.get('code');
+             if (code) {
+               await supabase.auth.exchangeCodeForSession(code);
+             }
+          }
+        } else if (res.type === 'cancel') {
+          setErrorMsg('Google Sign-In was cancelled.');
+        } else {
+          setErrorMsg('Google Sign-In failed.');
+        }
+      }
     } catch (error: any) {
       setErrorMsg(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -133,7 +178,7 @@ export default function RegisterScreen() {
         >
           <Image
             source={require('../../assets/images/main-logo.png')}
-            style={{ width: '100%', aspectRatio: 4 }}
+            style={{ width: 80, height: 80, marginBottom: 16 }}
             resizeMode="contain"
           />
         </Pressable>
@@ -217,7 +262,7 @@ export default function RegisterScreen() {
               className={`flex-1 p-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center`}
             >
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
-                {r.replace('_', ' ')}
+                {roleLabel(r)}
               </Text>
             </Pressable>
           ))}

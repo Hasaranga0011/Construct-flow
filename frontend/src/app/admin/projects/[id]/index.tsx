@@ -7,6 +7,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { notify, confirmAction } from '@/utils/notify';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../../../hooks/useResponsive';
+import { roleLabel } from '../../../../utils/roles';
 
 export default function AdminProjectDetailsPage() {
   const { id } = useLocalSearchParams();
@@ -22,7 +23,8 @@ export default function AdminProjectDetailsPage() {
     console.log("AdminProjectDetailsPage mounted with ID:", id);
     const fetchProject = async () => {
       try {
-        if (!id) {
+        const projectId = Array.isArray(id) ? id[0] : id;
+        if (!projectId) {
             console.error("ID is undefined!");
             if (isMounted) setLoading(false);
             return;
@@ -31,7 +33,7 @@ export default function AdminProjectDetailsPage() {
         const { data: projData, error: projError } = await supabase
           .from('projects')
           .select('*')
-          .eq('id', id)
+          .eq('id', projectId as string)
           .single();
 
         if (projError) {
@@ -41,18 +43,18 @@ export default function AdminProjectDetailsPage() {
 
         if (projData.pm_id) {
             const { data: pmData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.pm_id).single();
-            projData.pm = pmData;
+            (projData as any).pm = pmData;
         }
 
         if (projData.client_id) {
             const { data: clientData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.client_id).single();
-            projData.client = clientData;
+            (projData as any).client = clientData;
         }
 
         const { data: roleData, error: roleError } = await supabase
           .from('project_role_assignments')
           .select('user_id, role, profiles (full_name, email, role)')
-          .eq('project_id', id);
+          .eq('project_id', projectId as string);
 
         if (roleError) console.error("Error fetching assignments:", roleError);
 
@@ -66,7 +68,7 @@ export default function AdminProjectDetailsPage() {
               const supplierIds = normalizedRoles.filter((a: any) => a.role === 'supplier').map((a:any) => a.user_id);
               if (supplierIds.length > 0) {
                  // Fetch POs to compute stats
-                 const { data: poData } = await supabase.from('purchase_orders').select('*').eq('project_id', id);
+                 const { data: poData } = await supabase.from('purchase_orders').select('*').eq('project_id', projectId as string);
                  const pos = poData || [];
 
                  const stats = supplierIds.map((sid: string) => {
@@ -123,7 +125,7 @@ export default function AdminProjectDetailsPage() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
+      const { error } = await supabase.from('projects').delete().eq('id', projectId as string);
       if (error) throw error;
       notify('Success', 'Project deleted successfully');
       router.replace('/admin/projects' as any);
@@ -229,7 +231,7 @@ export default function AdminProjectDetailsPage() {
                         </View>
                         <View>
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 text-sm font-medium">{a.profiles?.full_name || 'Unknown User'}</Text>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize">{a.role.replace('_', ' ')}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize">{roleLabel(a.role)}</Text>
                         </View>
                       </View>
                     ))}

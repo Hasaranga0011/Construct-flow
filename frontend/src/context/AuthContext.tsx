@@ -60,6 +60,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       prevUserId = nextSession.user.id;
 
       try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const pendingRole = await AsyncStorage.getItem('pending_google_role');
+        if (pendingRole) {
+           await fetch(`${process.env.EXPO_PUBLIC_API_URL}/auth/google-role`, {
+              method: 'POST',
+              headers: {
+                 'Content-Type': 'application/json',
+                 'Authorization': `Bearer ${nextSession.access_token}`
+              },
+              body: JSON.stringify({ role: pendingRole })
+           });
+           await AsyncStorage.removeItem('pending_google_role');
+           // Also update user metadata locally to reflect immediately
+           nextSession.user.user_metadata = nextSession.user.user_metadata || {};
+           nextSession.user.user_metadata.role = pendingRole;
+        }
+      } catch (e) {
+        console.error("Failed to sync google role", e);
+      }
+
+      try {
         const metaRole = nextSession.user.user_metadata?.role;
         let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
         let resolvedIsApproved = true;

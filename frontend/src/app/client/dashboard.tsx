@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
 import { ClientBudgetRing } from '../../components/client/ClientBudgetRing';
 import { useAuth } from '../../context/AuthContext';
+import { router } from 'expo-router';
 
 type Project = {
   id: string;
@@ -18,6 +19,8 @@ type Project = {
   start_date?: string | null;
   end_date?: string | null;
   completion_percentage?: number | null;
+  pm_id?: string | null;
+  pm?: { id: string; full_name: string; role: string } | null;
 };
 
 type Milestone = {
@@ -95,7 +98,7 @@ export default function ClientDashboardPage() {
       try {
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
-          .select('id, name, location, status, total_budget, spent_cost, start_date, end_date, completion_percentage')
+          .select('id, name, location, status, total_budget, spent_cost, start_date, end_date, completion_percentage, pm_id')
           .eq('client_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -111,6 +114,27 @@ export default function ClientDashboardPage() {
             setSpentCosts({});
           }
           return;
+        }
+
+        // Fetch PM profiles manually to avoid schema cache relationship issues
+        const pmIds = [...new Set(clientProjects.map(p => p.pm_id).filter((id): id is string => Boolean(id)))];
+        if (pmIds.length > 0) {
+          const { data: pmProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, role')
+            .in('id', pmIds);
+          
+          if (pmProfiles) {
+            const pmMap = pmProfiles.reduce((acc: any, pm) => {
+              if (pm.id) acc[pm.id] = pm;
+              return acc;
+            }, {});
+            clientProjects.forEach(p => {
+              if (p.pm_id && pmMap[p.pm_id]) {
+                p.pm = pmMap[p.pm_id];
+              }
+            });
+          }
         }
 
         const [milestoneResponse] = await Promise.all([
@@ -247,6 +271,22 @@ export default function ClientDashboardPage() {
                       <View className={`h-full bg-brand-orange rounded-full ${getProgressWidthClass(projectProgress)}`} />
                     </View>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-2">{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'} · Target end {formatDate(project.end_date)}</Text>
+                    {project.pm && (
+                      <View className="mt-4 p-3 bg-brand-light rounded-xl flex-row items-center justify-between border border-gray-100">
+                        <View className="flex-row items-center">
+                          <View className="w-10 h-10 rounded-full bg-brand-orange items-center justify-center mr-3">
+                            <Text className="text-white font-bold">{project.pm.full_name?.charAt(0) || 'P'}</Text>
+                          </View>
+                          <View>
+                            <Text className="text-sm font-bold text-brand-text">{project.pm.full_name}</Text>
+                            <Text className="text-xs text-gray-500">Project Manager</Text>
+                          </View>
+                        </View>
+                        <Pressable onPress={() => router.push(`/client/messages/${project.id}?channel=pm` as any)} className="bg-white border border-gray-200 px-3 py-2 rounded-lg shadow-sm">
+                          <Text className="text-xs font-bold text-brand-text">Message</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 );
               })}

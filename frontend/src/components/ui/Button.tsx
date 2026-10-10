@@ -6,6 +6,7 @@ export type ButtonSize = 'default' | 'compact';
 
 interface ButtonProps {
   label: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -18,6 +19,7 @@ interface ButtonProps {
 
 export const Button = ({
   label,
+  accessibilityLabel,
   onPress,
   variant = 'primary',
   size = 'default',
@@ -73,6 +75,8 @@ export const Button = ({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
       onPress={onPress}
       disabled={disabled || loading}
       className={`${baseClasses} ${variantClasses} ${disabledClasses} ${className}`}

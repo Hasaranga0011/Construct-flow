@@ -1,0 +1,107 @@
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:238: const { session, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:355: <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:376: <Link href={(role ? getDashboardForRole(role) : '/') as any} asChild>
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:442: {[{ val: '15+', label: 'Modules' }, { val: '6', label: 'Role Types' }, { val: 'LKR', label: 'Native Currency' }, { val: '95%', label: 'ML Accuracy' }].map(s => (
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:463: <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.8)', fontSize: 12, fontWeight: '500' }]}>ConstructAi — Nimal Fernando (PM)</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\index.tsx:624: { step: '02', title: 'Invite Your Team',         desc: 'Send role-based invites to PMs, site managers, suppliers, and clients. Each gets a tailored Sri Lankan portal.' },
+D:\PROJECTS\Construct-flow\frontend\src\app\partner-register.tsx:261: className={`flex-1 p-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center`}
+D:\PROJECTS\Construct-flow\frontend\src\app\partner-register.tsx:263: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
+D:\PROJECTS\Construct-flow\frontend\src\app\team-register.tsx:261: className={`flex-1 p-3 rounded-xl border ${role === r ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-gray-50'} items-center`}
+D:\PROJECTS\Construct-flow\frontend\src\app\team-register.tsx:263: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-medium capitalize ${role === r ? 'text-brand-orange' : 'text-gray-500'}`}>
+D:\PROJECTS\Construct-flow\frontend\src\app\_layout.tsx:31: const { session, role, isLoading, signOut } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\materials\orders\[id].tsx:317: <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\materials\orders\[id].tsx:318: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mb-1">{displayDate(event.timestamp, 'MMM dd, yyyy h:mm a')} • {event.role === 'supplier' ? 'Supplier' : 'You'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\projects\index.tsx:146: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mb-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'Unassigned'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\projects\index.tsx:174: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'None'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\projects\[id]\edit.tsx:55: const assignmentByRole: Record<string, string[]> = { admin: [], site_manager: [], worker: [], supplier: [] };
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\projects\[id]\index.tsx:208: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium">{project.pm?.full_name || 'Unassigned'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\projects\[id]\index.tsx:232: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize">{a.role.replace('_', ' ')}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\suppliers\index.tsx:27: .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: "role=eq.supplier" }, () => {
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:13: { label: 'Project Manager', value: 'pm' },
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:14: { label: 'Site Manager', value: 'site_manager' },
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:186: {/* Role Selection */}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:192: key={role.value}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:193: onPress={() => setSelectedRole(role.value)}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\create.tsx:203: {role.label}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\index.tsx:146: {formatRoleDisplay(u.role)}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\index.tsx:178: <View className={`px-2 py-1 rounded self-start ${getRoleColor(u.role).bg}`}>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\index.tsx:179: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold ${getRoleColor(u.role).text}`}>{formatRoleDisplay(u.role)}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:11: { label: 'Project Manager', value: 'pm' },
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:12: { label: 'Site Manager', value: 'site_manager' },
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:173: {/* Role Selection */}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:179: key={role.value}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:180: onPress={() => setSelectedRole(role.value)}
+D:\PROJECTS\Construct-flow\frontend\src\app\admin\users\[id].tsx:190: {role.label}
+D:\PROJECTS\Construct-flow\frontend\src\app\client\dashboard.tsx:23: pm?: { id: string; full_name: string; role: string } | null;
+D:\PROJECTS\Construct-flow\frontend\src\app\client\dashboard.tsx:278: <Text className="text-white font-bold">{project.pm.full_name?.charAt(0) || 'P'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\client\dashboard.tsx:281: <Text className="text-sm font-bold text-brand-text">{project.pm.full_name}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\index.tsx:20: const [unreadCounts, setUnreadCounts] = useState({ pm: 0, super_admin: 0, site_manager: 0 });
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\index.tsx:51: const counts = { pm: 0, super_admin: 0, site_manager: 0 };
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\index.tsx:89: { key: 'pm', label: 'Project Manager', count: unreadCounts.pm },
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\index.tsx:91: { key: 'site_manager', label: 'Site Manager', count: unreadCounts.site_manager }
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\[threadId].tsx:27: { key: 'pm',           label: 'Project Manager' },
+D:\PROJECTS\Construct-flow\frontend\src\app\client\messages\[threadId].tsx:29: { key: 'site_manager', label: 'Site Manager' },
+D:\PROJECTS\Construct-flow\frontend\src\app\client\project\index.tsx:88: <Link href={`/client/messages/${project.id}`} asChild><Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-1 border border-gray-300 py-3 rounded-lg items-center"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-xs">Message PM</Text></Pressable></Link>
+D:\PROJECTS\Construct-flow\frontend\src\app\client\project\[id]\reports.tsx:110: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1 text-xs">Submitted by: {report.site_manager.full_name}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\index.tsx:1: import React from 'react'; import { Redirect } from 'expo-router'; export default function Index() { return <Redirect href='/pm/dashboard' />; }
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\labour.tsx:51: <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold">Today?s Attendance</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">View Payroll</Text></Pressable></View>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\materials\index.tsx:81: {tab === 'orders' && <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/materials/orders/create')} className="bg-brand-orange rounded-xl p-4 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Create PO</Text></Pressable>}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\materials\index.tsx:87: {tab === 'orders' && <><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-2">Total: {row.total_price == null ? 'Not recorded' : formatMoney(Number(row.total_price))}</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`/pm/materials/orders/${row.id}`)} className="bg-gray-100 rounded-lg p-3 mt-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold">View Order</Text></Pressable></>}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\messages\index.tsx:2: export default function PMMessages() { return <StaffMessagesIndex basePath='/pm' />; }
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\index.tsx:119: <Link href={`/pm/projects/${p.id}` as any} asChild>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\index.tsx:158: <Link href={`/pm/projects/${p.id}` as any} asChild>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\index.tsx:176: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium">{project.pm?.full_name || 'Unassigned'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\index.tsx:200: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize">{a.role.replace('_', ' ')}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\index.tsx:213: onPress={() => router.push(`/pm/projects/${project.id}/milestones`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\index.tsx:225: onPress={() => router.push(`/pm/projects/${project.id}/reports`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\index.tsx:237: onPress={() => router.push(`/pm/projects/${project.id}/expenses`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\reports.tsx:34: setReports((reportsData || []).map((report: SiteReport) => ({ ...report, site_manager: firstRelation(report.site_manager) })));
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\reports.tsx:87: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1 text-xs">Submitted by: {report.site_manager.full_name}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\milestones\index.tsx:71: onActionPress={() => router.push(`/pm/projects/${projectId}/milestones/create`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\projects\[id]\milestones\index.tsx:90: onPress={() => router.push(`/pm/projects/${projectId}/milestones/create`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\suppliers\index.tsx:117: <Pressable key={supplier.id} onPress={() => router.push(`/pm/suppliers/${supplier.id}` as any)} className="bg-white rounded-xl border border-gray-100 p-5 mb-4 shadow-sm">
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\suppliers\[id]\index.tsx:146: onPress={() => router.push(`/pm/suppliers/${id}/orders`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\suppliers\[id]\index.tsx:165: onPress={() => router.push(`/pm/suppliers/${id}/orders`)}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\suppliers\[id]\orders.tsx:131: if (isMobile && !loading && !error && orders.length) return <View className="flex-1 bg-brand-light"><TopNav title="Supplier Orders" showAction={false} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>{orders.map(order => <RecordCard key={order.id} title={order.materials?.name || 'Material order'} fields={[{ label: 'Quantity', value: `${order.quantity} ${order.materials?.unit || ''}` }, { label: 'Total', value: formatCurrency(order.total_price) }, { label: 'Status', value: order.status }, { label: 'Expected', value: formatDate(order.expected_delivery) }]} action={{ label: 'View order', onPress: () => router.push(`/pm/materials/orders/${order.id}` as any) }} />)}</ScrollView></View>;
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\team\index.tsx:10: type TeamMember = { id: string; full_name?: string | null; email?: string | null; role?: string | null };
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\team\index.tsx:96: <Pressable key={member.id} onPress={() => router.push(`/pm/team/${member.id}` as any)} className="bg-white rounded-xl border border-gray-100 p-5 mb-3 shadow-sm active:opacity-70">
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\team\index.tsx:99: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold uppercase mt-3">{(member.role || 'team member').replace('_', ' ')}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\team\[id]\index.tsx:89: {(member.role || 'team member').replace('_', ' ')}
+D:\PROJECTS\Construct-flow\frontend\src\app\pm\team\[id]\index.tsx:141: onPress={() => router.push(`/pm/projects/${project.id}` as any)}
+D:\PROJECTS\Construct-flow\frontend\src\app\site-manager\materials\index.tsx:313: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">{submitting ? 'Submitting...' : 'Submit Request to PM'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\app\supplier\orders\[id].tsx:357: <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
+D:\PROJECTS\Construct-flow\frontend\src\app\supplier\orders\[id].tsx:358: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'You' : 'Admin/PM'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\chat\StaffMessagesIndex.tsx:13: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\chat\StaffMessagesIndex.tsx:52: .or(`and(sender_role.eq.client,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.client),and(sender_role.eq.worker,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.worker)`)
+D:\PROJECTS\Construct-flow\frontend\src\components\chat\StaffMessagesThread.tsx:21: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\client\ClientAccountsPanel.tsx:194: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base text-brand-text uppercase">{client.role}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\common\MobileSidebar.tsx:23: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\common\MobileSidebar.tsx:166: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isMobile || isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\common\NotificationPanel.tsx:11: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\common\Sidebar.tsx:24: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\common\Sidebar.tsx:145: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{role || 'Loading...'}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\common\TopNav.tsx:29: export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Project', onActionPress, role, showBackButton = false, initialSearchQuery = '', onSearch, searchItems, searchEntityLabel = 'items', searchConfig }: TopNavProps) => {
+D:\PROJECTS\Construct-flow\frontend\src\components\common\TopNav.tsx:46: const { user, role: userRole } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\dashboard\ActiveProjectsTable.tsx:166: <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(pmId ? '/pm/projects' : '/admin/projects')}>
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\AttendanceTable.tsx:44: {role}
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\AttendanceTable.tsx:94: {/* Worker Name & Role */}
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\AttendanceTable.tsx:97: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{role}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\AttendanceTable.tsx:233: role={l.role || 'Worker'}
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\PayrollSummary.tsx:7: const PayrollRow = ({ name, role, total }: { name: string, role: string, total: number }) => (
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\PayrollSummary.tsx:11: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">{role}</Text>
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\PayrollSummary.tsx:21: const [data, setData] = useState<{name: string, role: string, total: number}[]>([]);
+D:\PROJECTS\Construct-flow\frontend\src\components\labour\PayrollSummary.tsx:119: <PayrollRow key={i} name={d.name} role={d.role} total={d.total} />
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\ProfileScreen.tsx:43: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\ProfileScreen.tsx:305: { label: 'Role', value: rc.label.split(' ')[0], icon: 'shield-checkmark-outline' },
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\ProfileScreen.tsx:448: export default function ProfileScreen(){const {role}=useAuth();return role?.toLowerCase()==='worker'?<WorkerAccount/>:<LegacyProfileScreen/>;}
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\SettingsScreen.tsx:31: const { user, role, signOut } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\SettingsScreen.tsx:281: { label: 'Role', value: rc.label },
+D:\PROJECTS\Construct-flow\frontend\src\components\shared\SettingsScreen.tsx:310: export default function SettingsScreen(props: {profileHref?:string;showNotificationPreferences?:boolean}){const {role}=useAuth();return role?.toLowerCase()==='worker'?<WorkerAccount settings/>:<LegacySettingsScreen {...props}/>;}
+D:\PROJECTS\Construct-flow\frontend\src\context\AuthContext.tsx:118: <AuthContext.Provider value={{ session, user, role, isLoading, isApproved, signOut }}>
+D:\PROJECTS\Construct-flow\frontend\src\context\NotificationContext.tsx:29: const { user, role, session } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\hooks\useAuth.ts:102: return { user, profile, role, loading, handleRoleRedirect };
+D:\PROJECTS\Construct-flow\frontend\src\hooks\useRealtime.ts:16: .or(`user_id.eq.${userId},target_role.eq.All,target_role.eq.${role}`)
+D:\PROJECTS\Construct-flow\frontend\src\hooks\useRealtime.ts:31: .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `target_role=eq.${role}` }, handleNewNotification)
+D:\PROJECTS\Construct-flow\frontend\src\hooks\useRealtimeNotifications.ts:17: const { user, role } = useAuth();
+D:\PROJECTS\Construct-flow\frontend\src\services\api.ts:230: updateRole: (userId: string, role: string) => fetchWithAuth(`/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+D:\PROJECTS\Construct-flow\frontend\src\services\api.ts:232: createUser: (data: { email: string; password: string; full_name: string; role: string }) =>

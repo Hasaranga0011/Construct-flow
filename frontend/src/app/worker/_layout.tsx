@@ -8,6 +8,7 @@ import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 const WORKER_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',  href: '/dashboard',  IconFamily: MaterialIcons, iconName: 'dashboard' },
   { label: 'Attendance', href: '/attendance', IconFamily: Ionicons,      iconName: 'calendar' },
+  { label: 'Messages',   href: '/messages',   IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Payroll',    href: '/payroll',    IconFamily: FontAwesome5,  iconName: 'money-check-alt' },
   { label: 'Profile',    href: '/profile',    IconFamily: Ionicons,      iconName: 'person' },
   { label: 'Settings',   href: '/settings',   IconFamily: Ionicons,      iconName: 'settings-sharp' },

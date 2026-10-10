@@ -48,7 +48,11 @@ export async function deliverReport(report: ReportDocument, format: ExportFormat
   if (format === 'pdf') {
     const Print = await import('expo-print');
     const result = await Print.printToFileAsync({ html: reportHtml(report), width: 842, height: 595 });
-    uri = result.uri;
+    const { File, Paths } = await import('expo-file-system');
+    const cached = new File(Paths.cache, `${reportFilename(report)}.pdf`);
+    if (cached.exists) cached.delete();
+    new File(result.uri).copy(cached);
+    uri = cached.uri;
   } else {
     const { File, Paths } = await import('expo-file-system');
     const file = new File(Paths.cache, `${reportFilename(report)}.xlsx`);

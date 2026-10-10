@@ -12,6 +12,7 @@
     "date-fns": "^2.30.0",
     "exceljs": "^4.4.0",
     "expo": "~54.0.37",
+    "expo-brightness": "~14.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.14",
     "expo-device": "~8.0.10",
@@ -71,6 +72,6 @@
     "web": "node --dns-result-order=ipv4first ./node_modules/expo/bin/cli start --web",
     "build": "npx expo export -p web",
     "lint": "node ./node_modules/expo/bin/cli lint",
-    "audit:responsive": "node audit-responsive.js"
+    "audit:responsive": "node scripts/audit-responsive.cjs"
   }
 }

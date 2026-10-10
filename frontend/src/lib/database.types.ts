@@ -16,6 +16,7 @@ export interface Database {
           project_id: string | null
           assigned_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -32,6 +33,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -51,13 +53,26 @@ export interface Database {
           approved_at: string | null
           paid_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
+      }
+      labour: {
+        Row: { id:string;worker_id:string;project_id:string;site_id:string|null;site_name:string|null;date:string;status:string;check_in_time:string|null;check_out_time:string|null;hours_worked:number;overtime_hours:number;created_at:string }
+        Relationships: []
+        Insert: { [key:string]:any }
+        Update: { [key:string]:any }
       }
       salary_slips: {
         Row: {
           id: string | null
           worker_id: string | null
+          period_start: string
+          period_end: string
+          total_amount: number | null
+          slip_number: string | null
+          deductions: number
+          daily_rate: number | null
           month: string | null
           total_days: number | null
           total_hours: number | null
@@ -68,6 +83,7 @@ export interface Database {
           status: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -79,6 +95,7 @@ export interface Database {
           client_id: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -89,6 +106,7 @@ export interface Database {
           project_id: string | null
           assigned_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -102,6 +120,7 @@ export interface Database {
           actual_cost: number | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -116,6 +135,7 @@ export interface Database {
           logged_by: string | null
           logged_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -133,6 +153,7 @@ export interface Database {
           file_name: string | null
           url: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -151,6 +172,7 @@ export interface Database {
           message: string | null
           content: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -166,6 +188,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -182,6 +205,7 @@ export interface Database {
           created_at: string | null
           due_date: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -197,6 +221,7 @@ export interface Database {
           joined_date: string | null
           qr_code_url: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -210,6 +235,7 @@ export interface Database {
           created_at: string | null
           email: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -224,6 +250,7 @@ export interface Database {
           created_by: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -240,9 +267,12 @@ export interface Database {
           daily_rate: number | null
           avatar_url: string | null
           bio: string | null
+          worker_code: string | null
+          notification_preferences: Json
           qr_code: string | null
           email: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -260,6 +290,7 @@ export interface Database {
           blockers: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -272,6 +303,7 @@ export interface Database {
           uploaded_by: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -287,6 +319,7 @@ export interface Database {
           created_at: string | null
           supplier_type: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -297,6 +330,7 @@ export interface Database {
           stock_quantity: number | null
           last_updated: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -319,6 +353,7 @@ export interface Database {
           address: string | null
           spent_cost: number | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -333,6 +368,7 @@ export interface Database {
           active: boolean | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -346,6 +382,7 @@ export interface Database {
           paid_date: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -357,6 +394,7 @@ export interface Database {
           author_id: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -368,6 +406,7 @@ export interface Database {
           role: string | null
           assigned_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -387,6 +426,7 @@ export interface Database {
           stock_level: number | null
           status: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -395,9 +435,12 @@ export interface Database {
           user_id: string | null
           worker_type: string | null
           daily_rate: number | null
+          worker_code: string | null
+          notification_preferences: Json
           qr_code: string | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -418,6 +461,7 @@ export interface Database {
           created_at: string | null
           sent_to_client: boolean | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -433,6 +477,7 @@ export interface Database {
           sender_role: string | null
           receiver_role: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -443,6 +488,7 @@ export interface Database {
           lng: number | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -458,6 +504,7 @@ export interface Database {
           date: string | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -474,6 +521,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -490,6 +538,7 @@ export interface Database {
           qr_scan_verified: boolean | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -501,6 +550,7 @@ export interface Database {
           expo_push_token: string | null
           email: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -511,6 +561,7 @@ export interface Database {
           project_id: string | null
           assigned_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -524,6 +575,7 @@ export interface Database {
           caption: string | null
           category: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -540,6 +592,7 @@ export interface Database {
           raw_json: Json | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -552,6 +605,7 @@ export interface Database {
           confidence_score: number | null
           created_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -581,6 +635,7 @@ export interface Database {
           received_at: string | null
           received_by: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -595,6 +650,7 @@ export interface Database {
           caption: string | null
           uploaded_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -613,6 +669,7 @@ export interface Database {
           target_user_id: string | null
           project_id: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }
@@ -629,6 +686,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
         }
+        Relationships: []
         Insert: { [key: string]: any }
         Update: { [key: string]: any }
       }

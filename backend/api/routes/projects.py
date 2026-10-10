@@ -100,7 +100,7 @@ def notify_assigned_client(client, project):
     if not project.get("client_id"):
         return
     try:
-        profile = client.table("profiles").select("email").eq("id", project["client_id"])
+        profile = client.table("profiles").select("email").eq("id", project["client_id"]).execute()
         if profile.data and profile.data[0].get("email"):
             send_client_assignment_email(profile.data[0]["email"], project["name"])
     except Exception:
@@ -424,18 +424,20 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
             .execute()
         actual_po = sum(float(r.get("total_price") or 0) for r in (actual_po_res.data or []))
 
-        # Actual: salary slips (via workers on this project's sites)
-        salary_res = supabase.table("salary_slips") \
-            .select("total_amount, site_id") \
-            .execute()
-        # Filter salary slips to project's sites
-        site_res = supabase.table("site_manager_sites").select("id").eq("project_id", project_id).execute()
-        project_site_ids = {r["id"] for r in (site_res.data or [])}
-        actual_payroll = sum(
-            float(r.get("total_amount") or 0)
-            for r in (salary_res.data or [])
-            if r.get("site_id") in project_site_ids
-        )
+        # Actual: salary slips (via workers on this project)
+        worker_res = supabase.table("site_workers").select("worker_id").eq("project_id", project_id).execute()
+        project_worker_ids = [r["worker_id"] for r in (worker_res.data or [])]
+        
+        actual_payroll = 0
+        if project_worker_ids:
+            salary_res = supabase.table("salary_slips") \
+                .select("total_amount") \
+                .in_("worker_id", project_worker_ids) \
+                .execute()
+            actual_payroll = sum(
+                float(r.get("total_amount") or 0)
+                for r in (salary_res.data or [])
+            )
 
         # Actual: project expenses
         expense_res = supabase.table("project_expenses") \

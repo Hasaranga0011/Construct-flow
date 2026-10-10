@@ -1,3 +1,4 @@
+import WorkerAccount from './WorkerAccount';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable,
@@ -26,7 +27,7 @@ const roleConfig: Record<string, { color: string; label: string }> = {
   Worker: { color: '#06B6D4', label: 'Worker' },
 };
 
-export default function SettingsScreen({ profileHref, showNotificationPreferences = true }: { profileHref?: string; showNotificationPreferences?: boolean }) {
+function LegacySettingsScreen({ profileHref, showNotificationPreferences = true }: { profileHref?: string; showNotificationPreferences?: boolean }) {
   const { user, role, signOut } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const router = useRouter();
@@ -305,3 +306,5 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
     </View>
   );
 }
+
+export default function SettingsScreen(props: {profileHref?:string;showNotificationPreferences?:boolean}){const {role}=useAuth();return role?.toLowerCase()==='worker'?<WorkerAccount settings/>:<LegacySettingsScreen {...props}/>;}

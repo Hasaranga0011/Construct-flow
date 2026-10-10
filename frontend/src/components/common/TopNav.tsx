@@ -56,12 +56,12 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
       >
         <View className="flex-row items-center flex-1 min-w-0 pr-2">
           {showBackButton && (
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="mr-2 p-3">
+            <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="mr-2 p-3">
               <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#111827'} />
             </Pressable>
           )}
           {useDrawer && (
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Open navigation menu" onPress={() => setIsOpen(true)} className="mr-1 p-2 -ml-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] items-center justify-center">
+            <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Open navigation menu" onPress={() => setIsOpen(true)} className="mr-1 p-2 -ml-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] items-center justify-center">
               <Ionicons name="menu" size={26} color={isDark ? "#ffffff" : "#111827"} />
             </Pressable>
           )}
@@ -70,7 +70,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
 
         <View className="flex-row items-center gap-2 md:gap-4 flex-shrink-0">
           {/* Bell Icon */}
-          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+          <Pressable style={{ minHeight: 48, minWidth: 48 }}
             onPress={() => router.push(notificationsHref as any)}
             accessibilityLabel="Open notifications"
             className={`w-11 h-11 rounded-full border items-center justify-center relative transition-colors ${isDark ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
@@ -83,7 +83,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
             )}
           </Pressable>
 
-          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+          <Pressable style={{ minHeight: 48, minWidth: 48 }}
             onPress={() => setAccountMenuOpen((isOpen) => !isOpen)}
             accessibilityLabel="Open account details"
             className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center"
@@ -93,7 +93,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
 
           {/* Action Button */}
           {!isMobile && showAction && onActionPress && (
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={onActionPress}>
+            <Pressable style={{ minHeight: 48, minWidth: 48 }} onPress={onActionPress}>
               <LinearGradient
                 colors={['#F97316', '#EA580C']}
                 className="px-3 md:px-4 py-3 min-h-[44px] justify-center rounded-lg shadow-sm max-w-[180px]"
@@ -107,7 +107,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
         </View>
       </LinearGradient>
 
-      {isMobile && showAction && onActionPress && <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
+      {isMobile && showAction && onActionPress && <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
       {onSearch && (
         <View className="mx-4 my-2 z-50">
           <SearchInput 
@@ -127,7 +127,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
           className={`w-full rounded-xl border p-4 shadow-lg ${isDark ? 'bg-[#111827] border-gray-700' : 'bg-white border-gray-200'}`}
           style={{ zIndex: 20, elevation: 8, width: Math.min(256, width - 32) }}
         >
-          <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Close account details" onPress={() => setAccountMenuOpen(false)} className="min-h-[44px] min-w-[44px] self-end items-center justify-center"><Ionicons name="close" size={24} color={isDark ? '#fff' : '#111827'} /></Pressable>
+          <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Close account details" onPress={() => setAccountMenuOpen(false)} className="min-h-[44px] min-w-[44px] self-end items-center justify-center"><Ionicons name="close" size={24} color={isDark ? '#fff' : '#111827'} /></Pressable>
           <ScrollView keyboardShouldPersistTaps="handled">
           <Text style={{ flexShrink: 1, minWidth: 0 }} className={`text-sm font-bold ${isDark ? 'text-white' : 'text-brand-text'}`} maxFontSizeMultiplier={1.3}>
             {user?.user_metadata?.full_name || user?.email || 'User'}
@@ -139,13 +139,13 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
             {userRole || 'User'}
           </Text>
           <View className={`h-px my-3 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />
-          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+          <Pressable style={{ minHeight: 48, minWidth: 48 }}
             onPress={() => { setAccountMenuOpen(false); router.push(`/${portalRole}/profile` as any); }}
             className={`min-h-[44px] justify-center py-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
           >
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Profile</Text>
           </Pressable>
-          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+          <Pressable style={{ minHeight: 48, minWidth: 48 }}
             onPress={() => { setAccountMenuOpen(false); router.push(`/${portalRole}/settings` as any); }}
             className={`min-h-[44px] justify-center py-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
           >

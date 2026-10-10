@@ -5,6 +5,7 @@ from api.routes import labour
 
 class Query:
     def __init__(self, client, name): self.client, self.name, self.filters, self.payload = client, name, {}, None
+    def update(self, payload): self.client.updated = payload; return self
     def select(self, columns):
         if self.name == 'attendance': assert 'status' not in columns
         return self
@@ -54,3 +55,22 @@ def test_invalid_project_or_worker_cannot_write_attendance(monkeypatch, options,
         labour.scan_qr_code(labour.ScanRequest(qr_code='qr', site_id='project'), USER)
     assert error.value.status_code == status
     assert client.writes == []
+
+
+def test_checkout_persists_hours_and_overtime(monkeypatch):
+    from datetime import datetime, timezone, timedelta
+    original = Query.execute
+    executed = []
+    def execute(query):
+        if query.name == 'attendance':
+            executed.append(query.filters)
+            return SimpleNamespace(data=[{'id':'entry','check_in_time':(datetime.now(timezone.utc)-timedelta(hours=10)).isoformat(),'check_out_time':None}])
+        return original(query)
+    monkeypatch.setattr(Query,'execute',execute)
+    client=Client()
+    monkeypatch.setattr(labour,'client_for_token',lambda token:client)
+    result=labour.scan_qr_code(labour.ScanRequest(qr_code='opaque',site_id='project'),USER)
+    assert result['action']=='check_out'
+    assert client.updated['hours_worked']==10
+    assert client.updated['overtime_hours']==2
+    assert any(item.get('id')=='entry' for item in executed)

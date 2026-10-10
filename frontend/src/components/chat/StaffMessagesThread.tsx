@@ -4,6 +4,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 
 type Message = {
   id: string;
@@ -18,6 +19,7 @@ type Message = {
 
 export default function StaffMessagesThread({ threadId }: { threadId: string }) {
   const { user, role } = useAuth();
+  const effectiveRole = role === 'admin' ? 'super_admin' : role;
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -47,7 +49,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
           .from('client_messages')
           .select('*')
           .eq('project_id', threadId)
-          .or(`and(sender_role.eq.client,receiver_role.eq.${role}),and(sender_role.eq.${role},receiver_role.eq.client)`)
+          .or(`and(sender_role.eq.client,receiver_role.eq.${effectiveRole}),and(sender_role.eq.${effectiveRole},receiver_role.eq.client)`)
           .order('created_at', { ascending: true });
         if (msgRes.error) throw msgRes.error;
         if (isMounted) setMessages((msgRes.data || []) as Message[]);
@@ -61,7 +63,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
     loadThread();
 
     const realtimeChannel = supabase
-      .channel(`staff-msg:${threadId}:${role}`)
+      .channel(`staff-msg:${threadId}:${effectiveRole}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -69,7 +71,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
         filter: `project_id=eq.${threadId}`,
       }, (payload) => {
         const msg = payload.new as Message;
-        const isForThisChannel = (msg.sender_role === 'client' && msg.receiver_role === role) || (msg.sender_role === role && msg.receiver_role === 'client');
+        const isForThisChannel = (msg.sender_role === 'client' && msg.receiver_role === effectiveRole) || (msg.sender_role === effectiveRole && msg.receiver_role === 'client');
         if (isForThisChannel && isMounted) {
           setMessages(current => current.some(m => m.id === msg.id) ? current : [...current, msg]);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -81,7 +83,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
       isMounted = false;
       supabase.removeChannel(realtimeChannel);
     };
-  }, [user, threadId, role]);
+  }, [user, threadId, role, effectiveRole]);
 
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
@@ -112,16 +114,14 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
     setSending(true);
     setError(null);
     try {
-      const { data, error: sendError } = await supabase.from('client_messages').insert({
+      const data = await api.messages.send({
         project_id: threadId,
         sender_id: user.id,
         receiver_id: clientId,
-        sender_role: role,
+        sender_role: effectiveRole,
         receiver_role: 'client',
-        message_text: trimmed,
-        is_read: false,
-      }).select('*').single();
-      if (sendError) throw sendError;
+        content: trimmed,
+      });
       if (data) {
         setMessages(current => current.some(m => m.id === data.id) ? current : [...current, data as Message]);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);

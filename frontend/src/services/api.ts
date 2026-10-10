@@ -188,6 +188,7 @@ export const api = {
   // Messages (multichannel: client↔pm, client↔admin, client↔site_manager)
   // ----------------------------------------------------------------
   messages: {
+    getContacts: (projectId: string) => fetchWithAuth(`/messages/${projectId}/contacts`),
     send: (data: {
       project_id: string;
       sender_id: string;

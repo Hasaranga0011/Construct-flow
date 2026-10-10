@@ -30,12 +30,32 @@ export default function ClientProjectSiteReports() {
       const { data: reportsData } = await supabase
         .from('site_reports')
         .select(`
-          id, project_id, date, work_completed, workers_present_count, blockers, photos, created_at,
-          site_manager:profiles!site_manager_id(full_name, avatar_url)
+          id, project_id, date, work_completed, workers_present_count, blockers, photos, created_at, site_manager_id
         `)
         .eq('project_id', projectId)
         .order('date', { ascending: false });
-      setReports((reportsData || []).map(report => ({ ...report, site_manager: firstRelation(report.site_manager) })));
+        
+      const parsedReports = reportsData || [];
+      const smIds = [...new Set(parsedReports.map(r => r.site_manager_id).filter((id): id is string => Boolean(id)))];
+      if (smIds.length > 0) {
+        const { data: smProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', smIds);
+        
+        if (smProfiles) {
+          const smMap = smProfiles.reduce((acc: any, p) => {
+            if (p.id) acc[p.id] = { full_name: p.full_name, avatar_url: p.avatar_url };
+            return acc;
+          }, {});
+          parsedReports.forEach(r => {
+            if (r.site_manager_id && smMap[r.site_manager_id]) {
+              r.site_manager = smMap[r.site_manager_id];
+            }
+          });
+        }
+      }
+      setReports(parsedReports as SiteReport[]);
     } catch (error) {
       console.error('Failed to load site reports:', error);
     } finally {

@@ -497,7 +497,7 @@ def get_insights(
 
     # ---- 4. Labour count --------------------------------------------------
     try:
-        labour_res = db.table("labour").select("id").execute()
+        labour_res = db.table("attendance").select("id").execute()
         labour_count = len(labour_res.data) if labour_res.data else 0
     except Exception:
         labour_count = 0
