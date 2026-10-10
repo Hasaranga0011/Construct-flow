@@ -193,6 +193,28 @@ const PortalToggle = () => {
   );
 };
 
+import { BlurView } from 'expo-blur';
+
+const GlassSection = ({ style, className, children, id, onLayout, intensity = 20, tint = 'dark' }: any) => {
+  if (Platform.OS === 'web') {
+    return <View id={id} onLayout={onLayout} style={style} className={className}>{children}</View>;
+  }
+  
+  let bg = 'transparent';
+  let newStyle = { ...style };
+  if (newStyle.backgroundColor) {
+    bg = newStyle.backgroundColor;
+    delete newStyle.backgroundColor;
+  }
+  
+  return (
+    <View id={id} onLayout={onLayout} style={[newStyle, { overflow: 'hidden' }]} className={className}>
+      <BlurView intensity={intensity} tint={tint} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg }} />
+      {children}
+    </View>
+  );
+};
+
 export default function LandingPage() {
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -306,7 +328,7 @@ export default function LandingPage() {
   ];
 
   return (
-    <View className="flex-1" style={{ backgroundColor: Platform.OS === 'web' ? 'transparent' : '#0F172A' }}>
+    <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
       {Platform.OS !== 'web' && (
         <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, zIndex: -1 }}>
           <Video
@@ -512,7 +534,7 @@ export default function LandingPage() {
         </View>
 
         {/* FEATURES */}
-        <View className="py-24 px-6 md:px-10" id="services" onLayout={event => { sectionOffsets.current.services = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(10,14,26,0.82)', backdropFilter: 'blur(8px)' }}>
+        <GlassSection intensity={40} className="py-24 px-6 md:px-10" id="services" onLayout={(event: any) => { sectionOffsets.current.services = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(10,14,26,0.82)', ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}) }}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Platform Capabilities</Text>
@@ -535,7 +557,7 @@ export default function LandingPage() {
               ))}
             </View>
           </View>
-        </View>
+        </GlassSection>
 
         {/* STATS STRIP */}
         <View className="py-12 px-6" style={{ backgroundColor: 'rgba(249,115,22,0.90)' }}>
@@ -550,7 +572,7 @@ export default function LandingPage() {
         </View>
 
         {/* PROJECTS GALLERY */}
-        <View className="py-24 px-6 md:px-10" id="projects" onLayout={event => { sectionOffsets.current.projects = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.88)', backdropFilter: 'blur(8px)' }}>
+        <GlassSection intensity={40} className="py-24 px-6 md:px-10" id="projects" onLayout={(event: any) => { sectionOffsets.current.projects = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.88)', ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}) }}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Featured Projects</Text>
@@ -584,11 +606,11 @@ export default function LandingPage() {
               ))}
             </View>
           </View>
-        </View>
+        </GlassSection>
 
         {/* ANIMATED COUNTERS */}
-        <View className="py-24 px-6" style={{ backgroundColor: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(8px)' }}
-          onLayout={e => setCountersY(e.nativeEvent.layout.y)}>
+        <GlassSection intensity={40} className="py-24 px-6" style={{ backgroundColor: 'rgba(10,14,26,0.85)', ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}) }}
+          onLayout={(e: any) => setCountersY(e.nativeEvent.layout.y)}>
           <View className="max-w-6xl mx-auto">
             <View className="items-center mb-14">
               <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 28 : 40, lineHeight: isMobile ? 36 : 50 }]}>
@@ -613,11 +635,11 @@ export default function LandingPage() {
               ))}
             </View>
           </View>
-        </View>
+        </GlassSection>
 
         {/* HOW IT WORKS */}
-        <View className="py-24 px-6 md:px-10"
-          style={{ backgroundColor: 'rgba(249,115,22,0.07)', backdropFilter: 'blur(8px)', borderTopWidth: 1, borderTopColor: 'rgba(249,115,22,0.1)' }}>
+        <GlassSection intensity={40} className="py-24 px-6 md:px-10"
+          style={{ backgroundColor: 'rgba(249,115,22,0.07)', borderTopWidth: 1, borderTopColor: 'rgba(249,115,22,0.1)', ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}) }}>
           <View className="max-w-5xl mx-auto">
             <View className="items-center mb-14">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm tracking-widest uppercase mb-3">Simple Setup</Text>
@@ -637,10 +659,10 @@ export default function LandingPage() {
               ))}
             </View>
           </View>
-        </View>
+        </GlassSection>
 
         {/* CONTACT */}
-        <View className="py-24 px-6 md:px-10" id="contact" onLayout={event => { sectionOffsets.current.contact = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.90)', backdropFilter: 'blur(8px)' }}>
+        <GlassSection intensity={40} className="py-24 px-6 md:px-10" id="contact" onLayout={(event: any) => { sectionOffsets.current.contact = event.nativeEvent.layout.y; }} style={{ backgroundColor: 'rgba(8,12,22,0.90)', ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}) }}>
           <View className="max-w-5xl mx-auto">
             <View className="items-center mb-14">
               <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold text-center" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 32 : 40, lineHeight: isMobile ? 40 : 50 }]}>
@@ -697,7 +719,7 @@ export default function LandingPage() {
               </View>
             </View>
           </View>
-        </View>
+        </GlassSection>
 
         {/* FOOTER */}
         <View style={{ backgroundColor: 'rgba(5,8,18,0.97)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>

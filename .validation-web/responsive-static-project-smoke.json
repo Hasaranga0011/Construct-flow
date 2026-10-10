@@ -1,0 +1,62 @@
+[
+  {
+    "route": "/admin/projects/00000000-0000-0000-0000-000000000001",
+    "width": 360,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects/00000000-0000-0000-0000-000000000001",
+    "width": 390,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects/00000000-0000-0000-0000-000000000001",
+    "width": 768,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects/00000000-0000-0000-0000-000000000001",
+    "width": 1024,
+    "smallControls": [],
+    "menuButtons": 0,
+    "headers": 1,
+    "overflow": false,
+    "body": " costs dynamically\n\n\nEdit Project\nUpdate budget & details\n\n\nDelete Project\nPermanently remove this project\n\nAssigned Suppliers\nManage\n\nNo suppliers assigned yet.\nAdd Supplier",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects/00000000-0000-0000-0000-000000000001",
+    "width": 1440,
+    "smallControls": [],
+    "menuButtons": 0,
+    "headers": 1,
+    "overflow": false,
+    "body": " costs dynamically\n\n\nEdit Project\nUpdate budget & details\n\n\nDelete Project\nPermanently remove this project\n\nAssigned Suppliers\nManage\n\nNo suppliers assigned yet.\nAdd Supplier",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  }
+]

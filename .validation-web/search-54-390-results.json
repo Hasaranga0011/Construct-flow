@@ -1,0 +1,62 @@
+[
+  {
+    "route": "/admin/client",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/labour",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/users",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/projects",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/materials",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/materials/stock",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/suppliers",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/admin/dashboard",
+    "pass": true,
+    "checks": "stale response cancellation, stable inline config through parent resize, remote error, retry, 8-second timeout, blur preserves text"
+  },
+  {
+    "route": "/supplier/dashboard",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/supplier/deliveries",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/supplier/orders/history",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  },
+  {
+    "route": "/pm/projects",
+    "pass": true,
+    "checks": "slow/fast typing, zero keystroke requests, realtime refetch preserves focus/query/dropdown, clear, first-click selection, input geometry"
+  }
+]

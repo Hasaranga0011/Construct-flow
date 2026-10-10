@@ -168,7 +168,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
         </Pressable>
       </View>
 
-      <View className="flex-1">
+      <View className={isMobile ? "w-full" : "flex-1"}>
         {loading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator color="#F97316" />

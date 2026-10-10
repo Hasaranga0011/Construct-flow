@@ -1,0 +1,74 @@
+[
+  {
+    "route": "/worker/dashboard",
+    "width": 320,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "ns.\nRecent Alerts\n\nNo new alerts.\nView all notifications →\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 360,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "ns.\nRecent Alerts\n\nNo new alerts.\nView all notifications →\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 390,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "ns.\nRecent Alerts\n\nNo new alerts.\nView all notifications →\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 768,
+    "smallControls": [],
+    "menuButtons": 1,
+    "headers": 1,
+    "overflow": false,
+    "body": "ns.\nRecent Alerts\n\nNo new alerts.\nView all notifications →\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 1024,
+    "smallControls": [],
+    "menuButtons": 0,
+    "headers": 1,
+    "overflow": false,
+    "body": "ess\n32%\n10 days elapsed of 31\nLATEST PAYSLIP\nNo salary slips generated yet.\nRecent Check-Ins\nView all →\nNo recent check-ins.\nRecent Alerts\n\nNo new alerts.\nView all notifications →",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 1440,
+    "smallControls": [],
+    "menuButtons": 0,
+    "headers": 1,
+    "overflow": false,
+    "body": "ess\n32%\n10 days elapsed of 31\nLATEST PAYSLIP\nNo salary slips generated yet.\nRecent Check-Ins\nView all →\nNo recent check-ins.\nRecent Alerts\n\nNo new alerts.\nView all notifications →",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  }
+]

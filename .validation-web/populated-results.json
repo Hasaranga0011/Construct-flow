@@ -1,0 +1,362 @@
+[
+  {
+    "route": "/admin/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "board\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n\nSep",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "board\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": " 30 days.\nActive Projects\nView all →\nR\nRiverside Apartment Development Phase One\nColombo Western Province\nactive\n0%\nManage\nRecent Alerts\nNo new alerts.\nView all notifications →\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": " 30 days.\nActive Projects\nView all →\nR\nRiverside Apartment Development Phase One\nColombo Western Province\nactive\n0%\nManage\nRecent Alerts\nNo new alerts.\nView all notifications →\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/client",
+    "width": 320,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/client",
+    "width": 768,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/client",
+    "width": 1024,
+    "overflow": false,
+    "body": " Construction Company\nProject: Riverside Apartment Development Phase One\nView Details\nRecent Client Activity\n\nNo recent activity.\nShared Documents\n0 files\nNo shared documents yet.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/client",
+    "width": 1440,
+    "overflow": false,
+    "body": " Construction Company\nProject: Riverside Apartment Development Phase One\nView Details\nRecent Client Activity\n\nNo recent activity.\nShared Documents\n0 files\nNo shared documents yet.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/materials",
+    "width": 320,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/materials",
+    "width": 768,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/materials",
+    "width": 1024,
+    "overflow": false,
+    "body": "ng Dispatch\nNo confirmed orders awaiting dispatch.\nExpected Deliveries\nShipped by Supplier, Awaiting Receipt\nNo orders currently in transit.\nRecent Deliveries\nNo recent deliveries.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/materials",
+    "width": 1440,
+    "overflow": false,
+    "body": "ng Dispatch\nNo confirmed orders awaiting dispatch.\nExpected Deliveries\nShipped by Supplier, Awaiting Receipt\nNo orders currently in transit.\nRecent Deliveries\nNo recent deliveries.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects",
+    "width": 320,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects",
+    "width": 768,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects",
+    "width": 1024,
+    "overflow": false,
+    "body": "S\nACTION\nR\nRiverside Apartment Development Phase One\nID: p1...\nColombo Western Province\nPM: Responsive Test Person\nClient: Responsive Test Person\nRs. 12,500,000\nACTIVE\nView Details",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/projects",
+    "width": 1440,
+    "overflow": false,
+    "body": "S\nACTION\nR\nRiverside Apartment Development Phase One\nID: p1...\nColombo Western Province\nPM: Responsive Test Person\nClient: Responsive Test Person\nRs. 12,500,000\nACTIVE\nView Details",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/attendance",
+    "width": 320,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/attendance",
+    "width": 768,
+    "overflow": false,
+    "body": "Dashboard\n\nProjects\n\nUsers\n\nMaterials\n\nLabour\n\nClient Portal\n\nSuppliers\n\nAI Estimator\n\nNotifications\n\nML Insights\n\nReports\n\nProfile\n\nSettings\nRE\nResponsive Test\nadmin\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/attendance",
+    "width": 1024,
+    "overflow": false,
+    "body": "o view and manage worker attendance.\nLive\n\n0 / 0 Checked In Today\n\n\n\nToday: Oct 06\nRiverside Apartment Development Phase One\n\nColombo Western Province\n0 Checked In\nView Logs →",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/admin/attendance",
+    "width": 1440,
+    "overflow": false,
+    "body": "o view and manage worker attendance.\nLive\n\n0 / 0 Checked In Today\n\n\n\nToday: Oct 06\nRiverside Apartment Development Phase One\n\nColombo Western Province\n0 Checked In\nView Logs →",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/pm/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "form\n\nDashboard\n\nProjects\n\nMaterials\n\nLabour\n\nPayroll\n\nClients\n\nSuppliers\n\nTeam\n\nAttendance\n\nAI Estimator\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\npm\n\nSep",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/pm/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "form\n\nDashboard\n\nProjects\n\nMaterials\n\nLabour\n\nPayroll\n\nClients\n\nSuppliers\n\nTeam\n\nAttendance\n\nAI Estimator\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\npm\n\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/pm/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": "essments.\nActive Projects\nView all →\nR\nRiverside Apartment Development Phase One\nColombo Western Province\nactive\n0%\nManage\nRecent Alerts\nNo new alerts.\nView all notifications →\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/pm/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": "essments.\nActive Projects\nView all →\nR\nRiverside Apartment Development Phase One\nColombo Western Province\nactive\n0%\nManage\nRecent Alerts\nNo new alerts.\nView all notifications →\nNov",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/client/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nProject\n\nMedia & Gallery\n\nMessages\n\nInvoices\n\nDocuments\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\nclient\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/client/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nProject\n\nMedia & Gallery\n\nMessages\n\nInvoices\n\nDocuments\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\nclient\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/client/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": "Colombo Western Province · active\n0%\nUSED\n0 milestones · Target end 31/12/2026\nMilestone Summary\n0 of 0 milestones completed.\nNo milestones have been created for your projects yet.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/client/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": "Colombo Western Province · active\n0%\nUSED\n0 milestones · Target end 31/12/2026\nMilestone Summary\n0 of 0 milestones completed.\nNo milestones have been created for your projects yet.",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/site-manager/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "structAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nReports\n\nMaterials\n\nMilestones\n\nIssues\n\nTeam\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\nsite_manager\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/site-manager/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "structAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nReports\n\nMaterials\n\nMilestones\n\nIssues\n\nTeam\n\nNotifications\n\nProfile\n\nSettings\nRE\nResponsive Test\nsite_manager\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/site-manager/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": "threshold\nACTIVE ISSUES\n0\nRequires attention\nLive Site Signals\nAttendance, stock, and issue counts update from your assigned site data in real time.\nWORKERS PRESENT\n0\nOPEN ISSUES\n0",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/site-manager/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": "threshold\nACTIVE ISSUES\n0\nRequires attention\nLive Site Signals\nAttendance, stock, and issue counts update from your assigned site data in real time.\nWORKERS PRESENT\n0\nOPEN ISSUES\n0",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/supplier/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "veries\nOrders past expected date\n0\n\nAll deliveries on track!\nConstructAi\nAI Construction Platform\n\nDashboard\n\nMy Deliveries\n\nMy Profile\n\nSettings\nRE\nResponsive Test\nsupplier\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/supplier/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "veries\nOrders past expected date\n0\n\nAll deliveries on track!\nConstructAi\nAI Construction Platform\n\nDashboard\n\nMy Deliveries\n\nMy Profile\n\nSettings\nRE\nResponsive Test\nsupplier\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/supplier/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": "ur response.\nPending Deliveries\nConfirmed orders awaiting dispatch\n\n\nNo confirmed orders awaiting dispatch.\nLate Deliveries\nOrders past expected date\n0\n\nAll deliveries on track!",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/supplier/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": "ur response.\nPending Deliveries\nConfirmed orders awaiting dispatch\n\n\nNo confirmed orders awaiting dispatch.\nLate Deliveries\nOrders past expected date\n0\n\nAll deliveries on track!",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 320,
+    "overflow": false,
+    "body": "00-0000-0...\nRecent Check-Ins\n\nNo attendance recorded yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 768,
+    "overflow": false,
+    "body": "00-0000-0...\nRecent Check-Ins\n\nNo attendance recorded yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 1024,
+    "overflow": false,
+    "body": "00-0000-0...\nRecent Check-Ins\n\nNo attendance recorded yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  },
+  {
+    "route": "/worker/dashboard",
+    "width": 1440,
+    "overflow": false,
+    "body": "00-0000-0...\nRecent Check-Ins\n\nNo attendance recorded yet.\nConstructAi\nAI Construction Platform\n\nDashboard\n\nAttendance\n\nPayroll\n\nProfile\n\nSettings\nRE\nResponsive Test\nworker\n",
+    "renderError": false,
+    "outside": [],
+    "errors": []
+  }
+]

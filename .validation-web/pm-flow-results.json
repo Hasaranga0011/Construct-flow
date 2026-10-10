@@ -1,0 +1,184 @@
+{
+  "results": [
+    {
+      "name": "approval, rejection and stock names",
+      "pass": true
+    },
+    {
+      "name": "payroll uses saved slips and opens details",
+      "pass": true
+    },
+    {
+      "name": "purchase-order routes resolve",
+      "pass": true
+    },
+    {
+      "name": "milestone completion persists percentage",
+      "pass": true
+    },
+    {
+      "name": "milestone creation validates date and saves",
+      "pass": true
+    },
+    {
+      "name": "PM client details are read-only",
+      "pass": true
+    },
+    {
+      "name": "query error recovers",
+      "pass": true
+    },
+    {
+      "name": "dashboard responsive",
+      "pass": true
+    },
+    {
+      "name": "projects responsive",
+      "pass": true
+    },
+    {
+      "name": "projects/p1 responsive",
+      "pass": true
+    },
+    {
+      "name": "projects/p1/milestones responsive",
+      "pass": true
+    },
+    {
+      "name": "projects/p1/milestones/create responsive",
+      "pass": true
+    },
+    {
+      "name": "projects/p1/expenses responsive",
+      "pass": true
+    },
+    {
+      "name": "projects/p1/reports responsive",
+      "pass": true
+    },
+    {
+      "name": "materials responsive",
+      "pass": true
+    },
+    {
+      "name": "materials/orders/create responsive",
+      "pass": true
+    },
+    {
+      "name": "materials/orders/po1 responsive",
+      "pass": true
+    },
+    {
+      "name": "payroll responsive",
+      "pass": true
+    },
+    {
+      "name": "labour responsive",
+      "pass": true
+    },
+    {
+      "name": "team responsive",
+      "pass": true
+    },
+    {
+      "name": "suppliers responsive",
+      "pass": true
+    },
+    {
+      "name": "client responsive",
+      "pass": true
+    },
+    {
+      "name": "estimator responsive",
+      "pass": true
+    },
+    {
+      "name": "notifications responsive",
+      "pass": true
+    },
+    {
+      "name": "profile responsive",
+      "pass": true
+    },
+    {
+      "name": "settings responsive",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "mutations": [
+    {
+      "name": "material_requests",
+      "method": "PATCH",
+      "body": {
+        "status": "Approved"
+      }
+    },
+    {
+      "name": "notifications",
+      "method": "POST",
+      "body": {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "project_id": "p1",
+        "target_user_id": "sm1",
+        "target_role": "site_manager",
+        "title": "Material Request Approved",
+        "message": "Sand: Approved. A purchase order can now be arranged.",
+        "type": "info"
+      }
+    },
+    {
+      "name": "material_requests",
+      "method": "PATCH",
+      "body": {
+        "status": "Rejected",
+        "notes": "Quantity exceeds current need"
+      }
+    },
+    {
+      "name": "notifications",
+      "method": "POST",
+      "body": {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "project_id": "p1",
+        "target_user_id": "sm1",
+        "target_role": "site_manager",
+        "title": "Material Request Rejected",
+        "message": "Bricks: Rejected. Quantity exceeds current need",
+        "type": "info"
+      }
+    },
+    {
+      "name": "/api/projects/p1/milestones/ms1",
+      "method": "PATCH",
+      "body": {
+        "status": "Completed",
+        "completion_percentage": 100
+      }
+    },
+    {
+      "name": "/api/projects/p1/milestones",
+      "method": "POST",
+      "body": {
+        "title": "Roof inspection",
+        "description": "",
+        "due_date": "2026-11-20"
+      }
+    },
+    {
+      "name": "/maps/api/js",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "name": "/api/ai/insights",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "name": "/api/site-reports/p1",
+      "method": "GET",
+      "body": null
+    }
+  ]
+}

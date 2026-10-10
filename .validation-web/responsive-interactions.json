@@ -1,0 +1,392 @@
+[
+  {
+    "role": "admin",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "project modal fields and assignment overlay",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "project modal fields and assignment overlay",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "project modal fields and assignment overlay",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "project modal fields and assignment overlay",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "admin",
+    "name": "project modal fields and assignment overlay",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "pm",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "site-manager",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "supplier",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "client",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "single header and drawer",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "account overlay fits and closes",
+    "width": 360,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "single header and drawer",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "account overlay fits and closes",
+    "width": 390,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "single header and drawer",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "account overlay fits and closes",
+    "width": 768,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "single header and drawer",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "account overlay fits and closes",
+    "width": 1024,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "single header and drawer",
+    "width": 1440,
+    "pass": true
+  },
+  {
+    "role": "worker",
+    "name": "account overlay fits and closes",
+    "width": 1440,
+    "pass": true
+  }
+]

@@ -1,0 +1,152 @@
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at D:\PROJECTS\Construct-flow\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+<--- Last few GCs --->
+
+[10220:000001889D654000] 50341211 ms: Mark-Compact (reduce) 4006.4 (4063.6) -> 4006.1 (4047.4) MB, pooled: 0 MB, 1442.28 / 0.00 ms  (average mu = 0.117, current mu = 0.000) last resort; GC in old space requested
+
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 00007FF6B779403F node::OnFatalError+1343
+ 2: 00007FF6B83DFAA7 v8::Function::NewInstance+423
+ 3: 00007FF6B81E04D7 v8::base::AddressSpaceReservation::AddressSpaceReservation+322071
+ 4: 00007FF6B81E41E4 v8::base::AddressSpaceReservation::AddressSpaceReservation+337700
+ 5: 00007FF6B81F313C v8::internal::StrongRootAllocatorBase::deallocate_impl+16604
+ 6: 00007FF6B81F297B v8::internal::StrongRootAllocatorBase::deallocate_impl+14619
+ 7: 00007FF6B967A2AD v8::base::UnsignedDivisionByConstant<unsigned __int64>+2794653
+ 8: 00007FF6B81DDFA0 v8::base::AddressSpaceReservation::AddressSpaceReservation+312544
+ 9: 00007FF6B81DE8C6 v8::base::AddressSpaceReservation::AddressSpaceReservation+314886
+10: 00007FF6B81F893E X509_STORE_set_cleanup+5438
+11: 00007FF6B8204648 uv_timer_set_repeat+19096
+12: 00007FF6B821F9A5 uv_timer_set_repeat+130549
+13: 00007FF6B821F90C uv_timer_set_repeat+130396
+14: 00007FF6B7942D03 v8::internal::Version::GetVersion+102915
+15: 00007FF6B7DC2FE5 v8::String::Utf8Value::~Utf8Value+63845
+16: 00000188D5DB75FA 

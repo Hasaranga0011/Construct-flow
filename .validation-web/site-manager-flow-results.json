@@ -1,0 +1,243 @@
+{
+  "results": [
+    {
+      "name": "assigned project repairs missing site and worker before attendance",
+      "pass": true
+    },
+    {
+      "name": "material names, quantity validation, request and receipt",
+      "pass": true
+    },
+    {
+      "name": "second-project issue creation and resolution",
+      "pass": true
+    },
+    {
+      "name": "milestone percentage and notes save",
+      "pass": true
+    },
+    {
+      "name": "report date/worker validation, real photo picker and submission",
+      "pass": true
+    },
+    {
+      "name": "manual attendance check-in/out persists hours",
+      "pass": true
+    },
+    {
+      "name": "QR scanner decodes an uploaded worker code and shows camera denial",
+      "pass": true
+    },
+    {
+      "name": "camera frames decode once and release tracks",
+      "pass": true
+    },
+    {
+      "name": "team removal confirmation",
+      "pass": true
+    },
+    {
+      "name": "profile save and settings navigation",
+      "pass": true
+    },
+    {
+      "name": "notifications unread filter and mark read",
+      "pass": true
+    },
+    {
+      "name": "load errors recover on refresh",
+      "pass": true
+    },
+    {
+      "name": "unassigned manager sees an empty state",
+      "pass": true
+    },
+    {
+      "name": "dashboard responsive",
+      "pass": true
+    },
+    {
+      "name": "attendance responsive",
+      "pass": true
+    },
+    {
+      "name": "materials responsive",
+      "pass": true
+    },
+    {
+      "name": "milestones responsive",
+      "pass": true
+    },
+    {
+      "name": "issues responsive",
+      "pass": true
+    },
+    {
+      "name": "team responsive",
+      "pass": true
+    },
+    {
+      "name": "reports responsive",
+      "pass": true
+    },
+    {
+      "name": "reports/create responsive",
+      "pass": true
+    },
+    {
+      "name": "notifications responsive",
+      "pass": true
+    },
+    {
+      "name": "profile responsive",
+      "pass": true
+    },
+    {
+      "name": "settings responsive",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "mutations": [
+    {
+      "name": "/api/projects/p1/attendance-setup",
+      "method": "POST",
+      "body": {}
+    },
+    {
+      "name": "/api/projects/p2/attendance-setup",
+      "method": "POST",
+      "body": {}
+    },
+    {
+      "name": "attendance",
+      "method": "POST",
+      "body": {
+        "worker_id": "worker-profile",
+        "site_id": "actual-site-1",
+        "date": "2026-10-08",
+        "check_in_time": "2026-10-08T17:05:31.874Z"
+      }
+    },
+    {
+      "name": "material_requests",
+      "method": "POST",
+      "body": {
+        "project_id": "p1",
+        "requested_by": "00000000-0000-0000-0000-000000000001",
+        "item_name": "Sand",
+        "quantity": 4,
+        "unit": "units",
+        "status": "Pending Approval"
+      }
+    },
+    {
+      "name": "/api/purchase-orders/po1/receive",
+      "method": "PATCH",
+      "body": null
+    },
+    {
+      "name": "issues",
+      "method": "POST",
+      "body": {
+        "site_id": "actual-site-2",
+        "reported_by": "00000000-0000-0000-0000-000000000001",
+        "title": "Safety barrier",
+        "description": "Install barrier near excavation.",
+        "severity": "Medium",
+        "status": "Open"
+      }
+    },
+    {
+      "name": "issues",
+      "method": "PATCH",
+      "body": {
+        "status": "Resolved"
+      }
+    },
+    {
+      "name": "/api/projects/p1/milestones/ms1",
+      "method": "PATCH",
+      "body": {
+        "completion_percentage": 42,
+        "description": "Inspection complete",
+        "status": "In Progress"
+      }
+    },
+    {
+      "name": "/api/media/upload",
+      "method": "POST",
+      "body": "------WebKitFormBoundaryck5xmZn7D6QtTdiB\r\nContent-Disposition: form-data; name=\"file\"; filename=\"site.png\"\r\nContent-Type: image/png\r\n\r\n�PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\b\u0004\u0000\u0000\u0000�\u001c\f\u0002\u0000\u0000\u0000\u000bIDATx�c��\u001f\u0000\u0003\u0003\u0002\u0000�E�\u0000\u0000\u0000\u0000IEND�B`�\r\n------WebKitFormBoundaryck5xmZn7D6QtTdiB\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\np1\r\n------WebKitFormBoundaryck5xmZn7D6QtTdiB\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\nDaily site report\r\n------WebKitFormBoundaryck5xmZn7D6QtTdiB--\r\n"
+    },
+    {
+      "name": "/api/site-reports/",
+      "method": "POST",
+      "body": {
+        "project_id": "p1",
+        "site_id": "s1",
+        "date": "2026-10-07",
+        "work_completed": "Concrete poured",
+        "workers_present_count": 0,
+        "photos": [
+          "https://example.invalid/test-photo.jpg"
+        ]
+      }
+    },
+    {
+      "name": "attendance",
+      "method": "POST",
+      "body": {
+        "worker_id": "worker-record",
+        "site_id": "actual-site-1",
+        "date": "2026-10-08",
+        "check_in_time": "2026-10-08T17:05:39.439Z"
+      }
+    },
+    {
+      "name": "attendance",
+      "method": "PATCH",
+      "body": {
+        "check_out_time": "2026-10-08T17:05:40.436Z",
+        "hours_worked": 2
+      }
+    },
+    {
+      "name": "/api/labour/scan",
+      "method": "POST",
+      "body": {
+        "qr_code": "worker-qr",
+        "site_id": "p1"
+      }
+    },
+    {
+      "name": "/api/labour/scan",
+      "method": "POST",
+      "body": {
+        "qr_code": "worker-qr",
+        "site_id": "p1"
+      }
+    },
+    {
+      "name": "site_workers",
+      "method": "DELETE",
+      "body": null
+    },
+    {
+      "name": "profiles",
+      "method": "PATCH",
+      "body": {
+        "full_name": "Updated Site Manager",
+        "contact_number": "",
+        "bio": "",
+        "company_name": ""
+      }
+    },
+    {
+      "name": "notifications",
+      "method": "PATCH",
+      "body": {
+        "is_read": true
+      }
+    }
+  ]
+}
