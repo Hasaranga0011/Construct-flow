@@ -172,7 +172,7 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
   }
 
   return (
-    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px]">
+    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 w-full min-h-[400px]">
       <View className="flex-row justify-between items-start mb-4">
         <View className="flex-1">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Project Cost vs Timeline</Text>

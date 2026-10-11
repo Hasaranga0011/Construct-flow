@@ -98,7 +98,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
   };
 
   return (
-    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 min-h-[300px] flex-1">
+    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 min-h-[300px] w-full">
       <View className="flex-row justify-between items-center mb-1">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">AI Delay Risk</Text>
         <View className="w-5 h-5 bg-red-100 rounded flex items-center justify-center">

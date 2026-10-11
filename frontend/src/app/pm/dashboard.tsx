@@ -142,59 +142,63 @@ export default function DashboardScreen() {
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
           {/* Top Stat Cards Row */}
-          <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
-            <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
                 value={stats.activeProjects.toString()} 
                 indicatorText="Live tracking" 
                 indicatorType="success" 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={200} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Workers On Site" 
                 value={stats.workersOnSite.toString()} 
                 indicatorText="Currently checked in" 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={300} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Low Stock Alerts" 
                 value={stats.lowStockAlerts.toString()} 
                 indicatorText="Requires ordering" 
                 indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"} 
+                fullWidth
               />
             </AnimatedCard>
-            <AnimatedCard delay={400} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
+            <AnimatedCard delay={400} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Total Budget" 
                 value={formatCurrency(stats.totalBudget)} 
                 indicatorText="Approved estimates" 
+                fullWidth
               />
             </AnimatedCard>
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 24 }}>
             {/* Main Content Area (Chart) */}
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
               <CostTimelineChart pmId={currentUserId} />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <DelayRiskPanel pmId={currentUserId} />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className={isMobile ? "flex-col gap-6 pb-6" : "flex-row gap-6 pb-6"}>
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, paddingBottom: 24 }}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} pmId={currentUserId} />
             </View>
             
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <RecentAlertsPanel pmId={currentUserId} />
             </View>
           </View>
