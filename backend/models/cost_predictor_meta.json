@@ -1,6 +1,6 @@
 {
   "model_type": "RandomForestRegressor",
-  "trained_at": "2026-10-09T04:49:00+00:00",
+  "trained_at": "2026-10-11T04:45:48+00:00",
   "dataset_size": 50000,
   "features": [
     "square_footage",
@@ -15,7 +15,9 @@
     "finishing_electrical",
     "target_timeline"
   ],
-  "validation_r2": 0.9527,
-  "validation_mae": 37921998.38,
-  "n_estimators": 150
+  "validation_r2": 0.9521,
+  "validation_mae": 38167829.61,
+  "n_estimators": 100,
+  "max_depth": 16,
+  "min_samples_leaf": 3
 }

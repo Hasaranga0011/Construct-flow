@@ -16,6 +16,9 @@ What it does:
      the old model is kept and a warning is printed.
 
 Optional: pass --skip-validation-gate to force replacement regardless.
+
+NOTE: max_depth and min_samples_leaf are set so the saved models stay small
+(tens of MB instead of hundreds of MB), which keeps them committable to git.
 """
 
 import argparse
@@ -46,9 +49,14 @@ DELAY_PKL  = MODELS_DIR / "delay_classifier.pkl"
 COST_META  = MODELS_DIR / "cost_predictor_meta.json"
 DELAY_META = MODELS_DIR / "delay_classifier_meta.json"
 
+# Model size controls
+N_ESTIMATORS     = 100
+MAX_DEPTH        = 16
+MIN_SAMPLES_LEAF = 3
+
 COST_FEATURES = [
     "square_footage", "location", "project_type", "quality_tier",
-    "num_floors", "site_condition", "structure_type", 
+    "num_floors", "site_condition", "structure_type",
     "finishing_flooring", "finishing_sanitary", "finishing_electrical",
     "target_timeline"
 ]
@@ -89,22 +97,28 @@ def train_and_save_models(skip_gate: bool = False) -> None:
     print("Training Cost Predictor (Pipeline with OrdinalEncoder + RandomForestRegressor)...")
     numeric_features = ["square_footage", "num_floors"]
     categorical_features = [
-        "location", "project_type", "quality_tier", "site_condition", 
-        "structure_type", "finishing_flooring", "finishing_sanitary", 
+        "location", "project_type", "quality_tier", "site_condition",
+        "structure_type", "finishing_flooring", "finishing_sanitary",
         "finishing_electrical", "target_timeline"
     ]
-    
+
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', 'passthrough', numeric_features),
             ('cat', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), categorical_features)
         ])
-        
+
     cost_model = Pipeline(steps=[
         ('preprocessor', preprocessor),
-        ('regressor', RandomForestRegressor(n_estimators=150, random_state=42, n_jobs=-1))
+        ('regressor', RandomForestRegressor(
+            n_estimators=N_ESTIMATORS,
+            max_depth=MAX_DEPTH,
+            min_samples_leaf=MIN_SAMPLES_LEAF,
+            random_state=42,
+            n_jobs=-1,
+        ))
     ])
-    
+
     cost_model.fit(X_tr_c, y_tr_c)
 
     preds_c = cost_model.predict(X_te_c)
@@ -120,7 +134,9 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         "features": COST_FEATURES,
         "validation_r2": round(r2, 4),
         "validation_mae": round(mae, 2),
-        "n_estimators": 150,
+        "n_estimators": N_ESTIMATORS,
+        "max_depth": MAX_DEPTH,
+        "min_samples_leaf": MIN_SAMPLES_LEAF,
     }
 
     # Validation gate
@@ -133,7 +149,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         )
     else:
         tmp = MODELS_DIR / "_cost_predictor_tmp.pkl"
-        joblib.dump(cost_model, tmp)
+        joblib.dump(cost_model, tmp, compress=3)
         shutil.move(str(tmp), COST_PKL)
         COST_META.write_text(json.dumps(new_cost_meta, indent=2))
         print("  [OK] Cost predictor saved.")
@@ -153,9 +169,14 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         X_delay, y_delay, test_size=0.20, random_state=42
     )
 
-    print("Training Delay Classifier (RandomForestClassifier, 150 trees)...")
+    print(f"Training Delay Classifier (RandomForestClassifier, {N_ESTIMATORS} trees)...")
     delay_model = RandomForestClassifier(
-        n_estimators=150, random_state=42, n_jobs=-1, class_weight="balanced"
+        n_estimators=N_ESTIMATORS,
+        max_depth=MAX_DEPTH,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
+        random_state=42,
+        n_jobs=-1,
+        class_weight="balanced",
     )
     delay_model.fit(X_tr_d, y_tr_d)
 
@@ -170,7 +191,9 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         "dataset_size": len(delay_df),
         "features": DELAY_FEATURES,
         "validation_accuracy": round(acc, 4),
-        "n_estimators": 150,
+        "n_estimators": N_ESTIMATORS,
+        "max_depth": MAX_DEPTH,
+        "min_samples_leaf": MIN_SAMPLES_LEAF,
     }
 
     old_acc = _load_existing_metric(DELAY_META, "validation_accuracy")
@@ -181,7 +204,7 @@ def train_and_save_models(skip_gate: bool = False) -> None:
         )
     else:
         tmp = MODELS_DIR / "_delay_classifier_tmp.pkl"
-        joblib.dump(delay_model, tmp)
+        joblib.dump(delay_model, tmp, compress=3)
         shutil.move(str(tmp), DELAY_PKL)
         DELAY_META.write_text(json.dumps(new_delay_meta, indent=2))
         print("  [OK] Delay classifier saved.")

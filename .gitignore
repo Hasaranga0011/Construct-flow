@@ -23,8 +23,6 @@ Thumbs.db
 .vscode/
 .idea/
 # ML models (regenerate with backend/data_pipeline/run_pipeline.bat)
-backend/models/*.pkl
-backend/models/*.joblib
 
 .env
 .env.*

@@ -1,6 +1,6 @@
 {
   "model_type": "RandomForestClassifier",
-  "trained_at": "2026-10-09T04:49:00+00:00",
+  "trained_at": "2026-10-11T04:45:48+00:00",
   "dataset_size": 50000,
   "features": [
     "worker_count",
@@ -10,6 +10,8 @@
     "equipment_utilization_rate",
     "material_shortage_alert"
   ],
-  "validation_accuracy": 0.5225,
-  "n_estimators": 150
+  "validation_accuracy": 0.5122,
+  "n_estimators": 100,
+  "max_depth": 16,
+  "min_samples_leaf": 3
 }
