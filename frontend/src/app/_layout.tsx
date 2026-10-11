@@ -13,7 +13,16 @@ import { NotificationProvider } from '../context/NotificationContext';
 import { normalizeRole } from '../utils/auth';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/apiUrl';
+import { LogBox } from 'react-native';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 
+// Ignore React Native logs for Reanimated strict mode
+LogBox.ignoreLogs(['[Reanimated] Reading from `value`']);
+
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false, // Disables strict mode warnings for Reanimated
+});
 
 const DASHBOARD_MAP: Record<string, string> = {
   admin: '/admin/dashboard',

@@ -65,7 +65,8 @@ function injectVideoBackground(): () => void {
       :root{--vblur:${BLUR};--vdim:${DIM};}
       #cf-vbg{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;z-index:0;overflow:hidden;
         background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0c1a2e 100%);}
-      #cf-vbg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
+      #cf-vbg video{position:absolute;top:50%;left:50%;min-width:100vw;min-height:100vh;width:auto;height:auto;
+        transform:translate(-50%,-50%) scale(1.78);object-fit:cover;object-position:center center;
         filter:blur(var(--vblur)) brightness(0.65);
         opacity:0;transition:opacity 1s ease;}
       #cf-vbg.rdy video{opacity:1;}
@@ -230,7 +231,9 @@ export default function LandingPage() {
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${getApiUrl()}/public-inquiry`, {
+      const targetUrl = `${getApiUrl()}/public-inquiry`;
+      console.log('[Inquiry] Submitting to:', targetUrl);
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -241,7 +244,10 @@ export default function LandingPage() {
         })
       });
       
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Server status ${response.status}: ${errText}`);
+      }
       
       if (Platform.OS === 'web') { alert('Message Sent! Our team will get back to you shortly.'); }
       else { Alert.alert('Message Sent', 'Our team will get back to you shortly.'); }
@@ -251,9 +257,9 @@ export default function LandingPage() {
       setContactProject('');
       setContactMessage('');
     } catch (e: any) {
-      console.error(e);
+      console.warn('[Inquiry Error]', e);
       if (Platform.OS === 'web') { alert('Failed to send message: ' + e.message); }
-      else { Alert.alert('Error', 'Failed to send message. Please try again.'); }
+      else { Alert.alert('Error', 'Failed to send message. Please ensure the backend server is reachable: ' + (e.message || 'Network error')); }
     } finally {
       setIsSubmitting(false);
     }
@@ -330,16 +336,16 @@ export default function LandingPage() {
   return (
     <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
       {Platform.OS !== 'web' && (
-        <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, zIndex: -1 }}>
+        <View style={{ position: 'absolute', top: -150, bottom: -150, left: -150, right: -150, zIndex: -1, backgroundColor: '#0F172A' }}>
           <Video
             source={require('../../assets/images/homepage_scroll.mp4')}
-            style={{ width: ww, height: wh }}
+            style={{ width: '100%', height: '100%', transform: [{ scale: ww > wh ? 1.78 : 1.05 }] }}
             resizeMode={ResizeMode.COVER}
             shouldPlay
             isLooping
             isMuted
           />
-          <View style={{ position: 'absolute', top: 0, left: 0, width: ww, height: wh, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
         </View>
       )}
 

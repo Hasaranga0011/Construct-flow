@@ -21,6 +21,8 @@ The main role-based workflows are implemented and connected to Supabase:
 - Client project progress, milestones, media, invoices/financials, documents, estimates, notifications, and messaging surfaces. Some auxiliary client components still contain mock data and require production wiring.
 - Role-limited data views: non-admin portals filter records to the signed-in user's projects, sites, orders, or personal records. PM supplier/team views and site-manager labour views follow this rule.
 - Responsive portal shell: desktop sidebars switch to an overlay drawer below 1024px; dashboard columns, cards, forms, and list surfaces reflow for phone, tablet, and desktop widths.
+- Interactive landing page: features a scroll-scrubbing 3D-orbit video background (`homepage_scroll.mp4`) with smooth forward/reverse lerping on web and native video playback on mobile, responsive glassmorphism sections, and an integrated public inquiry form connected to `/api/public-inquiry` and Supabase notifications.
+- Universal backend resolution: centralized `getApiUrl()` automatically resolves backend endpoints across web browsers (window hostname) and physical mobile devices on Expo Go (dynamically resolving computer LAN IP via Metro bundler metadata, eliminating loopback connection failures).
 - Stable authenticated navigation: role prefixes are composed from `basePath` plus suffix-only sidebar hrefs, and session initialization is guarded against stale asynchronous auth events.
 - Supabase Auth, Postgres, Realtime subscriptions, Storage, Cloudinary upload support, Resend email support, scheduled late-order/low-stock checks, and RandomForest-based cost estimation.
 

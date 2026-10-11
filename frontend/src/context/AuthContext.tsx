@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { normalizeRole } from '../utils/auth';
+import { getApiUrl } from '../lib/apiUrl';
 
 type AuthContextType = {
   session: Session | null;
@@ -63,7 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const AsyncStorage = require('@react-native-async-storage/async-storage').default;
         const pendingRole = await AsyncStorage.getItem('pending_google_role');
         if (pendingRole) {
-           await fetch(`${process.env.EXPO_PUBLIC_API_URL}/auth/google-role`, {
+           await fetch(`${getApiUrl()}/auth/google-role`, {
               method: 'POST',
               headers: {
                  'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
            nextSession.user.user_metadata.role = pendingRole;
         }
       } catch (e) {
-        console.error("Failed to sync google role", e);
+        console.warn("Failed to sync google role", e);
       }
 
       try {

@@ -1,13 +1,5 @@
-import React, { useEffect } from 'react';
-import { ViewStyle, StyleProp } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
-  withDelay, 
-  withSpring,
-  Easing 
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { ViewStyle, StyleProp, Animated } from 'react-native';
 
 interface AnimatedCardProps {
   children: React.ReactNode;
@@ -26,53 +18,46 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   direction = 'up',
   duration = 500
 }) => {
-  const opacity = useSharedValue(0);
-  const translate = useSharedValue(50);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translate = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
-    // Fade in
-    opacity.value = withDelay(
-      delay, 
-      withTiming(1, { duration, easing: Easing.out(Easing.exp) })
-    );
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translate, {
+          toValue: 0,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        })
+      ])
+    ]).start();
+  }, [delay, duration, opacity, translate]);
 
-    // Slide in
-    translate.value = withDelay(
-      delay,
-      withSpring(0, {
-        damping: 15,
-        stiffness: 100,
-        mass: 1
-      })
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    let transform = [];
-    
-    switch (direction) {
-      case 'up':
-        transform.push({ translateY: translate.value });
-        break;
-      case 'down':
-        transform.push({ translateY: -translate.value });
-        break;
-      case 'left':
-        transform.push({ translateX: translate.value });
-        break;
-      case 'right':
-        transform.push({ translateX: -translate.value });
-        break;
-    }
-
-    return {
-      opacity: opacity.value,
-      transform,
-    };
-  });
+  let transform: any[] = [];
+  switch (direction) {
+    case 'up':
+      transform.push({ translateY: translate });
+      break;
+    case 'down':
+      transform.push({ translateY: Animated.multiply(translate, -1) });
+      break;
+    case 'left':
+      transform.push({ translateX: translate });
+      break;
+    case 'right':
+      transform.push({ translateX: Animated.multiply(translate, -1) });
+      break;
+  }
 
   return (
-    <Animated.View style={[animatedStyle, style]} className={className}>
+    <Animated.View style={[{ opacity, transform }, style]} className={className}>
       {children}
     </Animated.View>
   );

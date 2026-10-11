@@ -60,3 +60,23 @@ Automatic approval review rejected the additional milestone/expense endpoint and
 ## Full completion brief: Phase 1 follow-up (2026-09-25)
 
 The previously pending project-access patch is now applied and refined. Its old approval blocker no longer applies to this local patch. Project expense creation is limited to admin/PM. The shared notification helper now respects explicit recipients before role-wide matching. See `backend/reviews/PHASE1_AUDIT.md` for current scope and the read-only staging preflight. Phase 1 remains incomplete until schema reconciliation and authenticated staging tests pass; no later phase is marked complete.
+
+## Landing Page, Video Background & Expo Go Connectivity (2026-10-11)
+
+### Fixed
+- **Scroll-Driven Video Background Scaling (`frontend/src/app/index.tsx`)**:
+  - Fixed video sizing and aspect ratio fitting across Web and Native.
+  - Accommodated baked-in ~420px letterboxing/pillarboxing in `homepage_scroll.mp4` by applying `scale(1.78)` to ensure a crisp, seamless full-screen fill without side bars.
+  - Maintained bidirectional scroll-scrubbing via `requestAnimationFrame` on Web and auto-looping on Native.
+- **Expo Go Dynamic API URL Resolution (`frontend/src/lib/apiUrl.ts`)**:
+  - Resolved `TypeError: Network request failed` on mobile devices caused by requests directed to device loopback (`localhost`).
+  - Added robust detection of development machine IP via `Constants.expoConfig?.hostUri`, `Constants.manifest2?.extra?.expoGo?.debuggerHost`, and `Constants.experienceUrl`.
+  - Added LAN IP fallback (`10.24.163.40`) to maintain connectivity when Expo config metadata is missing.
+  - Ensured Web continues dynamically detecting the browser hostname for local LAN access.
+- **Centralized Endpoint Resolution in Services & Contexts**:
+  - `frontend/src/context/AuthContext.tsx`: Replaced direct `process.env.EXPO_PUBLIC_API_URL` usage with `getApiUrl()` for `/auth/google-role` sync, eliminating redbox network failure modals on app launch.
+  - `frontend/src/utils/notifications.ts`: Replaced duplicate and un-prefixed ad-hoc `getApiUrl` with centralized resolver from `lib/apiUrl.ts`.
+  - `frontend/src/app/index.tsx`: Integrated public contact inquiries with backend `POST /api/public-inquiry` and improved client-side error handling/logging.
+- **Silenced Reanimated Strict Mode Warnings (`frontend/src/app/_layout.tsx`)**:
+  - Silenced `[Reanimated] Reading from value during component render` terminal flood by configuring `configureReanimatedLogger({ strict: false })` and `LogBox.ignoreLogs`.
+  - Converted `AnimatedCard.tsx` to React Native's standard `Animated` API for maximum stability.

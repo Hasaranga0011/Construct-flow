@@ -97,14 +97,13 @@
 The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/site-manager` for new work. Route aliases should preserve the same role boundary as the canonical route and must not expose the admin-wide implementation accidentally.
 
 ## 4. Current State & Progress
-
 **2026-09-27 completion brief:** Full Site Manager integration and core portal routing fixes.
 - **IMPLEMENTED (Phases 1-7)**:
   - Phase 1: Hardened core RLS and replaced anonymous grants. Scoped attendance and legacy queries.
   - Phase 2: Fully connected Daily-Operations workflow with Supabase Realtime subscriptions on Dashboards (PM, Supplier, Site Manager). Integrated 'Confirm Receipt' for purchase orders. QR scan worker detail card.
   - Phase 3: 3-Way Multichannel Chat. client_messages upgraded to support PM, Admin, and Site Manager channels with live Realtime updates.
   - Phase 4: Payroll Notification Automation. Resend emails and in-app notifications automatically fire upon salary generation.
-  - Phase 5 & 6: Project Finances. client_payment_schedule and ariation_orders added. GET /api/projects/{id}/financials calculates committed vs actual spend with budget overrun alerts.
+  - Phase 5 & 6: Project Finances. client_payment_schedule and  ariation_orders added. GET /api/projects/{id}/financials calculates committed vs actual spend with budget overrun alerts.
   - Phase 7: Daily Site Reports. Mobile-first daily report creation UI for Site Managers and backend integration.
 - **COMPLETE & Working**:
   - Full Site Manager Dashboard and screens using real data and the `useAssignedSites()` hook for proper tenant isolation.
@@ -116,6 +115,13 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - Frontend finance charts (`CostTimelineChart`, `ClientBudgetRing`) wired to real backend `/financials` endpoint.
   - Automated APScheduler background jobs observability via `job_runs` table logging.
   - Supplier approval workflows and role boundary validations enforced throughout API.
+
+**2026-10-11 completion brief:** Landing Page, Scroll Video Background & Expo Go Connectivity.
+- **COMPLETE & Working**:
+  - **Landing Page Video Background**: Seamless scroll-scrubbed video layer (`homepage_scroll.mp4`) with smooth forward/reverse lerping via `requestAnimationFrame` on Web and looping playback on Native. Scaled to `scale(1.78)` to eliminate baked-in pillarboxes.
+  - **Universal API Discovery (`lib/apiUrl.ts`)**: Dynamically resolves API addresses across Web (`window.location.hostname`) and mobile Expo Go (dynamically extracting LAN IP from Metro's `Constants.expoConfig?.hostUri`, `Constants.experienceUrl`, and local network fallback `10.24.163.40`), resolving mobile `Network request failed` errors.
+  - **Public Inquiry Endpoint**: Fully wired `/api/public-inquiry` on FastAPI with automatic Supabase admin notification dispatching.
+  - **Reanimated Strict Mode Stabilization**: Suppressed strict-mode log flood in `_layout.tsx` via `configureReanimatedLogger({ strict: false })` and `LogBox.ignoreLogs`. Migrated `AnimatedCard.tsx` to React Native's standard `Animated` library for cross-platform stability.
 - **IN PROGRESS**:
   - Final end-to-end integration testing and production rollout readiness.
 - **KNOWN BUGS / ISSUES**:

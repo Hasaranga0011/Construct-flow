@@ -28,15 +28,7 @@ export const isNotificationForUser = (
       || getNotificationRoleAliases(role).includes(notification.target_role || '')));
 
 import { supabase } from '../lib/supabase';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-
-const getApiUrl = () => {
-  if (Platform.OS === 'web') return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-  const debuggerHost = Constants.expoConfig?.hostUri;
-  const localhost = debuggerHost?.split(':')[0] || '10.0.2.2';
-  return process.env.EXPO_PUBLIC_API_URL || `http://${localhost}:8000`;
-};
+import { getApiUrl } from '../lib/apiUrl';
 
 export const sendSystemNotification = async (
   title: string,

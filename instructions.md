@@ -15,8 +15,9 @@ This project contains a React Native frontend (using Expo Router) and a FastAPI 
 & ".\.venv\Scripts\Activate.ps1"
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+> **Note**: Binding to `--host 0.0.0.0` allows physical devices on the same Wi-Fi running Expo Go to reach the backend API.
 
 ## Install and Run Frontend
 
@@ -32,7 +33,7 @@ When Expo opens, press:
 - `a` to open Android
 - `i` to open iOS
 
-For a physical phone, keep `npm start` running and scan the QR code with Expo Go.
+For a physical phone on the same Wi-Fi network, keep `npm start` running and scan the QR code with Expo Go. The app automatically detects your computer's LAN IP address from the Metro bundler so all API requests connect directly.
 
 ## Other commands
 

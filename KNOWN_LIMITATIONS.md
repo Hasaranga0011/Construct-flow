@@ -22,7 +22,7 @@ These items do not block the core operations of the system but are documented fo
 * **Metro Bundler Pathing:** Because Expo Router relies on the file system, some files nested deep in `/site-manager/reports/...` or `/admin/materials/orders/...` may occasionally experience relative pathing conflicts or require restart when moving files. 
 
 ## 5. Offline Capabilities
-* **Offline Mode:** Site Managers operating in areas with poor cellular reception cannot currently queue Daily Site Reports or Attendance QR Scans locally. The app requires an active connection to `http://localhost:8000` or the production Supabase endpoint to complete actions.
+* **Offline Mode:** Site Managers operating in areas with poor cellular reception cannot currently queue Daily Site Reports or Attendance QR Scans locally. The app requires an active connection to the backend API (dynamically resolved via local LAN during Expo Go development or the production API endpoint) and Supabase to complete actions.
 
 ## 6. Advanced Reporting
 * **Admin Master Reporting:** The `/admin/reports` namespace exists but does not export to PDF/Excel or run advanced cross-project analytics. Current reporting relies on the frontend Dashboard aggregation components.
