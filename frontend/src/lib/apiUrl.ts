@@ -33,11 +33,23 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
 
 export function getApiUrl(): string {
   if (Platform.OS === 'web') {
+    const configured = process.env.EXPO_PUBLIC_API_URL;
+    const isLoopback = !configured || /localhost|127\.0\.0\.1/.test(configured);
+
+    // Hosted build: use the configured backend URL as-is
+    if (!isLoopback) {
+      const clean = configured!.replace(/\/$/, '');
+      return clean.endsWith('/api') ? clean : `${clean}/api`;
+    }
+
+    // Local dev (existing behaviour): same host as the page, port 8000
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
       return `http://${window.location.hostname}:8000/api`;
     }
     return 'http://localhost:8000/api';
   }
+
+  // ...native branch unchanged below
   
   // Try multiple ways to get the Metro bundler IP in Expo Go
   const manifest = Constants.expoConfig || (Constants as any).manifest || (Constants as any).manifest2;
