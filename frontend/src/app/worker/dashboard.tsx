@@ -18,32 +18,46 @@ import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
 function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
-  let svgRef: any = null;
+  const svgRef = useRef<any>(null);
 
   const downloadQR = () => {
-    if (svgRef && svgRef.toDataURL) {
-      svgRef.toDataURL(async (data: string) => {
-        if (Platform.OS === 'web') {
-          const a = document.createElement('a');
-          a.href = `data:image/png;base64,${data}`;
-          a.download = `worker_qr_${profile.worker_code || profile.id}.png`;
-          a.click();
-        } else {
-          try {
-            const fileUri = `${FileSystem.documentDirectory}worker_qr_${profile.worker_code || profile.id}.png`;
-            await FileSystem.writeAsStringAsync(fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
-            const isAvailable = await Sharing.isAvailableAsync();
-            if (isAvailable) {
-              await Sharing.shareAsync(fileUri);
-            } else {
-              Alert.alert('Sharing not available', 'Unable to share or save the QR code on this device.');
-            }
-          } catch (e) {
-            Alert.alert('Error', 'Failed to save QR code.');
-          }
-        }
-      });
+    if (!svgRef.current || !svgRef.current.toDataURL) {
+      Alert.alert('Please wait', 'QR Code is still rendering, please try again in a moment.');
+      return;
     }
+
+    svgRef.current.toDataURL(async (data: string) => {
+      if (Platform.OS === 'web') {
+        const a = document.createElement('a');
+        a.href = `data:image/png;base64,${data}`;
+        a.download = `worker_qr_${(profile.worker_code || profile.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+        a.click();
+      } else {
+        try {
+          const cleanBase64 = data.replace(/^data:image\/png;base64,/, '').trim();
+          const safeName = (profile.worker_code || profile.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const fileUri = `${FileSystem.cacheDirectory}worker_qr_${safeName}.png`;
+          
+          await FileSystem.writeAsStringAsync(fileUri, cleanBase64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(fileUri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Download Worker QR Code',
+              UTI: 'public.png',
+            });
+          } else {
+            Alert.alert('Sharing not available', 'Unable to share or save files on this device.');
+          }
+        } catch (e: any) {
+          console.error('[Download QR Error]', e);
+          Alert.alert('Error', `Failed to save QR code: ${e?.message || 'Unknown error'}`);
+        }
+      }
+    });
   };
 
   if (!profile) return null;
@@ -53,7 +67,7 @@ function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
         <Text className="text-2xl font-bold text-slate-900 mb-2">{profile.full_name}</Text>
         <Text className="text-cyan-600 font-semibold mb-6">{profile.worker_code || 'Pending'}</Text>
         <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={200} getRef={(c) => (svgRef = c)} />
+          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={200} getRef={(c) => (svgRef.current = c)} />
         </View>
         <Text className="text-slate-500 text-sm text-center mt-6">Show this QR code to your Site Manager when arriving at or leaving the site.</Text>
         <Pressable onPress={downloadQR} className="mt-8 bg-brand-orange px-8 py-3 rounded-xl w-full items-center">

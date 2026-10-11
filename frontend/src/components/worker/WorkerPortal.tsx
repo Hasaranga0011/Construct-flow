@@ -6,9 +6,11 @@ import {
   Modal,
   useWindowDimensions,
   Linking,
-  Platform,
   ScrollView,
+  Alert,
 } from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
@@ -514,34 +516,42 @@ function QRModal({
           .catch(() => {});
     };
   }, []);
-  let svgRef: any = null;
+  const svgRef = React.useRef<any>(null);
 
   const downloadQR = () => {
-    if (svgRef && svgRef.toDataURL) {
-      svgRef.toDataURL(async (data: string) => {
-        if (Platform.OS === 'web') {
-          const a = document.createElement('a');
-          a.href = `data:image/png;base64,${data}`;
-          a.download = `worker_qr_${profile.worker_code || profile.id}.png`;
-          a.click();
-        } else {
-          try {
-            const FileSystem = await import('expo-file-system');
-            const Sharing = await import('expo-sharing');
-            const fileUri = `${FileSystem.documentDirectory}worker_qr_${profile.worker_code || profile.id}.png`;
-            await FileSystem.writeAsStringAsync(fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
-            const isAvailable = await Sharing.isAvailableAsync();
-            if (isAvailable) {
-              await Sharing.shareAsync(fileUri);
-            } else {
-              Alert.alert('Sharing not available', 'Unable to share or save the QR code on this device.');
-            }
-          } catch (e) {
-            Alert.alert('Error', 'Failed to save QR code.');
-          }
-        }
-      });
+    if (!svgRef.current || !svgRef.current.toDataURL) {
+      Alert.alert('Please wait', 'QR Code is still rendering, please try again in a moment.');
+      return;
     }
+
+    svgRef.current.toDataURL(async (data: string) => {
+      if (Platform.OS === 'web') {
+        const a = document.createElement('a');
+        a.href = `data:image/png;base64,${data}`;
+        a.download = `worker_qr_${(profile?.worker_code || profile?.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+        a.click();
+      } else {
+        try {
+          const cleanBase64 = data.replace(/^data:image\/png;base64,/, '').trim();
+          const safeName = (profile?.worker_code || profile?.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const fileUri = `${FileSystem.cacheDirectory}worker_qr_${safeName}.png`;
+          await FileSystem.writeAsStringAsync(fileUri, cleanBase64, { encoding: FileSystem.EncodingType.Base64 });
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(fileUri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Download Worker QR Code',
+              UTI: 'public.png',
+            });
+          } else {
+            Alert.alert('Sharing not available', 'Unable to share or save files on this device.');
+          }
+        } catch (e: any) {
+          console.error('[Download QR Error]', e);
+          Alert.alert('Error', `Failed to save QR code: ${e?.message || 'Unknown error'}`);
+        }
+      }
+    });
   };
 
   return (
@@ -566,7 +576,7 @@ function QRModal({
                 value={profile.qr_code}
                 size={Math.max(120, Math.min(width * 0.8, height * 0.55, 600))}
                 backgroundColor="white"
-                getRef={(c) => (svgRef = c)}
+                getRef={(c) => (svgRef.current = c)}
               />
               <Button label="Download QR" onPress={downloadQR} style={{ marginTop: 16 }} />
             </View>
