@@ -51,9 +51,11 @@ def prepare_data():
         cost_df['labour_cost'] = cost_df['num_workers'] * 3_500 * 20
 
         locations = [
-            'Colombo', 'Gampaha', 'Kandy', 'Galle',
-            'Matara', 'Kurunegala', 'Ratnapura', 'Anuradhapura',
-            'Jaffna', 'Trincomalee',
+            'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
+            'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara',
+            'Kandy', 'Kegalle', 'Kilinochchi', 'Kurunegala', 'Mannar',
+            'Matale', 'Matara', 'Monaragala', 'Mullaitivu', 'Nuwara Eliya',
+            'Polonnaruwa', 'Puttalam', 'Ratnapura', 'Trincomalee', 'Vavuniya',
         ]
         project_types = [
             'Residential House', 'Commercial Building', 'Apartment Complex',
@@ -87,12 +89,17 @@ def prepare_data():
         }
         base_rates = cost_df['project_type'].map(base_rate_map)
 
-        # Location multiplier
+        # Location multiplier (regional cost factors across all 25 districts)
         loc_mul_map = {
-            'Colombo': 1.30, 'Gampaha': 1.15, 'Kandy': 1.10,
-            'Galle': 1.08,  'Matara': 1.05,  'Kurunegala': 1.00,
-            'Ratnapura': 0.98, 'Anuradhapura': 0.95,
-            'Jaffna': 0.97,  'Trincomalee': 0.95,
+            'Colombo': 1.30, 'Gampaha': 1.15, 'Kalutara': 1.10,
+            'Kandy': 1.12, 'Matale': 0.98, 'Nuwara Eliya': 1.08,
+            'Galle': 1.08, 'Matara': 1.05, 'Hambantota': 1.02,
+            'Jaffna': 1.06, 'Kilinochchi': 0.97, 'Mannar': 0.98,
+            'Vavuniya': 0.96, 'Mullaitivu': 0.97, 'Batticaloa': 1.03,
+            'Ampara': 0.96, 'Trincomalee': 1.04, 'Kurunegala': 1.01,
+            'Puttalam': 0.99, 'Anuradhapura': 0.96, 'Polonnaruwa': 0.97,
+            'Badulla': 1.01, 'Monaragala': 0.95, 'Ratnapura': 0.99,
+            'Kegalle': 1.00,
         }
         loc_mul = cost_df['location'].map(loc_mul_map)
 

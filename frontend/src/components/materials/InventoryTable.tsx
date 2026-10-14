@@ -131,15 +131,15 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
           .from('materials')
           .select(`
             id, name, unit, current_stock, minimum_threshold, last_updated, project_id,
-            projects!inner(name, status)
+            projects(name, status)
           `)
           .order('last_updated', { ascending: false });
 
         if (projectId) {
           query = query.eq('project_id', projectId);
         } else {
-          // Scope to active projects if no specific project is selected
-          query = query.eq('projects.status', 'active');
+          // Scope to active / non-archived projects if no specific project is selected
+          query = query.neq('projects.status', 'archived');
         }
 
 

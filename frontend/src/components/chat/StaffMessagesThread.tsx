@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { ChatComposer } from './ChatComposer';
 
 type Message = {
   id: string;
@@ -165,17 +166,13 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
           );
         })}
       </ScrollView>
-      <View className="p-4 bg-white dark:bg-[#0B0F19] border-t border-gray-100 dark:border-gray-900 flex-row items-center">
-        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-          className="flex-1 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-full px-4 py-2.5 text-sm mr-2 outline-none"
-          placeholder="Message client..." placeholderTextColor="#9ca3af"
-          value={input} onChangeText={setInput} editable={!sending} onSubmitEditing={sendMessage} returnKeyType="send"
-        />
-        <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={sendMessage} disabled={sending || !input.trim()}
-          className={`w-11 h-11 rounded-full items-center justify-center ${sending || !input.trim() ? 'bg-gray-300 dark:bg-gray-700' : 'bg-brand-orange'}`}>
-          {sending ? <ActivityIndicator size="small" color="white" /> : <Ionicons name="send" size={18} color="white" />}
-        </Pressable>
-      </View>
+      <ChatComposer
+        value={input}
+        onChangeText={setInput}
+        onSend={sendMessage}
+        sending={sending}
+        placeholder="Message client..."
+      />
     </KeyboardAvoidingView>
   );
 }

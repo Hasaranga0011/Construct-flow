@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { managedProjects } from '@/services/pmData';
 import { assignedWorkers } from '@/services/siteData';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function PMLabourScreen() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function PMLabourScreen() {
     try {
       const projects = await managedProjects();
       if (!projects.length) { setRows([]); setStats({ workers: 0, present: 0, sites: 0, overtime: 0 }); return; }
-      const ids = projects.map(p => p.id);
+      const ids = projects.map(p => p.id).filter((id): id is string => Boolean(id));
       const [workersList, attendance] = await Promise.all([
         assignedWorkers(ids),
         supabase.from('attendance').select('*').in('site_id', ids).eq('date', new Date().toISOString().slice(0, 10)).order('check_in_time', { ascending: false }),
@@ -47,8 +48,8 @@ export default function PMLabourScreen() {
   const visible = rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
   const time = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not recorded';
   return <View className="flex-1 bg-brand-light"><TopNav title="Project Labour" actionLabel="Refresh" onActionPress={load} /><ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
-    <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',stats.overtime.toFixed(1)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mt-2">{value}</Text></View>)}</View>
-    <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold">Today?s Attendance</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">View Payroll</Text></Pressable></View>
+    <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',stats.overtime.toFixed(1)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><AutoFitText value={value} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>)}</View>
+    <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold">Today's Attendance</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">View Payroll</Text></Pressable></View>
     <View className="mb-4 z-50">
       <SearchInput 
         placeholder="Search worker or project..." 

@@ -27,23 +27,37 @@ export function useRealtimeStats(
   useEffect(() => { refetchRef.current = onRefetch; }, [onRefetch]);
 
   useEffect(() => {
-    const trigger = () => refetchRef.current();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        refetchRef.current();
+      }, 250);
+    };
+
+    const subId = Math.random().toString(36).slice(2, 8);
 
     // attendance → Workers On Site (admin / site / site-manager dashboards)
     const attendanceChannel = supabase
-      .channel('realtime-attendance')
+      .channel(`realtime-att-${subId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, trigger)
       .subscribe();
 
-    // labour → Workers On Site (PM / site dashboards that query labour.status = 'Present')
+    // projects → Active Projects, Total Budget (admin / PM dashboards)
+    const projectsChannel = supabase
+      .channel(`realtime-proj-${subId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger)
+      .subscribe();
+
+    // labour / legacy_labour → fallback worker status
     const labourChannel = supabase
-      .channel('realtime-labour')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'labour' }, trigger)
+      .channel(`realtime-lab-${subId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'legacy_labour' }, trigger)
       .subscribe();
 
     // materials → Low Stock Alerts
     const materialsChannel = supabase
-      .channel('realtime-materials')
+      .channel(`realtime-mat-${subId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, trigger)
       .subscribe();
 
@@ -51,13 +65,15 @@ export function useRealtimeStats(
     let siteMaterialsChannel: ReturnType<typeof supabase.channel> | null = null;
     if (includeSiteMaterials) {
       siteMaterialsChannel = supabase
-        .channel('realtime-site-materials')
+        .channel(`realtime-sm-${subId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_materials' }, trigger)
         .subscribe();
     }
 
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(attendanceChannel);
+      supabase.removeChannel(projectsChannel);
       supabase.removeChannel(labourChannel);
       supabase.removeChannel(materialsChannel);
       if (siteMaterialsChannel) supabase.removeChannel(siteMaterialsChannel);

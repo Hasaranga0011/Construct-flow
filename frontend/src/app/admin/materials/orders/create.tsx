@@ -1,9 +1,10 @@
 import { notify } from '@/utils/notify';
 import { positiveQuantity, validReportDate } from '@/utils/siteWorkflow';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
+import { ModalViewport } from '@/components/common/ModalViewport';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { sendSystemNotification } from '../../../../utils/notifications';
@@ -18,7 +19,8 @@ export default function AdminMaterialsOrdersCreatePage() {
   // Data arrays
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [materials, setMaterials] = useState<any[]>([]);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [projectStockMap, setProjectStockMap] = useState<Record<string, { current_stock: number; minimum_threshold: number; unit: string }>>({});
   const [assignments, setAssignments] = useState<any[]>([]);
 
   // Selected values
@@ -37,6 +39,13 @@ export default function AdminMaterialsOrdersCreatePage() {
   const [showProjectDrop, setShowProjectDrop] = useState(false);
   const [showMaterialDrop, setShowMaterialDrop] = useState(false);
   const [showUnitDrop, setShowUnitDrop] = useState(false);
+
+  // New Material Modal
+  const [showNewMatModal, setShowNewMatModal] = useState(false);
+  const [newMatName, setNewMatName] = useState('');
+  const [newMatUnit, setNewMatUnit] = useState('Units');
+  const [newMatCategory, setNewMatCategory] = useState('General');
+  const [creatingMaterial, setCreatingMaterial] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,14 +76,29 @@ export default function AdminMaterialsOrdersCreatePage() {
         const { data: projData, error: projErr } = await projectQuery;
         if (projErr) throw projErr;
 
-        // Fetch Materials
-        const { data: matData, error: matErr } = await supabase
-          .from('materials')
-          .select('id, name, project_id, unit')
-          .order('name');
+        // Fetch Catalog via API or distinct materials
+        let catalogItems: any[] = [];
+        try {
+          const catRes = await fetch(`${supabase.supabaseUrl ? '' : ''}/api/materials/catalog`);
+          // Or query directly from Supabase:
+          const { data: catData } = await supabase.from('material_catalog').select('*').order('name');
+          if (catData && catData.length > 0) {
+            catalogItems = catData;
+          }
+        } catch {}
 
-        // If materials fetch fails (e.g. RLS or table doesn't exist), just ignore
-        const validMaterials = matErr ? [] : (matData || []);
+        if (catalogItems.length === 0) {
+          // Fallback to distinct existing materials
+          const { data: matData } = await supabase.from('materials').select('id, name, unit, category').order('name');
+          const distinctMap = new Map();
+          (matData || []).forEach(m => {
+            const key = (m.name || '').trim();
+            if (key && !distinctMap.has(key)) {
+              distinctMap.set(key, { id: m.id, name: key, unit: m.unit || 'Units', category: m.category || 'General' });
+            }
+          });
+          catalogItems = Array.from(distinctMap.values());
+        }
 
         // Fetch Assignments
         const { data: assignData } = await supabase
@@ -85,13 +109,11 @@ export default function AdminMaterialsOrdersCreatePage() {
         if (isMounted) {
           setSuppliers(supData || []);
           setProjects(projData || []);
-          setMaterials(validMaterials);
+          setCatalog(catalogItems);
           setAssignments(assignData || []);
         }
       } catch (err: any) {
-        if (isMounted && Platform.OS !== 'web') {
-          Alert.alert('Error loading data', err.message);
-        } else if (isMounted && Platform.OS === 'web') {
+        if (isMounted) {
           notify('Error loading data', err.message);
         }
       } finally {
@@ -103,19 +125,93 @@ export default function AdminMaterialsOrdersCreatePage() {
     return () => { isMounted = false; };
   }, []);
 
+  // When selectedProject changes, load that project's stock rows
+  useEffect(() => {
+    if (!selectedProject) {
+      setProjectStockMap({});
+      return;
+    }
 
-  const handleCreateMaterial = async () => {
-    if (!selectedProject || !materialQuery.trim()) { notify('Project required', 'Select a project and enter a material name first.'); return; }
+    const loadProjectStock = async () => {
+      const { data } = await supabase
+        .from('materials')
+        .select('name, catalog_id, current_stock, minimum_threshold, unit')
+        .eq('project_id', selectedProject.id);
+
+      const map: Record<string, { current_stock: number; minimum_threshold: number; unit: string }> = {};
+      (data || []).forEach(row => {
+        if (row.name) {
+          map[row.name.trim().toLowerCase()] = {
+            current_stock: row.current_stock || 0,
+            minimum_threshold: row.minimum_threshold || 10,
+            unit: row.unit || 'Units',
+          };
+        }
+        if (row.catalog_id) {
+          map[row.catalog_id] = {
+            current_stock: row.current_stock || 0,
+            minimum_threshold: row.minimum_threshold || 10,
+            unit: row.unit || 'Units',
+          };
+        }
+      });
+      setProjectStockMap(map);
+    };
+
+    loadProjectStock();
+  }, [selectedProject]);
+
+  const handleCreateCatalogMaterial = async () => {
+    if (!newMatName.trim()) {
+      notify('Validation', 'Material name is required.');
+      return;
+    }
+    setCreatingMaterial(true);
     try {
-      const { data, error } = await supabase.from('materials').insert([{ name: materialQuery.trim(), project_id: selectedProject?.id, unit: selectedUnit, current_stock: 0, minimum_threshold: 0 }]).select().single();
-      if (error) throw error;
-      setMaterials([...materials, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedMaterial(data);
-      setMaterialQuery(data.name);
+      let createdItem: any = null;
+      // Try insert into material_catalog
+      const { data, error } = await supabase
+        .from('material_catalog')
+        .insert([{
+          name: newMatName.trim(),
+          unit: newMatUnit.trim(),
+          category: newMatCategory.trim()
+        }])
+        .select()
+        .single();
+
+      if (!error && data) {
+        createdItem = data;
+      } else {
+        // Fallback: insert into materials table
+        const { data: fallbackData, error: fbError } = await supabase
+          .from('materials')
+          .insert([{
+            name: newMatName.trim(),
+            project_id: selectedProject?.id,
+            unit: newMatUnit.trim(),
+            category: newMatCategory.trim(),
+            current_stock: 0,
+            minimum_threshold: 10
+          }])
+          .select()
+          .single();
+        if (fbError) throw fbError;
+        createdItem = fallbackData;
+      }
+
+      setCatalog(prev => [...prev, createdItem].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedMaterial(createdItem);
+      setMaterialQuery(createdItem.name);
+      setSelectedUnit(createdItem.unit || 'Units');
+      setShowNewMatModal(false);
       setShowMaterialDrop(false);
+      setNewMatName('');
+      notify('Success', `"${createdItem.name}" added to material catalog.`);
     } catch (err: any) {
-      if (Platform.OS === 'web') window.alert(err.message);
-      else Alert.alert('Error', err.message);
+      notify('Error', err.message || 'Failed to create material in catalog.');
+    } finally {
+      setCreatingMaterial(false);
     }
   };
 
@@ -143,10 +239,8 @@ export default function AdminMaterialsOrdersCreatePage() {
 
   const handleSubmit = async () => {
     if (loading) return;
-    if (!selectedSupplier || !selectedProject || !selectedMaterial || (selectedMaterial.project_id && selectedMaterial.project_id !== selectedProject?.id) || !positiveQuantity(quantity) || !validReportDate(expectedDate)) {
-      const msg = 'Select a supplier, project and material, enter a positive quantity and a valid delivery date (YYYY-MM-DD).';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+    if (!selectedSupplier || !selectedProject || !selectedMaterial || !positiveQuantity(quantity) || !validReportDate(expectedDate)) {
+      notify('Validation Error', 'Select an assigned supplier, project, and catalog material, enter a positive quantity and a valid delivery date (YYYY-MM-DD).');
       return;
     }
 
@@ -315,12 +409,19 @@ export default function AdminMaterialsOrdersCreatePage() {
             })()}
 
             {/* Material Dropdown */}
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Material</Text>
+            <View className="flex-row justify-between items-center mb-1">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase">Material (Catalog)</Text>
+              <Pressable onPress={() => setShowNewMatModal(true)} className="flex-row items-center">
+                <Ionicons name="add-circle" size={16} color="#F97316" className="mr-1" />
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-orange">Add New Material</Text>
+              </Pressable>
+            </View>
+
             <View className="relative z-40 mb-4">
               <View className="flex-row justify-between items-center border border-gray-200 rounded-lg bg-gray-50 pr-4">
                 <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                   className="flex-1 px-4 py-3 text-sm text-gray-800"
-                  placeholder="Search or type new material..."
+                  placeholder="Search material catalog..."
                   value={materialQuery}
                   onChangeText={(text) => {
                     setMaterialQuery(text);
@@ -337,29 +438,90 @@ export default function AdminMaterialsOrdersCreatePage() {
               </View>
 
               {showMaterialDrop && (
-                <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-lg max-h-48 z-40">
+                <View className="absolute top-full left-0 right-0 bg-white border border-gray-200 mt-1 rounded-lg shadow-xl max-h-64 z-40">
                   <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
-                    {materials.filter(m => (!m.project_id || m.project_id === selectedProject?.id) && m.name.toLowerCase().includes(materialQuery.toLowerCase())).map(mat => (
-                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                          key={mat.id}
-                          onPress={() => { setSelectedMaterial(mat); setMaterialQuery(mat.name); setShowMaterialDrop(false); }}
-                          className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
-                        >
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800">{mat.name}</Text>
-                        </Pressable>
-                    ))}
-                    {materialQuery.trim() !== '' && !materials.some(m => m.name.toLowerCase() === materialQuery.trim().toLowerCase()) && (
-                        <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                          onPress={handleCreateMaterial}
-                          className="px-4 py-3 border-b border-gray-100 bg-orange-50 hover:bg-orange-100 flex-row items-center"
-                        >
-                          <Ionicons name="add-circle-outline" size={18} color="#F97316" style={{marginRight: 8}} />
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold">Create &quot;{materialQuery}&quot;</Text>
-                        </Pressable>
-                    )}
-                    {materials.length === 0 && materialQuery.trim() === '' && (
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="p-4 text-gray-500">No materials in database. Type to create one.</Text>
-                    )}
+                    {(() => {
+                      const searchLower = materialQuery.toLowerCase().trim();
+                      const filtered = catalog.filter(m => (m.name || '').toLowerCase().includes(searchLower));
+
+                      if (filtered.length === 0) {
+                        return (
+                          <View className="p-4 items-center">
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mb-3">No matching material found in catalog.</Text>
+                            <Pressable
+                              onPress={() => {
+                                setNewMatName(materialQuery);
+                                setShowNewMatModal(true);
+                                setShowMaterialDrop(false);
+                              }}
+                              className="bg-orange-50 border border-orange-200 px-4 py-2 rounded-lg flex-row items-center"
+                            >
+                              <Ionicons name="add-circle-outline" size={18} color="#F97316" className="mr-2" />
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">Add &quot;{materialQuery}&quot; to Catalog</Text>
+                            </Pressable>
+                          </View>
+                        );
+                      }
+
+                      // Sort: low-stock items in selected project first, then alphabetical
+                      const sorted = [...filtered].sort((a, b) => {
+                        const stockA = projectStockMap[a.id] || projectStockMap[(a.name || '').toLowerCase().trim()];
+                        const stockB = projectStockMap[b.id] || projectStockMap[(b.name || '').toLowerCase().trim()];
+                        const isLowA = stockA && stockA.current_stock < stockA.minimum_threshold ? 1 : 0;
+                        const isLowB = stockB && stockB.current_stock < stockB.minimum_threshold ? 1 : 0;
+                        if (isLowB !== isLowA) return isLowB - isLowA;
+                        return (a.name || '').localeCompare(b.name || '');
+                      });
+
+                      // Group by category
+                      const groups: Record<string, any[]> = {};
+                      sorted.forEach(item => {
+                        const cat = item.category || 'General';
+                        if (!groups[cat]) groups[cat] = [];
+                        groups[cat].push(item);
+                      });
+
+                      return Object.entries(groups).map(([cat, items]) => (
+                        <View key={cat} className="mb-2">
+                          <View className="bg-gray-100 px-4 py-1.5">
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{cat}</Text>
+                          </View>
+                          {items.map(mat => {
+                            const stockInfo = projectStockMap[mat.id] || projectStockMap[(mat.name || '').toLowerCase().trim()];
+                            const hasStock = !!stockInfo;
+                            const isLow = hasStock && stockInfo.current_stock < stockInfo.minimum_threshold;
+                            const stockText = hasStock ? `${stockInfo.current_stock} in stock` : 'Not stocked yet';
+
+                            return (
+                              <Pressable
+                                style={{ minHeight: 44, minWidth: 44 }}
+                                key={mat.id || mat.name}
+                                onPress={() => {
+                                  setSelectedMaterial(mat);
+                                  setMaterialQuery(mat.name);
+                                  setSelectedUnit(mat.unit || 'Units');
+                                  setShowMaterialDrop(false);
+                                }}
+                                className="px-4 py-2.5 border-b border-gray-100 flex-row justify-between items-center hover:bg-gray-50"
+                              >
+                                <View className="flex-1 mr-2">
+                                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-sm">{mat.name}</Text>
+                                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400">Unit: {mat.unit || 'Units'}</Text>
+                                </View>
+                                <View className="items-end">
+                                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${isLow ? 'text-red-500' : hasStock ? 'text-green-600' : 'text-gray-400'}`}>
+                                    {stockText}
+                                  </Text>
+                                  {isLow && (
+                                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-red-400 font-bold">LOW STOCK</Text>
+                                  )}
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      ));
+                    })()}
                   </ScrollView>
                 </View>
               )}
@@ -430,6 +592,80 @@ export default function AdminMaterialsOrdersCreatePage() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Add New Material to Catalog Modal */}
+      <Modal visible={showNewMatModal} transparent animationType="fade" onRequestClose={() => setShowNewMatModal(false)}>
+        <ModalViewport>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ padding: 24 }}
+            className="w-full max-w-md max-h-full rounded-2xl bg-white shadow-2xl border border-gray-100"
+          >
+            <View className="flex-row items-center mb-4">
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-orange-100 mr-3">
+                <Ionicons name="cube" size={20} color="#F97316" />
+              </View>
+              <View className="flex-1">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-900">Add Material to Catalog</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">Available across all projects</Text>
+              </View>
+            </View>
+
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Material Name</Text>
+            <TextInput
+              maxFontSizeMultiplier={1.3}
+              className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50 mb-4"
+              placeholder="e.g. River Sand (Cube)"
+              value={newMatName}
+              onChangeText={setNewMatName}
+            />
+
+            <View className="flex-row gap-3 mb-4">
+              <View className="flex-1">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Default Unit</Text>
+                <TextInput
+                  maxFontSizeMultiplier={1.3}
+                  className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
+                  placeholder="e.g. Bags, Cube, Tons"
+                  value={newMatUnit}
+                  onChangeText={setNewMatUnit}
+                />
+              </View>
+              <View className="flex-1">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Category</Text>
+                <TextInput
+                  maxFontSizeMultiplier={1.3}
+                  className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
+                  placeholder="e.g. Raw Material"
+                  value={newMatCategory}
+                  onChangeText={setNewMatCategory}
+                />
+              </View>
+            </View>
+
+            <View className="flex-row justify-end gap-3 mt-4">
+              <Pressable
+                onPress={() => setShowNewMatModal(false)}
+                disabled={creatingMaterial}
+                className="rounded-lg border border-gray-200 px-4 py-2.5"
+              >
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleCreateCatalogMaterial}
+                disabled={creatingMaterial || !newMatName.trim()}
+                className={`rounded-lg px-5 py-2.5 flex-row items-center justify-center ${
+                  !newMatName.trim() || creatingMaterial ? 'bg-orange-300 opacity-60' : 'bg-brand-orange'
+                }`}
+              >
+                {creatingMaterial && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-white">Save to Catalog</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </ModalViewport>
+      </Modal>
     </View>
   );
 }

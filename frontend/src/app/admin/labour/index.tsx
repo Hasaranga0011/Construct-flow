@@ -29,7 +29,7 @@ export default function LabourForceScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [workers, setWorkers] = useState<any[]>([]);
   const { isMobile } = useResponsive();
-  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects', 'salary_slips', 'workers', 'site_workers']);
+  const { tick, lastUpdated } = useTableRealtime(['attendance', 'legacy_labour', 'profiles', 'projects', 'salary_slips', 'workers', 'site_workers']);
   const liveTrigger = refreshTrigger + tick;
 
   useEffect(() => {
@@ -39,13 +39,17 @@ export default function LabourForceScreen() {
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return;
 
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const utcDate = now.toISOString().split('T')[0];
+        const todayDates = Array.from(new Set([localDate, utcDate]));
 
-        const [workersReq, checkinsReq, sitesReq, labourReq, recordsReq, assignmentsReq] = await Promise.all([
+        const [workersReq, checkinsReq, attCheckinsReq, sitesReq, labourReq, recordsReq, assignmentsReq] = await Promise.all([
           supabase.from('profiles').select('id, full_name, email, role', { count: 'exact' }).eq('role', 'worker'),
-          supabase.from('legacy_labour').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present'),
+          supabase.from('legacy_labour').select('id', { count: 'exact', head: true }).in('date', todayDates).eq('status', 'Present'),
+          supabase.from('attendance').select('id', { count: 'exact', head: true }).in('date', todayDates).not('check_in_time', 'is', null).is('check_out_time', null),
           supabase.from('projects').select('id, name, status'),
-          supabase.from('legacy_labour').select('hours_worked').eq('date', today).eq('status', 'Present'),
+          supabase.from('legacy_labour').select('hours_worked').in('date', todayDates).eq('status', 'Present'),
           supabase.from('workers').select('*'),
           supabase.from('site_workers').select('worker_id, project_id')
         ]);
@@ -70,7 +74,7 @@ export default function LabourForceScreen() {
           }));
           setStats({
             totalWorkers: workersReq.count || 0,
-            checkedInToday: checkinsReq.count || 0,
+            checkedInToday: Math.max(attCheckinsReq.count || 0, checkinsReq.count || 0),
             activeSites: (sitesReq.data || []).filter(p => ['active', 'in progress'].includes(String(p.status).toLowerCase())).length, 
             pendingPayroll: Math.round(overtimeHrs), 
           });

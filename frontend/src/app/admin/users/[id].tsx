@@ -5,9 +5,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { notify, confirmAction } from '@/utils/notify';
+import { noAutofill } from '@/lib/formAutofill';
+import { PhoneInput } from '@/components/common/PhoneInput';
+import { AmountInput } from '@/components/common/AmountInput';
 
 const ROLES = [
-  { label: 'Admin', value: 'admin' },
+  { label: 'Admin', value: 'super_admin' },
   { label: 'Project Manager', value: 'pm' },
   { label: 'Site Manager', value: 'site_manager' },
   { label: 'Client', value: 'client' },
@@ -29,11 +32,21 @@ export default function AdminUsersEditPage() {
   const [email, setEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('pm');
   const [contactNumber, setContactNumber] = useState('');
+  const [isPhoneValid, setIsPhoneValid] = useState(true);
   const [workerType, setWorkerType] = useState('General Laborer');
-  const [dailyRate, setDailyRate] = useState('');
+  const [dailyRate, setDailyRate] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+    // Reset state every time the user ID changes so previous data never carries over
+    setInitialLoading(true);
+    setFullName('');
+    setEmail('');
+    setSelectedRole('');
+    setContactNumber('');
+    setWorkerType('General Laborer');
+    setDailyRate('');
+
     const fetchUser = async () => {
       try {
         const { data, error } = await supabase
@@ -51,7 +64,7 @@ export default function AdminUsersEditPage() {
           setContactNumber(data.contact_number || '');
           if (data.role === 'worker') {
             setWorkerType(data.worker_type || 'General Laborer');
-            setDailyRate(data.daily_rate ? data.daily_rate.toString() : '');
+            setDailyRate(data.daily_rate !== null && data.daily_rate !== undefined ? Number(data.daily_rate) : null);
           }
         }
       } catch (err: any) {
@@ -97,13 +110,18 @@ export default function AdminUsersEditPage() {
       return;
     }
 
+    if (contactNumber && !isPhoneValid) {
+      notify('Error', 'Please enter a valid Sri Lankan phone number (e.g. 077 123 4567).');
+      return;
+    }
+
     setSaving(true);
     try {
       const { error: profileError } = await supabase.rpc('update_user_role', {
         target_user_id: id,
         new_role: selectedRole,
         new_worker_type: selectedRole === 'worker' ? workerType : null,
-        new_daily_rate: selectedRole === 'worker' ? (parseFloat(dailyRate) || 0) : null
+        new_daily_rate: selectedRole === 'worker' ? dailyRate : null
       });
 
       if (profileError) throw profileError;
@@ -151,6 +169,7 @@ export default function AdminUsersEditPage() {
               placeholder="Enter full name"
               value={fullName}
               onChangeText={setFullName}
+              {...noAutofill('admin_edit_user_fullname')}
             />
 
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</Text>
@@ -158,15 +177,18 @@ export default function AdminUsersEditPage() {
               className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-400 mb-4 bg-gray-100"
               value={email || 'No email associated'}
               editable={false}
+              {...noAutofill('admin_edit_user_email', 'email')}
             />
 
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Contact Number</Text>
-            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-              className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
-              placeholder="Enter contact number (optional)"
+            <PhoneInput
+              label="Contact Number"
               value={contactNumber}
-              onChangeText={setContactNumber}
-              keyboardType="phone-pad"
+              onChangePhone={(e164, valid) => {
+                setContactNumber(e164);
+                setIsPhoneValid(valid);
+              }}
+              required={false}
+              placeholder="077 123 4567"
             />
           </View>
 
@@ -220,13 +242,13 @@ export default function AdminUsersEditPage() {
                 ))}
               </View>
 
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Daily Rate (LKR)</Text>
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 bg-gray-50"
-                placeholder="e.g. 2500"
+              <AmountInput
+                label="Daily Rate"
+                prefix="Rs."
                 value={dailyRate}
-                onChangeText={setDailyRate}
-                keyboardType="numeric"
+                onChangeValue={(val) => setDailyRate(val)}
+                placeholder="2,500"
+                allowDecimals={false}
               />
             </View>
           )}

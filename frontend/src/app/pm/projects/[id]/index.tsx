@@ -7,9 +7,11 @@ import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../../../hooks/useResponsive';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function PMProjectDetailsPage() {
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const id = (Array.isArray(rawId) ? rawId[0] : rawId) as string;
   const router = useRouter();
   const { isMobile } = useResponsive();
   const [loadError, setLoadError] = useState('');
@@ -44,18 +46,18 @@ export default function PMProjectDetailsPage() {
 
         if (projData.pm_id) {
             const { data: pmData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.pm_id).single();
-            projData.pm = pmData;
+            (projData as any).pm = pmData;
         }
 
         if (projData.client_id) {
             const { data: clientData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.client_id).single();
-            projData.client = clientData;
+            (projData as any).client = clientData;
         }
 
-        const { data: roleData, error: roleError } = await supabase
+        const { data: roleData, error: roleError } = (await supabase
           .from('project_role_assignments')
           .select('user_id, role, profiles (full_name, email, role)')
-          .eq('project_id', id);
+          .eq('project_id', id)) as any;
 
         if (roleError) throw roleError;
 
@@ -63,7 +65,7 @@ export default function PMProjectDetailsPage() {
             setProject(projData);
             if (roleData) {
               const otherStaff = roleData.filter((a: any) => a.role !== 'pm' && a.role !== 'client');
-              setAssignments(otherStaff.map(a => ({ ...a, profiles: firstRelation(a.profiles) })));
+              setAssignments(otherStaff.map((a: any) => ({ ...a, profiles: firstRelation(a.profiles) })));
             }
         }
       } catch (err: any) {
@@ -120,12 +122,12 @@ export default function PMProjectDetailsPage() {
           <View className="max-w-4xl mx-auto w-full">
 
             {/* Header Card */}
-            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-6 relative overflow-hidden">
+            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 md:p-8 mb-6 relative overflow-hidden">
               <View className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full" />
 
               <View className="flex-row flex-wrap gap-3 justify-between items-start mb-6">
-                <View className="flex-1 pr-6">
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-black text-gray-800 mb-2">{project.name}</Text>
+                <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 220, minWidth: 0 }}>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-gray-800 mb-2">{project.name}</Text>
                   <View className="flex-row items-center">
                     <Ionicons name="location-outline" size={16} color="#6B7280" />
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 ml-1">{project.location}</Text>
@@ -143,15 +145,11 @@ export default function PMProjectDetailsPage() {
               <View style={isMobile ? { flexDirection: 'column', gap: 16, paddingTop: 24, borderTopWidth: 1, borderColor: '#F3F4F6' } : { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingTop: 24, borderTopWidth: 1, borderColor: '#F3F4F6' }}>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Total Budget</Text>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">
-                    Rs. {project.total_budget?.toLocaleString() || 'N/A'}
-                  </Text>
+                  <AutoFitText value={`Rs. ${project.total_budget?.toLocaleString() || 'N/A'}`} maxFontSize={20} minFontSize={14} className="font-bold text-gray-800" />
                 </View>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Spent Cost</Text>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-orange">
-                    Rs. {project.spent_cost?.toLocaleString() || '0'}
-                  </Text>
+                  <AutoFitText value={`Rs. ${project.spent_cost?.toLocaleString() || '0'}`} maxFontSize={20} minFontSize={14} className="font-bold text-brand-orange" />
                 </View>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Target End</Text>

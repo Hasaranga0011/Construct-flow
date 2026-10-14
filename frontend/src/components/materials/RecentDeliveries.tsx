@@ -23,7 +23,7 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
   );
 };
 
-export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
+export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,14 +38,20 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
           return;
         }
 
-        const { data, error } = await supabase
+        let query = supabase
           .from('purchase_orders')
           .select(`
             id, items, status, 
-            actual_delivery, created_at, updated_at,
+            actual_delivery, created_at, updated_at, project_id,
             projects!inner(name)
           `)
-          .eq('status', 'Received')
+          .eq('status', 'Received');
+
+        if (projectId) {
+          query = query.eq('project_id', projectId);
+        }
+
+        const { data, error } = await query
           .order('updated_at', { ascending: false })
           .limit(5);
 
@@ -62,7 +68,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: numb
     loadDeliveries();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, projectId]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">

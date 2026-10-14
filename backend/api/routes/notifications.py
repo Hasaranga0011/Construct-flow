@@ -7,12 +7,14 @@ from dotenv import load_dotenv
 from core.security import get_current_user
 from core.notification_helper import create_notification
 from core.config import settings
-from supabase import create_client
-
-admin_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-from typing import List
-
 load_dotenv()
+
+def get_admin_supabase():
+    url = settings.SUPABASE_URL or "https://placeholder.supabase.co"
+    key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY or "placeholder-key"
+    return create_client(url, key)
+
+from typing import List
 
 router = APIRouter(
     prefix="/notifications",
@@ -58,8 +60,8 @@ async def mark_notifications_read(payload: MarkReadPayload, current_user: dict =
         return {"success": True}
         
     try:
-        # Using admin_supabase to bypass RLS since users can't update role-based notifications
-        admin_supabase.table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
+        # Using get_admin_supabase() to bypass RLS since users can't update role-based notifications
+        get_admin_supabase().table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
         return {"success": True, "updated": len(payload.ids)}
     except Exception as e:
         import logging
@@ -73,31 +75,15 @@ class EmailPayload(BaseModel):
     reply_to: Optional[str] = None
 
 
+from services.email_service import send_email as svc_send_email
+
 async def send_email(to: str, subject: str, html_body: str) -> dict:
-    """Send an email via Resend API."""
-    if not RESEND_API_KEY:
-        return {"status": "skipped", "reason": "RESEND_API_KEY not configured"}
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": FROM_EMAIL,
-                "to": [to],
-                "subject": subject,
-                "html": html_body,
-            },
-            timeout=10.0
-        )
-
-    if response.status_code not in (200, 201):
-        raise HTTPException(status_code=500, detail=f"Resend error: {response.text}")
-
-    return response.json()
+    """Send notification and email via Supabase integrated dispatch."""
+    try:
+        dispatch_status = svc_send_email(to, subject, html_body)
+        return {"status": "success", "provider": dispatch_status}
+    except Exception as e:
+        return {"status": "logged", "error": str(e)}
 
 
 @router.post("/email/send")

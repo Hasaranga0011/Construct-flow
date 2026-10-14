@@ -108,71 +108,116 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
 
   // Store map instance to manually pan
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const [isSearchingMap, setIsSearchingMap] = useState(false);
 
   const handleSearchMap = async () => {
-    if (!mapSearchQuery || !GOOGLE_MAPS_API_KEY) return;
+    if (!mapSearchQuery || !mapSearchQuery.trim()) return;
+    const query = mapSearchQuery.trim();
+    setIsSearchingMap(true);
+    setErrorMsg('');
 
     try {
-      const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(mapSearchQuery)}&key=${GOOGLE_MAPS_API_KEY}`);
-      const data = await response.json();
+      let foundResults: Array<{ lat: number; lon: number; display_name: string }> = [];
 
-      if (data.status === 'OK' && data.results && data.results.length > 0) {
-        const result = data.results[0];
-        const loc = result.geometry.location;
-
-        setMarkerPos({ lat: loc.lat, lng: loc.lng });
-        setLocation(result.formatted_address);
-        setMapSearchResults([]);
-        if (mapInstance) {
-          mapInstance.panTo({ lat: loc.lat, lng: loc.lng });
-          mapInstance.setZoom(14);
-        }
-      } else if (data.status === 'REQUEST_DENIED' || data.status === 'OVER_QUERY_LIMIT') {
-        console.warn('Google Maps API failed (Billing/Permissions). Falling back to free OpenStreetMap API...');
-
-        // Fallback to Free OpenStreetMap (Nominatim) API with progressive retries
-        let queryParts = mapSearchQuery.trim().split(/\s+/);
-        let foundResults: any[] = [];
-
-        while (queryParts.length > 0) {
-          const currentQuery = queryParts.join(' ');
-          const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(currentQuery)}&format=json&limit=5&countrycodes=lk`);
-          const osmData = await osmRes.json();
-
-          if (osmData && osmData.length > 0) {
-            foundResults = osmData;
-            break;
+      // 1. Primary: ConstructFlow backend geocoding route
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const res = await fetch(`${getApiUrl()}/projects/geocode?q=${encodeURIComponent(query)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            foundResults = data.map((item: any) => ({
+              lat: typeof item.lat === 'number' ? item.lat : parseFloat(item.lat),
+              lon: typeof item.lon === 'number' ? item.lon : parseFloat(item.lon),
+              display_name: item.display_name || '',
+            }));
           }
-          // Drop the last word and retry
+        }
+      } catch (backendErr) {
+        console.warn('Backend geocode request failed, falling back to direct client search:', backendErr);
+      }
+
+      // 2. Client-side fallback: Photon (free Komoot OSM with typo tolerance)
+      if (!foundResults || foundResults.length === 0) {
+        try {
+          const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+          if (photonRes.ok) {
+            const photonData = await photonRes.json();
+            const features = photonData?.features || [];
+            if (features.length > 0) {
+              foundResults = features.map((f: any) => {
+                const props = f.properties || {};
+                const coords = f.geometry?.coordinates || [0, 0];
+                const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean);
+                const uniqueParts = parts.filter((val: string, idx: number) => parts.indexOf(val) === idx);
+                return {
+                  lat: coords[1],
+                  lon: coords[0],
+                  display_name: uniqueParts.join(', ') || props.name || 'Selected Location',
+                };
+              });
+            }
+          }
+        } catch (photonErr) {
+          console.warn('Photon geocode fallback error:', photonErr);
+        }
+      }
+
+      // 3. Fallback: Nominatim OpenStreetMap with progressive retries
+      if (!foundResults || foundResults.length === 0) {
+        let queryParts = query.split(/\s+/);
+        while (queryParts.length > 0) {
+          const subQuery = queryParts.join(' ');
+          try {
+            const osmRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(subQuery)}&format=json&limit=5&countrycodes=lk`,
+              { headers: { 'User-Agent': 'ConstructFlow/1.0' } }
+            );
+            if (osmRes.ok) {
+              const text = await osmRes.text();
+              if (text.startsWith('[') || text.startsWith('{')) {
+                const osmData = JSON.parse(text);
+                if (Array.isArray(osmData) && osmData.length > 0) {
+                  foundResults = osmData.map((item: any) => ({
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                    display_name: item.display_name || '',
+                  }));
+                  break;
+                }
+              }
+            }
+          } catch {
+            // Drop trailing word and retry
+          }
           queryParts.pop();
         }
+      }
 
-        if (foundResults.length > 0) {
-          // Auto-pin the first result
-          const topResult = foundResults[0];
-          const loc = { lat: parseFloat(topResult.lat), lng: parseFloat(topResult.lon) };
-          setMarkerPos(loc);
-          setLocation(topResult.display_name);
+      if (foundResults && foundResults.length > 0) {
+        const topResult = foundResults[0];
+        const loc = { lat: topResult.lat, lng: topResult.lon };
+        setMarkerPos(loc);
+        setLocation(topResult.display_name);
 
-          if (mapInstance) {
-            mapInstance.panTo(loc);
-            mapInstance.setZoom(14);
-          }
-
-          // Show the rest as alternatives if there are more than 1
-          setMapSearchResults(foundResults);
-          setErrorMsg(''); // Clear error if fallback succeeds
-        } else {
-          setMapSearchResults([]);
-          setErrorMsg('Location not found in OpenStreetMap Fallback after trying variations.');
+        if (mapInstance) {
+          mapInstance.panTo(loc);
+          mapInstance.setZoom(15);
         }
+
+        setMapSearchResults(foundResults);
+        setErrorMsg('');
       } else {
         setMapSearchResults([]);
-        setErrorMsg('Location not found (Status: ' + data.status + ').');
+        setErrorMsg('Location not found. Try searching a nearby city, street, or landmark.');
       }
-    } catch (e) {
-      console.warn('Failed to forward geocode search query', e);
-      setErrorMsg('Failed to search map. Check console for details.');
+    } catch (e: any) {
+      console.warn('Map search error:', e);
+      setErrorMsg('Failed to search map. Please click on the map to pin a location directly.');
+    } finally {
+      setIsSearchingMap(false);
     }
   };
 
@@ -187,30 +232,44 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     const lng = e.latLng.lng();
     setMarkerPos({ lat, lng });
 
-    // Reverse Geocoding
-    if (GOOGLE_MAPS_API_KEY) {
-      try {
-        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`);
-        const data = await response.json();
+    // 1. Try backend reverse geocoding
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/projects/reverse-geocode?lat=${lat}&lng=${lng}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setLocation(data.display_name);
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
 
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-          setLocation(data.results[0].formatted_address);
-        } else {
-          // Fallback to OpenStreetMap Reverse Geocoding
-          const osmRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
-          const osmData = await osmRes.json();
-          if (osmData && osmData.display_name) {
-            setLocation(osmData.display_name);
-          } else {
-            setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    // 2. Client-side Photon reverse geocoding
+    try {
+      const pRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const f = pData?.features?.[0];
+        if (f) {
+          const props = f.properties || {};
+          const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean);
+          const uniqueParts = parts.filter((val: string, idx: number) => parts.indexOf(val) === idx);
+          if (uniqueParts.length > 0) {
+            setLocation(uniqueParts.join(', '));
+            return;
           }
         }
-      } catch (err) {
-        setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
       }
-    } else {
-      setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    } catch {
+      // Fallback
     }
+
+    setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
   }, []);
 
   const handleCreate = async () => {
@@ -245,6 +304,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         }
       }
 
+      const validMilestones = milestones.filter(m => m.title && m.due_date);
       const payload = {
         name,
         location,
@@ -258,12 +318,17 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         workers: selectedWorkers,
         suppliers: selectedSuppliers,
         admins: selectedAdmins,
+        milestones: validMilestones,
         total_budget: Number(totalBudget) || 0,
         latitude: markerPos?.lat ?? null,
         longitude: markerPos?.lng ?? null,
       };
 
       const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (__DEV__) {
+        console.log('[DEBUG POST /projects Request]:', payload);
+      }
+
       const response = await fetch(`${getApiUrl()}/projects`, {
         method: 'POST',
         headers: {
@@ -274,35 +339,33 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to create project');
+        let detailMsg = 'Failed to create project';
+        try {
+          const errData = await response.json();
+          if (__DEV__) {
+            console.log('[DEBUG POST /projects Error Response]:', response.status, errData);
+          }
+          if (typeof errData.detail === 'string') {
+            detailMsg = errData.detail;
+          } else if (Array.isArray(errData.detail)) {
+            detailMsg = errData.detail.map((d: any) => d.msg || `${d.loc?.join('.')}: ${d.type}`).join(', ');
+          } else if (errData.message) {
+            detailMsg = errData.message;
+          }
+        } catch {
+          detailMsg = await response.text();
+        }
+        throw new Error(detailMsg || `Error ${response.status}`);
       }
 
       const newProject = await response.json();
-
-      const validMilestones = milestones.filter(m => m.title && m.due_date);
-      if (validMilestones.length > 0) {
-        const msInserts = validMilestones.map(ms => ({
-          project_id: newProject.id,
-          title: ms.title,
-          description: ms.description,
-          due_date: ms.due_date,
-          planned_date: ms.due_date,
-          status: 'Pending'
-        }));
-        await supabase.from('milestones').insert(msInserts);
+      if (__DEV__) {
+        console.log('[DEBUG POST /projects Success]:', newProject);
       }
 
-      const notifs: Promise<void>[] = [];
-      
-      notifs.push(sendSystemNotification('New Project Created', `Admin has created a new project: ${name}. Please review the details.`, 'pm', null, null, 'general', newProject.id));
-
-      if (resolvedClientId) {
-        notifs.push(sendSystemNotification('New Project Assigned', `You have been assigned as the client for ${name}.`, 'client', resolvedClientId, null, 'general', newProject.id));
-      }
-
+      // Best-effort optional client email dispatch in background (never blocks success)
       if (clientEmail.trim()) {
-        await fetch(`${getApiUrl()}/notifications/email/send`, {
+        fetch(`${getApiUrl()}/notifications/email/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -328,28 +391,10 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
               </div>
             `,
           }),
-        });
+        }).catch((err) => console.warn('Background email send failed:', err));
       }
 
-      selectedSiteManagers.forEach((id: string) => {
-        notifs.push(sendSystemNotification('New Project Assignment', `You have been assigned as a Site Manager for ${name}.`, 'site_manager', id, null, 'general', newProject.id));
-      });
-
-      selectedWorkers.forEach((id: string) => {
-        notifs.push(sendSystemNotification('New Project Assignment', `You have been assigned as a Worker for ${name}.`, 'worker', id, null, 'general', newProject.id));
-      });
-
-      selectedSuppliers.forEach((id: string) => {
-        notifs.push(sendSystemNotification('New Project Assignment', `You have been assigned as a Supplier for ${name}.`, 'supplier', id, null, 'general', newProject.id));
-      });
-
-      selectedAdmins.forEach((id: string) => {
-        notifs.push(sendSystemNotification('New Project Assignment', `You have been assigned as an Admin for ${name}.`, 'admin', id, null, 'general', newProject.id));
-      });
-
-      await Promise.all(notifs);
-
-      toast.success('Project created!');
+      toast.success('Project created successfully!');
 
       setName('');
       setLocation('');
@@ -368,8 +413,10 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       setSelectedAdmins([]);
 
       onSuccess();
+      onClose();
     } catch (e: any) {
-      setErrorMsg(e.message || 'Failed to create project');
+      const readable = typeof e === 'object' && e !== null ? (e.message || String(e)) : String(e);
+      setErrorMsg(readable || 'Failed to create project');
     } finally {
       setLoading(false);
     }
@@ -517,12 +564,19 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                       placeholder="Type city or place name..."
                       value={mapSearchQuery}
                       onChangeText={setMapSearchQuery}
+                      onSubmitEditing={handleSearchMap}
+                      returnKeyType="search"
                     />
                     <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       onPress={handleSearchMap}
+                      disabled={isSearchingMap}
                       className="bg-blue-500 px-4 items-center justify-center rounded-xl hover:bg-blue-600 transition-colors"
                     >
-                      <Ionicons name="search" size={20} color="white" />
+                      {isSearchingMap ? (
+                        <ActivityIndicator size="small" color="white" />
+                      ) : (
+                        <Ionicons name="search" size={20} color="white" />
+                      )}
                     </Pressable>
                   </View>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mt-2">Search for a place and click the button to set it as the location.</Text>

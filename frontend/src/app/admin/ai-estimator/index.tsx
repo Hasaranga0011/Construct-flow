@@ -5,9 +5,13 @@ import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { AutoFitText } from '@/components/common/AutoFitText';
 import { useApi } from '@/hooks/useApi';
 
-const LOCATIONS = ['Colombo', 'Kandy', 'Galle', 'Other'];
+import { LocationPicker } from '@/components/estimator/LocationPicker';
+import { SRI_LANKA_DISTRICTS, District } from '@/constants/districts';
+import { Linking } from 'react-native';
+
 const TYPES = ['Residential', 'Commercial', 'Industrial'];
 const QUALITIES = ['Standard', 'Premium', 'Luxury'];
 
@@ -51,7 +55,12 @@ const OptionPill = ({
 export default function AdminAiEstimatorPage() {
   const { isMobile } = useResponsive();
   const [squareFootage, setSquareFootage] = useState('');
-  const [location, setLocation] = useState('Colombo');
+  const [district, setDistrict] = useState('Colombo');
+  const [town, setTown] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
+  const [selectedDistrictFilter, setSelectedDistrictFilter] = useState('All');
   const [projectType, setProjectType] = useState('Residential');
   const [qualityTier, setQualityTier] = useState('Standard');
   const [loading, setLoading] = useState(false);
@@ -66,7 +75,7 @@ export default function AdminAiEstimatorPage() {
       .from('estimations')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(8);
+      .limit(20);
     setHistory(data || []);
 
     try {
@@ -81,8 +90,12 @@ export default function AdminAiEstimatorPage() {
   useEffect(() => { loadData(); }, []);
 
   const handleEstimate = async () => {
-    if (!squareFootage || isNaN(Number(squareFootage))) {
+    if (!squareFootage || isNaN(Number(squareFootage)) || Number(squareFootage) <= 0) {
       Alert.alert('Input Required', 'Please enter a valid square footage.');
+      return;
+    }
+    if (!district) {
+      Alert.alert('Input Required', 'Please select a district.');
       return;
     }
     setLoading(true);
@@ -99,16 +112,38 @@ export default function AdminAiEstimatorPage() {
         },
         body: JSON.stringify({
           square_footage: Number(squareFootage),
-          location,
+          location: district,
+          district,
+          town: town || null,
+          latitude,
+          longitude,
           project_type: projectType,
           quality_tier: qualityTier,
+          site_condition: 'Flat',
+          structure_type: 'RCC frame',
+          finishing_flooring: 'Standard',
+          finishing_sanitary: 'Standard',
+          finishing_electrical: 'Standard',
+          target_timeline: 'Standard',
         }),
       });
 
       setResult(data);
+      setLocationNote(data.location_note || null);
+
+      const locTitle = town ? `${projectType} in ${town}, ${district}` : `${projectType} in ${district}`;
+      const projectNamePayload = JSON.stringify({
+        title: locTitle,
+        district,
+        town: town || null,
+        latitude,
+        longitude,
+        inputs: data.features_used,
+        contributions: data.feature_contributions
+      });
 
       await supabase.from('estimations').insert({
-        project_name: `${projectType} — ${location}`,
+        project_name: projectNamePayload,
         estimated_cost: data.estimated_cost,
         confidence_score: data.confidence_score,
         status: 'Generated',
@@ -249,16 +284,21 @@ export default function AdminAiEstimatorPage() {
                 />
               </View>
 
-              {/* Location */}
+              {/* Location Picker (25 Districts, Town, OSM, Project prefill) */}
               <View style={{ marginBottom: 18 }}>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 }]}>
-                  Location
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {LOCATIONS.map(loc => (
-                    <OptionPill key={loc} label={loc} selected={location === loc} onPress={() => setLocation(loc)} />
-                  ))}
-                </View>
+                <LocationPicker
+                  district={district}
+                  town={town}
+                  latitude={latitude}
+                  longitude={longitude}
+                  locationNote={locationNote}
+                  onLocationChange={({ district: newD, town: newT, latitude: newLat, longitude: newLng }) => {
+                    setDistrict(newD);
+                    setTown(newT);
+                    if (newLat !== undefined) setLatitude(newLat);
+                    if (newLng !== undefined) setLongitude(newLng);
+                  }}
+                />
               </View>
 
               {/* Project Type */}
@@ -322,9 +362,7 @@ export default function AdminAiEstimatorPage() {
                 <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 }]}>
                   Estimated Project Cost
                 </Text>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#fff', fontSize: isMobile ? 28 : 36, fontWeight: 'bold', marginBottom: 4 }]}>
-                  {formatCurrency(result.estimated_cost)}
-                </Text>
+                <AutoFitText value={formatCurrency(result.estimated_cost)} maxFontSize={isMobile ? 28 : 36} minFontSize={18} style={{ color: '#fff', fontWeight: 'bold' }} captionStyle={{ color: 'rgba(255,255,255,0.8)' }} containerStyle={{ marginBottom: 4 }} />
                 <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 16 }]}>
                   Estimate only — not a financial commitment. Confirm with a quantity surveyor.
                 </Text>
@@ -382,34 +420,162 @@ export default function AdminAiEstimatorPage() {
               }}
             >
               <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: 'bold', color: '#1F2937' }]}>Estimation History</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginBottom: 10 }]}>
+                  Recent Estimates
+                </Text>
+                {/* District Filter Bar */}
+                <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {['All', ...Array.from(new Set(history.map(item => {
+                      if (item.district) return item.district;
+                      try {
+                        const parsed = JSON.parse(item.project_name);
+                        return parsed.district || parsed.inputs?.district || parsed.inputs?.location;
+                      } catch (e) {
+                        for (const d of SRI_LANKA_DISTRICTS) {
+                          if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) return d;
+                        }
+                      }
+                      return null;
+                    }).filter(Boolean)))].map(dist => (
+                      <Pressable
+                        key={dist}
+                        onPress={() => setSelectedDistrictFilter(dist)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 5,
+                          borderRadius: 20,
+                          backgroundColor: selectedDistrictFilter === dist ? '#F97316' : '#F3F4F6',
+                          minHeight: 32,
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text
+                          maxFontSizeMultiplier={1.3}
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '600',
+                            color: selectedDistrictFilter === dist ? '#fff' : '#4B5563',
+                          }}
+                        >
+                          {dist}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
               </View>
+
               {history.length === 0 ? (
                 <View style={{ padding: 32, alignItems: 'center' }}>
                   <Ionicons name="document-outline" size={40} color="#E5E7EB" />
                   <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', marginTop: 12, fontSize: 14 }]}>No estimations yet.</Text>
                 </View>
               ) : (
-                history.map((item, i) => (
-                  <View
-                    key={item.id}
-                    style={{
-                      padding: 16,
-                      borderBottomWidth: i < history.length - 1 ? 1 : 0,
-                      borderBottomColor: '#F9FAFB',
-                    }}
-                  >
-                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontWeight: 'bold', color: '#1F2937', fontSize: 14 }]}>
-                      {item.project_name}
-                    </Text>
-                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316', fontWeight: 'bold', marginTop: 2 }]}>
-                      {formatCurrency(item.estimated_cost)}
-                    </Text>
-                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 11, marginTop: 2 }]}>
-                      Confidence: {item.confidence_score == null ? 'Not validated' : `${item.confidence_score}%`} · {new Date(item.created_at).toLocaleDateString()}
-                    </Text>
-                  </View>
-                ))
+                history
+                  .filter(item => {
+                    if (selectedDistrictFilter === 'All') return true;
+                    let itemDist = item.district;
+                    if (!itemDist) {
+                      try {
+                        const p = JSON.parse(item.project_name);
+                        itemDist = p.district || p.inputs?.district || p.inputs?.location;
+                      } catch (e) {
+                        for (const d of SRI_LANKA_DISTRICTS) {
+                          if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) {
+                            itemDist = d;
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    return (itemDist || '').toLowerCase() === selectedDistrictFilter.toLowerCase();
+                  })
+                  .map((item, i) => {
+                    let parsedTitle = item.project_name;
+                    let parsedDistrict = item.district || 'National';
+                    let parsedArea: any = null;
+                    let parsedType = 'Project';
+
+                    try {
+                      const p = JSON.parse(item.project_name);
+                      if (p.title) parsedTitle = p.title;
+                      if (p.district) parsedDistrict = p.district;
+                      else if (p.inputs?.district) parsedDistrict = p.inputs.district;
+                      else if (p.inputs?.location) parsedDistrict = p.inputs.location;
+                      if (p.inputs?.sq_ft) parsedArea = p.inputs.sq_ft;
+                      if (p.inputs?.type) parsedType = p.inputs.type;
+                    } catch (e) {
+                      for (const d of SRI_LANKA_DISTRICTS) {
+                        if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) {
+                          parsedDistrict = d;
+                          break;
+                        }
+                      }
+                    }
+
+                    const handleDownloadPdf = async () => {
+                      const apiUrl = getApiUrl();
+                      const url = `${apiUrl}/documents/estimation/${item.id}/pdf`;
+                      Linking.openURL(url);
+                    };
+
+                    return (
+                      <View
+                        key={item.id}
+                        style={{
+                          padding: 16,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#F9FAFB',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ flex: 1, marginRight: 8 }}>
+                            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontWeight: 'bold', color: '#1F2937', fontSize: 14 }]}>
+                              {parsedTitle}
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                              <View style={{ backgroundColor: '#FFF7ED', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text maxFontSizeMultiplier={1.3} style={{ fontSize: 11, color: '#C2410C', fontWeight: '600' }}>
+                                  📍 {parsedDistrict}
+                                </Text>
+                              </View>
+                              {parsedArea && (
+                                <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                  <Text maxFontSizeMultiplier={1.3} style={{ fontSize: 11, color: '#4B5563' }}>
+                                    {Number(parsedArea).toLocaleString()} sq.ft
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          <Pressable
+                            onPress={handleDownloadPdf}
+                            style={{
+                              padding: 6,
+                              borderRadius: 8,
+                              backgroundColor: '#FFF7ED',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minHeight: 36,
+                              minWidth: 36,
+                            }}
+                            accessibilityLabel="Download estimation PDF"
+                          >
+                            <Ionicons name="document-text-outline" size={18} color="#EA580C" />
+                          </Pressable>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                          <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316', fontWeight: 'bold', fontSize: 15 }]}>
+                            {formatCurrency(item.estimated_cost)}
+                          </Text>
+                          <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 11 }]}>
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
               )}
             </View>
 

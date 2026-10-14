@@ -22,8 +22,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   const translate = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
+    const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1,
@@ -36,8 +35,10 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
           tension: 40,
           useNativeDriver: true,
         })
-      ])
-    ]).start();
+      ]).start();
+    }, delay);
+
+    return () => clearTimeout(timer);
   }, [delay, duration, opacity, translate]);
 
   let transform: any[] = [];

@@ -13,6 +13,7 @@ import { NotificationProvider } from '../context/NotificationContext';
 import { normalizeRole } from '../utils/auth';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/apiUrl';
+import { cleanupLegacyRememberedKeys } from '../lib/rememberedEmail';
 import { LogBox } from 'react-native';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 
@@ -23,6 +24,9 @@ configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false, // Disables strict mode warnings for Reanimated
 });
+
+// Remove pre-"login.rememberedEmail" keys so stale emails stop appearing anywhere.
+cleanupLegacyRememberedKeys();
 
 const DASHBOARD_MAP: Record<string, string> = {
   admin: '/admin/dashboard',

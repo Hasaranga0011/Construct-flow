@@ -4,6 +4,7 @@ import secrets
 import string
 import resend
 from core.config import settings
+from services.email_service import send_credentials_welcome_email
 from ..models import ClientCreate, ClientResponse
 from core.notification_helper import create_notifications, create_notification
 from core.database import get_auth_client
@@ -60,61 +61,100 @@ def invite_client(req: InviteClientRequest, request: Request):
         # We need an auth client to ensure the person inviting is authenticated
         admin_client = get_auth_client(request)
         
-        # 1. Generate temp password
-        temp_password = secrets.token_urlsafe(24)
+        # 1. Invite client natively via Supabase Auth
+        admin_db = new_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        new_user_id = None
+        email_result = None
+
+        try:
+            invite_res = admin_db.auth.admin.invite_user_by_email(
+                req.email,
+                options={
+                    "data": {"full_name": req.name, "company": req.company, "role": "client"},
+                    "redirect_to": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:8082')}/reset-password"
+                }
+            )
+            new_user_id = invite_res.user.id
+            email_result = {
+                "success": True,
+                "sent_to_inbox": True,
+                "provider": "supabase",
+                "message": f"Client invitation delivered to {req.email} via Supabase Auth"
+            }
+        except Exception as invite_err:
+            err_msg = str(invite_err)
+            if "already" in err_msg.lower() or "registered" in err_msg.lower():
+                try:
+                    users_list = admin_db.auth.admin.list_users()
+                    matching = next((u for u in users_list if getattr(u, 'email', None) == req.email), None)
+                    if matching:
+                        new_user_id = matching.id
+                    admin_db.auth.reset_password_for_email(
+                        req.email,
+                        {"redirect_to": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:8082')}/reset-password"}
+                    )
+                    email_result = {
+                        "success": True,
+                        "sent_to_inbox": True,
+                        "provider": "supabase",
+                        "message": f"Client access link delivered to {req.email} via Supabase"
+                    }
+                except Exception:
+                    pass
+
+            if not new_user_id:
+                temp_password = secrets.token_urlsafe(24)
+                auth_res = admin_db.auth.admin.create_user({
+                    "email": req.email,
+                    "password": temp_password,
+                    "email_confirm": True,
+                    "app_metadata": {"role": "client"},
+                    "user_metadata": {"full_name": req.name, "company": req.company, "role": "client"}
+                })
+                new_user_id = auth_res.user.id
+                email_result = {
+                    "success": False,
+                    "sent_to_inbox": False,
+                    "provider": "local_audit",
+                    "error": err_msg
+                }
         
-        # 2. Sign up the user (this uses the anon key client to not disrupt admin's session if this was frontend, but backend is fine)
-        # Note: the trigger will auto-create a profile
-        signup_client = new_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_KEY, options=ClientOptions(persist_session=False, auto_refresh_token=False))
-        auth_res = signup_client.auth.sign_up({"email": req.email, "password": temp_password})
-        
-        if not auth_res.user:
-            raise HTTPException(status_code=400, detail="Could not create user account")
-            
-        new_user_id = auth_res.user.id
-        
-        # 3. Update the automatically created profile with name and company
-        admin_client.table("profiles").update({
+        # 2. Upsert profile with name, company, and role
+        admin_db.table("profiles").upsert({
+            "id": new_user_id,
+            "email": req.email,
             "full_name": req.name,
             "company_name": req.company,
-            "role": "client"
-        }).eq("id", new_user_id).execute()
+            "role": "client",
+            "is_approved": True
+        }).execute()
         
-        # 4. If project_id is provided, link them (maybe through a client_projects table? Or just set project_id? Wait, phase5 doesn't have a direct client to project many-to-many. The project has client_id)
+        # 3. If project_id is provided, link them
         if req.project_id:
-            # Check if project exists
-            admin_client.table("projects").update({"client_id": new_user_id}).eq("id", req.project_id).execute()
+            admin_db.table("projects").update({"client_id": new_user_id}).eq("id", req.project_id).execute()
             
-        # 5. Log activity
-        admin_client.table("client_activity").insert({
+        # 4. Log activity
+        admin_db.table("client_activity").insert({
             "action": f"Client {req.name} was invited",
             "project_id": req.project_id,
             "client_id": new_user_id
         }).execute()
         
-        # 5b. Notify the client
+        # 5. Notify the client via Supabase
         create_notifications([{
             "user_id": new_user_id,
             "title": "Welcome to ConstructFlow",
-            "message": f"You have been invited to ConstructFlow. Your account is ready.",
+            "message": f"Welcome {req.name}! You have been invited to ConstructFlow. Your client account is ready.",
             "type": "general",
-            "project_id": req.project_id
+            "project_id": req.project_id,
+            "sent_via": "in_app"
         }])
-        
-        # 6. Send Email using Resend
-        if settings.RESEND_API_KEY:
-            try:
-                resend.api_key = settings.RESEND_API_KEY
-                resend.Emails.send({
-                    "from": settings.RESEND_FROM_EMAIL,
-                    "to": [req.email],
-                    "subject": "You have been invited to ConstructFlow",
-                    "html": f"<p>Hello {req.name},</p><p>You've been invited to view your project updates.</p><p>Your temporary password is: <b>{temp_password}</b></p><p>Please login to the portal and change your password.</p>"
-                })
-            except Exception as e:
-                print(f"Failed to send email: {e}")
 
-        return {"message": "Client invited successfully", "user_id": new_user_id}
+        return {
+            "message": "Client invited successfully",
+            "user_id": new_user_id,
+            "email_delivery": email_result
+        }
     except HTTPException:
         raise
     except Exception as e:

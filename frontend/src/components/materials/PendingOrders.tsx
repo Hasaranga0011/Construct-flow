@@ -31,7 +31,7 @@ const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) =>
   );
 };
 
-export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refreshTrigger?: number, onRefreshNeeded: () => void }) => {
+export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNeeded }: { refreshTrigger?: number, projectId?: string, onRefreshNeeded: () => void }) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,13 +46,19 @@ export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refresh
           return;
         }
 
-        const { data, error } = await supabase
+        let query = supabase
           .from('purchase_orders')
           .select(`
-            id, supplier_name, po_number, status, expected_date,
+            id, supplier_name, po_number, status, expected_date, project_id,
             projects!inner(name)
           `)
-          .in('status', ['Delivered']) // only show delivered (shipped but not received)
+          .in('status', ['Delivered']); // only show delivered (shipped but not received)
+
+        if (projectId) {
+          query = query.eq('project_id', projectId);
+        }
+
+        const { data, error } = await query
           .order('expected_date', { ascending: true })
           .limit(5);
 
@@ -69,7 +75,7 @@ export const PendingOrders = ({ refreshTrigger = 0, onRefreshNeeded }: { refresh
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, projectId]);
 
   const handleDeliver = async (id: string) => {
     try {

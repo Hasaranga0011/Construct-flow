@@ -10,6 +10,7 @@ import { formatMoney } from '../../../utils/format';
 import { useTableRealtime } from '../../../hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
 import { Toolbar, ToolbarSearch } from '@/components/ui';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function AdminPayrollIndex() {
   const router = useRouter();
@@ -115,7 +116,7 @@ export default function AdminPayrollIndex() {
 
           <View className="z-10 flex-shrink min-w-0 w-full lg:w-auto">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-200 text-sm font-bold uppercase tracking-wider mb-2">Estimated Pending Liabilities</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-4xl font-extrabold text-white mb-2">Rs. {stats.totalPending.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+            <AutoFitText value={`Rs. ${stats.totalPending.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} maxFontSize={36} minFontSize={22} className="font-extrabold text-white" captionClassName="text-green-100" containerStyle={{ marginBottom: 8 }} />
             <View className="flex-row flex-wrap gap-2 items-center mt-2">
               <View className="bg-green-800/50 px-3 py-1 rounded border border-green-600/50 mr-4">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-100 text-xs">Last Run: {stats.lastRun}</Text>

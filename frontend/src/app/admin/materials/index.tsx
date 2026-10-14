@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../../components/common/StatCard';
 import { InventoryTable } from '../../../components/materials/InventoryTable';
@@ -19,6 +19,9 @@ import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function MaterialsScreen() {
   const router = useRouter();
+  const searchParams = useLocalSearchParams();
+  const initialProjectId = (Array.isArray(searchParams?.project) ? searchParams.project[0] : searchParams?.project) || '';
+
   const [stats, setStats] = useState({
     totalMaterials: 0,
     pendingDeliveries: 0,
@@ -33,7 +36,7 @@ export default function MaterialsScreen() {
   const { tick } = useTableRealtime(['materials']);
   const [searchMaterials, setSearchMaterials] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
   const [showProjectDrop, setShowProjectDrop] = useState(false);
   const { isMobile } = useResponsive();
 
@@ -44,10 +47,19 @@ export default function MaterialsScreen() {
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return;
 
+        let matQuery = supabase.from('materials').select('id, name, category, project_id, current_stock, minimum_threshold, unit_price');
+        let poQuery = supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).in('status', ['Pending Delivery', 'Confirmed']);
+        let projQuery = supabase.from('projects').select('id, name, status').neq('status', 'archived').order('name');
+
+        if (selectedProjectId) {
+          matQuery = matQuery.eq('project_id', selectedProjectId);
+          poQuery = poQuery.eq('project_id', selectedProjectId);
+        }
+
         const [materialsReq, ordersReq, projectsReq] = await Promise.all([
-          supabase.from('materials').select('id, name, category, project_id, current_stock, minimum_threshold, unit_price'),
-          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).in('status', ['Pending Delivery', 'Confirmed']),
-          supabase.from('projects').select('id, name').eq('status', 'active').order('name')
+          matQuery,
+          poQuery,
+          projQuery
         ]);
 
         let totalMaterials = 0;
@@ -81,20 +93,10 @@ export default function MaterialsScreen() {
 
     loadStats();
 
-    const chan1 = supabase.channel('admin-materials')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, loadStats)
-      .subscribe();
-
-    const chan2 = supabase.channel('admin-po')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, loadStats)
-      .subscribe();
-
     return () => {
       isMounted = false;
-      supabase.removeChannel(chan1);
-      supabase.removeChannel(chan2);
     };
-  }, [refreshTrigger, tick]);
+  }, [refreshTrigger, tick, selectedProjectId]);
 
   const handleOrderCreated = () => {
     setModalVisible(false);
@@ -138,7 +140,14 @@ export default function MaterialsScreen() {
               <ToolbarFilter>
                 <Select
                   value={selectedProjectId}
-                  onValueChange={setSelectedProjectId}
+                  onValueChange={(val) => {
+                    setSelectedProjectId(val);
+                    if (val) {
+                      router.setParams({ project: val });
+                    } else {
+                      router.setParams({ project: '' });
+                    }
+                  }}
                   options={[
                     { value: '', label: 'All Projects' },
                     ...projects.map(p => ({ value: p.id, label: p.name }))
@@ -197,10 +206,10 @@ export default function MaterialsScreen() {
 
             {/* Side Panel (Alerts & Deliveries) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1 }}>
-              <LowStockAlerts refreshTrigger={refreshTrigger} />
-              <PendingDeliveries refreshTrigger={refreshTrigger} />
-              <PendingOrders refreshTrigger={refreshTrigger} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
-              <RecentDeliveries refreshTrigger={refreshTrigger} />
+              <LowStockAlerts refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
+              <PendingDeliveries refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
+              <PendingOrders refreshTrigger={refreshTrigger} projectId={selectedProjectId} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
+              <RecentDeliveries refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
             </View>
           </View>
         </ScrollView>

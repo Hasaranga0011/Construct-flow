@@ -3,10 +3,21 @@ from api.models import ProjectCreate, ProjectUpdate
 from api.routes import projects
 
 class Client:
-    def __init__(self): self.calls = []
+    def __init__(self):
+        self.calls = []
     def rpc(self, name, data):
         self.calls.append((name, data))
         return SimpleNamespace(execute=lambda: SimpleNamespace(data={"id": "proj-123", "name": "Demo"}))
+    def table(self, name):
+        class Query:
+            def __init__(self, c): self.c = c
+            def select(self, *a, **kw): return self
+            def eq(self, *a, **kw): return self
+            def delete(self, *a, **kw): return self
+            def insert(self, *a, **kw): return self
+            def execute(self):
+                return SimpleNamespace(data=[{"id": "proj-123", "name": "Demo", "pm_id": None, "client_id": None}], count=1)
+        return Query(self)
 
 def test_create_project_and_assignments_saved_atomically(monkeypatch):
     client = Client()

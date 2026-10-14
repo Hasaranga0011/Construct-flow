@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { api } from '../../../../services/api';
 import { OrderItemRow } from '@/components/materials/OrderItemRow';
 import { useResponsive } from '@/hooks/useResponsive';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 const displayDate = (value: string | null | undefined, pattern = 'MMM dd, yyyy') => value && Number.isFinite(new Date(value).getTime()) ? format(new Date(value), pattern) : 'Not recorded';
 
@@ -123,7 +124,7 @@ export default function AdminMaterialsOrdersIdPage() {
   }, [id, isPM]);
   useEffect(() => { void fetchOrder(); }, [fetchOrder]);
 
-  const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received') => {
+  const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received' | 'Cancelled') => {
     if (actionLoading || !await confirmAction('Confirm Action', `Mark this order as ${newStatus}?`)) return;
     setActionLoading(true);
     try {
@@ -132,6 +133,10 @@ export default function AdminMaterialsOrdersIdPage() {
       if (newStatus === 'Rejected') await api.purchaseOrders.reject(id);
       if (newStatus === 'Delivered') await api.purchaseOrders.deliver(id);
       if (newStatus === 'Received') await api.purchaseOrders.receive(id);
+      if (newStatus === 'Cancelled') {
+        const { error } = await supabase.from('purchase_orders').update({ status: 'Cancelled' }).eq('id', id);
+        if (error) throw error;
+      }
 
       notify('Success', `Order marked as ${newStatus}!`);
 
@@ -289,9 +294,7 @@ export default function AdminMaterialsOrdersIdPage() {
                 {(!order.total_price || order.total_price === 0) && (order.status === 'Pending' || order.status === 'Suggested' || order.status === 'Awaiting Quote') ? (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm mt-1">Awaiting supplier price</Text>
                 ) : (
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xl">
-                    Rs. {(order.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </Text>
+                  <AutoFitText value={`Rs. ${(order.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} maxFontSize={20} minFontSize={14} className="font-bold text-brand-orange" />
                 )}
               </View>
             </View>

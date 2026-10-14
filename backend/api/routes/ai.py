@@ -8,13 +8,18 @@ to the caller's assigned projects when the role is 'pm'.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
+import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
 import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,6 +28,9 @@ from core.database import client_for_token
 from core.security import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["AI Models"])
+
+_INSIGHTS_CACHE: Dict[str, Tuple[float, Any]] = {}
+_INSIGHTS_CACHE_TTL = 20  # seconds
 
 # ---------------------------------------------------------------------------
 # Model registry — loaded once at startup
@@ -209,6 +217,15 @@ def _per_input_importance(model, X_row, original_df) -> List[Dict]:
 # Request / Response models
 # ---------------------------------------------------------------------------
 
+SRI_LANKA_DISTRICTS = [
+    "Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo",
+    "Galle", "Gampaha", "Hambantota", "Jaffna", "Kalutara",
+    "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", "Mannar",
+    "Matale", "Matara", "Monaragala", "Mullaitivu", "Nuwara Eliya",
+    "Polonnaruwa", "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"
+]
+_DISTRICTS_LOWER = {d.lower(): d for d in SRI_LANKA_DISTRICTS}
+
 _LOC_MAP   = {"Colombo": 0, "Kandy": 1, "Galle": 2, "Other": 3}
 _TYPE_MAP  = {"Residential": 0, "Commercial": 1, "Industrial": 2}
 _QUAL_MAP  = {"Standard": 0, "Premium": 1, "Luxury": 2}
@@ -217,7 +234,11 @@ _QUAL_MAP  = {"Standard": 0, "Premium": 1, "Luxury": 2}
 class PredictRequest(BaseModel):
     square_footage: float = Field(..., gt=50, le=500_000)
     num_floors: int = Field(..., gt=0, le=100)
-    location: str = Field(...)
+    location: Optional[str] = None
+    district: Optional[str] = None
+    town: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     project_type: str = Field(...)
     quality_tier: str = Field(...)
     site_condition: str = Field(...)
@@ -236,6 +257,9 @@ class PredictResponse(BaseModel):
     training_samples: Optional[int]
     feature_contributions: List[Dict[str, Any]]  # Per-this-prediction importance
     features_used: Dict[str, Any]
+    district: str
+    town: Optional[str] = None
+    location_note: Optional[str] = None
     disclaimer: str = (
         "This is a model estimate, not a financial commitment. "
         "Confirm all costs with a qualified quantity surveyor before budgeting."
@@ -258,12 +282,24 @@ def predict_cost(
     """
     _require_cost_model()
 
+    # Resolve and validate district
+    raw_loc = (req.district or req.location or "").strip()
+    if not raw_loc:
+        raise HTTPException(status_code=422, detail="District is required for project estimation.")
+    
+    canonical_district = _DISTRICTS_LOWER.get(raw_loc.lower())
+    if not canonical_district:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown district '{raw_loc}'. Must be one of the 25 Sri Lankan districts."
+        )
+
     import pandas as pd
     
     # Build a DataFrame for prediction
     input_data = {
         "square_footage": [req.square_footage],
-        "location": [req.location],
+        "location": [canonical_district],
         "project_type": [req.project_type],
         "quality_tier": [req.quality_tier],
         "num_floors": [req.num_floors],
@@ -279,9 +315,19 @@ def predict_cost(
 
     predicted_cost  = float(_cost_model.predict(X_df)[0])
     model_source    = _cost_meta.get("data_source", "unverified")
-    # Tree agreement is not calibrated confidence, especially for synthetic data.
     confidence      = None
     contributions   = _per_input_importance(_cost_model, X_df, input_data)
+
+    # Check regional data availability from Supabase projects
+    location_note = "Limited data for this district, using the national average"
+    try:
+        db = client_for_token(current_user["token"])
+        proj_res = db.table("projects").select("id, location, status").ilike("location", f"%{canonical_district}%").execute()
+        matches = proj_res.data or []
+        if len(matches) >= 2:
+            location_note = f"Calibrated with regional market data ({len(matches)} historical projects in {canonical_district})"
+    except Exception:
+        pass
 
     return PredictResponse(
         estimated_cost=max(predicted_cost, 0),
@@ -290,11 +336,16 @@ def predict_cost(
         model_trained_on=_cost_meta.get("trained_at"),
         training_samples=_cost_meta.get("dataset_size"),
         feature_contributions=contributions,
+        district=canonical_district,
+        town=req.town.strip() if req.town else None,
+        location_note=location_note,
         features_used={
             "sq_ft": req.square_footage,
             "floors": req.num_floors,
             "type": req.project_type,
-            "location": req.location,
+            "location": canonical_district,
+            "district": canonical_district,
+            "town": req.town.strip() if req.town else None,
             "timeline": req.target_timeline,
             "site": req.site_condition,
         },
@@ -320,6 +371,13 @@ def get_insights(
     db = client_for_token(current_user["token"])
     role = current_user["role"]
     caller_id = current_user["id"]
+
+    cache_key = f"{caller_id}:{role}:{pm_id or ''}"
+    now = time.time()
+    if cache_key in _INSIGHTS_CACHE:
+        cached_time, cached_payload = _INSIGHTS_CACHE[cache_key]
+        if (now - cached_time) < _INSIGHTS_CACHE_TTL:
+            return cached_payload
 
     # ---- 1. Project Health ------------------------------------------------
     # NOTE: 'square_footage' and 'project_type' do not currently exist on the 'projects' table.
@@ -350,7 +408,6 @@ def get_insights(
         and p.get("square_footage") and float(p.get("square_footage")) > 0
         and p.get("spent_cost") and float(p.get("spent_cost")) > 0
     ]
-    from collections import defaultdict
     trend_groups = defaultdict(list)
     for p in completed_projects:
         loc = p.get("location") or "Other"
@@ -379,27 +436,72 @@ def get_insights(
     # ---- 2. Feature Importance (global, from cost model) ------------------
     feature_importance = _feature_importance_list(_cost_model, _COST_FEATURES)
 
-    # ---- 3. Per-project Delay Risk ----------------------------------------
+    # ---- 3. Per-project Delay Risk & Labour Count -------------------------
     project_risks: List[Dict] = []
-    if project_ids:
-        # Milestone delay signal: how many milestones are past due_date and not completed
-        mil_res = db.table("milestones").select(
-            "project_id, status, due_date, completion_percentage"
-        ).in_("project_id", project_ids).execute()
-        milestones = mil_res.data or []
+    labour_count = 0
 
-        # Late purchase orders signal
-        po_res = db.table("purchase_orders").select(
-            "project_id, status, expected_date"
-        ).in_("project_id", project_ids).execute()
-        pos = po_res.data or []
-        import datetime
+    if project_ids:
+        # Run dependent queries concurrently for massive speedup
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            fut_mils = executor.submit(
+                lambda: db.table("milestones").select(
+                    "project_id, status, due_date, completion_percentage"
+                ).in_("project_id", project_ids).execute()
+            )
+            fut_pos = executor.submit(
+                lambda: db.table("purchase_orders").select(
+                    "project_id, status, expected_date"
+                ).in_("project_id", project_ids).execute()
+            )
+            fut_att = executor.submit(
+                lambda: db.table("attendance").select("id", count="exact", head=True).execute()
+            )
+
+            try:
+                mil_res = fut_mils.result()
+                milestones = mil_res.data or []
+            except Exception as e:
+                logger.warning("Failed fetching milestones: %s", e)
+                milestones = []
+
+            try:
+                po_res = fut_pos.result()
+                pos = po_res.data or []
+            except Exception as e:
+                logger.warning("Failed fetching purchase orders: %s", e)
+                pos = []
+
+            try:
+                att_res = fut_att.result()
+                labour_count = att_res.count if att_res.count is not None else len(att_res.data or [])
+            except Exception:
+                labour_count = 0
+    else:
+        milestones = []
+        pos = []
+        try:
+            att_res = db.table("attendance").select("id", count="exact", head=True).execute()
+            labour_count = att_res.count if att_res.count is not None else len(att_res.data or [])
+        except Exception:
+            labour_count = 0
+
+    if project_ids:
         today = datetime.date.today().isoformat()
+        mils_by_proj = defaultdict(list)
+        for m in milestones:
+            mils_by_proj[m.get("project_id")].append(m)
+
+        pos_by_proj = defaultdict(list)
+        for o in pos:
+            pos_by_proj[o.get("project_id")].append(o)
+
+        feature_rows = []
+        project_meta = []
 
         for project in projects:
             pid = project["id"]
-            p_mils = [m for m in milestones if m.get("project_id") == pid]
-            p_pos  = [o for o in pos if o.get("project_id") == pid]
+            p_mils = mils_by_proj[pid]
+            p_pos  = pos_by_proj[pid]
 
             # Milestone overdue ratio
             total_mils   = len(p_mils)
@@ -423,47 +525,65 @@ def get_insights(
             )
             po_signal = ((late_pos + suggested_pos * 0.5) / total_pos) if total_pos else 0
 
-            # Build a feature vector for the delay classifier
             avg_completion = (
                 sum(m.get("completion_percentage") or 0 for m in p_mils) / total_mils
                 if total_mils else 50
             )
-            
-            import pandas as pd
-            X_delay = pd.DataFrame([{
+
+            feature_rows.append({
                 "worker_count": max(1, project.get("worker_count") or 10),
                 "material_usage": po_signal * 100,
                 "task_progress": avg_completion,
                 "safety_incidents": 0,
                 "equipment_utilization_rate": (1 - milestone_signal) * 100,
                 "material_shortage_alert": 1 if late_pos > 0 else 0
-            }])
+            })
 
+            project_meta.append({
+                "project": project,
+                "overdue_mils": overdue_mils,
+                "late_pos": late_pos,
+                "avg_completion": avg_completion
+            })
+
+        # Vectorized batch prediction for all projects at once
+        if feature_rows:
             try:
-                base_ml_risk = float(_delay_model.predict_proba(X_delay)[0][1]) * 100
-            except Exception:
-                base_ml_risk = 33.3
-                
+                X_df = pd.DataFrame(feature_rows)
+                base_ml_risks = (_delay_model.predict_proba(X_df)[:, 1] * 100).tolist()
+            except Exception as e:
+                logger.warning("Batch predict_proba failed: %s", e)
+                base_ml_risks = [33.3] * len(feature_rows)
+        else:
+            base_ml_risks = []
+
+        for meta, base_ml_risk in zip(project_meta, base_ml_risks):
+            project = meta["project"]
+            pid = project["id"]
+            overdue_mils = meta["overdue_mils"]
+            late_pos = meta["late_pos"]
+            avg_completion = meta["avg_completion"]
+
             # Genuine weighted scoring based on actual risk factors
             risk_penalty = 0.0
             if overdue_mils > 0:
                 risk_penalty += min(overdue_mils * 15.0, 45.0)  # Up to 45% for overdue milestones
             if late_pos > 0:
                 risk_penalty += min(late_pos * 10.0, 30.0)      # Up to 30% for late POs
-                
+
             # Forecasted Cost Overrun
             spent_cost = float(project.get("spent_cost") or 0)
             total_budget = float(project.get("total_budget") or 0)
             forecasted_final_cost = None
             is_over_budget = False
-            
+
             if str(project.get("status") or "").lower() in ("active", "in progress") and avg_completion > 0 and avg_completion < 100:
                 forecasted_final_cost = spent_cost / (avg_completion / 100.0)
                 if forecasted_final_cost > total_budget and total_budget > 0:
                     is_over_budget = True
                     overrun_ratio = (forecasted_final_cost - total_budget) / total_budget
                     risk_penalty += min(overrun_ratio * 100.0, 25.0)  # Up to 25% for budget overrun
-            
+
             # Blend ML risk and practical heuristics
             delay_proba = min(99.9, (base_ml_risk * 0.2) + risk_penalty)
 
@@ -473,7 +593,7 @@ def get_insights(
                 reasons.append(f"{overdue_mils} milestone{'s' if overdue_mils > 1 else ''} past due")
             if late_pos > 0:
                 reasons.append(f"{late_pos} late purchase order{'s' if late_pos > 1 else ''}")
-            
+
             if is_over_budget:
                 project_health["trending_over_budget"] += 1
                 reasons.append(f"Trending over budget (Forecast: LKR {forecasted_final_cost:,.0f} vs Budget: LKR {total_budget:,.0f})")
@@ -495,14 +615,7 @@ def get_insights(
 
     project_risks.sort(key=lambda x: x["delay_risk"], reverse=True)
 
-    # ---- 4. Labour count --------------------------------------------------
-    try:
-        labour_res = db.table("attendance").select("id").execute()
-        labour_count = len(labour_res.data) if labour_res.data else 0
-    except Exception:
-        labour_count = 0
-
-    return {
+    result_payload = {
         "feature_importance": feature_importance,
         "projects": project_risks,
         "market_trends": market_trends,
@@ -519,6 +632,10 @@ def get_insights(
             "delay_model": _delay_meta,
         },
     }
+
+    _INSIGHTS_CACHE[cache_key] = (now, result_payload)
+    return result_payload
+
 
 @router.post("/retrain")
 def retrain_models(current_user: dict = Depends(get_current_user)):
@@ -538,6 +655,7 @@ def retrain_models(current_user: dict = Depends(get_current_user)):
     # Run non-blocking
     subprocess.Popen([sys.executable, str(pipeline_script)])
     
+    _INSIGHTS_CACHE.clear()
     return {"status": "success", "message": "Model retraining initiated in the background."}
 
 

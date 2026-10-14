@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Keyboa
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
+import { ChatComposer } from '../chat/ChatComposer';
 
 export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRole, targetUserId }: {
   projectId: string;
@@ -125,22 +126,12 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
         )}
       </ScrollView>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="p-3 border-t border-gray-100 flex-row items-center bg-gray-50">
-        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-          className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-800"
-          placeholder="Type a message..."
-          value={newMessage}
-          onChangeText={setNewMessage}
-          onSubmitEditing={sendMessage}
-        />
-        <Pressable style={{ minHeight: 44, minWidth: 44 }}
-          onPress={sendMessage}
-          className={`ml-2 w-11 h-11 rounded-full items-center justify-center ${newMessage.trim() ? 'bg-brand-orange' : 'bg-gray-300'}`}
-          disabled={!newMessage.trim()}
-        >
-          <Ionicons name="send" size={16} color="white" style={{ marginLeft: 2 }} />
-        </Pressable>
-      </KeyboardAvoidingView>
+      <ChatComposer
+        value={newMessage}
+        onChangeText={setNewMessage}
+        onSend={sendMessage}
+        placeholder="Type a message..."
+      />
     </View>
   );
 }

@@ -22,7 +22,7 @@ export function useApi<T = any>() {
   const request = useCallback(async (
     endpoint: string, 
     options: RequestInit = {}, 
-    timeoutMs = 15000
+    timeoutMs = 30000
   ) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();

@@ -117,7 +117,7 @@ export default function ForgotPasswordScreen() {
 
           <View className="flex-row flex-wrap justify-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Remember your password? </Text>
-            <Link href="/login" asChild>
+            <Link href="/team-login" asChild>
               <Pressable style={{ minHeight: 44, minWidth: 44 }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Back to Login</Text>
               </Pressable>

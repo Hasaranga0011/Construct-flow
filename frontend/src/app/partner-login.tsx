@@ -8,10 +8,8 @@ import * as Linking from 'expo-linking';
 WebBrowser.maybeCompleteAuthSession();
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-
-const REMEMBER_EMAIL_KEY = 'cf_remember_email';
+import { getRememberedEmail, saveRememberedEmail, clearRememberedEmail } from '../lib/rememberedEmail';
+import { loginEmailAutofill, loginPasswordAutofill } from '../lib/formAutofill';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -31,19 +29,21 @@ export default function LoginScreen() {
   }, [portalError]);
 
   useEffect(() => {
-    const restoreEmail = async () => {
-      try {
-        const saved = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
-        if (saved) {
-          setEmail(saved);
-          setRememberMe(true);
-        }
-      } catch {
-        // ignore restore failures
+    setPassword('');
+    getRememberedEmail().then((saved) => {
+      if (saved) {
+        setEmail(saved);
+        setRememberMe(true);
       }
-    };
-    restoreEmail();
+    });
   }, []);
+
+  const forgetEmail = async () => {
+    await clearRememberedEmail();
+    setEmail('');
+    setPassword('');
+    setRememberMe(false);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -57,21 +57,16 @@ export default function LoginScreen() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setErrorMsg(error.message);
+      setPassword('');
+      setErrorMsg('Incorrect email or password');
       setLoading(false);
       return;
     }
 
-    // Handle Remember Me persistence
-    try {
-      if (rememberMe) {
-        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, email);
-      } else {
-        await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
-      }
-    } catch {
-      // ignore persistence issues
-    }
+    // Remember Me: email only, never the password.
+    if (rememberMe) await saveRememberedEmail(email);
+    else await clearRememberedEmail();
+    setPassword('');
 
     // Auth succeeded — _layout.tsx enforces portal rules and routes to dashboard.
     // Keep loading so the user sees a spinner until _layout.tsx redirects.
@@ -204,10 +199,15 @@ export default function LoginScreen() {
           placeholder="name@company.com"
           value={email}
           onChangeText={setEmail}
-          autoCapitalize="none"
+          {...loginEmailAutofill}
           keyboardType="email-address"
           returnKeyType="next"
         />
+        {rememberMe && email ? (
+          <Pressable onPress={forgetEmail} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+            <Text maxFontSizeMultiplier={1.3} className="text-sm text-brand-orange">Not you? Use a different account</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View className="mb-6">
@@ -224,6 +224,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            {...loginPasswordAutofill}
             returnKeyType="done"
             onSubmitEditing={handleLogin}
           />

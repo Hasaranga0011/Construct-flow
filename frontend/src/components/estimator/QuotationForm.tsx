@@ -5,12 +5,23 @@ import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
 import { toast } from '../../lib/toast';
 import { sendSystemNotification } from '../../utils/notifications';
+import { LocationPicker } from './LocationPicker';
 
-export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCreated?: () => void }) => {
+export const QuotationForm = ({
+  onEstimateCreated = () => {},
+  projectId,
+}: {
+  onEstimateCreated?: () => void;
+  projectId?: string;
+}) => {
   const [projectType, setProjectType] = useState('Residential');
   const [squareFootage, setSquareFootage] = useState('');
   const [numFloors, setNumFloors] = useState('');
-  const [location, setLocation] = useState('Colombo');
+  const [district, setDistrict] = useState('Colombo');
+  const [town, setTown] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [qualityTier, setQualityTier] = useState('Standard');
   const [siteCondition, setSiteCondition] = useState('Flat');
   const [structureType, setStructureType] = useState('RCC frame');
@@ -34,6 +45,10 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       toast.error('Please enter a valid number of floors.');
       return;
     }
+    if (!district) {
+      toast.error('Please select a district.');
+      return;
+    }
 
     setIsGenerating(true);
 
@@ -45,7 +60,11 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       const aiData = await api.post('/ai/predict-cost', {
         square_footage: Number(squareFootage),
         num_floors: Number(numFloors),
-        location,
+        location: district,
+        district,
+        town: town || null,
+        latitude,
+        longitude,
         project_type: projectType,
         quality_tier: qualityTier,
         site_condition: siteCondition,
@@ -59,10 +78,17 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       const estimatedCost = aiData.estimated_cost;
       const confidence = aiData.confidence_score;
       const contributions = aiData.feature_contributions;
+      setLocationNote(aiData.location_note || null);
+
+      const locTitle = town ? `${projectType} in ${town}, ${district}` : `${projectType} in ${district}`;
 
       // Save estimation to DB using the generic CRUD route, storing context in project_name
       const projectNamePayload = JSON.stringify({
-        title: `${projectType} in ${location}`,
+        title: locTitle,
+        district,
+        town: town || null,
+        latitude,
+        longitude,
         inputs: aiData.features_used,
         contributions: contributions
       });
@@ -71,7 +97,12 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
         project_name: projectNamePayload,
         estimated_cost: estimatedCost,
         status: 'Pending',
-        confidence_score: confidence
+        confidence_score: confidence,
+        district,
+        town: town || null,
+        latitude,
+        longitude,
+        project_id: projectId || null,
       });
 
       toast.success(`AI Estimate Generated: Rs. ${(estimatedCost / 1000000).toFixed(2)}M\nConfidence: ${confidence == null ? 'Not validated' : `${confidence}%`}`);
@@ -79,7 +110,7 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
       // Real-time Notification Dispatch
       await sendSystemNotification(
         'AI Estimate Generated',
-        `A new ${projectType} project estimate for Rs. ${(estimatedCost / 1000000).toFixed(2)}M was generated and is pending review.`,
+        `A new ${projectType} project estimate for Rs. ${(estimatedCost / 1000000).toFixed(2)}M in ${district} was generated and is pending review.`,
         'Admin'
       );
 
@@ -105,19 +136,27 @@ export const QuotationForm = ({ onEstimateCreated = () => {} }: { onEstimateCrea
         </View>
       </View>
 
+      {/* Location Picker Section (25 Districts + Town + OSM + Project prefill) */}
+      <LocationPicker
+        district={district}
+        town={town}
+        latitude={latitude}
+        longitude={longitude}
+        projectId={projectId}
+        locationNote={locationNote}
+        onLocationChange={({ district: newD, town: newT, latitude: newLat, longitude: newLng }) => {
+          setDistrict(newD);
+          setTown(newT);
+          if (newLat !== undefined) setLatitude(newLat);
+          if (newLng !== undefined) setLongitude(newLng);
+        }}
+      />
+
       <View className="flex-row flex-wrap -mx-3">
-        <View className="w-full md:w-1/3 px-3 mb-4">
+        <View className="w-full md:w-1/2 px-3 mb-4">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold mb-2">Project Type</Text>
           <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => cycleOption(projectType, ['Residential House', 'Commercial Building', 'Apartment Complex', 'Warehouse', 'Road Construction', 'Renovation'], setProjectType)} className="border border-gray-200 rounded-lg bg-gray-50 px-4 py-3 flex-row justify-between items-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm truncate flex-1">{projectType}</Text>
-            <Ionicons name="swap-vertical" size={16} color="#9CA3AF" />
-          </Pressable>
-        </View>
-
-        <View className="w-full md:w-1/3 px-3 mb-4">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold mb-2">Location</Text>
-          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => cycleOption(location, ['Colombo', 'Gampaha', 'Kandy', 'Galle', 'Matara', 'Kurunegala', 'Ratnapura', 'Anuradhapura', 'Jaffna', 'Trincomalee'], setLocation)} className="border border-gray-200 rounded-lg bg-gray-50 px-4 py-3 flex-row justify-between items-center">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm truncate flex-1">{location}</Text>
             <Ionicons name="swap-vertical" size={16} color="#9CA3AF" />
           </Pressable>
         </View>

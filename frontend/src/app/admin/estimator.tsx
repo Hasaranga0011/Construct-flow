@@ -65,11 +65,11 @@ export default function EstimatorScreen() {
 
         {/* Bottom Section Layout */}
         <View className={`gap-6 pb-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-          <View className={isMobile ? "w-full" : "flex-[4] w-full"}>
+          <View className={isMobile ? "w-full" : "w-full lg:w-[380px] lg:flex-shrink-0"}>
             <CostBreakdown refreshTrigger={refreshTrigger} />
           </View>
           
-          <View className={isMobile ? "w-full" : "flex-[5] w-full"}>
+          <View className={isMobile ? "w-full" : "flex-1 min-w-0"}>
             <RecentEstimates refreshTrigger={refreshTrigger} />
           </View>
         </View>

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView, Platform, Alert, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { sendSystemNotification } from '../../utils/notifications';
+import { notify, confirmAction } from '@/utils/notify';
 import { StatusBadge } from '../common/StatusBadge';
 
 const EstimateRow = ({ 
@@ -121,32 +122,32 @@ const EstimateRow = ({
   }
 
   return (
-    <View className="flex-col py-4 border-b border-gray-50">
+    <View className="flex-col py-3.5 border-b border-gray-50">
       <View className="flex-row items-center w-full">
-        <View className="flex-1 min-w-0 pr-2">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{title}</Text>
+        <View className="flex-1 min-w-[140px] pr-2">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} numberOfLines={2} className="text-brand-text font-bold text-sm">{title}</Text>
         </View>
-        <View className="w-24 px-2">
+        <View className="w-[76px] px-2">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{date}</Text>
         </View>
-        <View className="w-28 px-2" style={{ flexShrink: 1 }}>
+        <View className="w-[96px] px-2" style={{ flexShrink: 1 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm" numberOfLines={1}>{cost}</Text>
         </View>
-        <View className="w-28 px-2" style={{ flexShrink: 1 }}>
+        <View className="w-[92px] px-2" style={{ flexShrink: 1 }}>
           <StatusBadge status={status} />
         </View>
-        <View className="w-48 items-center flex-row justify-end gap-2">
+        <View className="w-[180px] items-center flex-row justify-end gap-1.5">
           {status === 'Pending' && (
             <>
-              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onApprove(id)} className="bg-brand-success px-3 py-2 rounded justify-center">
+              <Pressable style={{ minHeight: 34 }} onPress={() => onApprove(id)} className="bg-brand-success px-2.5 py-1.5 rounded justify-center items-center">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">Approve</Text>
               </Pressable>
-              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onReject(id)} className="border border-red-500 px-3 py-2 rounded justify-center bg-white">
+              <Pressable style={{ minHeight: 34 }} onPress={() => onReject(id)} className="border border-red-500 px-2.5 py-1.5 rounded justify-center items-center bg-white">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500 text-xs font-bold">Reject</Text>
               </Pressable>
             </>
           )}
-          <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={async () => {
+          <Pressable style={{ minHeight: 34 }} onPress={async () => {
             try {
               const { data: sessionData } = await supabase.auth.getSession();
               const token = sessionData?.session?.access_token;
@@ -179,13 +180,13 @@ const EstimateRow = ({
               console.error(err);
               Platform.OS === 'web' ? window.alert('An error occurred while generating the PDF.') : Alert.alert('Estimate PDF', 'An error occurred while generating the PDF.');
             }
-          }} className="justify-center">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold pl-2">View PDF</Text>
+          }} className="justify-center py-1.5">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-bold pl-1">View PDF</Text>
           </Pressable>
         </View>
       </View>
       {inputs && (
-        <View className="flex-row mt-2 items-center">
+        <View className="flex-row mt-1.5 items-center flex-wrap">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-400 font-medium">Context: </Text>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500">
             {subline} • {inputs.floors} floors • {inputs.site} • {inputs.timeline} Schedule
@@ -298,35 +299,24 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
           );
         })
         .then(() => {
-          if (Platform.OS === 'web') {
-            window.alert('Estimate Rejected successfully.');
-          } else {
-            Alert.alert('Success', 'Estimate Rejected successfully.');
-          }
+          notify('Success', 'Estimate Rejected successfully.');
         })
         .catch(err => {
           console.warn('Failed to reject', err);
-          if (Platform.OS === 'web') {
-            window.alert(`Error: ${err.message || 'Failed to reject estimate.'}`);
-          } else {
-            Alert.alert('Error', err.message || 'Failed to reject estimate.');
-          }
+          notify('Error', err.message || 'Failed to reject estimate.');
         })
         .finally(() => {
           setLoading(false);
         });
     };
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to reject the estimate for ${title}?`)) {
-        confirmReject();
-      }
-    } else {
-      Alert.alert('Reject Estimate', `Are you sure you want to reject the estimate for ${title}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: confirmReject }
-      ]);
-    }
+    confirmAction(
+      'Reject Estimate',
+      `Are you sure you want to reject the estimate for ${title}?`,
+      true
+    ).then((confirmed) => {
+      if (confirmed) confirmReject();
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -340,7 +330,7 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
   const isMobile = width < 1024;
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] ${isMobile ? '' : 'ml-6'}`}>
+    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
       <View className="flex-row justify-between items-center mb-4">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Recent Estimates</Text>
         <Pressable style={{ minHeight: 44, minWidth: 44 }}>
@@ -348,39 +338,43 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
         </Pressable>
       </View>
 
-      {!isMobile && (
-        <View className="flex-row py-2 border-b border-gray-100 mb-2">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 pr-2 text-xs font-semibold text-gray-400 uppercase">Project Name</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-24 px-2 text-xs font-semibold text-gray-400 uppercase">Date</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase">Estimated Cost</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-28 px-2 text-xs font-semibold text-gray-400 uppercase">Status</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-48 text-xs font-semibold text-gray-400 uppercase text-right"></Text>
-        </View>
-      )}
+      <ScrollView horizontal={!isMobile} showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: '100%' }}>
+        <View style={{ minWidth: isMobile ? undefined : 560, flex: 1 }}>
+          {!isMobile && (
+            <View className="flex-row py-2 border-b border-gray-100 mb-2">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 min-w-[140px] pr-2 text-xs font-semibold text-gray-400 uppercase">Project Name</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[76px] px-2 text-xs font-semibold text-gray-400 uppercase">Date</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[96px] px-2 text-xs font-semibold text-gray-400 uppercase">Estimated Cost</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[92px] px-2 text-xs font-semibold text-gray-400 uppercase">Status</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[180px] text-xs font-semibold text-gray-400 uppercase text-right"></Text>
+            </View>
+          )}
 
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View className="py-10 items-center">
-            <ActivityIndicator color="#F97316" />
-          </View>
-        ) : estimations.length === 0 ? (
-          <View className="py-10 items-center">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No estimations generated yet.</Text>
-          </View>
-        ) : (
-          estimations.map((est) => (
-            <EstimateRow 
-              key={est.id}
-              id={est.id}
-              projectName={est.project_name || `Estimation #${est.id.toString().substring(0, 4)}`} 
-              date={new Date(est.created_at).toLocaleDateString()} 
-              cost={formatCurrency(est.estimated_cost)} 
-              status={est.status || 'Pending'} 
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ))
-        )}
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {loading ? (
+              <View className="py-10 items-center">
+                <ActivityIndicator color="#F97316" />
+              </View>
+            ) : estimations.length === 0 ? (
+              <View className="py-10 items-center">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No estimations generated yet.</Text>
+              </View>
+            ) : (
+              estimations.map((est) => (
+                <EstimateRow 
+                  key={est.id}
+                  id={est.id}
+                  projectName={est.project_name || `Estimation #${est.id.toString().substring(0, 4)}`} 
+                  date={new Date(est.created_at).toLocaleDateString()} 
+                  cost={formatCurrency(est.estimated_cost)} 
+                  status={est.status || 'Pending'} 
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                />
+              ))
+            )}
+          </ScrollView>
+        </View>
       </ScrollView>
     </View>
   );

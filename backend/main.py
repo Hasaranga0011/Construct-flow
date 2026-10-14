@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from core.config import settings
 from core.security import get_current_user
-from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports, admin
+from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports, admin, auth
 from apscheduler.schedulers.background import BackgroundScheduler
 from supabase import create_client
 import logging
@@ -108,6 +108,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Public Auth router (self-registration, login helpers)
+app.include_router(auth.router, prefix="/api")
 
 # Routers
 secure_dependency = [Depends(get_current_user)]

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { useApi } from '@/hooks/useApi';
+import { SRI_LANKA_DISTRICTS } from '@/constants/districts';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 type Project = { id: string; name: string; location?: string | null };
 type Estimation = { id: string; project_name: string; estimated_cost: number; confidence_score?: number | null; status: string; created_at: string };
@@ -70,13 +72,40 @@ export default function ClientProjectEstimatesPage() {
     setSubmitting(true);
     setError(null);
     try {
+      let resolvedDistrict = 'Colombo';
+      if (project.location) {
+        for (const d of SRI_LANKA_DISTRICTS) {
+          if (project.location.toLowerCase().includes(d.toLowerCase())) {
+            resolvedDistrict = d;
+            break;
+          }
+        }
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const responseData = await apiRequest('/ai/predict-cost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session?.access_token || ''}` },
-        body: JSON.stringify({ square_footage: area, location: project.location || 'Other', project_type: projectType, quality_tier: qualityTier }),
+        body: JSON.stringify({
+          square_footage: area,
+          location: resolvedDistrict,
+          district: resolvedDistrict,
+          project_type: projectType,
+          quality_tier: qualityTier,
+          site_condition: 'Flat',
+          structure_type: 'RCC frame',
+          finishing_flooring: 'Standard',
+          finishing_sanitary: 'Standard',
+          finishing_electrical: 'Standard',
+          target_timeline: 'Standard',
+        }),
       });
-      const { data: saved, error: saveError } = await supabase.from('estimations').insert({ project_name: project.name, estimated_cost: responseData.estimated_cost, confidence_score: responseData.confidence_score, status: 'Pending' }).select('id, project_name, estimated_cost, confidence_score, status, created_at').single();
+      const { data: saved, error: saveError } = await supabase.from('estimations').insert({
+        project_name: `${project.name} (${resolvedDistrict})`,
+        estimated_cost: responseData.estimated_cost,
+        confidence_score: responseData.confidence_score,
+        status: 'Pending',
+      }).select('id, project_name, estimated_cost, confidence_score, status, created_at').single();
       if (saveError) throw saveError;
       setResult(saved as Estimation);
       setEstimations(current => [saved as Estimation, ...current]);
@@ -110,9 +139,9 @@ export default function ClientProjectEstimatesPage() {
             <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="mb-6">{QUALITY_TIERS.map(tier => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={tier} onPress={() => setQualityTier(tier)} className={`px-4 py-2 rounded-full border mr-2 ${qualityTier === tier ? 'bg-brand-orange border-brand-orange' : 'bg-white border-gray-300'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={qualityTier === tier ? 'text-white font-bold' : 'text-gray-600'}>{tier}</Text></Pressable>)}</ScrollView>
             <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={generateEstimate} disabled={submitting} className={`py-4 rounded-xl items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">{submitting ? 'Generating...' : 'Generate Estimate'}</Text></Pressable>
           </View>
-          {result && <View className="bg-brand-orange rounded-2xl p-6 mb-6"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm opacity-80">Latest estimate</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-3xl font-bold mt-2">{formatCurrency(Number(result.estimated_cost))}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white mt-2">Confidence: {result.confidence_score == null ? 'Not validated' : `${result.confidence_score}%`}</Text></View>}
+          {result && <View className="bg-brand-orange rounded-2xl p-6 mb-6"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm opacity-80">Latest estimate</Text><AutoFitText value={formatCurrency(Number(result.estimated_cost))} maxFontSize={30} minFontSize={18} className="text-white font-bold" captionClassName="text-white" containerStyle={{ marginTop: 8 }} /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white mt-2">Confidence: {result.confidence_score == null ? 'Not validated' : `${result.confidence_score}%`}</Text></View>}
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4">Estimate History</Text>
-          {estimations.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No estimates have been generated.</Text> : estimations.map(estimation => <View key={estimation.id} className="bg-white border border-gray-100 rounded-xl p-5 mb-3"><View className="flex-row justify-between"><View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{estimation.project_name}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-1">{new Date(estimation.created_at).toLocaleDateString('en-GB')}</Text></View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold">{formatCurrency(Number(estimation.estimated_cost))}</Text></View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-3">{estimation.status} · Confidence {estimation.confidence_score == null ? 'Not validated' : `${estimation.confidence_score}%`}</Text></View>)}
+          {estimations.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No estimates have been generated.</Text> : estimations.map(estimation => <View key={estimation.id} className="bg-white border border-gray-100 rounded-xl p-5 mb-3"><View className="flex-row justify-between" style={{ gap: 12 }}><View style={{ flex: 1, minWidth: 0 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{estimation.project_name}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-1">{new Date(estimation.created_at).toLocaleDateString('en-GB')}</Text></View><Text style={{ flexShrink: 0, maxWidth: '55%' }} numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold">{formatCurrency(Number(estimation.estimated_cost))}</Text></View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-3">{estimation.status} · Confidence {estimation.confidence_score == null ? 'Not validated' : `${estimation.confidence_score}%`}</Text></View>)}
         </>}
       </ScrollView>
     </View>

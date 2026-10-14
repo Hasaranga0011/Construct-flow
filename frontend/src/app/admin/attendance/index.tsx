@@ -14,7 +14,7 @@ export default function AdminAttendanceIndex() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'projects']);
+  const { tick, lastUpdated } = useTableRealtime(['attendance', 'legacy_labour', 'profiles', 'projects']);
 
   const [globalStats, setGlobalStats] = useState({ totalWorkers: 0, checkedIn: 0 });
 
@@ -22,38 +22,45 @@ export default function AdminAttendanceIndex() {
     let isMounted = true;
     const fetchSites = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const utcDate = now.toISOString().split('T')[0];
+        const todayDates = Array.from(new Set([localDate, utcDate]));
 
         // Fetch projects
         let query = supabase.from('projects').select('id, name, location, status');
         if (search) query = query.ilike('name', `%${search}%`);
 
-        const { data: projData, error: projErr } = await query;
-        if (projErr) throw projErr;
+        const [projReq, sitesReq, attReq, legacyReq, totalWorkersReq] = await Promise.all([
+          query,
+          supabase.from('sites').select('id, project_id'),
+          supabase.from('attendance').select('id, site_id, check_in_time, check_out_time').in('date', todayDates).not('check_in_time', 'is', null).is('check_out_time', null),
+          supabase.from('legacy_labour').select('id, project_id, status').in('date', todayDates).eq('status', 'Present'),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker')
+        ]);
 
-        // Fetch today's attendance to show quick stats per site
-        const { data: attData, error: attErr } = await supabase
-          .from('legacy_labour')
-          .select('id, project_id, status')
-          .eq('date', today);
+        if (projReq.error) throw projReq.error;
 
-        const { count: totalWorkers } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'worker');
-
-        if (attErr) throw attErr;
+        const siteToProj = new Map((sitesReq.data || []).map(s => [s.id, s.project_id]));
+        const activeAtt = attReq.data || [];
+        const activeLegacy = legacyReq.data || [];
 
         if (isMounted) {
-          const enrichedProjects = (projData || []).map((p: any) => {
-            const siteAttendance = (attData || []).filter((a: any) => a.project_id === p.id);
+          const enrichedProjects = (projReq.data || []).map((p: any) => {
+            const attCount = activeAtt.filter(a => siteToProj.get(a.site_id) === p.id || a.site_id === p.id).length;
+            const legacyCount = activeLegacy.filter(a => a.project_id === p.id).length;
             return {
               ...p,
-              checkedInToday: siteAttendance.filter((a: any) => a.status === 'Present').length
+              checkedInToday: Math.max(attCount, legacyCount)
             };
           });
 
+          const totalCheckedIn = activeAtt.length > 0 ? activeAtt.length : activeLegacy.length;
+
           setProjects(enrichedProjects);
           setGlobalStats({
-            totalWorkers: totalWorkers || 0,
-            checkedIn: (attData || []).filter((a: any) => a.status === 'Present').length
+            totalWorkers: totalWorkersReq.count || 0,
+            checkedIn: totalCheckedIn
           });
         }
       } catch (err) {

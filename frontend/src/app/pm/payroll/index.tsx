@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { managedPayroll } from '@/services/pmData';
 import { formatMoney } from '@/utils/format';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function PMPayrollPage() {
   const [slips, setSlips] = useState<any[]>([]);
@@ -30,7 +31,7 @@ export default function PMPayrollPage() {
     <ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mb-2">Salary Slips</Text>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4">Generated payroll records for projects you manage.</Text>
-      <View className="bg-white rounded-xl p-5 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Pending payment: {pending.length} slips</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mt-2">{formatMoney(pendingTotal)}</Text></View>
+      <View className="bg-white rounded-xl p-5 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Pending payment: {pending.length} slips</Text><AutoFitText value={formatMoney(pendingTotal)} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>
       <View className="mb-4 z-50">
         <SearchInput 
           placeholder="Search worker or project..." 

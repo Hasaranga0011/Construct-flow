@@ -4,6 +4,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform }
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
+import { notify, confirmAction } from '@/utils/notify';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { ChatWidget } from '../../../components/shared/ChatWidget';
@@ -12,6 +13,7 @@ import { api } from '../../../services/api';
 import { Modal, TextInput } from 'react-native';
 import { OrderItemRow } from '@/components/materials/OrderItemRow';
 import { useResponsive } from '@/hooks/useResponsive';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
   const [qty, setQty] = useState('');
@@ -140,19 +142,12 @@ export default function AdminMaterialsOrdersIdPage() {
   }, [id]);
 
   const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received') => {
-    // Platform-safe confirm dialog
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Are you sure you want to mark this order as ${newStatus}?`)
-      : await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            'Confirm Action',
-            `Are you sure you want to mark this order as ${newStatus}?`,
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Yes', onPress: () => resolve(true) }
-            ]
-          );
-        });
+    const isDestructive = newStatus === 'Rejected';
+    const confirmed = await confirmAction(
+      'Confirm Action',
+      `Are you sure you want to mark this order as ${newStatus}?`,
+      isDestructive
+    );
 
     if (!confirmed) return;
 
@@ -173,15 +168,13 @@ export default function AdminMaterialsOrdersIdPage() {
       if (newStatus === 'Delivered') await api.purchaseOrders.deliver(id);
       if (newStatus === 'Received') await api.purchaseOrders.receive(id);
 
-      if (Platform.OS === 'web') window.alert(`Order marked as ${newStatus}!`);
-      else Alert.alert('Success', `Order marked as ${newStatus}!`);
+      notify('Success', `Order marked as ${newStatus}!`);
 
       // Refresh data
       fetchOrder();
     } catch (err: any) {
       const msg = err.message || 'Failed to update status';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      notify('Error', msg);
     } finally {
       setActionLoading(false);
     }
@@ -200,8 +193,7 @@ export default function AdminMaterialsOrdersIdPage() {
       fetchOrder();
     } catch (err: any) {
       const msg = err.message || err.detail || 'Failed to submit suggestion';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      notify('Error', msg);
     } finally {
       setActionLoading(false);
     }
@@ -317,9 +309,7 @@ export default function AdminMaterialsOrdersIdPage() {
                 {(!order.total_price || order.total_price === 0) && (order.status === 'Pending Delivery' || order.status === 'Pending' || order.status === 'Suggested' || order.status === 'Awaiting Quote') && !unitPrice ? (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm mt-1">Awaiting your price</Text>
                 ) : (
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xl">
-                    Rs. {(order.status === 'Pending Delivery' ? ((parseFloat(unitPrice) || 0) * (order.quantity_ordered || 0)) : (order.total_price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </Text>
+                  <AutoFitText value={`Rs. ${(order.status === 'Pending Delivery' ? ((parseFloat(unitPrice) || 0) * (order.quantity_ordered || 0)) : (order.total_price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} maxFontSize={20} minFontSize={14} className="font-bold text-brand-orange" />
                 )}
               </View>
             </View>

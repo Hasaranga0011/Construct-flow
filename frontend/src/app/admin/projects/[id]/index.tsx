@@ -1,22 +1,28 @@
 import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { notify, confirmAction } from '@/utils/notify';
+import { DeleteProjectModal } from '@/components/common/DeleteProjectModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { roleLabel } from '../../../../utils/roles';
+import { getApiUrl } from '../../../../lib/apiUrl';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function AdminProjectDetailsPage() {
   const { id } = useLocalSearchParams();
+  const projectId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [supplierStats, setSupplierStats] = useState<any[]>([]);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,6 +43,10 @@ export default function AdminProjectDetailsPage() {
           .single();
 
         if (projError) {
+          if (projError.code === 'PGRST116') {
+            if (isMounted) setProject(null);
+            return;
+          }
           console.error("Supabase Error:", projError);
           throw projError;
         }
@@ -51,17 +61,17 @@ export default function AdminProjectDetailsPage() {
             (projData as any).client = clientData;
         }
 
-        const { data: roleData, error: roleError } = await supabase
+        const { data: roleData, error: roleError } = (await supabase
           .from('project_role_assignments')
           .select('user_id, role, profiles (full_name, email, role)')
-          .eq('project_id', projectId as string);
+          .eq('project_id', projectId as string)) as any;
 
         if (roleError) console.error("Error fetching assignments:", roleError);
 
         if (isMounted) {
             setProject(projData);
             if (roleData) {
-              const normalizedRoles = roleData.map(assignment => ({ ...assignment, profiles: firstRelation(assignment.profiles) }));
+              const normalizedRoles = (roleData as any[]).map((assignment: any) => ({ ...assignment, profiles: firstRelation(assignment.profiles) }));
               const otherStaff = normalizedRoles.filter((a: any) => a.role !== 'pm' && a.role !== 'client' && a.role !== 'supplier');
               setAssignments(otherStaff);
 
@@ -97,8 +107,12 @@ export default function AdminProjectDetailsPage() {
             }
         }
       } catch (err: any) {
+        if (!isMounted) return;
+        if (err?.code === 'PGRST116' || err?.message?.includes('JSON object')) {
+          return;
+        }
         console.error('Error fetching project details', err);
-        alert(`Error fetching project details: ${err.message || JSON.stringify(err)} | ID: ${id}`);
+        notify('Error', `Error fetching project details: ${err.message || JSON.stringify(err)}`);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -109,7 +123,7 @@ export default function AdminProjectDetailsPage() {
     const channel = supabase
       .channel('project_roles_' + id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'project_role_assignments', filter: `project_id=eq.${id}` }, () => {
-        fetchProject();
+        if (isMounted) fetchProject();
       })
       .subscribe();
 
@@ -119,21 +133,179 @@ export default function AdminProjectDetailsPage() {
     };
   }, [id]);
 
-  const handleDeleteProject = async () => {
-    const confirmed = await confirmAction('Delete Project', 'Are you sure you want to delete this project? This action cannot be undone.');
+  const handleArchiveProject = async (skipConfirm = false) => {
+    if (!project) return;
+    if (!skipConfirm) {
+      const confirmed = await confirmAction(
+        'Archive Project',
+        `Archive "${project.name}"?\n\nThe project will be hidden from active lists and dashboards, but retained for finance, audit, and reports.`,
+        false
+      );
+      if (!confirmed) return;
+    }
+
+    setLoading(true);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      const targetId = project?.id || projectId;
+      if (!targetId) {
+        throw new Error('Project ID is missing');
+      }
+      const targetUrl = `${getApiUrl()}/projects/${targetId}?archive_only=true`;
+      if (__DEV__) {
+        console.log('[DEBUG DELETE (Archive) /projects Request]:', targetUrl);
+      }
+
+      const res = await fetch(targetUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        let errText = 'Failed to archive project';
+        try {
+          const errData = await res.json();
+          errText = errData.detail || errData.message || JSON.stringify(errData);
+        } catch {
+          errText = await res.text();
+        }
+        throw new Error(errText);
+      }
+
+      notify('Success', `Project "${project.name}" has been archived successfully.`);
+      setProject(prev => prev ? { ...prev, status: 'archived' } : null);
+      router.replace('/admin/projects' as any);
+    } catch (err: any) {
+      console.error('Failed to archive project:', err);
+      notify('Error', err.message || 'Failed to archive project');
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreProject = async () => {
+    if (!project) return;
+    const confirmed = await confirmAction(
+      'Restore Project',
+      `Restore "${project.name}" to active status?\n\nThe project will return to active dashboards and project lists.`,
+      false
+    );
     if (!confirmed) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('projects').delete().eq('id', projectId as string);
-      if (error) throw error;
-      notify('Success', 'Project deleted successfully');
-      router.replace('/admin/projects' as any);
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      const targetId = project?.id || projectId;
+      if (!targetId) {
+        throw new Error('Project ID is missing');
+      }
+
+      let res = await fetch(`${getApiUrl()}/projects/${targetId}/restore`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        res = await fetch(`${getApiUrl()}/projects/${targetId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'active' })
+        });
+      }
+
+      if (!res.ok) {
+        let errText = 'Failed to restore project';
+        try {
+          const errData = await res.json();
+          errText = errData.detail || errData.message || JSON.stringify(errData);
+        } catch {
+          errText = await res.text();
+        }
+        throw new Error(errText);
+      }
+
+      setProject(prev => prev ? { ...prev, status: 'active' } : null);
+      notify('Success', `Project "${project.name}" has been restored to active status.`);
     } catch (err: any) {
-      console.error("Failed to delete project", err);
-      notify('Error', err.message || 'Failed to delete project');
+      console.error('Failed to restore project:', err);
+      notify('Error', err.message || 'Failed to restore project');
+    } finally {
       setLoading(false);
     }
+  };
+
+  const executeDeleteProject = async () => {
+    if (!project) return;
+    setDeleting(true);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      const targetId = project?.id || projectId;
+      if (!targetId) {
+        throw new Error('Project ID is missing');
+      }
+      const targetUrl = `${getApiUrl()}/projects/${targetId}?archive_only=false`;
+      if (__DEV__) {
+        console.log('[DEBUG DELETE (Permanent) /projects Request]:', targetUrl);
+      }
+
+      const response = await fetch(targetUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 409) {
+        let depMessage = 'This project has financial or operational history. Archive it instead.';
+        try {
+          const errData = await response.json();
+          depMessage = errData.detail || depMessage;
+        } catch {}
+
+        setDeleteModalVisible(false);
+        setDeleting(false);
+
+        const shouldArchive = await confirmAction('Archive Instead?', `${depMessage}\n\nWould you like to archive it instead?`, false);
+        if (shouldArchive) {
+          await handleArchiveProject(true);
+        }
+        return;
+      }
+
+      if (!response.ok) {
+        let errMessage = 'Failed to delete project';
+        try {
+          const errData = await response.json();
+          errMessage = errData.detail || errData.message || JSON.stringify(errData);
+        } catch {
+          errMessage = await response.text();
+        }
+        throw new Error(errMessage);
+      }
+
+      setDeleteModalVisible(false);
+      notify('Success', `Project "${project.name}" deleted successfully.`);
+      router.replace('/admin/projects' as any);
+    } catch (err: any) {
+      console.error('Failed to delete project:', err);
+      notify('Error', err.message || 'Failed to delete project');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteProject = () => {
+    if (!project) return;
+    setDeleteModalVisible(true);
   };
 
   return (
@@ -154,38 +326,54 @@ export default function AdminProjectDetailsPage() {
           <View className="max-w-4xl mx-auto w-full">
 
             {/* Header Card */}
-            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-6 relative overflow-hidden">
+            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 md:p-8 mb-6 relative overflow-hidden">
               <View className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full" />
 
-              <View className="flex-row justify-between items-start mb-6">
-                <View className="flex-1 pr-6">
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-black text-gray-800 mb-2">{project.name}</Text>
+              <View className="flex-row flex-wrap gap-3 justify-between items-start mb-6">
+                <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 220, minWidth: 0 }}>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-gray-800 mb-2">{project.name}</Text>
                   <View className="flex-row items-center">
                     <Ionicons name="location-outline" size={16} color="#6B7280" />
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 ml-1">{project.location}</Text>
                   </View>
                 </View>
 
-                <View className={`px-4 py-2 rounded-lg ${project.status === 'active' ? 'bg-[#DCFCE7]' : 'bg-gray-100'}`}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider ${project.status === 'active' ? 'text-brand-success' : 'text-gray-600'}`}>
+                <View className={`px-4 py-2 rounded-lg ${project.status === 'active' ? 'bg-[#DCFCE7]' : String(project.status || '').toLowerCase() === 'archived' ? 'bg-amber-100' : 'bg-gray-100'}`}>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider ${project.status === 'active' ? 'text-brand-success' : String(project.status || '').toLowerCase() === 'archived' ? 'text-amber-800' : 'text-gray-600'}`}>
                     {project.status}
                   </Text>
                 </View>
               </View>
 
+              {String(project.status || '').toLowerCase() === 'archived' && (
+                <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1 mr-3">
+                    <Ionicons name="archive" size={20} color="#D97706" className="mr-3" />
+                    <View className="flex-1">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-amber-900 font-bold text-sm">Archived Project</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-amber-700 text-xs">This project is archived and hidden from active views. Historical records remain accessible.</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={{ minHeight: 40, minWidth: 40 }}
+                    onPress={handleRestoreProject}
+                    className="bg-emerald-600 px-4 py-2 rounded-xl flex-row items-center"
+                  >
+                    <Ionicons name="arrow-undo-outline" size={16} color="#FFFFFF" className="mr-1.5" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">Restore</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Stats Row */}
               <View style={isMobile ? { flexDirection: 'column', gap: 16, paddingTop: 24, borderTopWidth: 1, borderColor: '#F3F4F6' } : { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingTop: 24, borderTopWidth: 1, borderColor: '#F3F4F6' }}>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Total Budget</Text>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">
-                    Rs. {project.total_budget?.toLocaleString() || 'N/A'}
-                  </Text>
+                  <AutoFitText value={`Rs. ${project.total_budget?.toLocaleString() || 'N/A'}`} maxFontSize={20} minFontSize={14} className="font-bold text-gray-800" />
                 </View>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Spent Cost</Text>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-orange">
-                    Rs. {project.spent_cost?.toLocaleString() || '0'}
-                  </Text>
+                  <AutoFitText value={`Rs. ${project.spent_cost?.toLocaleString() || '0'}`} maxFontSize={20} minFontSize={14} className="font-bold text-brand-orange" />
                 </View>
                 <View style={isMobile ? { width: '100%' } : { width: '30%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase font-bold mb-1">Target End</Text>
@@ -279,6 +467,32 @@ export default function AdminProjectDetailsPage() {
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                  </TouchableOpacity>
 
+                 {String(project.status || '').toLowerCase() === 'archived' ? (
+                   <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
+                      onPress={handleRestoreProject}
+                      className="flex-row items-center p-3 bg-emerald-50 rounded-xl border border-emerald-200 mt-2"
+                   >
+                      <Ionicons name="arrow-undo-outline" size={20} color="#059669" className="mr-3" />
+                      <View className="flex-1">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-emerald-800">Restore Project</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-emerald-600">Return to active dashboard & lists</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#059669" />
+                   </TouchableOpacity>
+                 ) : (
+                   <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
+                      onPress={() => handleArchiveProject(false)}
+                      className="flex-row items-center p-3 bg-amber-50 rounded-xl border border-amber-200 mt-2"
+                   >
+                      <Ionicons name="archive-outline" size={20} color="#D97706" className="mr-3" />
+                      <View className="flex-1">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-amber-800">Archive Project</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-amber-600">Hide from active views, keep history</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#D97706" />
+                   </TouchableOpacity>
+                 )}
+
                  <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
                     onPress={handleDeleteProject}
                     className="flex-row items-center p-3 bg-red-50 rounded-xl border border-red-200 mt-2"
@@ -286,7 +500,7 @@ export default function AdminProjectDetailsPage() {
                     <Ionicons name="trash" size={20} color="#EF4444" className="mr-3" />
                     <View className="flex-1">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-red-700">Delete Project</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-red-500">Permanently remove this project</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-red-500">Permanently remove if no history</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#EF4444" />
                  </TouchableOpacity>
@@ -354,6 +568,16 @@ export default function AdminProjectDetailsPage() {
           </View>
         )}
       </ScrollView>
+
+      {project && (
+        <DeleteProjectModal
+          visible={deleteModalVisible}
+          projectName={project.name || ''}
+          loading={deleting}
+          onCancel={() => setDeleteModalVisible(false)}
+          onConfirm={executeDeleteProject}
+        />
+      )}
     </View>
   );
 }

@@ -82,20 +82,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
-        const metaRole = nextSession.user.user_metadata?.role;
+        const appMetaRole = (nextSession.user as any).app_metadata?.role;
+        const userMetaRole = nextSession.user.user_metadata?.role;
+        const metaRole = appMetaRole || userMetaRole;
         let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
         let resolvedIsApproved = true;
-        
-        if (!resolvedRole || resolvedRole === 'supplier') {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role, is_approved')
-            .eq('id', nextSession.user.id)
-            .single();
-          if (!profileError) {
-             if (!resolvedRole) resolvedRole = normalizeRole(profile?.role);
-             if (profile?.is_approved !== undefined) resolvedIsApproved = profile.is_approved;
-          }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, is_approved')
+          .eq('id', nextSession.user.id)
+          .single();
+        if (!profileError && profile) {
+          if (profile.role) resolvedRole = normalizeRole(profile.role);
+          if (profile.is_approved !== undefined) resolvedIsApproved = profile.is_approved;
         }
 
         if (mounted && requestId === roleRequest) {

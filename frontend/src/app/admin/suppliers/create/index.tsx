@@ -1,9 +1,10 @@
 import { getApiUrl } from '../../../../lib/apiUrl';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../../lib/supabase';
+import { noAutofill } from '../../../../lib/formAutofill';
 
 export default function AdminSupplierCreatePage() {
   const router = useRouter();
@@ -13,6 +14,20 @@ export default function AdminSupplierCreatePage() {
   const [companyName, setCompanyName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const resetForm = useCallback(() => {
+    setFullName('');
+    setEmail('');
+    setPhone('');
+    setCompanyName('');
+    setSubmitting(false);
+    setError(null);
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    resetForm();
+    return resetForm;
+  }, [resetForm]));
 
   const submit = async () => {
     if (!fullName.trim() || !email.trim() || !phone.trim() || !companyName.trim()) {
@@ -52,6 +67,7 @@ export default function AdminSupplierCreatePage() {
       }
 
       const message = 'Supplier created and invited successfully.';
+      resetForm();
       if (Platform.OS === 'web') window.alert(message); else Alert.alert('Success', message);
       router.replace('/admin/suppliers');
     } catch (submitError: any) {
@@ -75,6 +91,7 @@ export default function AdminSupplierCreatePage() {
             onChangeText={setFullName}
             placeholder="John Doe"
             className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
+            {...noAutofill('admin_create_supplier_name')}
           />
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email Address *</Text>
@@ -82,9 +99,9 @@ export default function AdminSupplierCreatePage() {
             value={email}
             onChangeText={setEmail}
             placeholder="supplier@example.com"
-            autoCapitalize="none"
             keyboardType="email-address"
             className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
+            {...noAutofill('admin_create_supplier_email', 'email')}
           />
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Phone Number *</Text>
@@ -94,6 +111,7 @@ export default function AdminSupplierCreatePage() {
             placeholder="+94 77 123 4567"
             keyboardType="phone-pad"
             className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-4"
+            {...noAutofill('admin_create_supplier_phone')}
           />
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Company Name *</Text>
@@ -102,6 +120,7 @@ export default function AdminSupplierCreatePage() {
             onChangeText={setCompanyName}
             placeholder="ABC Construction Supplies"
             className="border border-gray-300 rounded-xl p-4 bg-gray-50 text-brand-text mb-6"
+            {...noAutofill('admin_create_supplier_company')}
           />
 
           <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={submit} disabled={submitting} className={`rounded-xl py-4 items-center ${submitting ? 'bg-orange-300' : 'bg-brand-orange'}`}>

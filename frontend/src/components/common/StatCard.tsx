@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 
 import { useResponsive } from "../../hooks/useResponsive";
+import { AutoFitText } from "./AutoFitText";
 
 export type IndicatorType = "success" | "warning" | "danger" | "neutral";
 
@@ -24,7 +25,7 @@ export const StatCard = ({
   fullWidth,
   compact = false,
 }: StatCardProps) => {
-  const { isPhone, isTablet } = useResponsive();
+  const { isPhone, isTablet, isDesktop } = useResponsive();
 
   const getIndicatorColor = () => {
     switch (indicatorType) {
@@ -42,7 +43,7 @@ export const StatCard = ({
   return (
     <View
       style={
-        !fullWidth && isTablet ? { flexBasis: "45%", flexGrow: 1 } : undefined
+        !fullWidth && isTablet ? { flexBasis: "45%", flexGrow: 1, minWidth: 0 } : { minWidth: 0 }
       }
       className={`bg-white rounded-lg ${compact ? "p-2" : "p-4 md:p-5"} shadow-sm border border-gray-100 ${fullWidth ? "w-full flex-grow min-w-0" : isPhone ? "w-full mb-3" : "flex-1 mx-1 md:mx-2 mb-3 md:mb-0"}`}
     >
@@ -61,13 +62,14 @@ export const StatCard = ({
         ) : null}
       </View>
 
-      <Text
-        style={{ flexShrink: 1, minWidth: 0 }}
-        maxFontSizeMultiplier={1.3}
-        className={`${compact ? "text-2xl" : "text-2xl md:text-3xl"} font-bold text-brand-text mb-2`}
-      >
-        {value}
-      </Text>
+      <AutoFitText
+        value={value}
+        maxFontSize={compact || !isDesktop ? 24 : 30}
+        minFontSize={16}
+        className="font-bold text-brand-text"
+        containerStyle={{ marginBottom: 8 }}
+        captionClassName="text-brand-text-muted"
+      />
 
       <View className="flex-row items-center mt-auto">
         <Text

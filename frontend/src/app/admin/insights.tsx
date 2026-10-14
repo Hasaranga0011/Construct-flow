@@ -3,8 +3,10 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import { TopNav } from '@/components/common/TopNav';
+import { notify, confirmAction } from '@/utils/notify';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useRouter } from 'expo-router';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function MLInsightsDashboard() {
   const [loading, setLoading] = useState(true);
@@ -38,37 +40,26 @@ export default function MLInsightsDashboard() {
       });
       setSimResult(res.estimated_cost);
     } catch (e: any) {
-      if (Platform.OS === 'web') window.alert(e.message || 'Error running simulator');
-      else Alert.alert('Error', e.message || 'Error running simulator');
+      notify('Error', e.message || 'Error running simulator');
     }
     setSimulating(false);
   };
 
   const handleRetrain = async () => {
     const confirmMessage = "Retrain the cost model now? This may take a minute.";
-    if (Platform.OS === 'web') {
-      if (!window.confirm(confirmMessage)) return;
-    } else {
-      await new Promise<void>((resolve, reject) => {
-        Alert.alert('Retrain Model', confirmMessage, [
-          { text: 'Cancel', style: 'cancel', onPress: () => reject(new Error('Cancelled')) },
-          { text: 'Retrain', onPress: resolve }
-        ]);
-      }).catch(() => { /* do nothing */ });
-    }
+    const confirmed = await confirmAction('Retrain Model', confirmMessage, false);
+    if (!confirmed) return;
 
     setRetraining(true);
     try {
       const res = await api.post('/ai/retrain', {});
-      if (Platform.OS === 'web') window.alert(res.message || 'Model retraining completed successfully.');
-      else Alert.alert('Success', res.message || 'Model retraining completed successfully.');
+      notify('Success', res.message || 'Model retraining completed successfully.');
       
       // refresh insights after retraining
       const data = await api.get('/ai/insights');
       setInsights(data);
     } catch (err: any) {
-      if (Platform.OS === 'web') window.alert(err.message || 'Error retraining model.');
-      else Alert.alert('Error', err.message || 'Error retraining model.');
+      notify('Error', err.message || 'Error retraining model.');
     } finally {
       setRetraining(false);
     }
@@ -285,7 +276,7 @@ export default function MLInsightsDashboard() {
           </View>
         </View>
 
-        <View className="bg-white dark:bg-[#1E293B] p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 mb-8">
+        <View className="bg-white dark:bg-[#1E293B] p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 mb-8">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-white mb-2">Market Trends (Avg Cost / SqFt)</Text>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-6">Real benchmarks calculated from completed projects, grouped by location and type.</Text>
 
@@ -309,7 +300,7 @@ export default function MLInsightsDashboard() {
         </View>
 
         {/* What-If Simulator */}
-        <View className="bg-white dark:bg-[#1E293B] p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 mb-12">
+        <View className="bg-white dark:bg-[#1E293B] p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 mb-12">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-white mb-2">Cost Simulator (What-If Analysis)</Text>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-6">Adjust parameters to see how the model&apos;s cost prediction shifts in real time.</Text>
 
@@ -348,10 +339,10 @@ export default function MLInsightsDashboard() {
             </View>
 
             {simResult !== null && (
-              <View className="mt-6 p-6 bg-orange-50 border border-orange-100 rounded-xl flex-row items-center justify-between">
-                <View>
+              <View className="mt-6 p-4 md:p-6 bg-orange-50 border border-orange-100 rounded-xl flex-row items-center justify-between" style={{ gap: 12 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 font-semibold mb-1">Simulated Total Cost</Text>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-black text-brand-text">LKR {simResult.toLocaleString(undefined, {maximumFractionDigits:0})}</Text>
+                  <AutoFitText value={`LKR ${simResult.toLocaleString(undefined, {maximumFractionDigits:0})}`} maxFontSize={30} minFontSize={18} className="font-black text-brand-text" />
                 </View>
                 <Ionicons name="calculator-outline" size={32} color="#F97316" className="opacity-50" />
               </View>

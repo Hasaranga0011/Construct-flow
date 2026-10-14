@@ -77,6 +77,20 @@ The previously pending project-access patch is now applied and refined. Its old 
   - `frontend/src/context/AuthContext.tsx`: Replaced direct `process.env.EXPO_PUBLIC_API_URL` usage with `getApiUrl()` for `/auth/google-role` sync, eliminating redbox network failure modals on app launch.
   - `frontend/src/utils/notifications.ts`: Replaced duplicate and un-prefixed ad-hoc `getApiUrl` with centralized resolver from `lib/apiUrl.ts`.
   - `frontend/src/app/index.tsx`: Integrated public contact inquiries with backend `POST /api/public-inquiry` and improved client-side error handling/logging.
+- **Worker QR Code Download on Mobile (`worker/dashboard.tsx` & `WorkerPortal.tsx`)**:
+  - Switched from root `expo-file-system` to `expo-file-system/legacy` to eliminate SDK 54 deprecation runtime errors when calling `writeAsStringAsync`.
+  - Replaced `FileSystem.documentDirectory` with `FileSystem.cacheDirectory` (with safe fallback) so Android/iOS FileProvider can share/download QR images without permission errors.
+  - Used stable `useRef` for `svgRef`, cleaned base64 header prefixes (`data:image/png;base64,`), sanitized filenames, and added proper mime-type and UTI metadata to `Sharing.shareAsync`.
+- **Project Manager & Admin Dashboard Layout Overlap Fix (`pm/dashboard.tsx`, `admin/dashboard.tsx`, `CostTimelineChart.tsx`, `DelayRiskPanel.tsx`)**:
+  - Replaced fragile NativeWind dynamic ternary classes with explicit React Native flexbox layout styles (`flexDirection`, `width`, `gap`).
+  - Removed root `flex-1` from `CostTimelineChart` and `DelayRiskPanel` inside `ScrollView` so children size by their content/minHeight instead of collapsing to 0 height and overlapping adjacent cards.
+  - Restored proper `fullWidth` prop and responsive wrapping to top stat cards.
 - **Silenced Reanimated Strict Mode Warnings (`frontend/src/app/_layout.tsx`)**:
   - Silenced `[Reanimated] Reading from value during component render` terminal flood by configuring `configureReanimatedLogger({ strict: false })` and `LogBox.ignoreLogs`.
   - Converted `AnimatedCard.tsx` to React Native's standard `Animated` API for maximum stability.
+- **Worker Profile & Settings Unified Across Roles (`ProfileScreen.tsx` & `SettingsScreen.tsx`)**:
+  - Removed worker-specific branch that previously redirected workers to an isolated `WorkerAccount` component.
+  - Workers now utilize the standard, rich `ProfileScreen` and `SettingsScreen` shared by Admin, PM, Site Manager, Client, and Supplier roles.
+  - Added support in `ProfileScreen` to query assigned project info via `workers.site_id` so workers see their assigned construction site card.
+- **Top-Level Authentication Route Normalization**:
+  - Fixed unhandled navigation action warnings by updating logout redirects in `Sidebar.tsx`, `MobileSidebar.tsx`, `SettingsScreen.tsx`, and `useAuth.ts` from `/login` to `/team-login`.

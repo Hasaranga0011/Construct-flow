@@ -60,7 +60,7 @@ export default function ResetPasswordScreen() {
     } else {
       await supabase.auth.signOut();
       setSuccessMsg('Password updated successfully! Redirecting to login…');
-      setTimeout(() => router.replace('/login'), 2500);
+      setTimeout(() => router.replace('/team-login'), 2500);
     }
     setLoading(false);
   };
@@ -178,7 +178,7 @@ export default function ResetPasswordScreen() {
 
           <View className="flex-row flex-wrap justify-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Back to </Text>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/login')}>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/team-login')}>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Login</Text>
             </Pressable>
           </View>

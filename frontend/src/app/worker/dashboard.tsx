@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Linking, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
@@ -13,7 +13,7 @@ import { getApiUrl } from '@/lib/apiUrl';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
 import QRCode from 'react-native-qrcode-svg';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
@@ -36,7 +36,8 @@ function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
         try {
           const cleanBase64 = data.replace(/^data:image\/png;base64,/, '').trim();
           const safeName = (profile.worker_code || profile.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_');
-          const fileUri = `${FileSystem.cacheDirectory}worker_qr_${safeName}.png`;
+          const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+          const fileUri = `${cacheDir}worker_qr_${safeName}.png`;
           
           await FileSystem.writeAsStringAsync(fileUri, cleanBase64, {
             encoding: FileSystem.EncodingType.Base64,

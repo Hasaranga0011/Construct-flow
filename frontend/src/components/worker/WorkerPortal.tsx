@@ -8,8 +8,9 @@ import {
   Linking,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { StatCard } from "@/components/common/StatCard";
+import { AutoFitText } from "@/components/common/AutoFitText";
 import { TopNav } from "@/components/common/TopNav";
 import {
   Attendance,
@@ -534,7 +536,8 @@ function QRModal({
         try {
           const cleanBase64 = data.replace(/^data:image\/png;base64,/, '').trim();
           const safeName = (profile?.worker_code || profile?.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_');
-          const fileUri = `${FileSystem.cacheDirectory}worker_qr_${safeName}.png`;
+          const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+          const fileUri = `${cacheDir}worker_qr_${safeName}.png`;
           await FileSystem.writeAsStringAsync(fileUri, cleanBase64, { encoding: FileSystem.EncodingType.Base64 });
           const isAvailable = await Sharing.isAvailableAsync();
           if (isAvailable) {
@@ -677,7 +680,7 @@ function Slip({
       <Text className="font-semibold dark:text-white">
         {dateLabel(slip.period_start)} · {dateLabel(slip.period_end)}
       </Text>
-      <Text className="text-2xl font-bold dark:text-white">{money(net)}</Text>
+      <AutoFitText value={money(net)} maxFontSize={24} minFontSize={16} className="font-bold dark:text-white" />
       <StatusBadge
         status={
           String(slip.status).toLowerCase() === "paid" ? "Paid" : "Generated"

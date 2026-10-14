@@ -20,7 +20,7 @@ const AlertRow = ({ material, project, remaining }: { material: string, project:
   );
 };
 
-export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
+export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,13 +32,20 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('materials')
         .select(`
-          id, name, unit, current_stock, minimum_threshold,
-          projects!inner(name, status)
-        `)
-        .eq('projects.status', 'active');
+          id, name, unit, current_stock, minimum_threshold, project_id,
+          projects(name, status)
+        `);
+
+      if (projectId) {
+        query = query.eq('project_id', projectId);
+      } else {
+        query = query.neq('projects.status', 'archived');
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -59,9 +66,9 @@ export const LowStockAlerts = ({ refreshTrigger = 0 }: { refreshTrigger?: number
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
-  useEffect(() => { loadAlerts(); }, [loadAlerts, refreshTrigger]);
+  useEffect(() => { loadAlerts(); }, [loadAlerts, refreshTrigger, projectId]);
 
   // Realtime: refresh list whenever materials rows change
   useRealtimeStats(loadAlerts);

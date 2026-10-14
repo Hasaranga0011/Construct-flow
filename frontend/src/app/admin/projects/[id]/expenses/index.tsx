@@ -6,16 +6,19 @@ import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '@/hooks/useResponsive';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function AdminExpensesIndexPage() {
   const { isMobile } = useResponsive();
-  const { id: projectId } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const projectId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [project, setProject] = useState<any>(null);
 
   const fetchExpenses = async () => {
+    if (!projectId) return;
     try {
       setLoading(true);
 
@@ -53,10 +56,10 @@ export default function AdminExpensesIndexPage() {
       <TopNav title={project ? `${project.name} Expenses` : 'Project Expenses'} showBackButton />
 
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
-        <View className="flex-row justify-between items-center mb-6">
-          <View>
+        <View className="flex-row flex-wrap gap-3 justify-between items-center mb-6">
+          <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 160 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text dark:text-white mb-1">Expenses Log</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-gray-400">Total Logged: Rs. {totalSpent.toLocaleString()}</Text>
+            <AutoFitText value={`Total Logged: Rs. ${totalSpent.toLocaleString()}`} maxFontSize={14} minFontSize={11} className="text-gray-500 dark:text-gray-400" />
           </View>
           <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={() => router.push(`/admin/projects/${projectId}/expenses/create`)}

@@ -41,7 +41,7 @@ const DeliveryRow = ({ order }: { order: any }) => {
   );
 };
 
-export const PendingDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
+export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,13 +56,19 @@ export const PendingDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: num
           return;
         }
 
-        const { data, error } = await supabase
+        let query = supabase
           .from('purchase_orders')
           .select(`
-            id, supplier_name, po_number, status, expected_date, quantity_ordered, total_price,
+            id, supplier_name, po_number, status, expected_date, quantity_ordered, total_price, project_id,
             projects!inner(name)
           `)
-          .in('status', ['Confirmed']) // only show confirmed (agreed but not dispatched)
+          .in('status', ['Confirmed']); // only show confirmed (agreed but not dispatched)
+
+        if (projectId) {
+          query = query.eq('project_id', projectId);
+        }
+
+        const { data, error } = await query
           .order('expected_date', { ascending: true })
           .limit(5);
 
@@ -79,7 +85,7 @@ export const PendingDeliveries = ({ refreshTrigger = 0 }: { refreshTrigger?: num
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, projectId]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">

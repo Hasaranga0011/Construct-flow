@@ -13,8 +13,9 @@ export async function managedPayroll() {
   const projects = await managedProjects();
   if (!projects.length) return [];
   
-  const assigned = await assignedWorkers(projects.map(p => p.id));
-  const workerIds = [...new Set(assigned.map(a => a.profiles?.id).filter(Boolean))];
+  const projectIds = projects.map(p => p.id).filter((id): id is string => Boolean(id));
+  const assigned = await assignedWorkers(projectIds);
+  const workerIds = [...new Set(assigned.map(a => a.profiles?.id).filter((id): id is string => Boolean(id)))];
   if (!workerIds.length) return [];
   
   const result = await supabase.from('salary_slips').select('*').in('worker_id', workerIds).order('created_at', { ascending: false });

@@ -88,7 +88,7 @@ export function useAuth() {
           setUser(null);
           setProfile(null);
           setRole(null);
-          router.replace('/login');
+          router.replace('/team-login');
         }
       }
     });

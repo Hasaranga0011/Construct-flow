@@ -315,28 +315,16 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                     profile = profile_by_user.get(uid)
                     if profile and profile.get("email") and (profile.get("notification_preferences") or {}).get("email", True):
                         try:
-                            import httpx, os
-                            resend_key = os.environ.get("RESEND_API_KEY", "")
-                            if resend_key:
-                                from html import escape
-                                name = escape(profile.get("full_name") or "there")
-                                email_response = httpx.post(
-                                    "https://api.resend.com/emails",
-                                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
-                                    json={
-                                        "from": os.environ.get("RESEND_FROM_EMAIL", "noreply@constructflow.lk"),
-                                        "to": [profile["email"]],
-                                        "subject": "Your ConstructFlow Salary Slip is Ready",
-                                        "html": (
-                                            f"<p>Hi {name},</p>"
-                                            f"<p>Your salary slip for <b>{payload.start_date} to {payload.end_date}</b> "
-                                            "has been generated.</p>"
-                                            f'<p><a href="{os.environ.get("FRONTEND_URL", "http://localhost:8081").rstrip("/")}/worker/payroll">View your payslip</a></p>'
-                                        ),
-                                    },
-                                    timeout=10,
-                                )
-                                email_response.raise_for_status()
+                            from services.email_service import send_email
+                            from html import escape
+                            name = escape(profile.get("full_name") or "there")
+                            p_url = f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:8082').rstrip('/')}/worker/payroll"
+                            html_body = (
+                                f"<p>Hi {name},</p>"
+                                f"<p>Your salary slip for <b>{payload.start_date} to {payload.end_date}</b> has been generated.</p>"
+                                f'<p><a href="{p_url}">View your payslip on ConstructFlow</a></p>'
+                            )
+                            send_email(profile["email"], "Your ConstructFlow Salary Slip is Ready", html_body)
                         except Exception:
                             import logging
                             logging.exception("Failed payroll email for worker %s", uid)

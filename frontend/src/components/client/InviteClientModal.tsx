@@ -6,6 +6,7 @@ import { api } from '../../lib/api';
 import { Ionicons } from '@expo/vector-icons';
 import { toast } from '../../lib/toast';
 import { notify } from '../../utils/notify';
+import { noAutofill } from '../../lib/formAutofill';
 
 type InviteClientModalProps = {
   visible: boolean;
@@ -25,9 +26,16 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
   const [fetchingProjects, setFetchingProjects] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch active projects
+  // Fetch active projects and reset inputs when modal opens
   useEffect(() => {
     if (!visible) return;
+
+    setEmail('');
+    setName('');
+    setCompany('');
+    setAccessLevel('Full Access');
+    setProjectId(null);
+    setErrorMsg('');
 
     let isMounted = true;
     const fetchProjects = async () => {
@@ -60,7 +68,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
     setErrorMsg('');
 
     try {
-      await api.post('/clients/invite', {
+      const res = await api.post('/clients/invite', {
         email,
         name,
         company,
@@ -75,7 +83,12 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
       setAccessLevel('Full Access');
       setProjectId(null);
 
-      notify('Success', `Client ${name || email} added successfully.`);
+      const emailSent = Boolean((res as any)?.email_delivery?.sent_to_inbox);
+      if (emailSent) {
+        notify('Success', `Client ${name || email} added & credentials emailed!`);
+      } else {
+        notify('Success', `Client ${name || email} created. Email delivery pending SMTP setup.`);
+      }
       onSuccess();
     } catch (e: any) {
       notify('Error', e.message || e.detail || 'Failed to invite client.');
@@ -108,6 +121,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
+                {...noAutofill('invite_client_email', 'email')}
               />
             </View>
 
@@ -118,6 +132,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
                 placeholder="John Doe"
                 value={name}
                 onChangeText={setName}
+                {...noAutofill('invite_client_name')}
               />
             </View>
 
@@ -128,6 +143,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
                 placeholder="Acme Corp"
                 value={company}
                 onChangeText={setCompany}
+                {...noAutofill('invite_client_company')}
               />
             </View>
 

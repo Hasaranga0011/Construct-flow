@@ -19,6 +19,7 @@ export const normalizeRole = (value?: string | null): string | null => {
     client: 'client',
     worker: 'worker',
     supplier: 'supplier',
+    pending: 'pending',
   };
 
   return roleMap[normalized] ?? normalized;
@@ -36,6 +37,7 @@ export const getDashboardForRole = (value?: string | null): string | null => {
     client: '/client/dashboard',
     worker: '/worker/dashboard',
     supplier: '/supplier/dashboard',
+    pending: '/pending-approval',
   };
 
   return dashboardMap[normalized] ?? null;

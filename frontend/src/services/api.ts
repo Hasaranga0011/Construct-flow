@@ -16,7 +16,7 @@ async function executeFetch(endpoint: string, options: RequestInit) {
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
 
   try {
     const response = await fetch(`${getApiUrl()}${endpoint}`, {
@@ -178,7 +178,10 @@ export const api = {
   // Reports
   // ----------------------------------------------------------------
   reports: {
-    management: () => executeFetch('/reports/management', {}),
+    management: (params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+      return executeFetch(`/reports/management${query}`, {});
+    },
     projects: () => fetchWithAuth('/reports/projects'),
     materials: () => fetchWithAuth('/reports/materials'),
     payroll: () => fetchWithAuth('/reports/payroll'),

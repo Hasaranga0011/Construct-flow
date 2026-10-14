@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, ActivityIndicator, Text, TextInput } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
@@ -16,6 +16,7 @@ import { SearchInput } from '../../components/common/SearchInput';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useRealtimeStats } from '../../hooks/useRealtimeStats';
 
 export default function DashboardScreen() {
   const { isMobile } = useResponsive();
@@ -32,74 +33,67 @@ export default function DashboardScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allProjects, setAllProjects] = useState<any[]>([]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadStats = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) return;
+  const loadStats = useCallback(async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return;
 
-        // Fetch counts from various tables
-        const today = new Date().toISOString().split('T')[0];
-        const [projectsReq, labourReq, materialsReq, budgetReq, allProjectsReq] = await Promise.all([
-          supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['active', 'Active', 'In Progress', 'in progress']),
-          supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'Present').is('check_out_time', null),
-          // Assuming materials has current_stock and minimum_threshold. Since we can't do raw sql in select, we can fetch them.
-          // Wait, the prompt said: .lt('current_stock', supabase.raw('minimum_threshold')) - supabase.raw doesn't exist in JS client.
-          // A better way is to fetch all and filter in JS if there's no SQL function, or call an RPC. For now, fetch all materials and filter:
-          supabase.from('materials').select('current_stock, minimum_threshold'),
-          supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress']),
-          supabase.from('projects').select('id, name')
-        ]);
-        
-        if (allProjectsReq.data) {
-          if (isMounted) setAllProjects(allProjectsReq.data);
-        }
+      // Robust date calculation: match local timezone (e.g. Sri Lanka UTC+5:30) and UTC
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const utcDate = now.toISOString().split('T')[0];
+      const todayDates = Array.from(new Set([localDate, utcDate]));
 
-        let lowStockCount = 0;
-        if (materialsReq.data) {
-          lowStockCount = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 0)).length;
-        }
-
-        let totalBudget = 0;
-        if (budgetReq.data) {
-          totalBudget = budgetReq.data.reduce((sum, item) => sum + (Number(item.total_budget) || 0), 0);
-        }
-
-        if (isMounted) {
-          setStats({
-            activeProjects: projectsReq.count || 0,
-            workersOnSite: labourReq.count || 0,
-            lowStockAlerts: lowStockCount,
-            totalBudget: totalBudget,
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to load dashboard stats:', error);
-      } finally {
-        if (isMounted) setLoading(false);
+      const [projectsReq, labourReq, materialsReq, budgetReq, allProjectsReq] = await Promise.all([
+        supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['active', 'Active', 'In Progress', 'in progress']),
+        supabase.from('attendance').select('*', { count: 'exact', head: true }).in('date', todayDates).not('check_in_time', 'is', null).is('check_out_time', null),
+        supabase.from('materials').select('current_stock, minimum_threshold'),
+        supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress']),
+        supabase.from('projects').select('id, name')
+      ]);
+      
+      if (allProjectsReq.data) {
+        setAllProjects(allProjectsReq.data);
       }
-    };
 
+      let lowStockCount = 0;
+      if (materialsReq.data) {
+        lowStockCount = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 0)).length;
+      }
+
+      let totalBudget = 0;
+      if (budgetReq.data) {
+        totalBudget = budgetReq.data.reduce((sum, item) => sum + (Number(item.total_budget) || 0), 0);
+      }
+
+      setStats({
+        activeProjects: projectsReq.count || 0,
+        workersOnSite: labourReq.count || 0,
+        lowStockAlerts: lowStockCount,
+        totalBudget: totalBudget,
+      });
+    } catch (error) {
+      console.warn('Failed to load dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     loadStats();
-    
-    // Realtime subscription for Bug 9
-    const channel = supabase
-      .channel('admin-dashboard-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => setRefreshTrigger(prev => prev + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => setRefreshTrigger(prev => prev + 1))
-      .subscribe();
+  }, [loadStats]);
+  
+  // Realtime subscription for attendance, projects, and materials
+  const handleRealtimeRefetch = useCallback(() => {
+    loadStats();
+    setRefreshTrigger(prev => prev + 1);
+  }, [loadStats]);
 
-    return () => { 
-      isMounted = false; 
-      supabase.removeChannel(channel);
-    };
-  }, [refreshTrigger]);
+  useRealtimeStats(handleRealtimeRefetch);
 
   const handleProjectCreated = () => {
     setModalVisible(false);
-    // Incrementing this triggers useEffect here and in ActiveProjectsTable
-    setRefreshTrigger(prev => prev + 1);
+    handleRealtimeRefetch();
   };
 
   const formatCurrency = (amount: number) => {
@@ -121,7 +115,7 @@ export default function DashboardScreen() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={true}>
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
             
@@ -157,6 +151,7 @@ export default function DashboardScreen() {
                 label="Workers On Site" 
                 value={stats.workersOnSite.toString()} 
                 indicatorText="Currently checked in" 
+                indicatorType={stats.workersOnSite > 0 ? "success" : "neutral"}
                 fullWidth
               />
             </AnimatedCard>
@@ -180,45 +175,45 @@ export default function DashboardScreen() {
           </View>
 
           {/* Center Row: Chart & Delay Risk */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 24 }}>
             {/* Main Content Area (Chart) */}
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
               <CostTimelineChart />
             </View>
             
             {/* Side Panel (Delay Risk) */}
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <DelayRiskPanel />
             </View>
           </View>
 
           {/* New Charts Grid Row 1 */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 24 }}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <BudgetUtilizationChart />
             </View>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <MaterialsStockChart />
             </View>
           </View>
 
           {/* New Charts Grid Row 2 */}
-          <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 24 }}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <PurchaseOrderPipelineChart />
             </View>
-            <View className={isMobile ? "w-full" : "flex-1 w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <MonthlyAttendanceChart />
             </View>
           </View>
 
           {/* Bottom Row: Active Projects & Recent Alerts */}
-          <View className={`pb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, paddingBottom: 24 }}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
               <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} />
             </View>
             
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
               <RecentAlertsPanel />
             </View>
           </View>

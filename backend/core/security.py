@@ -10,8 +10,18 @@ def normalize_role(value):
     return {"admin": "super_admin", "superadmin": "super_admin", "manager": "pm", "project_manager": "pm"}.get(role, role)
 
 
+import time
+
+_TOKEN_CACHE = {}
+_TOKEN_CACHE_TTL = 60  # seconds
+
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     token = credentials.credentials
+    now = time.time()
+    cached = _TOKEN_CACHE.get(token)
+    if cached and (now - cached["cached_at"]) < _TOKEN_CACHE_TTL:
+        return cached["user"]
+
     try:
         # Validate the token directly with Supabase
         user_response = supabase.auth.get_user(token)
@@ -27,12 +37,16 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         if role not in {"super_admin", "pm", "site_manager", "worker", "client", "supplier"}:
             raise HTTPException(status_code=403, detail="An authorized profile is required")
         
-        return {
+        user_data = {
             "id": user_response.user.id,
             "email": user_response.user.email,
             "role": role,
             "token": token
         }
+        if len(_TOKEN_CACHE) > 500:
+            _TOKEN_CACHE.clear()
+        _TOKEN_CACHE[token] = {"user": user_data, "cached_at": now}
+        return user_data
     except HTTPException:
         raise
     except Exception as e:
@@ -41,7 +55,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
 
 def require_admin(current_user: dict = Depends(get_current_user)):
     if normalize_role(current_user["role"]) != "super_admin":
-        raise HTTPException(status_code=403, detail="Not enough privileges")
+        raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
     
 def require_manager_or_admin(current_user: dict = Depends(get_current_user)):

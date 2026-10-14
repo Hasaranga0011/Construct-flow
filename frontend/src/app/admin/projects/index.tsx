@@ -14,6 +14,7 @@ export default function AdminProjectsList() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all');
   const { isMobile } = useResponsive();
 
   useEffect(() => {
@@ -71,7 +72,26 @@ export default function AdminProjectsList() {
     };
   }, []);
 
-  const filteredRows = projects.filter(row => String(row.name || '').toLowerCase().includes(search.toLowerCase()) || String(row.location || '').toLowerCase().includes(search.toLowerCase()));
+  const getStatusBadge = (status: string) => {
+    const s = String(status || '').toLowerCase();
+    if (s === 'active') return { bg: 'bg-[#DCFCE7]', text: 'text-brand-success' };
+    if (s === 'archived') return { bg: 'bg-amber-100', text: 'text-amber-800' };
+    if (s === 'completed') return { bg: 'bg-blue-100', text: 'text-blue-600' };
+    return { bg: 'bg-gray-100', text: 'text-gray-500' };
+  };
+
+  const activeCount = projects.filter(p => String(p.status || '').toLowerCase() !== 'archived').length;
+  const archivedCount = projects.filter(p => String(p.status || '').toLowerCase() === 'archived').length;
+
+  const filteredRows = projects.filter(row => {
+    const matchesSearch = String(row.name || '').toLowerCase().includes(search.toLowerCase()) || 
+      String(row.location || '').toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    const rowStatus = String(row.status || '').toLowerCase();
+    if (statusFilter === 'active') return rowStatus !== 'archived';
+    if (statusFilter === 'archived') return rowStatus === 'archived';
+    return true;
+  });
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -79,7 +99,7 @@ export default function AdminProjectsList() {
         <TopNav title="Projects" actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
         
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Projects</Text>
             
             <SearchInput items={projects} entityLabel="projects" 
@@ -96,6 +116,37 @@ export default function AdminProjectsList() {
                 routePrefix: '/admin/projects/'
               }}
             />
+          </View>
+
+          {/* Status Filter Tabs */}
+          <View className="flex-row items-center flex-wrap gap-2 mb-6">
+            <Pressable
+              style={{ minHeight: 36, minWidth: 44 }}
+              onPress={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-lg border ${statusFilter === 'all' ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`}
+            >
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${statusFilter === 'all' ? 'text-brand-orange' : 'text-gray-600'}`}>
+                All ({projects.length})
+              </Text>
+            </Pressable>
+            <Pressable
+              style={{ minHeight: 36, minWidth: 44 }}
+              onPress={() => setStatusFilter('active')}
+              className={`px-3 py-1.5 rounded-lg border ${statusFilter === 'active' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
+            >
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${statusFilter === 'active' ? 'text-emerald-700' : 'text-gray-600'}`}>
+                Active ({activeCount})
+              </Text>
+            </Pressable>
+            <Pressable
+              style={{ minHeight: 36, minWidth: 44 }}
+              onPress={() => setStatusFilter('archived')}
+              className={`px-3 py-1.5 rounded-lg border ${statusFilter === 'archived' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}
+            >
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${statusFilter === 'archived' ? 'text-amber-800' : 'text-gray-600'}`}>
+                Archived ({archivedCount})
+              </Text>
+            </Pressable>
           </View>
           
           <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>
@@ -131,63 +182,63 @@ export default function AdminProjectsList() {
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-medium">{formatMoney(p.total_budget)}</Text>
                     </View>
                   </View>
-                  <View className="flex-row items-center mb-4 pl-[52px]">
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons name="location-outline" size={14} color="#6B7280" />
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1">{p.location || 'N/A'}</Text>
+                    <View className="flex-row items-center mb-4 pl-[52px]">
+                      <View className="flex-row items-center flex-1">
+                        <Ionicons name="location-outline" size={14} color="#6B7280" />
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1">{p.location || 'N/A'}</Text>
+                      </View>
+                      <View className={`px-2 py-1 rounded-full ${getStatusBadge(p.status).bg}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
+                          {p.status}
+                        </Text>
+                      </View>
                     </View>
-                    <View className={`px-2 py-1 rounded-full ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${p.status === 'active' ? 'text-brand-success' : p.status === 'completed' ? 'text-blue-600' : 'text-gray-500'}`}>
-                        {p.status}
-                      </Text>
+                    <View className="flex-col mb-4 pl-[52px]">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mb-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'Unassigned'}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'Unassigned'}</Text>
                     </View>
+                    <Link href={`/admin/projects/${p.id}` as any} asChild>
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm font-bold">View Details</Text>
+                      </Pressable>
+                    </Link>
                   </View>
-                  <View className="flex-col mb-4 pl-[52px]">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mb-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'Unassigned'}</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'Unassigned'}</Text>
-                  </View>
-                  <Link href={`/admin/projects/${p.id}` as any} asChild>
-                    <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm font-bold">View Details</Text>
-                    </Pressable>
-                  </Link>
-                </View>
-              ))
-            ) : (
-              filteredRows.map(p => (
-                <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">
-                  <View className="w-[25%] flex-row items-center pr-4">
-                    <View className="w-8 h-8 bg-orange-100 rounded items-center justify-center mr-3">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs">{p.name.charAt(0)}</Text>
+                ))
+              ) : (
+                filteredRows.map(p => (
+                  <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">
+                    <View className="w-[25%] flex-row items-center pr-4">
+                      <View className="w-8 h-8 bg-orange-100 rounded items-center justify-center mr-3">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs">{p.name.charAt(0)}</Text>
+                      </View>
+                      <View>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{p.name}</Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {p.id.slice(0, 8)}...</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{p.name}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {p.id.slice(0, 8)}...</Text>
+                    
+                    <View className="w-[15%] pr-2">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
                     </View>
-                  </View>
-                  
-                  <View className="w-[15%] pr-2">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
-                  </View>
 
-                  <View className="w-[15%] pr-2 flex-col justify-center">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'None'}</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'None'}</Text>
-                  </View>
-                  
-                  <View className="w-[15%]">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">
-                      {p.total_budget ? `Rs. ${p.total_budget.toLocaleString()}` : 'TBD'}
-                    </Text>
-                  </View>
-                  
-                  <View className="w-[15%]">
-                    <View className={`px-2 py-1 rounded self-start ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${p.status === 'active' ? 'text-brand-success' : p.status === 'completed' ? 'text-blue-600' : 'text-gray-500'}`}>
-                        {p.status}
+                    <View className="w-[15%] pr-2 flex-col justify-center">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'None'}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'None'}</Text>
+                    </View>
+                    
+                    <View className="w-[15%]">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">
+                        {p.total_budget ? `Rs. ${p.total_budget.toLocaleString()}` : 'TBD'}
                       </Text>
                     </View>
-                  </View>
+                    
+                    <View className="w-[15%]">
+                      <View className={`px-2 py-1 rounded self-start ${getStatusBadge(p.status).bg}`}>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
+                          {p.status}
+                        </Text>
+                      </View>
+                    </View>
                   
                   <View className="flex-1 flex-row justify-end space-x-2 pl-1">
                     <Link href={`/admin/projects/${p.id}` as any} asChild>

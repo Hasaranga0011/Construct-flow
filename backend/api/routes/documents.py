@@ -236,15 +236,22 @@ def generate_estimation_pdf(
         c.setFont("Helvetica", 10)
         c.drawString(width - 4.0 * inch, height - 2.0 * inch, title)
         
+        district_val = est.get("district") or (inputs.get("district") if inputs else None) or (inputs.get("location") if inputs else None)
+        town_val = est.get("town") or (inputs.get("town") if inputs else None)
+        loc_display = f"{district_val}{f' ({town_val})' if town_val else ''}" if district_val else "Sri Lanka"
+
         if inputs:
             y_input = height - 2.2 * inch
             c.drawString(width - 4.0 * inch, y_input, f"Area: {inputs.get('sq_ft', 'N/A')} sq.ft")
             c.drawString(width - 4.0 * inch, y_input - 0.2*inch, f"Floors: {inputs.get('floors', 'N/A')}")
             c.drawString(width - 4.0 * inch, y_input - 0.4*inch, f"Site: {inputs.get('site', 'N/A')}")
             c.drawString(width - 4.0 * inch, y_input - 0.6*inch, f"Structure: {inputs.get('structure', 'N/A')}")
+            c.drawString(width - 4.0 * inch, y_input - 0.8*inch, f"Location: {loc_display}")
+        else:
+            c.drawString(width - 4.0 * inch, height - 2.2 * inch, f"Location: {loc_display}")
 
         # Summary
-        y_pos = height - 3.2 * inch
+        y_pos = height - 3.4 * inch
         c.setStrokeColor(colors.lightgrey)
         c.line(0.5 * inch, y_pos, width - 0.5 * inch, y_pos)
         

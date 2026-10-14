@@ -4,6 +4,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView 
 import { supabase } from '../../lib/supabase';
 import { toast } from '../../lib/toast';
 import { Ionicons } from '@expo/vector-icons';
+import { getApiUrl } from '../../lib/apiUrl';
 
 export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }: { visible: boolean, onClose: () => void, project: any, onProjectUpdated: () => void }) => {
   const [form, setForm] = useState({
@@ -26,29 +27,58 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
   }, [project]);
 
   const handleSubmit = async () => {
-    if (!form.name || !form.location) {
+    if (!form.name?.trim() || !form.location?.trim()) {
       toast.error('Name and location are required');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('projects')
-        .update({
-          name: form.name,
-          location: form.location,
-          status: form.status,
-          total_budget: Number(form.total_budget)
-        })
-        .eq('id', project.id);
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      const payload = {
+        name: form.name.trim(),
+        location: form.location.trim(),
+        status: form.status,
+        total_budget: Number(form.total_budget) || 0
+      };
 
-      if (error) throw error;
+      if (__DEV__) {
+        console.log('[DEBUG PATCH /projects (Modal)]:', payload);
+      }
+
+      const res = await fetch(`${getApiUrl()}/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let errText = 'Failed to update project';
+        try {
+          const errData = await res.json();
+          if (typeof errData.detail === 'string') {
+            errText = errData.detail;
+          } else if (Array.isArray(errData.detail)) {
+            errText = errData.detail.map((d: any) => d.msg || `${d.loc?.join('.')}: ${d.type}`).join(', ');
+          } else if (errData.message) {
+            errText = errData.message;
+          }
+        } catch {
+          errText = await res.text();
+        }
+        throw new Error(errText || `HTTP ${res.status}`);
+      }
+
       toast.success('Project updated successfully!');
       onProjectUpdated();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update project');
+      const readable = typeof err === 'object' && err !== null ? (err.message || String(err)) : String(err);
+      toast.error(readable || 'Failed to update project');
     } finally {
       setIsSubmitting(false);
     }

@@ -51,15 +51,29 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
       setLoading(true);
       setError(null);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
+        let { data: { session } } = await supabase.auth.getSession();
+        let token = session?.access_token;
+
+        if (!token) {
+          // Wait briefly in case session is hydrating from storage
+          await new Promise(resolve => setTimeout(resolve, 400));
+          const retryRes = await supabase.auth.getSession();
+          token = retryRes.data.session?.access_token;
+        }
+
+        if (!token) {
+          if (isMounted) {
+            setError('Please sign in to view AI risk assessments.');
+          }
+          return;
+        }
 
         const params = pmId ? `?pm_id=${pmId}` : '';
         const data = await apiRequest(`/ai/insights${params}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+          headers: { Authorization: `Bearer ${token}` },
+        }, 30000);
 
-        if (isMounted) {
+        if (isMounted && data) {
           // Use real per-project delay risks from the backend
           const projectRisks: any[] = data.projects || [];
           const sorted = [...projectRisks].sort(

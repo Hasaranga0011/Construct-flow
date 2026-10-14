@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { AutoFitText } from '../common/AutoFitText';
 
 /**
  * CostBreakdown
@@ -163,20 +164,18 @@ export const CostBreakdown = ({
       )}
 
       {/* Total Cost + Confidence */}
-      <View className="flex-row items-center mb-6">
-        <View className="flex-1">
+      <View className="flex-row flex-wrap items-center mb-6" style={{ gap: 12 }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-1">
             Estimated Total Cost
           </Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange">
-            {formatCurrency(cost)}
-          </Text>
+          <AutoFitText value={formatCurrency(cost)} maxFontSize={30} minFontSize={18} className="font-bold text-brand-orange" />
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">
             This is an estimate — confirm with a quantity surveyor.
           </Text>
         </View>
 
-        <View className={`px-3 py-2 rounded-xl ${confidenceBg} ml-4 items-center`}>
+        <View className={`px-3 py-2 rounded-xl ${confidenceBg} items-center`}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] uppercase mb-0.5">Confidence</Text>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold text-sm ${confidenceText}`}>
             {confidenceVal != null ? `${Math.round(confidenceVal)}%` : '—'}

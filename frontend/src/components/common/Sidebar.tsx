@@ -32,7 +32,7 @@ export const Sidebar = ({ navItems, basePath = '' }: { navItems: NavItem[], base
 
   const completeLogout = async () => {
     await supabase.auth.signOut();
-    router.replace('/login');
+    router.replace('/team-login');
   };
 
   const handleLogout = () => {

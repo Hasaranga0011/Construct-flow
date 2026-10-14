@@ -4,6 +4,12 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from core import security
 
+@pytest.fixture(autouse=True)
+def clear_token_cache():
+    security._TOKEN_CACHE.clear()
+    yield
+    security._TOKEN_CACHE.clear()
+
 class ProfileClient:
     def __init__(self, role): self.role = role
     def table(self, name): return self

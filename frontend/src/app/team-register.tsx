@@ -1,33 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Platform,  View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
 WebBrowser.maybeCompleteAuthSession();
+import { getApiUrl } from '../lib/apiUrl';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { roleLabel } from '../utils/roles';
+import { noAutofill } from '../lib/formAutofill';
 
 export default function RegisterScreen() {
+  // Registration never reads stored/remembered values; every field starts empty.
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [role, setRole] = useState('worker');
+  const [role, setRole] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const router = useRouter();
 
+  const resetForm = useCallback(() => {
+    setFullName(''); setEmail(''); setPassword(''); setConfirmPassword('');
+    setShowPassword(false); setShowConfirmPassword(false); setRole('');
+    setLoading(false); setErrorMsg('');
+  }, []);
+
+  // Reset on focus and on blur/unmount so returning (or after logout) shows an empty form.
+  useFocusEffect(useCallback(() => { resetForm(); return resetForm; }, [resetForm]));
+
   const handleRegister = async () => {
-    if (!fullName || !email || !password || !confirmPassword) {
-      setErrorMsg('Please fill in all fields');
+    if (!role) {
+      setErrorMsg('Please choose a role: Project Manager, Site Manager, or Worker.');
       return;
     }
+    if (!fullName || !email || !password || !confirmPassword) {
+      setErrorMsg('Please fill in all fields.');
+      return;
+    }
+
+    // Enforce valid Gmail address
+    const trimmedEmail = email.trim().toLowerCase();
+    const typoDomains = [
+      'gnail.com', 'gamil.com', 'gmial.com', 'gmaill.com',
+      'gmai.com', 'gmal.com', 'gmaik.com', 'gmeil.com',
+      'gmail.co', 'gmail.con', 'gmail.cpm', 'gmail.cm',
+      'gemail.com', 'gmail.com.com', 'gmaild.com'
+    ];
+    const emailParts = trimmedEmail.split('@');
+    const domainPart = emailParts.length > 1 ? emailParts[1].trim() : '';
+
+    if (typoDomains.includes(domainPart)) {
+      setErrorMsg(`Did you mean @gmail.com? You entered '@${domainPart}'. Only valid Gmail accounts (@gmail.com) are permitted.`);
+      return;
+    }
+
+    if (domainPart !== 'gmail.com') {
+      setErrorMsg('Only valid Gmail accounts (@gmail.com) are permitted for registration. Please enter a valid @gmail.com address.');
+      return;
+    }
+
+    const usernamePart = emailParts[0];
+    const gmailUsernameRegex = /^[a-zA-Z0-9](?!.*\.\.)[a-zA-Z0-9.]{4,28}[a-zA-Z0-9]$/;
+    if (!gmailUsernameRegex.test(usernamePart)) {
+      setErrorMsg('Invalid Gmail address. Gmail usernames must be 6-30 characters long and contain only letters, numbers, and non-consecutive periods.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setErrorMsg('Passwords do not match');
       return;
@@ -36,32 +81,74 @@ export default function RegisterScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          role: role,
-        }
-      }
-    });
+    let backendSucceeded = false;
+    let backendErrorMessage: string | null = null;
 
-    if (error) {
-      console.error('SUPABASE RAW ERROR:', error);
-      let displayError = error.message;
-      if (typeof displayError === 'object' || displayError === '{}' || !displayError) {
-        displayError = JSON.stringify(error);
+    try {
+      // Attempt registration through backend API to set app_metadata
+      const res = await fetch(`${getApiUrl()}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password,
+          full_name: fullName.trim(),
+          role,
+          portal: 'internal',
+        }),
+      });
+
+      if (res.ok) {
+        backendSucceeded = true;
+        resetForm();
+        router.replace('/team-login');
+        return;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        backendErrorMessage = errJson.detail || `Registration failed (${res.status})`;
       }
-      setErrorMsg(displayError);
+    } catch (networkErr: any) {
+      console.warn('Backend API /auth/register unreachable, falling back to direct Supabase sign up:', networkErr);
+    }
+
+    // If backend returned a specific error (e.g. role violation, invalid phone, trigger error), display it
+    if (backendErrorMessage) {
+      setErrorMsg(backendErrorMessage);
       setLoading(false);
-    } else {
-      // Sign out immediately to prevent auto-login
-      if (data.session) {
-        await supabase.auth.signOut();
+      return;
+    }
+
+    // Direct Supabase sign up fallback if backend service was unreachable
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            role: role,
+          }
+        }
+      });
+
+      if (error) {
+        console.error('SUPABASE RAW ERROR:', error);
+        let displayError = error.message;
+        if (!displayError || displayError === '{}' || typeof displayError === 'object') {
+          displayError = 'Registration failed. A database configuration issue occurred while creating your account.';
+        }
+        setErrorMsg(displayError);
+        setLoading(false);
+      } else {
+        if (data.session) {
+          await supabase.auth.signOut();
+        }
+        resetForm();
+        router.replace('/team-login');
       }
-      // Force them to the login screen
-      router.replace('/team-login');
+    } catch (fallbackErr: any) {
+      setErrorMsg(fallbackErr.message || 'An unexpected error occurred during registration.');
+      setLoading(false);
     }
   };
 
@@ -201,18 +288,23 @@ export default function RegisterScreen() {
           placeholder="John Doe"
           value={fullName}
           onChangeText={setFullName}
+          {...noAutofill('reg_team_full_name')}
         />
       </View>
 
       <View className="mb-4">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email</Text>
+        <View className="flex-row items-center justify-between mb-2">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700">Gmail Address</Text>
+          <Text className="text-xs text-brand-orange font-medium">@gmail.com required</Text>
+        </View>
         <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
           className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-          placeholder="name@company.com"
+          placeholder="yourname@gmail.com"
           value={email}
           onChangeText={setEmail}
-          autoCapitalize="none"
+          {...noAutofill('reg_team_email', 'email')}
           keyboardType="email-address"
+          autoCapitalize="none"
         />
       </View>
 
@@ -225,6 +317,7 @@ export default function RegisterScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            {...noAutofill('reg_team_password', 'new-password')}
             returnKeyType="next"
           />
           <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setShowPassword(!showPassword)} className="p-2 cursor-pointer min-w-[44px] min-h-[44px] items-center justify-center" accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
@@ -242,6 +335,7 @@ export default function RegisterScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry={!showConfirmPassword}
+            {...noAutofill('reg_team_confirm_password', 'new-password')}
             returnKeyType="done"
             onSubmitEditing={handleRegister}
           />

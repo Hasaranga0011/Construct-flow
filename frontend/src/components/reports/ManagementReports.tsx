@@ -3,9 +3,13 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text, TextIn
 import { useRouter, type Href } from 'expo-router';
 import { TopNav } from '../common/TopNav';
 import { api } from '../../services/api';
-import { deliverReport } from './reportDelivery';
+import { deliverReport, deliverServerExport } from './reportDelivery';
 import { ExportFormat, ReportDocument, ExportSection, typedSection } from './reportDocument';
 import { amount, csv, dateKey, grouped, lateOrder, localDay, ManagementReport, money, monthKey, numeric, openOrder, orderValue, overBudget, overdueProject, overtime, paidPay, pendingPay, projectFlags, ReportRow, shortage, siteId, stock, stockFlag, sumKnown, text, threshold } from './metrics';
+import { ReportFilters, ReportFilterValues, ProjectOption } from './ReportFilters';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
+import { AutoFitText } from '../common/AutoFitText';
 
 type Kind = 'overview' | 'projects' | 'materials' | 'payroll';
 const titles: Record<Kind, string> = { overview: 'Management Reports', projects: 'Project Performance', materials: 'Inventory & Procurement', payroll: 'Payroll & Workforce Cost' };
@@ -28,11 +32,11 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   return <View style={cardStyle}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-2">{title}</Text>{note && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mb-4">{note}</Text>}{children}</View>;
 }
 function KPI({ title, value, note, alert = false }: { title: string; value: string | number; note: string; alert?: boolean }) {
-  return <View style={{ ...cardStyle, flexGrow: 1, flexBasis: 220, marginBottom: 0 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold uppercase text-gray-500">{title}</Text><Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 26, fontWeight: '700', color: alert ? '#B45309' : '#111827', marginVertical: 10 }]}>{value}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">{note}</Text></View>;
+  return <View style={{ ...cardStyle, flexGrow: 1, flexBasis: 220, minWidth: 0, marginBottom: 0 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold uppercase text-gray-500">{title}</Text><AutoFitText value={value} maxFontSize={26} minFontSize={18} containerStyle={{ marginVertical: 10 }} style={{ fontWeight: '700', color: alert ? '#B45309' : '#111827' }} captionStyle={{ color: '#6B7280', marginTop: 2 }} /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">{note}</Text></View>;
 }
 function Bars({ rows, currency = false }: { rows: [string, number][]; currency?: boolean }) {
   const max = Math.max(1, ...rows.map(row => row[1]));
-  return rows.length ? <View style={{ gap: 14 }}>{rows.map(([label, value]) => <View key={label}><View className="flex-row justify-between mb-2" style={{ gap: 12 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 flex-1">{label}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold">{currency ? money(value) : value}</Text></View><View style={{ height: 7, borderRadius: 4, backgroundColor: '#FFF0E5' }}><View style={{ width: `${Math.max(0, value / max * 100)}%`, height: 7, backgroundColor: '#F97316', borderRadius: 4 }} /></View></View>)}</View> : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No recorded data for this view.</Text>;
+  return rows.length ? <View style={{ gap: 14 }}>{rows.map(([label, value]) => <View key={label}><View className="flex-row justify-between mb-2" style={{ gap: 12 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 flex-1">{label}</Text><Text style={{ flexShrink: 0, maxWidth: '60%' }} numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold">{currency ? money(value) : value}</Text></View><View style={{ height: 7, borderRadius: 4, backgroundColor: '#FFF0E5' }}><View style={{ width: `${Math.max(0, value / max * 100)}%`, height: 7, backgroundColor: '#F97316', borderRadius: 4 }} /></View></View>)}</View> : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">No recorded data for this view.</Text>;
 }
 function Table({ headers, rows, links = [] }: { headers: string[]; rows: string[][]; links?: (string | undefined)[] }) {
   const router = useRouter();
@@ -63,6 +67,9 @@ export default function ManagementReports({ kind }: { kind: Kind }) {
   const [month, setMonth] = useState(localDay().slice(0, 7));
   const [exportMessage, setExportMessage] = useState('');
   const [exportBusy, setExportBusy] = useState(false);
+  const [filterValues, setFilterValues] = useState<ReportFilterValues | null>(null);
+  const [allProjectOptions, setAllProjectOptions] = useState<ProjectOption[]>([]);
+
   const handleExport = async (report: ReportDocument, format: ExportFormat) => {
     if (exportBusy) return;
     setExportBusy(true); setExportMessage('Preparing report...');
@@ -70,14 +77,72 @@ export default function ManagementReports({ kind }: { kind: Kind }) {
     catch (e) { setExportMessage(e instanceof Error ? e.message : 'Report export failed. Please retry.'); }
     finally { setExportBusy(false); }
   };
+
+  const handleServerExport = async (format: 'pdf' | 'xlsx' | 'csv' | 'zip') => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    setExportMessage(`Generating ${format.toUpperCase()} export...`);
+    try {
+      const params: Record<string, string> = {};
+      if (filterValues?.fromDate) params.from_date = filterValues.fromDate;
+      if (filterValues?.toDate) params.to_date = filterValues.toDate;
+      if (filterValues?.selectedProjectIds?.length) params.projects = filterValues.selectedProjectIds.join(',');
+      if (filterValues?.status && filterValues.status !== 'All') params.status = filterValues.status;
+      if (search.trim()) params.search = search.trim();
+
+      const msg = await deliverServerExport({
+        reportType: kind,
+        format,
+        queryParams: params,
+      });
+      setExportMessage(msg);
+    } catch (e: any) {
+      setExportMessage(e.message || `Export failed for ${format}`);
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    supabase
+      .from('projects')
+      .select('id, name')
+      .order('name')
+      .then(({ data: projs, error }) => {
+        if (!error && projs && projs.length > 0) {
+          setAllProjectOptions(projs.map(p => ({ id: String(p.id), name: String(p.name || `Project ${p.id}`) })));
+        }
+      });
+  }, []);
+
   useEffect(() => {
     let alive = true;
     setLoading(true); setError('');
-    api.reports.management().then((result: ManagementReport) => { if (alive) setData(result); })
+    const params: Record<string, string> = {};
+    if (filterValues?.fromDate) params.from_date = filterValues.fromDate;
+    if (filterValues?.toDate) params.to_date = filterValues.toDate;
+    if (filterValues?.selectedProjectIds?.length) params.projects = filterValues.selectedProjectIds.join(',');
+    if (filterValues?.status && filterValues.status !== 'All') params.status = filterValues.status;
+    if (search.trim()) params.search = search.trim();
+
+    api.reports.management(params).then((result: ManagementReport) => {
+      if (alive) {
+        setData(result);
+        if (result?.projects?.length) {
+          setAllProjectOptions(prev => {
+            const map = new Map(prev.map(p => [p.id, p]));
+            result.projects.forEach(p => {
+              map.set(String(p.id), { id: String(p.id), name: String(p.name || `Project ${p.id}`) });
+            });
+            return Array.from(map.values());
+          });
+        }
+      }
+    })
       .catch((e: Error) => { if (alive) { setError(e.message || 'Unable to load reports.'); setData(null); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [refresh]);
+  }, [refresh, filterValues, search]);
   const projects = data?.projects ?? [], materials = data?.materials ?? [], orders = data?.orders ?? [], slips = data?.payroll ?? [];
   const names = Object.fromEntries((data?.people ?? []).map(p => [p.id, p.full_name || p.id]));
   const projectNames = Object.fromEntries(projects.map(p => [p.id, text(p.name)]));
@@ -160,10 +225,91 @@ export default function ManagementReports({ kind }: { kind: Kind }) {
       { title: 'Monthly generated payroll', note: 'Latest six recorded months across all records, independent of selected detail filters. Missing amounts and undated records excluded.', headers: ['Month', 'Generated amount'], rows: grouped(slips.filter(p => !!monthKey(p.period_start)), p => monthKey(p.period_start)!, amount).sort((a, b) => a[0].localeCompare(b[0])).slice(-6), currencyColumns: [1] }],
   };
   const fullDocument = makeDocument(titles[kind], sections[kind]);
-  return <View className="flex-1 bg-brand-light"><TopNav title={titles[kind]} showAction={false} /><ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+  return <View className="flex-1 bg-brand-light"><TopNav title={titles[kind]} showAction={false} /><ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ padding: width < 640 ? 16 : 24, paddingBottom: 48 }}>
     <View className="flex-row flex-wrap justify-between items-start mb-5" style={{ gap: 16 }}><View style={{ flex: 1, minWidth: 200 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">{titles[kind]}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-2">{descriptions[kind]}</Text>{data && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mt-2">Data retrieved {new Date(data.generated_at).toLocaleString()} · Currency LKR</Text>}</View><Button label={loading ? 'Refreshing…' : 'Refresh data'} disabled={loading} onPress={() => setRefresh(n => n + 1)} /></View>
     <View className="flex-row flex-wrap mb-5" style={{ gap: 8 }}>{(['overview', 'projects', 'materials', 'payroll'] as Kind[]).map(tab => <Button key={tab} label={tab === 'overview' ? 'Executive overview' : titles[tab]} active={kind === tab} onPress={() => router.push(`/admin/reports${tab === 'overview' ? '' : '/' + tab}` as Href)} />)}</View>
+
+    <ReportFilters
+      projects={allProjectOptions}
+      onApplyFilters={(newFilters) => setFilterValues(newFilters)}
+      onExport={handleServerExport}
+      exporting={exportBusy}
+      statusOptions={
+        kind === 'overview'
+          ? ['All', 'active', 'planning', 'on_hold', 'completed']
+          : kind === 'projects'
+          ? ['All', 'active', 'planning', 'on_hold', 'completed', 'cancelled']
+          : kind === 'materials'
+          ? ['All', 'ordered', 'received', 'pending', 'cancelled']
+          : ['All', 'pending', 'paid', 'approved', 'rejected']
+      }
+      dateExplanation={
+        kind === 'overview'
+          ? 'Dates filter project activities, purchase order dates, and salary slip periods.'
+          : kind === 'projects'
+          ? 'Dates filter project schedule and milestone activity within the selected range.'
+          : kind === 'materials'
+          ? 'Dates filter purchase orders by order and expected delivery dates.'
+          : 'Dates filter salary slips by payroll period start date.'
+      }
+    />
+
     {loading ? <View style={cardStyle}><ActivityIndicator color="#F97316" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-3">Loading report data…</Text></View> : error ? <Section title="Report unavailable" note={error}><Button label="Retry" onPress={() => setRefresh(n => n + 1)} /></Section> : data && <>
+      {filterValues?.breakdown === 'per_project' && (
+        <Section title="Per-Project Breakdown" note="Individual performance and resource breakdown for projects matching selected filters.">
+          <View style={{ gap: 16 }}>
+            {projects.map(p => {
+              const pMaterials = materials.filter(m => siteId(m) === p.id);
+              const pOrders = orders.filter(o => siteId(o) === p.id);
+              const pSlips = slips.filter(s => siteId(s) === p.id);
+              const b = numeric(p.total_budget);
+              const s = numeric(p.spent_cost);
+              const pBudgetRemaining = b !== null && s !== null ? b - s : null;
+              const pLowStock = pMaterials.filter(m => ['Out of stock', 'Low stock'].includes(stockFlag(m)));
+              const pLateOrders = pOrders.filter(o => lateOrder(o, today));
+
+              return (
+                <View key={p.id} style={{ borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFFDF9', borderRadius: 12, padding: 16 }}>
+                  <View className="flex-row flex-wrap justify-between items-center mb-3" style={{ gap: 8 }}>
+                    <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 200, minWidth: 0 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{text(p.name)}</Text>
+                      <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                        Manager: {names[text(p.pm_id, '')] || 'Unassigned'} · Status: <Text style={{ fontWeight: '600', color: '#C2410C' }}>{text(p.status)}</Text>
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#EA580C', borderRadius: 8, minHeight: 36, justifyContent: 'center' }}
+                      onPress={() => router.push(`/admin/projects/${p.id}` as Href)}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Open Project →</Text>
+                    </Pressable>
+                  </View>
+                  <View className="flex-row flex-wrap" style={{ gap: 8, marginTop: 4 }}>
+                    <View style={{ flexGrow: 1, flexBasis: 120, minWidth: 0, backgroundColor: '#fff', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase' }}>Budget</Text>
+                      <AutoFitText value={money(b)} maxFontSize={14} minFontSize={11} containerStyle={{ marginTop: 2 }} style={{ fontWeight: '700', color: '#111827' }} />
+                    </View>
+                    <View style={{ flexGrow: 1, flexBasis: 120, minWidth: 0, backgroundColor: '#fff', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase' }}>Spent</Text>
+                      <AutoFitText value={money(s)} maxFontSize={14} minFontSize={11} containerStyle={{ marginTop: 2 }} style={{ fontWeight: '700', color: '#111827' }} />
+                    </View>
+                    <View style={{ flexGrow: 1, flexBasis: 120, minWidth: 0, backgroundColor: '#fff', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase' }}>Remaining</Text>
+                      <AutoFitText value={money(pBudgetRemaining)} maxFontSize={14} minFontSize={11} containerStyle={{ marginTop: 2 }} style={{ fontWeight: '700', color: pBudgetRemaining !== null && pBudgetRemaining < 0 ? '#DC2626' : '#16A34A' }} />
+                    </View>
+                  </View>
+                  <View className="flex-row flex-wrap mt-3 pt-3" style={{ borderTopWidth: 1, borderColor: '#F3F4F6', gap: 12 }}>
+                    <Text style={{ fontSize: 12, color: '#4B5563' }}>Stock lines: <Text style={{ fontWeight: '600' }}>{pMaterials.length}</Text> ({pLowStock.length} low/out)</Text>
+                    <Text style={{ fontSize: 12, color: '#4B5563' }}>Orders: <Text style={{ fontWeight: '600' }}>{pOrders.length}</Text> ({pLateOrders.length} late)</Text>
+                    <Text style={{ fontSize: 12, color: '#4B5563' }}>Payroll slips: <Text style={{ fontWeight: '600' }}>{pSlips.length}</Text></Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Section>
+      )}
       <Section title="Print or save this report" note="Includes summary indicators and all matching detail rows, including rows beyond the on-screen page. Filters and retrieval time are included."><ExportActions report={fullDocument} busy={exportBusy} onExport={(report, format) => void handleExport(report, format)} />{!!exportMessage && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} accessibilityRole="alert" className="text-gray-600">{exportMessage}</Text>}</Section>
       {(kind === 'payroll' || kind === 'overview') && <Section title="Payroll reporting period" note="Salary slips are assigned by period start. Undated records appear only under All periods. Project and stock indicators are current snapshots."><ScrollView keyboardShouldPersistTaps="handled" horizontal><View className="flex-row" style={{ gap: 8 }}><Button label="All periods" active={month === 'all'} onPress={() => setMonth('all')} />{months.map(m => <Button key={m} label={m} active={month === m} onPress={() => setMonth(m)} />)}</View></ScrollView></Section>}
       {kind === 'overview' ? <>

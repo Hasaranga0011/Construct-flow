@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import { ClientBudgetRing } from '../../components/client/ClientBudgetRing';
 import { useAuth } from '../../context/AuthContext';
 import { router } from 'expo-router';
+import { AutoFitText } from '@/components/common/AutoFitText';
 
 type Project = {
   id: string;
@@ -242,11 +243,11 @@ export default function ClientDashboardPage() {
               </View>
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Budget</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalBudget)}</Text>
+                <AutoFitText value={formatCurrency(totalBudget)} maxFontSize={20} minFontSize={14} className="font-bold text-brand-text" containerStyle={{ marginTop: 12 }} />
               </View>
               <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Spent</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text mt-3">{formatCurrency(totalSpent)}</Text>
+                <AutoFitText value={formatCurrency(totalSpent)} maxFontSize={20} minFontSize={14} className="font-bold text-brand-text" containerStyle={{ marginTop: 12 }} />
               </View>
             </View>
 

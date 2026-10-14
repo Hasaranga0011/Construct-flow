@@ -61,3 +61,94 @@ export async function deliverReport(report: ReportDocument, format: ExportFormat
   await Sharing.shareAsync(uri, { mimeType: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', UTI: format === 'pdf' ? 'com.adobe.pdf' : 'org.openxmlformats.spreadsheetml.sheet', dialogTitle: report.title });
   return 'Report is ready to save or share.';
 }
+
+export async function deliverServerExport({
+  reportType,
+  format,
+  queryParams,
+  token,
+}: {
+  reportType: string;
+  format: 'pdf' | 'xlsx' | 'csv' | 'zip';
+  queryParams: Record<string, string>;
+  token?: string;
+}): Promise<string> {
+  const { getApiUrl } = await import('../../lib/apiUrl');
+  const baseUrl = getApiUrl();
+  const searchParams = new URLSearchParams({
+    report_type: reportType,
+    format,
+    ...queryParams,
+  });
+
+  let authToken = token;
+  if (!authToken) {
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data } = await supabase.auth.getSession();
+      authToken = data.session?.access_token;
+    } catch {
+      // Ignore if session unavailable
+    }
+  }
+
+  const url = `${baseUrl}/reports/export?${searchParams.toString()}`;
+  const response = await fetch(url, {
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  });
+
+  if (!response.ok) {
+    let errorDetail = 'Report export failed';
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.detail || errorDetail;
+    } catch {
+      errorDetail = `Server returned status ${response.status}`;
+    }
+    throw new Error(errorDetail);
+  }
+
+  const blob = await response.blob();
+  const dateStr = new Date().toISOString().split('T')[0];
+  const ext = format === 'xlsx' ? 'xlsx' : format === 'csv' ? 'csv' : format === 'zip' ? 'zip' : 'pdf';
+  const filename = `ConstructFlow_${reportType}_${dateStr}.${ext}`;
+
+  if (Platform.OS === 'web') {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    return `${format.toUpperCase()} report downloaded successfully.`;
+  }
+
+  // Native (Expo Go / iOS / Android)
+  const Sharing = await import('expo-sharing');
+  if (!await Sharing.isAvailableAsync()) {
+    throw new Error('File sharing is unavailable on this device.');
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const { File, Paths } = await import('expo-file-system');
+  const file = new File(Paths.cache, filename);
+  if (file.exists) file.delete();
+  file.write(bytes);
+
+  const mimeMap = {
+    pdf: 'application/pdf',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    csv: 'text/csv',
+    zip: 'application/zip',
+  };
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: mimeMap[format],
+    dialogTitle: `Export ${reportType} report`,
+  });
+
+  return `${format.toUpperCase()} report is ready to share.`;
+}

@@ -1,4 +1,3 @@
-import WorkerAccount from './WorkerAccount';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable, TextInput,
@@ -39,7 +38,7 @@ const roleConfig: Record<string, { color: string; bg: string; label: string }> =
   Worker: { color: '#06B6D4', bg: '#ECFEFF', label: 'Worker' },
 };
 
-function LegacyProfileScreen() {
+export default function ProfileScreen() {
   const { user, role } = useAuth();
   const { isDark } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -69,7 +68,7 @@ function LegacyProfileScreen() {
         .eq('id', user.id)
         .single();
       if (data && isMounted) {
-        setProfile(data);
+        setProfile(data as any);
         setForm({
           full_name: data.full_name || '',
           contact_number: data.contact_number || '',
@@ -88,6 +87,28 @@ function LegacyProfileScreen() {
              if (r.projects) projectsMap.set(r.project_id, r.projects);
            });
            setAssignedProjects(Array.from(projectsMap.values()));
+        }
+
+        if (data.role?.toLowerCase() === 'worker') {
+          const { data: wData } = await supabase
+            .from('workers')
+            .select('site_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (wData?.site_id) {
+            const { data: proj } = await supabase
+              .from('projects')
+              .select('id, name, location')
+              .eq('id', wData.site_id)
+              .maybeSingle();
+            if (proj && isMounted) {
+              setAssignedProjects(prev => {
+                const map = new Map(prev.map(p => [p.id, p]));
+                map.set(proj.id, proj);
+                return Array.from(map.values());
+              });
+            }
+          }
         }
       }
       if (isMounted) setLoading(false);
@@ -445,4 +466,3 @@ function LegacyProfileScreen() {
   );
 }
 
-export default function ProfileScreen(){const {role}=useAuth();return role?.toLowerCase()==='worker'?<WorkerAccount/>:<LegacyProfileScreen/>;}

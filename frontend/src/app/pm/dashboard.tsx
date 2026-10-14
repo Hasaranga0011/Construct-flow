@@ -54,7 +54,7 @@ export default function DashboardScreen() {
 
       if (projectsReq.data) {
         activeProjectsCount = projectsReq.data.filter(p => ['active', 'in progress', 'ongoing'].includes(String(p.status).toLowerCase())).length;
-        totalBudget = projectsReq.data.reduce((sum, item) => sum + (Number(item.total_budget ?? item.estimated_cost) || 0), 0);
+        totalBudget = projectsReq.data.reduce((sum, item) => sum + (Number(item.total_budget ?? (item as any).estimated_cost) || 0), 0);
       }
 
       if (assignedProjectIds.length > 0) {
@@ -140,7 +140,7 @@ export default function DashboardScreen() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={true}>
           {/* Top Stat Cards Row */}
           <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
             <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>

@@ -9,6 +9,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
+import { ChatComposer } from '../../../components/chat/ChatComposer';
 
 type Message = {
   id: string;
@@ -265,28 +266,14 @@ export default function ClientMessagesThreadPage() {
       </ScrollView>
 
       {/* Input bar */}
-      <View className="p-4 bg-white border-t border-gray-100 flex-row items-center">
-        <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-          className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm mr-2 text-brand-text outline-none"
-          placeholder={receiverId ? `Message your ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}...` : 'No contact assigned to this project yet'}
-          value={input}
-          onChangeText={setInput}
-          editable={!sending && !!receiverId}
-          onSubmitEditing={sendMessage}
-          returnKeyType="send"
-        />
-        <Pressable style={{ minHeight: 44, minWidth: 44 }}
-          onPress={sendMessage}
-          disabled={sending || !input.trim() || !receiverId}
-          className={`w-11 h-11 rounded-full items-center justify-center ${sending || !input.trim() || !receiverId ? 'bg-gray-300' : 'bg-brand-orange'}`}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Ionicons name="send" size={18} color="white" />
-          )}
-        </Pressable>
-      </View>
+      <ChatComposer
+        value={input}
+        onChangeText={setInput}
+        onSend={sendMessage}
+        sending={sending}
+        disabled={!receiverId}
+        placeholder={receiverId ? `Message your ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}...` : 'No contact assigned to this project yet'}
+      />
     </KeyboardAvoidingView>
   );
 }

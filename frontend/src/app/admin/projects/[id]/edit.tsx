@@ -90,45 +90,77 @@ export default function AdminProjectEditPage() {
   }, [projectId]);
 
   const handleSave = async () => {
-    if (!formData.name) {
+    if (!formData.name?.trim()) {
       Alert.alert("Error", "Project name is required");
       return;
     }
 
     setSaving(true);
     try {
+      const budgetNum = formData.total_budget ? parseFloat(formData.total_budget) : null;
+      const cleanPmId = formData.pm_id && formData.pm_id.trim() ? formData.pm_id.trim() : null;
+      const cleanClientId = formData.client_id && formData.client_id.trim() ? formData.client_id.trim() : null;
+
       const payload = {
-        name: formData.name,
-        location: formData.location,
-        address: formData.address,
-        total_budget: formData.total_budget ? parseFloat(formData.total_budget) : null,
-        status: formData.status,
-        pm_id: formData.pm_id || null,
-        client_id: formData.client_id || null,
-        site_managers: formData.site_managers,
-        workers: formData.workers
-        , suppliers: formData.suppliers
-        , admins: formData.admins
+        name: formData.name.trim(),
+        location: formData.location?.trim() || '',
+        address: formData.address?.trim() || '',
+        total_budget: isNaN(budgetNum as number) ? null : budgetNum,
+        status: formData.status || 'Planning',
+        pm_id: cleanPmId,
+        client_id: cleanClientId,
+        site_managers: formData.site_managers || [],
+        workers: formData.workers || [],
+        suppliers: formData.suppliers || [],
+        admins: formData.admins || []
       };
+
+      if (__DEV__) {
+        console.log('[DEBUG PATCH /projects Request]:', payload);
+      }
+
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
 
       const response = await fetch(`${getApiUrl()}/projects/${projectId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || 'Failed to update project');
+        let errorDetail = 'Failed to update project';
+        try {
+          const errData = await response.json();
+          if (__DEV__) {
+            console.log('[DEBUG PATCH /projects Error Response]:', response.status, errData);
+          }
+          if (typeof errData.detail === 'string') {
+            errorDetail = errData.detail;
+          } else if (Array.isArray(errData.detail)) {
+            errorDetail = errData.detail.map((d: any) => d.msg || `${d.loc?.join('.')}: ${d.type}`).join(', ');
+          } else if (errData.message) {
+            errorDetail = errData.message;
+          }
+        } catch {
+          errorDetail = await response.text();
+        }
+        throw new Error(errorDetail || `HTTP ${response.status}`);
+      }
+
+      const updatedProj = await response.json();
+      if (__DEV__) {
+        console.log('[DEBUG PATCH /projects Success]:', updatedProj);
       }
 
       Alert.alert('Success', "Project updated successfully!");
       router.push(`/admin/projects/${projectId}`);
     } catch (err: any) {
-      Alert.alert('Error', `Error saving project: ${err.message}`);
+      const readable = typeof err === 'object' && err !== null ? (err.message || String(err)) : String(err);
+      Alert.alert('Error', readable || 'Failed to update project');
     } finally {
       setSaving(false);
     }
@@ -191,15 +223,18 @@ export default function AdminProjectEditPage() {
             <View className="mb-8">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-2">Status</Text>
               <View className="flex-row flex-wrap">
-                {['Planning', 'Active', 'Completed', 'On Hold'].map(status => (
-                  <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
-                    key={status}
-                    onPress={() => setFormData({...formData, status})}
-                    className={`px-4 py-2 rounded-full mr-2 mb-2 ${formData.status === status ? 'bg-blue-600' : 'bg-gray-100'}`}
-                  >
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={formData.status === status ? 'text-white font-bold' : 'text-gray-600'}>{status}</Text>
-                  </TouchableOpacity>
-                ))}
+                {['Planning', 'Active', 'Completed', 'On Hold', ...(String(formData.status || '').toLowerCase() === 'archived' ? ['Archived'] : [])].map(status => {
+                  const isSelected = String(formData.status || '').toLowerCase() === status.toLowerCase();
+                  return (
+                    <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
+                      key={status}
+                      onPress={() => setFormData({...formData, status: status.toLowerCase() === 'archived' ? 'archived' : status})}
+                      className={`px-4 py-2 rounded-full mr-2 mb-2 ${isSelected ? (status.toLowerCase() === 'archived' ? 'bg-amber-600' : 'bg-blue-600') : 'bg-gray-100'}`}
+                    >
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSelected ? 'text-white font-bold' : 'text-gray-600'}>{status}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
