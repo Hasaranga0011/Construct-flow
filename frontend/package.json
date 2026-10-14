@@ -71,6 +71,7 @@
   "scripts": {
     "start": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start",
     "start:clear": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start -c",
+    "tunnel": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start --tunnel -c",
     "android": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start --android",
     "ios": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start --ios",
     "web": "node --max-old-space-size=4096 --dns-result-order=ipv4first ./node_modules/expo/bin/cli start --web",

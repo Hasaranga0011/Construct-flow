@@ -79,10 +79,8 @@ export default function LoginScreen() {
       setErrorMsg('');
       
       // Save selected role to local storage so it survives the OAuth redirect
-      if (typeof role !== 'undefined' && role) {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        await AsyncStorage.setItem('pending_google_role', role);
-      }
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.setItem('pending_google_role', 'pm');
 
       const redirectTo = Linking.createURL('auth/callback');
       const { data, error } = await supabase.auth.signInWithOAuth({

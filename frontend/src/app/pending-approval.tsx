@@ -22,8 +22,9 @@ export default function PendingApprovalPage() {
         .single();
 
       if (!error && data) {
-        if (data.role && data.role !== 'pending' && data.is_approved !== false) {
-          const target = getDashboardForRole(data.role);
+        const profileData = data as any;
+        if (profileData.role && profileData.role !== 'pending' && profileData.is_approved !== false) {
+          const target = getDashboardForRole(profileData.role);
           if (target) {
             router.replace(target as any);
             return;
