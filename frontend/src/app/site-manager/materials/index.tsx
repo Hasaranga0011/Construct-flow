@@ -50,8 +50,8 @@ export default function SMMaterialsPage() {
       setProjects(parsedProjects);
 
       if (parsedProjects.length > 0) {
-        const currentProject = parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId! : parsedProjects[0].id;
-        if (currentProject !== activeProjectId) setActiveProjectId(currentProject);
+        const currentProject: string = (parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId : parsedProjects[0].id) || '';
+        if (currentProject && currentProject !== activeProjectId) setActiveProjectId(currentProject);
 
         // 2. Fetch materials for the active project
         const { data: stockData, error: stockError } = await supabase

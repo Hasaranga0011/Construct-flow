@@ -7,8 +7,10 @@ import { ModalViewport } from '@/components/common/ModalViewport';
 import { managedPayroll } from '@/services/pmData';
 import { formatMoney } from '@/utils/format';
 import { AutoFitText } from '@/components/common/AutoFitText';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function PMPayrollPage() {
+  const { isMobile } = useResponsive();
   const [slips, setSlips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,19 +31,22 @@ export default function PMPayrollPage() {
   return <View className="flex-1 bg-brand-light">
     <TopNav title="Project Payroll" actionLabel="Refresh" onActionPress={load} />
     <ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold mb-2">Salary Slips</Text>
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-4">Generated payroll records for projects you manage.</Text>
-      <View className="bg-white rounded-xl p-5 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Pending payment: {pending.length} slips</Text><AutoFitText value={formatMoney(pendingTotal)} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>
-      <View className="mb-4 z-50">
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+        <View>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-1">Salary Slips</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Generated payroll records for projects you manage.</Text>
+        </View>
         <SearchInput 
           placeholder="Search worker or project..." 
           value={search} 
           onChangeText={setSearch} 
           items={slips} 
           entityLabel="payroll" 
+          className={isMobile ? "w-full" : "w-80"}
           getLocalResults={(query) => slips.filter(s => `${s.worker?.full_name || ''} ${s.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(s => ({ id: s.id, title: s.worker?.full_name || 'Worker', subtitle: s.project?.name || '' }))}
         />
       </View>
+      <View className="bg-white rounded-xl p-5 mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Pending payment: {pending.length} slips</Text><AutoFitText value={formatMoney(pendingTotal)} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>
       <View className="flex-row flex-wrap gap-3 mb-4">{['All', 'Pending', 'Paid'].map(status => <Pressable style={{ minHeight: 44, minWidth: 44 }} key={status} onPress={() => setFilter(status)} className={`px-4 py-3 rounded-lg ${filter === status ? 'bg-brand-orange' : 'bg-white'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={filter === status ? 'text-white font-bold' : 'text-gray-700'}>{status}</Text></Pressable>)}</View>
       {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
       {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No salary slips match these filters.</Text> : visible.map(s => <View key={s.id} className="bg-white rounded-xl p-5 mb-3">

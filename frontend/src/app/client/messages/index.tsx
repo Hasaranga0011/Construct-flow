@@ -133,7 +133,7 @@ export default function ClientMessagesPage() {
               ((m.sender_role === 'client' && m.receiver_role === activeChannel) ||
                (m.sender_role === activeChannel && m.receiver_role === 'client'))
             );
-            const preview = message?.message_text || 'No messages yet';
+            const preview = (message as any)?.message_text || (message as any)?.content || 'No messages yet';
             return (
               <Link key={project.id} href={`/client/messages/${project.id}?channel=${activeChannel}`} asChild>
                 <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-white rounded-2xl border border-gray-100 p-5 mb-3 flex-row items-center">

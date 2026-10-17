@@ -237,12 +237,26 @@ def save_project(client, data, project_id=None):
 
     # Fallback or direct update via service client
     if project_id:
-        upd = service_client.table("projects").update(clean_data).eq("id", project_id).execute()
+        try:
+            upd = service_client.table("projects").update(clean_data).eq("id", project_id).execute()
+        except Exception as e:
+            if "image_url" in clean_data or "images" in clean_data:
+                clean_data_fallback = {k: v for k, v in clean_data.items() if k not in ("image_url", "images")}
+                upd = service_client.table("projects").update(clean_data_fallback).eq("id", project_id).execute()
+            else:
+                raise e
         if upd.data and len(upd.data) > 0:
             return upd.data[0]
         raise HTTPException(status_code=400, detail="Project update failed: database returned 0 modified rows. Please verify permissions.")
     else:
-        ins = service_client.table("projects").insert(clean_data).execute()
+        try:
+            ins = service_client.table("projects").insert(clean_data).execute()
+        except Exception as e:
+            if "image_url" in clean_data or "images" in clean_data:
+                clean_data_fallback = {k: v for k, v in clean_data.items() if k not in ("image_url", "images")}
+                ins = service_client.table("projects").insert(clean_data_fallback).execute()
+            else:
+                raise e
         if ins.data and len(ins.data) > 0:
             return ins.data[0]
         raise HTTPException(status_code=400, detail="Project creation failed: database returned empty result.")
@@ -623,6 +637,52 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
         logging.exception("Project updated, but PM/client notification failed")
 
     ensure_project_attendance(setup_client(), project_id)
+
+    # Automated Learning Loop: When project is completed, add row to historical_projects automatically
+    if str(saved.get("status") or "").lower() == "completed":
+        try:
+            import datetime
+            import re
+            from services.historical_data_service import _get_local_conn, validate_district
+            p_name = saved.get("name") or f"Project-{project_id[:8]}"
+            raw_loc = saved.get("location") or "Colombo"
+            p_dist = validate_district(raw_loc) or "Colombo"
+            p_budget = float(saved.get("total_budget") or 0)
+            p_spent = float(saved.get("spent_cost") or p_budget or 5_000_000)
+            sqft = float(saved.get("square_footage") or 2500)
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            # Check if flagged as test data
+            is_test_flag = bool(saved.get("is_test"))
+            name_lower = p_name.lower()
+            is_test_by_name = any(kw in name_lower for kw in ["test", "demo", "sample"])
+            is_test_data = is_test_flag or is_test_by_name
+
+            source_val = "sample" if is_test_data else "real"
+            verified_val = 0 if is_test_data else 1
+            evidence = "Test project (excluded from training)" if is_test_data else f"ConstructFlow completed project: {p_name}"
+            
+            conn = _get_local_conn()
+            cur = conn.cursor()
+            cur.execute("""
+            INSERT OR REPLACE INTO historical_projects (
+                id, project_name, project_type, district, town, floor_area_sqft, floors,
+                structure_type, quality_tier, site_condition, start_date, end_date,
+                estimate_total_lkr, actual_total_lkr, cost_year, source, evidence_note, verified, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(project_id), p_name, saved.get("project_type", "Residential House"),
+                p_dist, None, sqft, 1, "RCC frame", "Standard", "Flat",
+                saved.get("start_date") or datetime.date.today().isoformat(),
+                saved.get("end_date") or datetime.date.today().isoformat(),
+                p_budget, p_spent, datetime.date.today().year, source_val, evidence, verified_val, now_iso
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as h_err:
+            import logging
+            logging.warning("Could not auto-record completed project to historical_projects: %s", h_err)
+
     return saved
 
 
@@ -858,6 +918,12 @@ def delete_milestone(project_id: str, milestone_id: str, current_user: dict = De
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+import time
+from typing import Tuple
+
+_FINANCIALS_CACHE: Dict[str, Tuple[float, Any]] = {}
+_FINANCIALS_CACHE_TTL = 30.0  # seconds cache to prevent N-query waterfalls
+
 from ..models import ExpenseCreate, ExpenseResponse
 
 @router.get("/{project_id}/financials")
@@ -867,6 +933,12 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
     Actual = POs in Delivered / Received + salary slips paid out.
     Fires budget-overrun notifications at 90% and 100% thresholds.
     """
+    now = time.time()
+    if project_id in _FINANCIALS_CACHE:
+        cached_time, cached_val = _FINANCIALS_CACHE[project_id]
+        if now - cached_time < _FINANCIALS_CACHE_TTL:
+            return cached_val
+
     supabase = authorized_project_client(project_id, current_user, write=False)
     try:
         # Fetch project budget
@@ -937,6 +1009,7 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
             elif utilisation >= 0.9:
                 _fire_overrun_notification(supabase, project_id, project_name, pm_id, 90, current_user["id"])
 
+        _FINANCIALS_CACHE[project_id] = (now, result)
         return result
     except HTTPException:
         raise
@@ -1009,6 +1082,7 @@ def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: d
         total_spent = sum(float(e.get("amount", 0)) for e in all_exp.data) if all_exp.data else 0.0
 
         supabase.table("projects").update({"spent_cost": total_spent}).eq("id", project_id).execute()
+        _FINANCIALS_CACHE.pop(project_id, None)
 
         return res.data[0]
     except HTTPException:

@@ -153,7 +153,7 @@ export default function ClientMessagesThreadPage() {
         const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
         if (data) {
           const newProfiles = { ...profiles };
-          data.forEach(p => { newProfiles[p.id] = p.full_name || 'Unknown'; });
+          data.forEach(p => { if (p.id) newProfiles[p.id] = p.full_name || 'Unknown'; });
           setProfiles(newProfiles);
         }
       }
@@ -177,7 +177,7 @@ export default function ClientMessagesThreadPage() {
       const data = await api.messages.send({
         project_id: threadId,
         sender_id: user.id,
-        ...(activeChannel !== 'All' ? { receiver_id: receiverId } : {}),
+        ...(activeChannel !== 'All' && receiverId ? { receiver_id: receiverId } : {}),
         sender_role: 'client',
         receiver_role: activeChannel,
         content: trimmed,

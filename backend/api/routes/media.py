@@ -41,7 +41,7 @@ def generate_cloudinary_signature(params: dict, api_secret: str) -> str:
 @router.post("/upload")
 async def upload_site_photo(
     file: UploadFile = File(...),
-    project_id: str = Form(...),
+    project_id: str = Form("general"),
     site_id: str = Form(None),
     caption: str = Form(""),
     current_user: dict = Depends(get_current_user)

@@ -49,7 +49,7 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
         if (projects && todayLabour) {
           const counts = projects.map(p => {
             const count = todayLabour.filter(l => l.project_id === p.id).length;
-            return { label: p.name, count };
+            return { label: p.name || 'Unnamed Project', count };
           });
           
           if (isMounted) setData(counts);

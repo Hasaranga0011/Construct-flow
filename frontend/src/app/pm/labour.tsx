@@ -7,9 +7,11 @@ import { supabase } from '@/lib/supabase';
 import { managedProjects } from '@/services/pmData';
 import { assignedWorkers } from '@/services/siteData';
 import { AutoFitText } from '@/components/common/AutoFitText';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function PMLabourScreen() {
   const router = useRouter();
+  const { isMobile } = useResponsive();
   const [rows, setRows] = useState<any[]>([]);
   const [stats, setStats] = useState({ workers: 0, present: 0, sites: 0, overtime: 0 });
   const [loading, setLoading] = useState(true);
@@ -49,16 +51,22 @@ export default function PMLabourScreen() {
   const time = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not recorded';
   return <View className="flex-1 bg-brand-light"><TopNav title="Project Labour" actionLabel="Refresh" onActionPress={load} /><ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
     <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',stats.overtime.toFixed(1)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><AutoFitText value={value} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>)}</View>
-    <View className="flex-row flex-wrap gap-3 justify-between items-center mb-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold">Today's Attendance</Text><Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">View Payroll</Text></Pressable></View>
-    <View className="mb-4 z-50">
-      <SearchInput 
-        placeholder="Search worker or project..." 
-        value={search} 
-        onChangeText={setSearch} 
-        items={rows} 
-        entityLabel="labour" 
-        getLocalResults={(query) => rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(a => ({ id: a.id, title: a.person?.full_name || 'Worker', subtitle: a.project?.name || '' }))}
-      />
+    <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Today&apos;s Attendance</Text>
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
+        <SearchInput 
+          placeholder="Search worker or project..." 
+          value={search} 
+          onChangeText={setSearch} 
+          items={rows} 
+          entityLabel="labour" 
+          className={isMobile ? "w-full" : "w-80"}
+          getLocalResults={(query) => rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(a => ({ id: a.id, title: a.person?.full_name || 'Worker', subtitle: a.project?.name || '' }))}
+        />
+        <Pressable style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }} onPress={() => router.push('/pm/payroll')} className="bg-brand-orange rounded-lg px-4 py-2">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">View Payroll</Text>
+        </Pressable>
+      </View>
     </View>
     {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
     {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.hours_worked ?? 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{a.status || 'Not recorded'}</Text></View></View>)}

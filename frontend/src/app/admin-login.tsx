@@ -74,7 +74,7 @@ export default function LoginScreen() {
           .select('role')
           .eq('id', signedInUser?.id)
           .single();
-        role = profile?.role;
+        role = profile?.role ?? undefined;
       }
 
       const destination = getDashboardForRole(role);

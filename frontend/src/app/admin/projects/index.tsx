@@ -9,6 +9,9 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
 
+import { ProjectImage } from '@/components/common/ProjectImage';
+import { RoleAvatar } from '@/components/common/RoleAvatar';
+
 export default function AdminProjectsList() {
   const router = useRouter();
   const [projects, setProjects] = useState<any[]>([]);
@@ -36,14 +39,20 @@ export default function AdminProjectsList() {
           if (userIds.size > 0) {
             const { data: profilesData } = await supabase
               .from('profiles')
-              .select('id, full_name')
+              .select('id, full_name, avatar_url, role')
               .in('id', Array.from(userIds));
               
             if (profilesData) {
-              const profileMap = Object.fromEntries(profilesData.map(p => [p.id, p.full_name]));
-              data.forEach(p => {
-                if (p.pm_id) p.pm_name = profileMap[p.pm_id];
-                if (p.client_id) p.client_name = profileMap[p.client_id];
+              const profileMap = Object.fromEntries(profilesData.map(p => [p.id, p]));
+              data.forEach((p: any) => {
+                if (p.pm_id && profileMap[p.pm_id]) {
+                  p.pm_name = profileMap[p.pm_id].full_name;
+                  p.pm_avatar = profileMap[p.pm_id].avatar_url;
+                }
+                if (p.client_id && profileMap[p.client_id]) {
+                  p.client_name = profileMap[p.client_id].full_name;
+                  p.client_avatar = profileMap[p.client_id].avatar_url;
+                }
               });
             }
           }
@@ -99,14 +108,14 @@ export default function AdminProjectsList() {
         <TopNav title="Projects" actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
         
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Projects</Text>
             
             <SearchInput items={projects} entityLabel="projects" 
               placeholder="Search projects..." 
               value={search} 
               onChangeText={setSearch} 
-              className={isMobile ? "w-full" : "w-64"}
+              className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'projects',
                 searchColumn: 'name',
@@ -172,85 +181,95 @@ export default function AdminProjectsList() {
               </View>
             ) : isMobile ? (
               filteredRows.map(p => (
-                <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
+                <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm overflow-hidden">
+                  <ProjectImage
+                    project={p}
+                    className="w-full h-36 rounded-lg mb-3"
+                    showBadge
+                    badgeText={p.status}
+                    badgeVariant={['active', 'in progress'].includes(String(p.status).toLowerCase()) ? 'active' : 'default'}
+                  />
+                  <View className="mb-2">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">{p.name}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">{formatMoney(p.total_budget)}</Text>
+                  </View>
                   <View className="flex-row items-center mb-3">
-                    <View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-3">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-lg">{p.name.charAt(0).toUpperCase()}</Text>
+                    <Ionicons name="location-outline" size={14} color="#6B7280" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1 flex-1">{p.location || 'N/A'}</Text>
+                  </View>
+                  <View className="flex-row items-center justify-between mb-4 pt-2 border-t border-gray-100">
+                    <View className="flex-row items-center gap-1.5 flex-1 pr-1">
+                      <RoleAvatar size="xs" avatarUrl={p.pm_avatar} role="pm" name={p.pm_name} />
+                      <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-600 font-medium">{p.pm_name || 'No PM'}</Text>
                     </View>
-                    <View className="flex-1">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">{p.name}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-medium">{formatMoney(p.total_budget)}</Text>
+                    <View className="flex-row items-center gap-1.5 flex-1 pl-1 justify-end">
+                      <RoleAvatar size="xs" avatarUrl={p.client_avatar} role="client" name={p.client_name} />
+                      <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-600 font-medium">{p.client_name || 'No Client'}</Text>
                     </View>
                   </View>
-                    <View className="flex-row items-center mb-4 pl-[52px]">
-                      <View className="flex-row items-center flex-1">
-                        <Ionicons name="location-outline" size={14} color="#6B7280" />
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1">{p.location || 'N/A'}</Text>
-                      </View>
-                      <View className={`px-2 py-1 rounded-full ${getStatusBadge(p.status).bg}`}>
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
-                          {p.status}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-col mb-4 pl-[52px]">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mb-1"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'Unassigned'}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'Unassigned'}</Text>
-                    </View>
-                    <Link href={`/admin/projects/${p.id}` as any} asChild>
-                      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm font-bold">View Details</Text>
-                      </Pressable>
-                    </Link>
-                  </View>
-                ))
-              ) : (
-                filteredRows.map(p => (
-                  <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">
-                    <View className="w-[25%] flex-row items-center pr-4">
-                      <View className="w-8 h-8 bg-orange-100 rounded items-center justify-center mr-3">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs">{p.name.charAt(0)}</Text>
-                      </View>
-                      <View>
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{p.name}</Text>
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {p.id.slice(0, 8)}...</Text>
-                      </View>
-                    </View>
-                    
-                    <View className="w-[15%] pr-2">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
-                    </View>
-
-                    <View className="w-[15%] pr-2 flex-col justify-center">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">PM:</Text> {p.pm_name || 'None'}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700">Client:</Text> {p.client_name || 'None'}</Text>
-                    </View>
-                    
-                    <View className="w-[15%]">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">
-                        {p.total_budget ? `Rs. ${p.total_budget.toLocaleString()}` : 'TBD'}
-                      </Text>
-                    </View>
-                    
-                    <View className="w-[15%]">
-                      <View className={`px-2 py-1 rounded self-start ${getStatusBadge(p.status).bg}`}>
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
-                          {p.status}
-                        </Text>
-                      </View>
-                    </View>
-                  
-                  <View className="flex-1 flex-row justify-end space-x-2 pl-1">
-                    <Link href={`/admin/projects/${p.id}` as any} asChild>
-                      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange px-3 py-1.5 rounded-md shadow-sm">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">View Details</Text>
-                      </Pressable>
-                    </Link>
-                  </View>
+                  <Link href={`/admin/projects/${p.id}` as any} asChild>
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm font-bold">View Details</Text>
+                    </Pressable>
+                  </Link>
                 </View>
               ))
-            )}
-          </View>
+            ) : (
+              filteredRows.map(p => (
+                <View key={p.id} className="flex-row items-center py-3.5 border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                  <View className="w-[25%] flex-row items-center pr-4">
+                    <ProjectImage
+                      project={p}
+                      className="w-12 h-12 rounded-lg mr-3 shadow-sm shrink-0"
+                    />
+                    <View className="flex-1 min-w-0">
+                      <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{p.name}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {p.id.slice(0, 8)}...</Text>
+                    </View>
+                  </View>
+                  
+                  <View className="w-[15%] pr-2">
+                    <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
+                  </View>
+
+                  <View className="w-[15%] pr-2 flex-col justify-center gap-1">
+                    <View className="flex-row items-center gap-1.5">
+                      <RoleAvatar size="xs" avatarUrl={p.pm_avatar} role="pm" name={p.pm_name} />
+                      <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-700 font-medium">{p.pm_name || 'Unassigned'}</Text>
+                    </View>
+                    {p.client_name ? (
+                      <View className="flex-row items-center gap-1.5">
+                        <RoleAvatar size="xs" avatarUrl={p.client_avatar} role="client" name={p.client_name} />
+                        <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">{p.client_name}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  
+                  <View className="w-[15%]">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-semibold">
+                      {p.total_budget != null ? formatMoney(p.total_budget) : 'TBD'}
+                    </Text>
+                  </View>
+                  
+                  <View className="w-[15%]">
+                    <View className={`px-2.5 py-1 rounded-full self-start ${getStatusBadge(p.status).bg}`}>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
+                        {p.status}
+                      </Text>
+                    </View>
+                  </View>
+                
+                <View className="flex-1 flex-row justify-end space-x-2 pl-1">
+                  <Link href={`/admin/projects/${p.id}` as any} asChild>
+                    <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange px-3.5 py-2 rounded-lg shadow-sm active:opacity-80">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">View Details</Text>
+                    </Pressable>
+                  </Link>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
         </ScrollView>
       </View>
     </View>

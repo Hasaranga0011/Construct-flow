@@ -11,7 +11,8 @@ import { useResponsive } from '@/hooks/useResponsive';
 
 export default function PMMilestonesIndexPage() {
   const { isMobile } = useResponsive();
-  const { id: projectId } = useLocalSearchParams();
+  const { id } = useLocalSearchParams();
+  const projectId = Array.isArray(id) ? id[0] : (id || '');
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [milestones, setMilestones] = useState<any[]>([]);

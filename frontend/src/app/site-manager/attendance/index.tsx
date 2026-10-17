@@ -71,7 +71,7 @@ export default function SMAttendancePage() {
 
       const actualSites = await projectSites(assignedProjectIds);
       const siteMap: Record<string, string> = {};
-      actualSites.forEach(s => { if (!siteMap[s.project_id]) siteMap[s.project_id] = s.id; });
+      actualSites.forEach(s => { if (s.project_id && s.id && !siteMap[s.project_id]) siteMap[s.project_id] = s.id; });
       if (isMounted.current && version === requestVersion.current) setSiteByProject(siteMap);
 
       const { data: projectsData, error: projectsDataError } = assignedProjectIds.length
@@ -83,10 +83,10 @@ export default function SMAttendancePage() {
       if (isMounted.current && version === requestVersion.current) setProjects(parsedProjects);
 
       if (parsedProjects.length > 0) {
-        const currentProject = parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId! : parsedProjects[0].id;
+        const currentProject = parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId! : (parsedProjects[0].id || '');
         if (activeProjectId !== currentProject && isMounted.current) setActiveProjectId(currentProject);
 
-        const siteId = siteMap[currentProject];
+        const siteId = currentProject ? siteMap[currentProject] : undefined;
         if (!siteId) { setProjectWorkers([]); setTodayAttendance([]); throw new Error('This project has no attendance site. Ask an administrator to link a site to the project.'); }
 
         // attendance.site_id references the physical sites table.
@@ -100,7 +100,7 @@ export default function SMAttendancePage() {
 
         if (isMounted.current && version === requestVersion.current) setTodayAttendance((attData || []) as AttendanceRecord[]);
 
-        const rows = await assignedWorkers([currentProject]);
+        const rows = await assignedWorkers([currentProject].filter((p): p is string => Boolean(p)));
         if (isMounted.current && version === requestVersion.current) setProjectWorkers(rows.filter(row => row.workerRecordId).map(row => ({
           id: row.workerRecordId!, full_name: row.profiles?.full_name || 'Worker',
           qr_code: row.profiles?.qr_code || null, avatar_url: row.profiles?.avatar_url,

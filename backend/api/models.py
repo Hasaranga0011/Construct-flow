@@ -20,6 +20,9 @@ class ProjectBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     address: Optional[str] = None
+    image_url: Optional[str] = None
+    images: Optional[List[str]] = Field(default_factory=list)
+    is_test: bool = False
 
 class ProjectCreate(ProjectBase):
     site_managers: Optional[list[str]] = None
@@ -44,6 +47,9 @@ class ProjectUpdate(BaseModel):
     longitude: Optional[float] = None
     address: Optional[str] = None
     description: Optional[str] = None
+    image_url: Optional[str] = None
+    images: Optional[List[str]] = None
+    is_test: Optional[bool] = None
     site_managers: Optional[list[str]] = None
     workers: Optional[list[str]] = None
     suppliers: Optional[list[str]] = None
@@ -98,6 +104,7 @@ class ProjectResponse(ProjectBase):
     spent_cost: Optional[float] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    images: Optional[List[str]] = Field(default_factory=list)
     notifications_failed: Optional[bool] = False
 
     model_config = {"from_attributes": True}

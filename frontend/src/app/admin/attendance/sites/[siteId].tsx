@@ -5,11 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { SearchInput } from '@/components/common/SearchInput';
-import { Toolbar, ToolbarSearch } from '@/components/ui';
+import { useResponsive } from '@/hooks/useResponsive';
 
 type Attendance = { id: string; worker_id: string; worker_name?: string; date: string; check_in_time: string | null; check_out_time: string | null; hours_worked: number | null };
 export default function AdminSiteAttendancePage() {
   const { siteId } = useLocalSearchParams<{ siteId: string }>();
+  const { isMobile } = useResponsive();
   const [records, setRecords] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,24 +55,24 @@ export default function AdminSiteAttendancePage() {
   return <View className="flex-1 bg-brand-light"><TopNav title="Site Attendance" showAction={false} />
     <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
       
-      <Toolbar>
-        <ToolbarSearch>
-          <SearchInput 
-            entityLabel="workers"
-            placeholder="Search by name or ID..."
-            value={search}
-            onChangeText={setSearch}
-            items={searchItems}
-            config={{
-              table: 'workers', // Client-side filter bypasses this
-              searchColumn: 'worker_name',
-              secondaryColumn: 'search_detail',
-              titleColumn: 'worker_name',
-              subtitleColumn: 'search_detail',
-            }}
-          />
-        </ToolbarSearch>
-      </Toolbar>
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+        <Text maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Worker Attendance</Text>
+        <SearchInput 
+          entityLabel="workers"
+          placeholder="Search by name or ID..."
+          value={search}
+          onChangeText={setSearch}
+          items={searchItems}
+          className={isMobile ? "w-full" : "w-80"}
+          config={{
+            table: 'workers', // Client-side filter bypasses this
+            searchColumn: 'worker_name',
+            secondaryColumn: 'search_detail',
+            titleColumn: 'worker_name',
+            subtitleColumn: 'search_detail',
+          }}
+        />
+      </View>
       {loading ? <ActivityIndicator color="#F97316" /> : error ? <Text className="text-red-600">{error}</Text> : !filteredRecords.length ? <View className="items-center py-16"><Ionicons name="calendar-outline" size={48} color="#D1D5DB" /><Text className="text-gray-500 mt-4">No attendance records found.</Text></View> : filteredRecords.map(record => {
         const status = record.check_in_time ? record.check_out_time ? 'Checked out' : 'On site' : 'Pending';
         return <View key={record.id} className="bg-white rounded-lg border border-gray-100 p-4 mb-3 min-w-0">

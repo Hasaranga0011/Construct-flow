@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { useTheme } from '../../context/ThemeContext';
+import { getRoleAvatarUrl } from '../../utils/projectImages';
 
 interface Profile {
   id: string;
@@ -222,6 +223,7 @@ export default function ProfileScreen() {
   const metadataName: unknown = user?.user_metadata?.full_name;
   const displayName = profile?.full_name || form.full_name || (typeof metadataName === 'string' ? metadataName : '') || 'Your Name';
   const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  const effectiveAvatarUrl = profile?.avatar_url || getRoleAvatarUrl(role, displayName);
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '—';
@@ -285,9 +287,9 @@ export default function ProfileScreen() {
                   alignItems: 'center', justifyContent: 'center',
                   shadowColor: rc.color, shadowOpacity: 0.4, shadowRadius: 16,
                 }}>
-                  {profile?.avatar_url ? (
+                  {effectiveAvatarUrl ? (
                     <Image
-                      source={{ uri: profile.avatar_url }}
+                      source={{ uri: effectiveAvatarUrl }}
                       style={{ width: 96, height: 96 }}
                       resizeMode="cover"
                     />

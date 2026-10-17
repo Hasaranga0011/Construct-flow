@@ -53,7 +53,7 @@ export default function PMSupplierOrdersPage() {
             supabase.from('purchase_orders')
               .select('id, po_number, material_id, quantity_ordered, total_price, status, expected_date, created_at, items, projects!inner(name, pm_id)')
               .eq('supplier_id', id)
-              .eq('projects.pm_id', data.session?.user.id)
+              .eq('projects.pm_id', data.session?.user.id || '')
               .order('created_at', { ascending: false })
           ),
           supabase.from('materials').select('id, name, unit')

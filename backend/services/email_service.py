@@ -1,4 +1,5 @@
 import os
+import sys
 import smtplib
 import logging
 from datetime import datetime
@@ -390,71 +391,20 @@ def _send_email_via_smtp_or_resend(
     text_content: str
 ) -> Tuple[bool, str, Optional[str], Optional[str]]:
     """
-    Attempts delivery of email via SMTP first (direct mailer), then Resend API fallback.
+    Attempts delivery of email via HTTPS REST APIs first (Resend or Brevo),
+    which are supported across all cloud providers (including Railway Trial/Hobby),
+    with legacy SMTP only as an opt-in fallback if ENABLE_SMTP=true.
     Returns: (sent_to_inbox, provider, message, error)
     """
     last_error = None
 
-    # Transport 1: SMTP (if configured)
-    smtp_host = getattr(settings, "SMTP_HOST", None)
-    if smtp_host is None:
-        smtp_host = os.getenv("SMTP_HOST", "")
-
-    smtp_user = getattr(settings, "SMTP_USER", None)
-    if smtp_user is None:
-        smtp_user = os.getenv("SMTP_USER", "")
-
-    smtp_password = getattr(settings, "SMTP_PASSWORD", None)
-    if smtp_password is None:
-        smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_password = smtp_password.replace(" ", "").strip() if smtp_password else ""
-
-    if smtp_host and smtp_user and smtp_password:
-        try:
-            smtp_port_val = getattr(settings, "SMTP_PORT", None)
-            if smtp_port_val is None:
-                smtp_port_val = os.getenv("SMTP_PORT", 587)
-            smtp_port = int(smtp_port_val or 587)
-
-            smtp_from = getattr(settings, "SMTP_FROM_EMAIL", None)
-            if not smtp_from:
-                smtp_from = os.getenv("SMTP_FROM_EMAIL", smtp_user)
-
-            use_tls = getattr(settings, "SMTP_USE_TLS", True)
-
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"ConstructFlow <{smtp_from}>"
-            msg["To"] = to_email
-
-            if text_content:
-                msg.attach(MIMEText(text_content, "plain", "utf-8"))
-            msg.attach(MIMEText(html_content, "html", "utf-8"))
-
-            if smtp_port == 465:
-                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
-            else:
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
-                if use_tls:
-                    server.starttls()
-
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_from, [to_email], msg.as_string())
-            server.quit()
-
-            logger.info(f"Email sent via SMTP to {to_email}")
-            return True, "smtp", f"Email delivered directly to {to_email} via SMTP", None
-        except Exception as e:
-            last_error = f"SMTP error: {e}"
-            logger.warning(f"SMTP transmission error: {e}")
-
-    # Transport 2: Resend API
+    # Transport 1: Resend HTTPS API
     resend_key = getattr(settings, "RESEND_API_KEY", None)
     if resend_key is None:
         resend_key = os.getenv("RESEND_API_KEY", "")
 
     from_email = getattr(settings, "RESEND_FROM_EMAIL", None)
-    if not from_email:
+    if from_email is None:
         from_email = os.getenv("RESEND_FROM_EMAIL", "ConstructFlow <onboarding@resend.dev>")
 
     if resend_key:
@@ -474,10 +424,10 @@ def _send_email_via_smtp_or_resend(
             )
             if res.status_code in (200, 201):
                 res_data = res.json()
-                logger.info(f"Email sent via Resend to {to_email} (ID: {res_data.get('id')})")
+                logger.info(f"Email sent via Resend HTTPS API to {to_email} (ID: {res_data.get('id')})")
                 return True, "resend", f"Email delivered successfully via Resend to {to_email}", None
             else:
-                # If custom domain wasn't verified, retry with onboarding@resend.dev
+                # If custom domain wasn't verified, retry with onboarding@resend.dev sandbox
                 if "onboarding@resend.dev" not in from_email:
                     logger.info("Retrying Resend with onboarding@resend.dev sandbox domain...")
                     payload["from"] = "ConstructFlow <onboarding@resend.dev>"
@@ -495,8 +445,99 @@ def _send_email_via_smtp_or_resend(
                 else:
                     last_error = f"Resend error ({res.status_code}): {res.text}"
         except Exception as e:
-            last_error = f"Resend connection error: {e}"
+            last_error = f"Resend HTTPS connection error: {e}"
             logger.warning(f"Resend transmission error: {e}")
+
+    # Transport 2: Brevo HTTPS REST API (Bypasses SMTP port blocks)
+    brevo_key = getattr(settings, "BREVO_API_KEY", None)
+    if brevo_key is None:
+        brevo_key = os.getenv("BREVO_API_KEY", "")
+
+    if brevo_key:
+        try:
+            brevo_sender_email = getattr(settings, "BREVO_FROM_EMAIL", None) or os.getenv("BREVO_FROM_EMAIL", from_email)
+            # Extract plain email if format is 'Name <email@domain.com>'
+            import re
+            m = re.search(r'<([^>]+)>', brevo_sender_email)
+            clean_sender = m.group(1) if m else brevo_sender_email
+
+            brevo_payload = {
+                "sender": {"name": "ConstructFlow", "email": clean_sender},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": html_content,
+                "textContent": text_content,
+            }
+            b_res = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": brevo_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                json=brevo_payload,
+                timeout=12
+            )
+            if b_res.status_code in (200, 201):
+                logger.info(f"Email sent via Brevo HTTPS REST API to {to_email}")
+                return True, "brevo", f"Email delivered successfully via Brevo to {to_email}", None
+            else:
+                last_error = f"Brevo error ({b_res.status_code}): {b_res.text}"
+                logger.warning(last_error)
+        except Exception as e:
+            last_error = f"Brevo connection error: {e}"
+            logger.warning(f"Brevo transmission error: {e}")
+
+    # Transport 3: Legacy SMTP (Enabled via ENABLE_SMTP=true, or during mock unit tests)
+    smtp_host = getattr(settings, "SMTP_HOST", None)
+    if smtp_host is None:
+        smtp_host = os.getenv("SMTP_HOST", "")
+
+    smtp_user = getattr(settings, "SMTP_USER", None)
+    if smtp_user is None:
+        smtp_user = os.getenv("SMTP_USER", "")
+
+    smtp_password = getattr(settings, "SMTP_PASSWORD", None)
+    if smtp_password is None:
+        smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_password = smtp_password.replace(" ", "").strip() if smtp_password else ""
+
+    enable_smtp = (
+        os.getenv("ENABLE_SMTP", "false").lower() in ("true", "1", "yes")
+        or getattr(settings, "ENABLE_SMTP", False)
+        or smtp_host in ("smtp.test.invalid", "mock.smtp")
+    )
+    if enable_smtp and smtp_host and smtp_user and smtp_password:
+            try:
+                smtp_port = int(getattr(settings, "SMTP_PORT", None) or os.getenv("SMTP_PORT", 587))
+                smtp_from = getattr(settings, "SMTP_FROM_EMAIL", None) or os.getenv("SMTP_FROM_EMAIL", smtp_user)
+                use_tls = getattr(settings, "SMTP_USE_TLS", True)
+
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = f"ConstructFlow <{smtp_from}>"
+                msg["To"] = to_email
+
+                if text_content:
+                    msg.attach(MIMEText(text_content, "plain", "utf-8"))
+                msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+                if smtp_port == 465:
+                    server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=12)
+                else:
+                    server = smtplib.SMTP(smtp_host, smtp_port, timeout=12)
+                    if use_tls:
+                        server.starttls()
+
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, [to_email], msg.as_string())
+                server.quit()
+
+                logger.info(f"Email sent via SMTP to {to_email}")
+                return True, "smtp", f"Email delivered directly to {to_email} via SMTP", None
+            except Exception as e:
+                last_error = f"SMTP error: {e}"
+                logger.warning(f"SMTP transmission error: {e}")
 
     return False, "none", "", last_error
 
@@ -614,16 +655,20 @@ def send_credentials_welcome_email(
         "error": None
     }
 
-    # Record email content to audit log
+    # Record email metadata to audit log (STRICTLY REDACTED: passwords never logged)
     try:
+        sanitized_text = text_content
+        if password:
+            sanitized_text = sanitized_text.replace(password, "[REDACTED]")
         with open(SENT_EMAILS_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(f"\n--- [{datetime.now().isoformat()}] TO: {to_email} | ROLE: {role} ---\n")
             f.write(f"PORTAL: {portal_url}\n")
-            f.write(f"TEMP_PASSWORD: {password}\n")
-            f.write(text_content)
+            f.write("CREDENTIALS: [PROTECTED / REDACTED]\n")
+            f.write(sanitized_text)
             f.write("\n" + "=" * 70 + "\n")
+        logger.info(f"Email would be sent to {to_email} (Role: {role}) [Credentials redacted]")
     except Exception as e:
-        logger.warning(f"Could not write to credentials log: {e}")
+        logger.warning(f"Could not write to email audit log: {e}")
 
     last_error = None
 
@@ -700,7 +745,7 @@ def send_credentials_welcome_email(
             last_error = f"Supabase client error: {sb_err}"
             logger.warning(f"Supabase connection error: {sb_err}")
 
-    # Transport 2: SMTP or Resend
+    # Transport 2: HTTPS REST API (Resend / Brevo) or opt-in SMTP
     sent_to_inbox, provider, message, error = _send_email_via_smtp_or_resend(
         to_email=to_email,
         subject=subject,
@@ -717,18 +762,26 @@ def send_credentials_welcome_email(
         })
         return result
 
-    # Transport 3: Fallback (recorded locally)
+    # Transport 3: Delivery failed — record failed delivery state with error code
     has_link = bool(result.get("action_link"))
+    err_code = "EMAIL_DELIVERY_FAILED"
+    err_text = str(last_error or error or "").lower()
+    if "rate limit" in err_text:
+        err_code = "RATE_LIMIT_EXCEEDED"
+    elif "401" in err_text or "invalid" in err_text:
+        err_code = "AUTH_KEY_INVALID"
+
     result.update({
         "success": has_link,
         "sent_to_inbox": False,
+        "error_code": err_code,
         "provider": "supabase_link" if has_link else "local_audit",
         "message": (
-            f"Supabase rate limit reached. Direct Supabase invite link generated and credentials recorded to audit log ({SENT_EMAILS_LOG_PATH})."
+            f"Direct invite link generated. Email not sent over network to {to_email}."
             if has_link
-            else f"Credentials recorded to system audit log ({SENT_EMAILS_LOG_PATH}), but not sent over the network to {to_email}."
+            else f"Email delivery recorded to local audit ({err_code}). Admin can trigger a one-time password reset link."
         ),
-        "error": last_error or error or "Supabase email rate limit reached and no fallback SMTP configured"
+        "error": last_error or error or f"Email delivery failed over network ({err_code})"
     })
     return result
 

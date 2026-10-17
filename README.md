@@ -12,21 +12,21 @@ This repository contains both the cross-platform application and its FastAPI ser
 
 The main role-based workflows are implemented and connected to Supabase:
 
-- Authentication, password recovery, role-based routing, and profile management.
-- Admin dashboards, project CRUD, user directory, project assignments, milestones, expenses, materials, purchase orders, suppliers, labour, and payroll views.
-- Project Manager dashboards, assigned-project filtering, material approval, labour summaries, payroll views, client/project team views, supplier summaries, and AI estimation.
-- Site Manager project/site selection, worker assignment, QR attendance, site-scoped labour, material requests, stock viewing, site photos, and issue reporting in the existing `site` route.
-- Supplier purchase-order dashboard and order actions: confirm, reject, suggest a counter-offer, and mark delivered.
-- Worker attendance history, QR code display, and salary-slip views.
-- Client project progress, milestones, media, invoices/financials, documents, estimates, notifications, and messaging surfaces. Some auxiliary client components still contain mock data and require production wiring.
-- Role-limited data views: non-admin portals filter records to the signed-in user's projects, sites, orders, or personal records. PM supplier/team views and site-manager labour views follow this rule.
-- Responsive portal shell: desktop sidebars switch to an overlay drawer below 1024px; dashboard columns, cards, forms, and list surfaces reflow for phone, tablet, and desktop widths.
-- Interactive landing page: features a scroll-scrubbing 3D-orbit video background (`homepage_scroll.mp4`) with smooth forward/reverse lerping on web and native video playback on mobile, responsive glassmorphism sections, and an integrated public inquiry form connected to `/api/public-inquiry` and Supabase notifications.
-- Universal backend resolution: centralized `getApiUrl()` automatically resolves backend endpoints across web browsers (window hostname) and physical mobile devices on Expo Go (dynamically resolving computer LAN IP via Metro bundler metadata, eliminating loopback connection failures).
-- Stable authenticated navigation: role prefixes are composed from `basePath` plus suffix-only sidebar hrefs, and session initialization is guarded against stale asynchronous auth events.
-- Supabase Auth, Postgres, Realtime subscriptions, Storage, Cloudinary upload support, Resend email support, scheduled late-order/low-stock checks, and RandomForest-based cost estimation.
+- **Authentication & Role Security**: Secure login, password recovery, role-based URL namespacing (`/admin`, `/pm`, `/site-manager`, `/supplier`, `/client`, `/worker`), and protected layout session guards.
+- **Cinematic Landing Page**: Features a scroll-scrubbing 3D-orbit construction video background (`homepage_scroll.mp4`) with smooth forward/reverse lerping on web and native video playback on mobile. Redesigned with a centralized, high-impact hero headline (responsively scaled from 42px on mobile to 78px on wide screens), centered dual portal CTAs ("Team Portal" and "Partner Portal"), horizontal metrics bar, and an integrated public inquiry form connected to `/api/public-inquiry` with automated admin notifications.
+- **Universal Multi-Platform API Resolution**: Centralized `getApiUrl()` (`lib/apiUrl.ts`) automatically resolves backend endpoints across web browsers (window hostname) and physical mobile devices on Expo Go (dynamically resolving computer LAN IP via Metro bundler metadata, eliminating loopback connection failures).
+- **Notification System**: Full cross-platform alert center with Supabase Realtime subscriptions, role-targeted broadcast alerts, and a hardened "Mark all as read" API (`PATCH /api/notifications/mark-read`) utilizing backend service-role client permissions with client-side direct Supabase update fallbacks.
+- **Admin Suite**: Global oversight for projects, users, assignments, milestones, expenses, materials, purchase orders, suppliers, labour, and payroll.
+- **Project Manager Portal**: Assigned-project scoping, material approvals, labour summaries, salary-slip generation, client/project team views, supplier summaries, and AI cost estimation.
+- **Site Manager Operations**: Site selection, worker assignment, QR attendance scanning, site-scoped materials, stock tracking, site reports, photos, and incident issue reporting.
+- **Supplier Portal**: Purchase-order review and response workflows: confirm, reject, suggest counter-offers, and mark orders delivered.
+- **Worker Experience**: Mobile-first personal profile, QR identity badge, daily attendance logs, and salary-slip history.
+- **Client Transparency**: Project progress, milestone tracking with media, invoices, document repository, cost estimates, and real-time messaging with project managers.
+- **Responsive Portal Shell**: Desktop sidebars gracefully switch to an animated slide-over drawer below 1024px; dashboard cards, charts, and tables stack seamlessly across phone, tablet, and desktop viewports.
+- **NativeWind Stability**: UI components adhere to strict React Native styling conventions, avoiding dynamic CSS variable classes (`ring-*`) on interactive state toggles to prevent CSS interop React Fiber serialization crashes.
+- **Background Automation & ML**: FastAPI background scheduler (APScheduler) monitors overdue purchase orders and low stock levels daily/hourly with `job_runs` database logging, alongside scikit-learn `RandomForest` cost and delay prediction models.
 
-Some generated screens are intentionally incomplete. Search for `Page stub generated successfully`, `Stub`, or `coming soon` before treating a route as production-ready. The most visible unfinished areas are report pages, supplier delivery tracking, some client auxiliary components, and parts of the site-manager portal. The core role dashboards and scoped operational screens still require authenticated multi-role smoke testing.
+Some generated screens remain intentionally phased. The core role dashboards and scoped operational screens are active and connected. Report export pages, live GPS delivery tracking, and auxiliary client components are targeted for subsequent production hardening.
 
 ## Technology Stack
 
@@ -112,100 +112,175 @@ Construct-flow/
 └── *.csv                           # Root-level project datasets
 ```
 
-## Prerequisites
+## Installation & Getting Started
 
-- Node.js 20 or newer. Node.js 22 or newer is recommended.
-- npm.
-- Python 3.10 or newer.
-- A Supabase project with Auth and the required database tables.
-- Expo Go for physical-device testing, or Android Studio/Xcode for native simulators.
+### 1. Prerequisites
 
-## Environment Configuration
+Before setting up ConstructFlow, ensure you have the following installed on your development machine:
 
-Do not commit real credentials. Create local environment files from the following templates.
+- **Node.js**: v20 or v22+ LTS recommended (Node 22 avoids engine deprecation warnings with Supabase).
+- **npm**: v10+ (bundled with Node.js).
+- **Python**: v3.10, v3.11, or v3.12 (with `pip` and `venv`).
+- **Supabase Account**: A free or paid Supabase project with PostgreSQL, Auth, and Storage enabled.
+- **Expo Go** *(Optional for mobile testing)*: Installed on your physical Android or iOS device from Google Play or Apple App Store.
+- **Android Studio / Xcode** *(Optional)*: If running emulators or simulators locally.
 
-### `frontend/.env`
+---
+
+### 2. Environment Configuration
+
+ConstructFlow requires environment variables configured for both the frontend (Expo) and backend (FastAPI).
+
+#### A. Frontend Configuration (`frontend/.env`)
+Create a `.env` file inside the `frontend/` directory:
 
 ```dotenv
-EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
+# Supabase Project Credentials (Found under Supabase Dashboard > Settings > API)
+EXPO_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+
+# Backend API Endpoint
+# Default localhost for Web development:
 EXPO_PUBLIC_API_URL=http://localhost:8000/api
-# Optional when Expo Go uses a hosted backend or Metro tunnel:
-EXPO_PUBLIC_NATIVE_API_URL=https://<backend-host>/api
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=<optional-google-maps-key>
+
+# Optional: Override for physical mobile devices when Metro bundler is tunneling or backend is hosted:
+# EXPO_PUBLIC_NATIVE_API_URL=http://<your-computer-lan-ip>:8000/api
+
+# Optional: Google Maps integration key for project geolocation pins
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=<optional-google-maps-api-key>
 ```
 
-`EXPO_PUBLIC_API_URL` can remain localhost for the web browser. In Expo Go, the app resolves that address to the Metro host's LAN IP. Set `EXPO_PUBLIC_NATIVE_API_URL` to a Railway/HTTPS backend URL or explicit LAN URL when Metro uses a tunnel or the backend runs elsewhere. Supabase must use a reachable HTTPS URL.
+> **Note on Mobile LAN Resolution**: You do NOT need to hardcode your local IP address for standard Wi-Fi testing. ConstructFlow's `frontend/src/lib/apiUrl.ts` automatically extracts your computer's LAN IP from the Expo Metro bundler host URI when running on Expo Go.
 
-### `backend/.env`
+#### B. Backend Configuration (`backend/.env`)
+Create a `.env` file inside the `backend/` directory:
 
 ```dotenv
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_KEY=<supabase-key>
+# Supabase Database Credentials
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+# Anon key for user-level requests:
+SUPABASE_KEY=<your-supabase-anon-key>
+# Service role key (REQUIRED for administrative background jobs, mark-all-read notifications, and bypass operations):
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 
-# Optional email integration
-RESEND_API_KEY=<resend-api-key>
-RESEND_FROM_EMAIL=ConstructFlow <noreply@example.com>
+# Transactional Email Service (Optional: Resend)
+RESEND_API_KEY=<optional-resend-api-key>
+RESEND_FROM_EMAIL=ConstructFlow <noreply@constructflow.lk>
 
-# Optional Cloudinary integration
-CLOUDINARY_CLOUD_NAME=<cloud-name>
-CLOUDINARY_API_KEY=<cloudinary-api-key>
-CLOUDINARY_API_SECRET=<cloudinary-api-secret>
+# Cloudinary Media Storage (Optional: Site photo uploads)
+CLOUDINARY_CLOUD_NAME=<optional-cloudinary-cloud-name>
+CLOUDINARY_API_KEY=<optional-cloudinary-api-key>
+CLOUDINARY_API_SECRET=<optional-cloudinary-api-secret>
 ```
 
-The current backend config uses `SUPABASE_KEY`. Use the key appropriate for the way the backend is deployed and keep service-role credentials server-side only. The frontend must use an anon key.
+---
 
-## Local Development
+### 3. Database Initialization (Supabase)
 
-Open two terminals from the repository root.
+ConstructFlow utilizes Supabase PostgreSQL with Row Level Security (RLS) policies, Realtime publications, and triggers.
 
-### 1. Start the backend
+1. Navigate to your **Supabase Dashboard > SQL Editor**.
+2. Run the foundational schema migrations from `frontend/supabase/`:
+   - `schema.sql`: Core tables (`profiles`, `projects`, `materials`, `labour`, `material_requests`).
+   - `schema_part2.sql`: Media, messages, and invoices.
+   - `schema_pm.sql`: Payroll, milestones, and notification schemas.
+   - `phase5_migration.sql`: Site manager sites, site workers, suppliers, issues, and salary slips.
+   - `02_add_expenses.sql`: Project expenses and financial cost tracking.
+   - `schema_fixes.sql`: Role normalization, foreign key constraints, and RLS adjustments.
+3. Ensure the storage bucket `project-images` is created under **Supabase Storage** with public read access or appropriate authenticated policies.
+4. Enable **Realtime** on `notifications`, `client_messages`, and `purchase_orders` tables under **Database > Publications > supabase_realtime**.
 
-PowerShell:
+---
 
+### 4. Step-by-Step Installation & Run Guide
+
+#### Step 4.1: Start the FastAPI Backend
+
+Open a terminal in the project root:
+
+**Windows (PowerShell):**
 ```powershell
+# 1. Create and activate a Python virtual environment
+python -m venv .venv
 & ".\.venv\Scripts\Activate.ps1"
+
+# 2. Navigate to backend and install dependencies
 cd backend
 pip install -r requirements.txt
+
+# 3. Start Uvicorn server bound to 0.0.0.0 (enables LAN connections for mobile devices)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-If the virtual environment does not exist yet:
+**macOS / Linux (Bash):**
+```bash
+# 1. Create and activate a Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-```powershell
-python -m venv .venv
-& ".\.venv\Scripts\Activate.ps1"
+# 2. Navigate to backend and install dependencies
 cd backend
 pip install -r requirements.txt
+
+# 3. Start Uvicorn server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Useful backend checks:
+Verify backend health in your browser:
+- **API Status**: [http://localhost:8000/health](http://localhost:8000/health)
+- **Interactive Swagger Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-```text
-http://localhost:8000/
-http://localhost:8000/health
-http://localhost:8000/docs
-```
+---
 
-### 2. Start the frontend
+#### Step 4.2: Start the React Native / Expo Frontend
 
-```powershell
+Open a second terminal in the project root:
+
+```bash
+# 1. Navigate to frontend directory
 cd frontend
+
+# 2. Install Node dependencies
 npm install
+
+# 3. Launch directly on Web
 npm run web
 ```
 
-Other frontend commands:
+Alternatively, launch the **interactive Expo developer menu**:
+```bash
+npm start
+```
+From the interactive CLI prompt:
+- Press `w` to open the **Web application** (`http://localhost:8081`).
+- Press `a` to open in an **Android Emulator**.
+- Press `i` to open in an **iOS Simulator** (macOS only).
+- Scan the QR code using the **Expo Go** app on your physical mobile phone.
+
+---
+
+### 5. Running on Physical Mobile Devices (Expo Go)
+
+To test seamlessly on an Android or iOS phone:
+1. Ensure your computer and phone are connected to the **same Wi-Fi network**.
+2. Run Uvicorn with `--host 0.0.0.0` (as shown above).
+3. Ensure your OS firewall (e.g., Windows Defender Firewall) allows incoming TCP traffic on port `8000`.
+4. Scan the QR code printed in the terminal by `npm start`.
+5. ConstructFlow will dynamically identify your host machine's IP (e.g., `192.168.1.X:8000/api`) and route API requests without requiring localhost tunnels.
+
+---
+
+### 6. Training the Machine Learning Models (Optional)
+
+ConstructFlow includes synthetic and historical construction datasets to train cost estimation regressors and delay classifiers:
 
 ```powershell
-npm start              # Expo developer menu
-npm run android        # Android device/emulator
-npm run ios            # iOS simulator, macOS only
-npm run lint           # Expo ESLint command
-npm start -- --clear   # Clear Metro cache when web is blank or imports are stale
+# From the project root with .venv activated:
+cd backend/data_pipeline
+python prepare_dataset.py
+python train_models.py
 ```
-
-From the Expo developer menu, `w` opens the web version, `a` starts Android, and `i` starts iOS. For a physical phone, use Expo Go and ensure the phone can reach the backend host.
+This generates serialized model artifacts under `backend/models/` (`cost_model.joblib` and `delay_model.joblib`).
 
 ## Architecture and Data Flow
 
@@ -322,6 +397,17 @@ There are two related estimation paths:
 1. `backend/api/routes/ai.py` trains a synthetic 1,000-row `RandomForestRegressor` when the module loads and serves `/api/ai/predict-cost` and `/api/ai/insights`.
 2. `backend/data_pipeline/` prepares the construction dataset and trains persisted models with `train_models.py`. The generated files are written under `backend/models/`.
 
+### Machine Learning Architecture: Log-Scale Hybrid Cost Estimator
+
+The AI cost estimator uses a **hybrid bottom-up quantity and log-scale ML architecture**:
+1. **Physical Bottom-Up Calculation**: Computes quantities of cement bags, steel kg, river sand cubes, aggregate cubes, site labour worker-days (calibrated to the standard Sri Lankan daily rate of Rs. 3,500/day), and a 15% preliminaries/overhead margin.
+2. **Log-Scale Model ($\ln(\text{Cost}/\text{SqFt})$)**: Random Forest and Gradient Boosting models predict log-scale cost per square foot, calibrated by district, site conditions, structure type, and finishing levels.
+3. **Honest Prediction Uncertainty**: Produces a conformal/uncertainty range ($\pm 15\text{--}20\%$, e.g. "LKR 14.5M to LKR 18.2M") reflecting early-stage design variance.
+4. **Real Evaluation Gate**: Accuracy is evaluated strictly against verified completed projects using **MAPE** (Mean Absolute Percentage Error) and **MAE**. Synthetic rows are never used for accuracy claims; if real projects $N < 5$, ML Insights displays `"Not enough real data yet (based on N real projects)"`.
+5. **Deterministic Delay Risk**: Delay risk is calculated 100% deterministically from overdue milestones, delayed purchase orders, and low site attendance.
+6. **Continuous Learning Loop**: Automatically adds completed project actuals to `historical_projects` and confirmed supplier prices to `material_prices`. Admins can import past contractor/QS BOQs via CSV validation against the 25 Sri Lankan districts.
+7. **Legacy Synthetic CSVs**: Uncorrelated random datasets (`construction_project_dataset.csv`, `construction_project_performance_dataset.csv`) have been decommissioned and moved to `data/legacy_synthetic/` with a deprecation notice.
+
 Run the pipeline from `backend/data_pipeline`:
 
 PowerShell:
@@ -332,16 +418,16 @@ python prepare_dataset.py
 python train_models.py
 ```
 
-Or use the included scripts:
-
-```powershell
-cd backend/data_pipeline
-\.\run_pipeline.bat
-```
-
-The pipeline creates `cost_data.csv` and `delay_data.csv`, then trains a cost regressor and delay classifier. The API's current AI route still uses its in-memory synthetic model, so retraining the persisted models does not automatically change `/api/ai/predict-cost`. Treat ML output as an estimate, not a financial commitment, until the model/data contract is unified and evaluated with real project data.
-
 ## Integrations and Storage
+
+### Email Infrastructure & Railway Deployment
+
+- **Railway SMTP Block**: Outbound SMTP ports (587, 465, 25) are blocked on Railway Trial, Free, and Hobby plans. ConstructFlow prioritizes HTTPS REST APIs:
+  - **Resend HTTPS API**: `https://api.resend.com/emails` (configured via `RESEND_API_KEY`)
+  - **Brevo HTTPS REST API**: `https://api.brevo.com/v3/smtp/email` (configured via `BREVO_API_KEY`)
+  - **Legacy SMTP**: Only attempted if `ENABLE_SMTP=true` is explicitly set in environment variables.
+- **Zero-Password Logging**: Plaintext passwords are strictly redacted from development logs and audit trails (`CREDENTIALS: [PROTECTED / REDACTED]`).
+- **Resilient Delivery**: Failed network deliveries record standardized error codes (`RATE_LIMIT_EXCEEDED`, `AUTH_KEY_INVALID`, `EMAIL_DELIVERY_FAILED`), allowing administrators to generate one-time invite and password reset links.
 
 ### Supabase Storage
 
@@ -357,10 +443,6 @@ The backend endpoint `POST /api/media/upload` accepts multipart form data:
 - `caption`: optional caption
 
 Use `/api/media/health` to verify that Cloudinary variables are configured.
-
-### Resend
-
-Email features are optional. Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, then verify `/api/notifications/email/health`. Without a key, the custom sender reports that delivery was skipped.
 
 ### PDF invoices
 

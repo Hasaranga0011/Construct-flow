@@ -2,12 +2,15 @@ import { DateField } from '../common/DateField';
 import { getApiUrl } from '../../lib/apiUrl';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Image } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { GoogleMap, useLoadScript, Marker } from './ProjectMap';
+import { InteractiveMap, InteractiveMapRef, MapLocation } from '../common/InteractiveMap';
 import { toast } from '../../lib/toast';
 import { ProjectAssignmentDropdown } from '../common/ProjectAssignmentDropdown';
+import { PROJECT_IMAGE_PRESETS } from '../../utils/projectImages';
+import { ProjectImage } from '../common/ProjectImage';
+import { ProjectImageUploader } from '../common/ProjectImageUploader';
 
 type NewProjectModalProps = {
   visible: boolean;
@@ -15,20 +18,10 @@ type NewProjectModalProps = {
   onSuccess: () => void;
 };
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '250px',
-  borderRadius: '12px',
-  marginTop: '8px',
-};
-
-const defaultCenter = {
+const defaultCenter: MapLocation = {
   lat: 7.8731, // Default to Sri Lanka
   lng: 80.7718
 };
-
-// Replace with the user's actual API key in production via process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModalProps) => {
   const [name, setName] = useState('');
@@ -51,6 +44,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedAdmins, setSelectedAdmins] = useState<string[]>([]);
+  const [isTest, setIsTest] = useState(false);
+  const [images, setImages] = useState<string[]>([PROJECT_IMAGE_PRESETS[0].url]);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -71,14 +66,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   };
 
   // Map state
-  const [markerPos, setMarkerPos] = useState<google.maps.LatLngLiteral | null>(null);
-
-  // Load Google Maps Script
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
-
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapRef = useRef<InteractiveMapRef>(null);
+  const [markerPos, setMarkerPos] = useState<MapLocation | null>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -106,8 +95,6 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     if (visible) fetchUsers();
   }, [visible]);
 
-  // Store map instance to manually pan
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [isSearchingMap, setIsSearchingMap] = useState(false);
 
   const handleSearchMap = async () => {
@@ -117,7 +104,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     setErrorMsg('');
 
     try {
-      let foundResults: Array<{ lat: number; lon: number; display_name: string }> = [];
+      let foundResults: { lat: number; lon: number; display_name: string }[] = [];
 
       // 1. Primary: ConstructFlow backend geocoding route
       try {
@@ -202,10 +189,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         setMarkerPos(loc);
         setLocation(topResult.display_name);
 
-        if (mapInstance) {
-          mapInstance.panTo(loc);
-          mapInstance.setZoom(15);
-        }
+        mapRef.current?.flyTo(loc.lat, loc.lng, 15);
 
         setMapSearchResults(foundResults);
         setErrorMsg('');
@@ -221,15 +205,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     }
   };
 
-  const onMapClick = useCallback(async (e: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
-    if (!e.latLng) return;
-
-    if ('placeId' in e) {
-      e.stop();
-    }
-
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
+  const handleLocationSelect = useCallback(async ({ lat, lng }: MapLocation) => {
     setMarkerPos({ lat, lng });
 
     // 1. Try backend reverse geocoding
@@ -269,6 +245,22 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       // Fallback
     }
 
+    // 3. Fallback to client-side Nominatim reverse geocode
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+        headers: { 'User-Agent': 'ConstructFlow/1.0' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setLocation(data.display_name);
+          return;
+        }
+      }
+    } catch {
+      // Keep fallback
+    }
+
     setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
   }, []);
 
@@ -298,7 +290,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           .maybeSingle();
 
         if (clientLookupError) throw clientLookupError;
-        if (existingClient) {
+        if (existingClient && existingClient.id) {
           resolvedClientId = existingClient.id;
           setClientId(existingClient.id);
         }
@@ -310,6 +302,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         location,
         address: location,
         status: 'active',
+        image_url: images[0] || null,
+        images: images,
         start_date: startDate,
         end_date: endDate,
         client_id: resolvedClientId || null,
@@ -320,6 +314,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         admins: selectedAdmins,
         milestones: validMilestones,
         total_budget: Number(totalBudget) || 0,
+        is_test: isTest,
         latitude: markerPos?.lat ?? null,
         longitude: markerPos?.lng ?? null,
       };
@@ -402,6 +397,8 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       setEndDate('');
       setClientEmail('');
       setTotalBudget('');
+      setIsTest(false);
+      setImages([PROJECT_IMAGE_PRESETS[0].url]);
       setMarkerPos(null);
       setMapSearchResults([]);
       setMilestones([]);
@@ -441,14 +438,6 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
               </View>
             ) : null}
 
-            {!GOOGLE_MAPS_API_KEY && Platform.OS === 'web' && (
-               <View className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-6">
-                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-700 text-sm text-center font-semibold">
-                   ⚠️ Google Maps API Key is missing. The map will load in development mode and address translation is disabled.
-                 </Text>
-               </View>
-            )}
-
             <View className="flex-col md:flex-row">
               {/* Left Column: Form Fields */}
               <View className="w-full md:w-auto md:flex-1 pr-0 md:pr-6 md:border-r border-gray-100 min-w-0">
@@ -458,9 +447,51 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                     className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="e.g. Marina Tower"
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={(t) => {
+                      setName(t);
+                      if (/test|demo|sample/i.test(t)) {
+                        setIsTest(true);
+                      }
+                    }}
                   />
                 </View>
+
+                {/* Project Images Uploader (Up to 5 images) */}
+                <ProjectImageUploader
+                  images={images}
+                  onChangeImages={setImages}
+                  maxImages={5}
+                  projectName={name || 'New Project'}
+                />
+
+                {/* Test Project Toggle */}
+                <Pressable
+                  onPress={() => setIsTest(!isTest)}
+                  className={`p-3.5 rounded-xl border mb-5 flex-row items-center justify-between ${
+                    isTest ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <View className="flex-1 pr-3">
+                    <View className="flex-row items-center mb-0.5">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-800">
+                        Mark as Test Project
+                      </Text>
+                      {isTest && (
+                        <View className="ml-2 bg-amber-200 px-1.5 py-0.5 rounded">
+                          <Text className="text-[10px] font-bold text-amber-800">EXCLUDED</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
+                      Excludes from live dashboards, delay alerts & ML training
+                    </Text>
+                  </View>
+                  <View className={`w-5 h-5 rounded items-center justify-center border ${
+                    isTest ? 'bg-amber-600 border-amber-600' : 'bg-white border-gray-300'
+                  }`}>
+                    {isTest && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  </View>
+                </Pressable>
 
                 <ProjectAssignmentDropdown
                   label="Assign Project Manager"
@@ -591,10 +622,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                             const loc = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
                             setMarkerPos(loc);
                             setLocation(result.display_name);
-                            if (mapInstance) {
-                              mapInstance.panTo(loc);
-                              mapInstance.setZoom(14);
-                            }
+                            mapRef.current?.flyTo(loc.lat, loc.lng, 14);
                             // Clear alternatives after selecting one
                             setMapSearchResults([]);
                           }}
@@ -607,37 +635,19 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                   )}
                 </View>
 
-                {Platform.OS === 'web' ? (
-                  loadError ? (
-                    <View className="h-[250px] bg-red-50 rounded-xl mt-2 items-center justify-center border border-red-200">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500">Error loading maps</Text>
-                    </View>
-                  ) : !isLoaded ? (
-                    <View className="h-[250px] bg-gray-50 rounded-xl mt-2 items-center justify-center border border-gray-200">
-                      <ActivityIndicator color="#F97316" />
-                    </View>
-                  ) : (
-                    <GoogleMap
-                      mapContainerStyle={mapContainerStyle}
-                      zoom={7}
-                      center={markerPos || defaultCenter}
-                      onClick={onMapClick}
-                      onLoad={setMapInstance}
-                      options={{
-                        disableDefaultUI: true,
-                        zoomControl: true,
-                        clickableIcons: false,
-                      }}
-                    >
-                      {markerPos && <Marker position={markerPos} />}
-                    </GoogleMap>
-                  )
-                ) : (
-                  <View className="h-[250px] bg-gray-50 rounded-xl mt-2 items-center justify-center border border-gray-200">
-                    <Ionicons name="map-outline" size={32} color="#9CA3AF" />
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2 text-sm text-center px-4">Interactive map is only available on web version.</Text>
-                  </View>
-                )}
+                <View className="mt-2">
+                  <InteractiveMap
+                    ref={mapRef}
+                    markerPos={markerPos}
+                    onLocationSelect={handleLocationSelect}
+                    defaultCenter={defaultCenter}
+                    height={260}
+                    interactive={true}
+                    showControls={true}
+                    showCurrentLocationButton={true}
+                    showLayerToggle={true}
+                  />
+                </View>
               </View>
             </View>
 

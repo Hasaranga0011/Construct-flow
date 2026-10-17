@@ -8,6 +8,7 @@ import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
 import { TopNav } from '@/components/common/TopNav';
 import { Ionicons } from '@expo/vector-icons';
+import { ProjectImage } from '@/components/common/ProjectImage';
 
 export default function PMProjectsList() {
   const [loadError, setLoadError] = useState('');
@@ -59,7 +60,7 @@ export default function PMProjectsList() {
               placeholder="Search projects..." 
               value={search} 
               onChangeText={setSearch} 
-              className={isMobile ? "w-full" : "w-64"}
+              className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'projects',
                 searchColumn: 'name',
@@ -95,26 +96,21 @@ export default function PMProjectsList() {
               </View>
             ) : isMobile ? (
               filteredRows.map(p => (
-                <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
-                  <View className="flex-row items-center mb-3">
-                    <View className="w-11 h-11 rounded-full bg-orange-50 items-center justify-center mr-3">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-lg">{p.name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">{p.name}</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-medium">{formatMoney(p.total_budget)}</Text>
-                    </View>
+                <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm overflow-hidden">
+                  <ProjectImage
+                    project={p}
+                    className="w-full h-36 rounded-lg mb-3"
+                    showBadge
+                    badgeText={p.status}
+                    badgeVariant={['active', 'in progress'].includes(String(p.status).toLowerCase()) ? 'active' : 'default'}
+                  />
+                  <View className="mb-2">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">{p.name}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">{formatMoney(p.total_budget)}</Text>
                   </View>
-                  <View className="flex-row items-center mb-4 pl-[52px]">
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons name="location-outline" size={14} color="#6B7280" />
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1">{p.location || 'N/A'}</Text>
-                    </View>
-                    <View className={`px-2 py-1 rounded-full ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${p.status === 'active' ? 'text-brand-success' : p.status === 'completed' ? 'text-blue-600' : 'text-gray-500'}`}>
-                        {p.status}
-                      </Text>
-                    </View>
+                  <View className="flex-row items-center mb-4">
+                    <Ionicons name="location-outline" size={14} color="#6B7280" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs ml-1 flex-1">{p.location || 'N/A'}</Text>
                   </View>
                   <Link href={`/pm/projects/${p.id}` as any} asChild>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
@@ -125,29 +121,30 @@ export default function PMProjectsList() {
               ))
             ) : (
               filteredRows.map(p => (
-                <View key={p.id} className="flex-row items-center py-4 border-b border-gray-100">
+                <View key={p.id} className="flex-row items-center py-3.5 border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                   <View className="w-[30%] flex-row items-center pr-4">
-                    <View className="w-8 h-8 bg-orange-100 rounded items-center justify-center mr-3">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs">{p.name.charAt(0)}</Text>
-                    </View>
-                    <View>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{p.name}</Text>
+                    <ProjectImage
+                      project={p}
+                      className="w-12 h-12 rounded-lg mr-3 shadow-sm shrink-0"
+                    />
+                    <View className="flex-1 min-w-0">
+                      <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{p.name}</Text>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {p.id.slice(0, 8)}...</Text>
                     </View>
                   </View>
                   
                   <View className="w-[20%] pr-2">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
+                    <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 text-sm">{p.location || 'N/A'}</Text>
                   </View>
                   
                   <View className="w-[15%]">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">
-                      {p.total_budget ? `Rs. ${p.total_budget.toLocaleString()}` : 'TBD'}
+                      {p.total_budget != null ? formatMoney(p.total_budget) : 'TBD'}
                     </Text>
                   </View>
                   
                   <View className="w-[15%]">
-                    <View className={`px-2 py-1 rounded self-start ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                    <View className={`px-2.5 py-1 rounded-full self-start ${p.status === 'active' ? 'bg-[#DCFCE7]' : p.status === 'completed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${p.status === 'active' ? 'text-brand-success' : p.status === 'completed' ? 'text-blue-600' : 'text-gray-500'}`}>
                         {p.status}
                       </Text>
@@ -156,7 +153,7 @@ export default function PMProjectsList() {
                   
                   <View className="flex-1 flex-row justify-end space-x-2 pl-1">
                     <Link href={`/pm/projects/${p.id}` as any} asChild>
-                      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange px-3 py-1.5 rounded-md shadow-sm">
+                      <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange px-3.5 py-2 rounded-lg shadow-sm active:opacity-80">
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">View Details</Text>
                       </Pressable>
                     </Link>

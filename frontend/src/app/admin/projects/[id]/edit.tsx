@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { ProjectAssignmentDropdown } from '../../../../components/common/ProjectAssignmentDropdown';
+import { ProjectImageUploader } from '@/components/common/ProjectImageUploader';
 
 export default function AdminProjectEditPage() {
   const { id } = useLocalSearchParams();
@@ -18,6 +19,7 @@ export default function AdminProjectEditPage() {
   const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [images, setImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -33,7 +35,7 @@ export default function AdminProjectEditPage() {
     , admins: [] as string[]
   });
 
-  const projectId = Array.isArray(id) ? id[0] : id;
+  const projectId = Array.isArray(id) ? id[0] : (id || '');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,13 +52,20 @@ export default function AdminProjectEditPage() {
           supabase.from('project_role_assignments').select('user_id, role').eq('project_id', projectId)
         ]);
 
-        if (projRes.error) throw projRes.error;
+        if (projRes.error || !projRes.data) throw (projRes.error || new Error('Project not found'));
         const data = projRes.data;
+        const initialImages: string[] = Array.isArray(data.images) && data.images.length > 0
+          ? data.images.filter((img): img is string => typeof img === 'string')
+          : (data.image_url ? [data.image_url] : []);
+        setImages(initialImages);
+
         const assignmentByRole: Record<string, string[]> = { admin: [], site_manager: [], worker: [], supplier: [] };
         for (const assignment of roleAssignmentsRes.data || []) {
           const role = assignment.role;
-          if (!assignmentByRole[role]) assignmentByRole[role] = [];
-          assignmentByRole[role].push(assignment.user_id);
+          if (role && assignment.user_id) {
+            if (!assignmentByRole[role]) assignmentByRole[role] = [];
+            assignmentByRole[role].push(assignment.user_id);
+          }
         }
 
         if (pmData.data) setPms(pmData.data);
@@ -112,7 +121,9 @@ export default function AdminProjectEditPage() {
         site_managers: formData.site_managers || [],
         workers: formData.workers || [],
         suppliers: formData.suppliers || [],
-        admins: formData.admins || []
+        admins: formData.admins || [],
+        image_url: images[0] || null,
+        images: images
       };
 
       if (__DEV__) {
@@ -176,6 +187,14 @@ export default function AdminProjectEditPage() {
         ) : (
           <View className="max-w-2xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800 mb-6">Update Project Details</Text>
+
+            {/* Project Photos & Cover Uploader */}
+            <ProjectImageUploader
+              images={images}
+              onChangeImages={setImages}
+              maxImages={5}
+              projectName={formData.name || 'Project'}
+            />
 
             <View className="mb-4">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 mb-1">Project Name</Text>

@@ -1,7 +1,9 @@
 import { projectSites, dataError } from '@/services/siteData';
 // Modified for Expo Go mobile compatibility
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
@@ -13,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { NoAssignedSites } from '../../components/common/NoAssignedSites';
 
 export default function SiteManagerDashboard() {
+  const router = useRouter();
   const { isMobile } = useResponsive();
   const { user } = useAuth();
   const [loadError, setLoadError] = useState('');
@@ -37,7 +40,7 @@ export default function SiteManagerDashboard() {
         : { data: [], error: null };
       if (projectsDataError) throw projectsDataError;
 
-      const projectIds = projectsData?.map(p => p.id) || [];
+      const projectIds = (projectsData?.map(p => p.id) || []).filter((id): id is string => Boolean(id));
       const siteIds = (await projectSites(projectIds)).map(s => s.id);
 
       let workersPresent = 0;
@@ -45,27 +48,30 @@ export default function SiteManagerDashboard() {
       let activeIssues = 0;
 
       if (projectIds.length > 0) {
-        // 2. Count workers checked in today via canonical attendance table.
-        //    attendance.site_id uses the project ID, matching the labour API.
         const today = new Date().toISOString().split('T')[0];
-        const attReq = await supabase
-          .from('attendance')
-          .select('id', { count: 'exact', head: true })
-          .in('site_id', siteIds)
-          .eq('date', today)
-          .not('check_in_time', 'is', null)
-          .is('check_out_time', null);
+        const [attReq, materialsReq, issuesReq] = await Promise.all([
+          supabase
+            .from('attendance')
+            .select('id', { count: 'exact', head: true })
+            .in('site_id', siteIds)
+            .eq('date', today)
+            .not('check_in_time', 'is', null)
+            .is('check_out_time', null),
+          supabase
+            .from('materials')
+            .select('id, current_stock, minimum_threshold')
+            .in('project_id', projectIds),
+          siteIds.length
+            ? supabase
+                .from('issues')
+                .select('id', { count: 'exact', head: true })
+                .in('site_id', siteIds)
+                .neq('status', 'Resolved')
+            : Promise.resolve({ count: 0, error: null } as any),
+        ]);
 
         if (attReq.error) throw attReq.error;
         workersPresent = attReq.count || 0;
-      }
-
-      if (projectIds.length > 0) {
-        // 3. Count materials with current_stock below minimum_threshold (per design system: danger <30, warning <60).
-        const materialsReq = await supabase
-          .from('materials')
-          .select('id, current_stock, minimum_threshold')
-          .in('project_id', projectIds);
 
         if (materialsReq.error) throw materialsReq.error;
         if (materialsReq.data) {
@@ -73,16 +79,10 @@ export default function SiteManagerDashboard() {
             m => (m.current_stock ?? 0) < (m.minimum_threshold ?? 0)
           ).length;
         }
-      }
 
-      // 4. Count open issues reported by this site manager.
-      const issuesReq = siteIds.length ? await supabase
-        .from('issues')
-        .select('id', { count: 'exact', head: true })
-        .in('site_id', siteIds)
-        .neq('status', 'Resolved') : { count: 0, error: null };
-      if (issuesReq.error) throw issuesReq.error;
-      activeIssues = issuesReq.count || 0;
+        if (issuesReq.error) throw issuesReq.error;
+        activeIssues = issuesReq.count || 0;
+      }
 
       setStats({
         assignedSites: projectIds.length,
@@ -122,6 +122,7 @@ export default function SiteManagerDashboard() {
                 label="Assigned Sites" 
                 value={stats.assignedSites.toString()} 
                 indicatorText="Currently managing" 
+                colorScheme="blue"
               />
             </AnimatedCard>
             
@@ -131,6 +132,7 @@ export default function SiteManagerDashboard() {
                 value={stats.workersPresent.toString()} 
                 indicatorText="Checked in today" 
                 indicatorType="success"
+                colorScheme="emerald"
               />
             </AnimatedCard>
             
@@ -140,6 +142,7 @@ export default function SiteManagerDashboard() {
                 value={stats.pendingMaterials.toString()} 
                 indicatorText="Items below threshold" 
                 indicatorType={stats.pendingMaterials > 0 ? "danger" : "success"}
+                colorScheme="amber"
               />
             </AnimatedCard>
             
@@ -149,8 +152,85 @@ export default function SiteManagerDashboard() {
                 value={stats.activeIssues.toString()} 
                 indicatorText="Requires attention"
                 indicatorType={stats.activeIssues > 0 ? "danger" : "success"}
+                colorScheme="rose"
               />
             </AnimatedCard>
+          </View>
+
+          {/* Quick Actions Grid */}
+          <View className="mb-6">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-3">Quick Actions</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <Pressable
+                onPress={() => router.push('/site-manager/attendance')}
+                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
+                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
+              >
+                <View className="w-10 h-10 rounded-lg bg-orange-50 items-center justify-center">
+                  <Ionicons name="qr-code-outline" size={22} color="#F97316" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Attendance</Text>
+                  <Text numberOfLines={1} className="text-xs text-gray-500">Scan & Check-in</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/site-manager/materials')}
+                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
+                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
+              >
+                <View className="w-10 h-10 rounded-lg bg-amber-50 items-center justify-center">
+                  <Ionicons name="cube-outline" size={22} color="#D97706" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Materials</Text>
+                  <Text numberOfLines={1} className="text-xs text-gray-500">Stock & Orders</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/site-manager/issues')}
+                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
+                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
+              >
+                <View className="w-10 h-10 rounded-lg bg-rose-50 items-center justify-center">
+                  <Ionicons name="alert-circle-outline" size={22} color="#E11D48" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Site Issues</Text>
+                  <Text numberOfLines={1} className="text-xs text-gray-500">Report & Track</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/site-manager/milestones')}
+                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
+                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
+              >
+                <View className="w-10 h-10 rounded-lg bg-blue-50 items-center justify-center">
+                  <Ionicons name="flag-outline" size={22} color="#2563EB" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Milestones</Text>
+                  <Text numberOfLines={1} className="text-xs text-gray-500">Update Progress</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/site-manager/reports')}
+                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
+                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
+              >
+                <View className="w-10 h-10 rounded-lg bg-emerald-50 items-center justify-center">
+                  <Ionicons name="document-text-outline" size={22} color="#059669" />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Daily Reports</Text>
+                  <Text numberOfLines={1} className="text-xs text-gray-500">Log Site Work</Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
 
           <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

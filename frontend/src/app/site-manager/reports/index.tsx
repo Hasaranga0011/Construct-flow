@@ -53,7 +53,7 @@ export default function SiteManagerReportsPage() {
         ;
       if (projectsDataError) throw projectsDataError;
 
-      const parsedProjects = projectsData || [];
+      const parsedProjects = (projectsData || []).filter((p): p is Project => Boolean(p.id && p.name));
       setProjects(parsedProjects);
 
       const activeId = parsedProjects.some(p => p.id === activeProjectId) ? activeProjectId : parsedProjects[0]?.id || null;

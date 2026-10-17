@@ -117,12 +117,15 @@ export default function AdminStockLevels() {
         </Pressable>
 
         <View style={{ flexDirection: 'column', marginBottom: 24, gap: 16, zIndex: 50 }}>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Site Inventory</Text>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 12 : 0 }}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Site Inventory</Text>
 
-          <SearchInput placeholder="Search material or site..." value={search} onChangeText={setSearch}
-            mode="filter" entityLabel="materials"
-            getLocalResults={query => materials.filter(m => `${m.name || ''} ${m.project?.name || ''}`.toLowerCase().includes(query.toLowerCase()))
-              .map(m => ({ id: m.id, title: m.name, subtitle: m.project?.name }))} />
+            <SearchInput placeholder="Search material or site..." value={search} onChangeText={setSearch}
+              mode="filter" entityLabel="materials"
+              className={isMobile ? "w-full" : "w-80"}
+              getLocalResults={query => materials.filter(m => `${m.name || ''} ${m.project?.name || ''}`.toLowerCase().includes(query.toLowerCase()))
+                .map(m => ({ id: m.id, title: m.name, subtitle: m.project?.name }))} />
+          </View>
 
           <FilterChipGrid
             options={statuses.map(s => ({ id: s, label: s }))}

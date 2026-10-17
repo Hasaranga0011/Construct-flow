@@ -8,6 +8,7 @@ import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 const CLIENT_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',     href: '/dashboard',    IconFamily: MaterialIcons, iconName: 'dashboard' },
   { label: 'Project',       href: '/project',      IconFamily: FontAwesome5,  iconName: 'building' },
+  { label: 'Project Map',   href: '/project/map',  IconFamily: Ionicons,      iconName: 'map-outline' },
   { label: 'Media & Gallery',href: '/media',       IconFamily: Ionicons,      iconName: 'images' },
   { label: 'Messages',      href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubble' },
   { label: 'Invoices',      href: '/invoices',     IconFamily: FontAwesome5,  iconName: 'file-invoice-dollar' },

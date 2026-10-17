@@ -9,6 +9,9 @@ import { ClientBudgetRing } from '../../components/client/ClientBudgetRing';
 import { useAuth } from '../../context/AuthContext';
 import { router } from 'expo-router';
 import { AutoFitText } from '@/components/common/AutoFitText';
+import { StatCard } from '../../components/common/StatCard';
+import { ProjectImage } from '../../components/common/ProjectImage';
+import { RoleAvatar } from '../../components/common/RoleAvatar';
 
 type Project = {
   id: string;
@@ -21,7 +24,8 @@ type Project = {
   end_date?: string | null;
   completion_percentage?: number | null;
   pm_id?: string | null;
-  pm?: { id: string; full_name: string; role: string } | null;
+  image_url?: string | null;
+  pm?: { id: string; full_name: string; role: string; avatar_url?: string | null } | null;
 };
 
 type Milestone = {
@@ -99,7 +103,7 @@ export default function ClientDashboardPage() {
       try {
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
-          .select('id, name, location, status, total_budget, spent_cost, start_date, end_date, completion_percentage, pm_id')
+          .select('id, name, location, status, total_budget, spent_cost, start_date, end_date, completion_percentage, pm_id, image_url, images')
           .eq('client_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -117,28 +121,13 @@ export default function ClientDashboardPage() {
           return;
         }
 
-        // Fetch PM profiles manually to avoid schema cache relationship issues
+        // Fetch PM profiles and milestones in parallel
         const pmIds = [...new Set(clientProjects.map(p => p.pm_id).filter((id): id is string => Boolean(id)))];
-        if (pmIds.length > 0) {
-          const { data: pmProfiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, role')
-            .in('id', pmIds);
-          
-          if (pmProfiles) {
-            const pmMap = pmProfiles.reduce((acc: any, pm) => {
-              if (pm.id) acc[pm.id] = pm;
-              return acc;
-            }, {});
-            clientProjects.forEach(p => {
-              if (p.pm_id && pmMap[p.pm_id]) {
-                p.pm = pmMap[p.pm_id];
-              }
-            });
-          }
-        }
-
-        const [milestoneResponse] = await Promise.all([
+        
+        const [pmProfilesRes, milestoneResponse] = await Promise.all([
+          pmIds.length > 0
+            ? supabase.from('profiles').select('id, full_name, role, avatar_url').in('id', pmIds)
+            : Promise.resolve({ data: [] }),
           supabase
             .from('milestones')
             .select('id, project_id, title, status, completion_percentage, due_date')
@@ -148,20 +137,38 @@ export default function ClientDashboardPage() {
 
         if (milestoneResponse.error) throw milestoneResponse.error;
 
-        // Fetch financials for all projects
-        const financialsList = await Promise.all(
-          projectIds.map(async id => {
-            const fin = await api.projects.financials(id).catch(() => null);
-            return { id, fin };
-          })
-        );
+        if (pmProfilesRes.data && pmProfilesRes.data.length > 0) {
+          const pmMap = (pmProfilesRes.data as any[]).reduce((acc: any, pm) => {
+            if (pm.id) acc[pm.id] = pm;
+            return acc;
+          }, {});
+          clientProjects.forEach(p => {
+            if (p.pm_id && pmMap[p.pm_id]) {
+              p.pm = pmMap[p.pm_id];
+            }
+          });
+        }
 
-        const expenseTotals = financialsList.reduce<Record<string, number>>((totals, item) => {
-          if (item.fin) {
-            totals[item.id] = item.fin.actual_spend || 0;
+        // Initialize expenseTotals from project spent_cost directly
+        const expenseTotals: Record<string, number> = {};
+        const missingFinancialIds: string[] = [];
+        clientProjects.forEach(p => {
+          if (p.spent_cost !== null && p.spent_cost !== undefined) {
+            expenseTotals[p.id] = Number(p.spent_cost);
+          } else {
+            missingFinancialIds.push(p.id);
           }
-          return totals;
-        }, {});
+        });
+
+        // Only fetch financials via API if spent_cost is not cached on project
+        if (missingFinancialIds.length > 0) {
+          await Promise.all(
+            missingFinancialIds.map(async id => {
+              const fin = await api.projects.financials(id).catch(() => null);
+              if (fin) expenseTotals[id] = fin.actual_spend || 0;
+            })
+          );
+        }
 
         if (isMounted) {
           setProjects(clientProjects);
@@ -233,21 +240,43 @@ export default function ClientDashboardPage() {
         ) : (
           <>
             <View className="flex-row flex-wrap gap-4 mb-6">
-              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Projects</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-text mt-2">{projects.length}</Text>
+              <View className="flex-1 min-w-[45%]">
+                <StatCard 
+                  label="Active Projects" 
+                  value={projects.length.toString()} 
+                  indicatorText="Assigned to you" 
+                  indicatorType="success" 
+                  colorScheme="blue" 
+                  fullWidth 
+                />
               </View>
-              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Progress</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl font-bold text-brand-orange mt-2">{averageProgress}%</Text>
+              <View className="flex-1 min-w-[45%]">
+                <StatCard 
+                  label="Average Progress" 
+                  value={`${averageProgress}%`} 
+                  indicatorText="Overall completion" 
+                  indicatorType="success" 
+                  colorScheme="emerald" 
+                  fullWidth 
+                />
               </View>
-              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Budget</Text>
-                <AutoFitText value={formatCurrency(totalBudget)} maxFontSize={20} minFontSize={14} className="font-bold text-brand-text" containerStyle={{ marginTop: 12 }} />
+              <View className="flex-1 min-w-[45%]">
+                <StatCard 
+                  label="Total Budget" 
+                  value={formatCurrency(totalBudget)} 
+                  indicatorText="Approved estimates" 
+                  colorScheme="purple" 
+                  fullWidth 
+                />
               </View>
-              <View className="flex-1 min-w-[45%] bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase">Spent</Text>
-                <AutoFitText value={formatCurrency(totalSpent)} maxFontSize={20} minFontSize={14} className="font-bold text-brand-text" containerStyle={{ marginTop: 12 }} />
+              <View className="flex-1 min-w-[45%]">
+                <StatCard 
+                  label="Total Spent" 
+                  value={formatCurrency(totalSpent)} 
+                  indicatorText="Verified expenses" 
+                  colorScheme="amber" 
+                  fullWidth 
+                />
               </View>
             </View>
 
@@ -259,9 +288,15 @@ export default function ClientDashboardPage() {
                 return (
                   <View key={project.id} className="border-b border-gray-100 py-4 last:border-b-0">
                     <View className="flex-row justify-between items-center">
-                      <View className="flex-1 pr-4">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{project.name}</Text>
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
+                      <View className="flex-row items-center flex-1 pr-4">
+                        <ProjectImage
+                          project={project}
+                          className="w-12 h-12 rounded-xl mr-3 shadow-sm shrink-0"
+                        />
+                        <View className="flex-1 min-w-0">
+                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{project.name}</Text>
+                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
+                        </View>
                       </View>
                       <ClientBudgetRing 
                         spent={spentCosts[project.id] || 0} 
@@ -275,9 +310,13 @@ export default function ClientDashboardPage() {
                     {project.pm && (
                       <View className="mt-4 p-3 bg-brand-light rounded-xl flex-row items-center justify-between border border-gray-100">
                         <View className="flex-row items-center">
-                          <View className="w-10 h-10 rounded-full bg-brand-orange items-center justify-center mr-3">
-                            <Text className="text-white font-bold">{project.pm.full_name?.charAt(0) || 'P'}</Text>
-                          </View>
+                          <RoleAvatar
+                            size="sm"
+                            avatarUrl={project.pm.avatar_url}
+                            role="pm"
+                            name={project.pm.full_name}
+                            className="mr-3"
+                          />
                           <View>
                             <Text className="text-sm font-bold text-brand-text">{project.pm.full_name}</Text>
                             <Text className="text-xs text-gray-500">Project Manager</Text>

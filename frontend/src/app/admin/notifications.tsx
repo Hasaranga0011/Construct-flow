@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
+import { SearchInput } from '@/components/common/SearchInput';
 import { ModalViewport } from '../../components/common/ModalViewport';
 import { NotificationCard } from '../../components/notifications/NotificationCard';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -48,23 +49,29 @@ export default function NotificationsScreen() {
       <TopNav 
         title="Notifications" 
         showAction={false} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
       />
       
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6 max-w-4xl mx-auto w-full'}`} showsVerticalScrollIndicator={false}>
         
         {/* Header Controls */}
-        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0 }}>
+        <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Notifications</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', width: isMobile ? '100%' : undefined, justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} className="mr-6" onPress={markAllAsRead}>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">Mark all as read</Text>
-            </Pressable>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Toggle unread notifications" onPress={() => setUnreadOnly(value => !value)} className="border border-gray-200 bg-white rounded-lg px-4 py-2 flex-row items-center">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium mr-2">{unreadOnly ? 'Unread' : 'All'}</Text>
-              <Ionicons name="filter" size={14} color="#6B7280" />
-            </Pressable>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
+            <SearchInput
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className={isMobile ? "w-full" : "w-80"}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-end', gap: 12 }}>
+              <Pressable style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }} className="mr-2" onPress={markAllAsRead}>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">Mark all as read</Text>
+              </Pressable>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityLabel="Toggle unread notifications" onPress={() => setUnreadOnly(value => !value)} className="border border-gray-200 bg-white rounded-lg px-4 py-2 flex-row items-center">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium mr-2">{unreadOnly ? 'Unread' : 'All'}</Text>
+                <Ionicons name="filter" size={14} color="#6B7280" />
+              </Pressable>
+            </View>
           </View>
         </View>
 

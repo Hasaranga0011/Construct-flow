@@ -10,6 +10,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { ModalViewport } from './ModalViewport';
 import { useAuth } from '../../context/AuthContext';
 import { SearchInput } from './SearchInput';
+import { RoleAvatar } from './RoleAvatar';
 
 interface TopNavProps {
   shell?: boolean;
@@ -30,9 +31,8 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
   const router = useRouter();
   const pathname = usePathname();
   const { isDark } = useTheme();
-  const { setIsOpen } = useSidebar();
+  const { isOpen, toggleSidebar } = useSidebar();
   const { isMobile, width } = useResponsive();
-  const useDrawer = Platform.OS !== 'web' || isMobile;
 
   const { unreadCount } = useNotifications();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -43,7 +43,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
     ? '/site-manager/notifications'
     : `/${portalRole}/notifications`;
   const getInitials = (email?: string) => email ? email.slice(0, 2).toUpperCase() : 'U';
-  const { user, role: userRole } = useAuth();
+  const { user, role: userRole, avatarUrl, fullName, signOut } = useAuth();
 
 
   return (
@@ -60,11 +60,15 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
               <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#111827'} />
             </Pressable>
           )}
-          {useDrawer && (
-            <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Open navigation menu" onPress={() => setIsOpen(true)} className="mr-1 p-2 -ml-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] items-center justify-center">
-              <Ionicons name="menu" size={26} color={isDark ? "#ffffff" : "#111827"} />
-            </Pressable>
-          )}
+          <Pressable
+            style={{ minHeight: 44, minWidth: 44 }}
+            accessibilityLabel={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+            {...(Platform.OS === 'web' ? { title: isOpen ? "Collapse sidebar" : "Expand sidebar" } : {})}
+            onPress={toggleSidebar}
+            className="mr-2 p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 items-center justify-center cursor-pointer"
+          >
+            <Ionicons name="menu" size={26} color={isDark ? "#ffffff" : "#111827"} />
+          </Pressable>
           <Text numberOfLines={2} ellipsizeMode="tail" style={{ flexShrink: 1, minWidth: 0 }} className={`text-lg md:text-2xl font-bold flex-shrink min-w-0 ${isDark ? 'text-white' : 'text-brand-text'}`} maxFontSizeMultiplier={1.3}>{title}</Text>
         </View>
 
@@ -86,9 +90,14 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
           <Pressable style={{ minHeight: 48, minWidth: 48 }}
             onPress={() => setAccountMenuOpen((isOpen) => !isOpen)}
             accessibilityLabel="Open account details"
-            className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center"
+            className="items-center justify-center cursor-pointer active:opacity-80"
           >
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">{getInitials(user?.user_metadata?.full_name || user?.email)}</Text>
+            <RoleAvatar
+              avatarUrl={avatarUrl || (user?.user_metadata as any)?.avatar_url}
+              role={userRole || role}
+              name={fullName || (user?.user_metadata as any)?.full_name || user?.email}
+              size="md"
+            />
           </Pressable>
 
           {/* Action Button */}
@@ -109,7 +118,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
 
       {isMobile && showAction && onActionPress && <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
       {onSearch && (
-        <View className="mx-4 my-2 z-50">
+        <View className="mx-4 my-2 z-50 flex-row justify-end">
           <SearchInput 
             placeholder="Search..." 
             value={initialSearchQuery}
@@ -117,6 +126,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
             items={searchItems}
             entityLabel={searchEntityLabel}
             config={searchConfig}
+            className="w-full md:w-80"
           />
         </View>
       )}
@@ -124,32 +134,57 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
         <Modal transparent visible animationType="fade" onRequestClose={() => setAccountMenuOpen(false)}>
         <ModalViewport>
         <View
-          className={`w-full rounded-xl border p-4 shadow-lg ${isDark ? 'bg-[#111827] border-gray-700' : 'bg-white border-gray-200'}`}
-          style={{ zIndex: 20, elevation: 8, width: Math.min(256, width - 32) }}
+          className={`w-full rounded-2xl border p-5 shadow-xl ${isDark ? 'bg-[#111827] border-gray-700' : 'bg-white border-gray-200'}`}
+          style={{ zIndex: 20, elevation: 8, width: Math.min(280, width - 32) }}
         >
-          <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityLabel="Close account details" onPress={() => setAccountMenuOpen(false)} className="min-h-[44px] min-w-[44px] self-end items-center justify-center"><Ionicons name="close" size={24} color={isDark ? '#fff' : '#111827'} /></Pressable>
+          <Pressable style={{ minHeight: 36, minWidth: 36 }} accessibilityLabel="Close account details" onPress={() => setAccountMenuOpen(false)} className="self-end items-center justify-center p-1 -mr-1 -mt-1"><Ionicons name="close" size={20} color={isDark ? '#fff' : '#6B7280'} /></Pressable>
           <ScrollView keyboardShouldPersistTaps="handled">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} className={`text-sm font-bold ${isDark ? 'text-white' : 'text-brand-text'}`} maxFontSizeMultiplier={1.3}>
-            {user?.user_metadata?.full_name || user?.email || 'User'}
+          <View className="items-center mb-3">
+            <RoleAvatar
+              avatarUrl={avatarUrl || (user?.user_metadata as any)?.avatar_url}
+              role={userRole || role}
+              name={fullName || (user?.user_metadata as any)?.full_name || user?.email}
+              size="xl"
+              showRoleBadge
+            />
+          </View>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} className={`text-base font-bold text-center ${isDark ? 'text-white' : 'text-brand-text'}`} maxFontSizeMultiplier={1.3}>
+            {fullName || (user?.user_metadata as any)?.full_name || user?.email || 'User'}
           </Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} className={`text-xs mt-1 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             {user?.email || ''}
           </Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs mt-1 ${isDark ? 'text-brand-orange' : 'text-brand-orange'}`}>
-            {userRole || 'User'}
-          </Text>
-          <View className={`h-px my-3 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />
-          <Pressable style={{ minHeight: 48, minWidth: 48 }}
+          <View className="self-center mt-2 px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-orange uppercase">
+              {userRole || 'User'}
+            </Text>
+          </View>
+          <View className={`h-px my-4 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={() => { setAccountMenuOpen(false); router.push(`/${portalRole}/profile` as any); }}
-            className={`min-h-[44px] justify-center py-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
+            className={`min-h-[44px] flex-row items-center px-3 py-2 rounded-xl ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
           >
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Profile</Text>
+            <Ionicons name="person-outline" size={17} color={isDark ? '#9CA3AF' : '#6B7280'} style={{ marginRight: 8 }} />
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Profile</Text>
           </Pressable>
-          <Pressable style={{ minHeight: 48, minWidth: 48 }}
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
             onPress={() => { setAccountMenuOpen(false); router.push(`/${portalRole}/settings` as any); }}
-            className={`min-h-[44px] justify-center py-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
+            className={`min-h-[44px] flex-row items-center px-3 py-2 rounded-xl ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`}
           >
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Settings</Text>
+            <Ionicons name="settings-outline" size={17} color={isDark ? '#9CA3AF' : '#6B7280'} style={{ marginRight: 8 }} />
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Settings</Text>
+          </Pressable>
+          <View className={`h-px my-2 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />
+          <Pressable style={{ minHeight: 44, minWidth: 44 }}
+            onPress={async () => {
+              setAccountMenuOpen(false);
+              await signOut();
+              router.replace('/');
+            }}
+            className="min-h-[44px] flex-row items-center px-3 py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 active:opacity-80"
+          >
+            <Ionicons name="log-out-outline" size={17} color="#EF4444" style={{ marginRight: 8 }} />
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-red-600">Sign Out</Text>
           </Pressable>
           </ScrollView>
         </View>

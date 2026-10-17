@@ -46,7 +46,7 @@ export const useRealtimeNotifications = () => {
           }
           return;
         }
-        if (isMounted) setNotifications(data || []);
+        if (isMounted) setNotifications((data || []) as any as AppNotification[]);
       } catch (e) {
         console.error('Failed to load notifications', e);
       } finally {

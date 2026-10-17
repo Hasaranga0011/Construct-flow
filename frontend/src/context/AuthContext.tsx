@@ -8,26 +8,58 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   role: string | null;
+  avatarUrl: string | null;
+  fullName: string | null;
   isLoading: boolean;
   isApproved: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   role: null,
+  avatarUrl: null,
+  fullName: null,
   isLoading: true,
   isApproved: true,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
+
+  const fetchProfileDetails = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, is_approved, avatar_url, full_name')
+        .eq('id', userId)
+        .single();
+      if (profile) {
+        if (profile.avatar_url) setAvatarUrl(profile.avatar_url);
+        if (profile.full_name) setFullName(profile.full_name);
+        if (profile.role) setRole(normalizeRole(profile.role));
+        if (profile.is_approved !== undefined && profile.is_approved !== null) setIsApproved(Boolean(profile.is_approved));
+      }
+    } catch (e) {
+      console.warn('Error fetching profile details:', e);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfileDetails(user.id);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -46,6 +78,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         prevUserId = null;
         if (mounted && requestId === roleRequest) {
           setRole(null);
+          setAvatarUrl(null);
+          setFullName(null);
           setIsApproved(true);
           setIsLoading(false);
         }
@@ -87,20 +121,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const metaRole = appMetaRole || userMetaRole;
         let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
         let resolvedIsApproved = true;
+        let resolvedAvatarUrl = (nextSession.user.user_metadata as any)?.avatar_url || null;
+        let resolvedFullName = (nextSession.user.user_metadata as any)?.full_name || null;
 
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role, is_approved')
+          .select('role, is_approved, avatar_url, full_name')
           .eq('id', nextSession.user.id)
           .single();
         if (!profileError && profile) {
           if (profile.role) resolvedRole = normalizeRole(profile.role);
-          if (profile.is_approved !== undefined) resolvedIsApproved = profile.is_approved;
+          if (profile.is_approved !== undefined && profile.is_approved !== null) resolvedIsApproved = Boolean(profile.is_approved);
+          if (profile.avatar_url) resolvedAvatarUrl = profile.avatar_url;
+          if (profile.full_name) resolvedFullName = profile.full_name;
         }
 
         if (mounted && requestId === roleRequest) {
             setRole(resolvedRole);
             setIsApproved(resolvedIsApproved);
+            setAvatarUrl(resolvedAvatarUrl);
+            setFullName(resolvedFullName);
         }
       } catch (error) {
         console.error('Error fetching role:', error);
@@ -137,7 +177,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isLoading, isApproved, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, avatarUrl, fullName, isLoading, isApproved, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

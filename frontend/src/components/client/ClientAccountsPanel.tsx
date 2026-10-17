@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { notify, confirmAction } from '../../utils/notify';
 
 import { useResponsive } from '../../hooks/useResponsive';
+import { RoleAvatar } from '../common/RoleAvatar';
 
 const ClientCard = ({
   initials,
@@ -16,6 +17,7 @@ const ClientCard = ({
   companyName,
   clientName,
   email,
+  avatarUrl,
   onViewDetails
 }: {
   initials: string,
@@ -25,6 +27,7 @@ const ClientCard = ({
   companyName: string,
   clientName: string,
   email: string,
+  avatarUrl?: string | null,
   onViewDetails: () => void
 }) => {
   const { isMobile } = useResponsive();
@@ -33,9 +36,13 @@ const ClientCard = ({
     return (
       <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12, width: '100%' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <View className={`w-12 h-12 rounded-full items-center justify-center ${colorClass}`}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-sm">{initials}</Text>
-          </View>
+          <RoleAvatar
+            size="md"
+            avatarUrl={avatarUrl}
+            role="client"
+            name={clientName}
+            showRoleBadge
+          />
 
           <View style={{ flex: 1 }}>
             <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 2 }]}>{clientName}</Text>
@@ -66,9 +73,14 @@ const ClientCard = ({
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Avatar */}
-      <View className={`w-12 h-12 rounded-full items-center justify-center mr-4 ${colorClass}`}>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-sm">{initials}</Text>
-      </View>
+      <RoleAvatar
+        size="md"
+        avatarUrl={avatarUrl}
+        role="client"
+        name={clientName}
+        showRoleBadge
+        className="mr-4"
+      />
 
       {/* Details */}
       <View className="flex-1">
@@ -255,7 +267,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
           const { data: projects, error: projectError } = await supabase.from('projects').select('client_id').eq('pm_id', pmId);
           if (projectError) throw projectError;
           if (projects) {
-            allowedClientIds = projects.map(p => p.client_id).filter(Boolean);
+            allowedClientIds = projects.map(p => p.client_id).filter((id): id is string => Boolean(id));
           }
         }
 
@@ -293,7 +305,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
           const clientsWithProjects = data.map(client => {
             const myProjects = (clientProjects || []).filter((p: any) => p.client_id === client.id);
             let projectName = 'N/A';
-            if (myProjects.length === 1) projectName = myProjects[0].name;
+            if (myProjects.length === 1) projectName = myProjects[0].name || 'Unnamed Project';
             else if (myProjects.length > 1) projectName = 'Multiple Projects';
 
             return {
@@ -359,6 +371,7 @@ export const ClientAccountsPanel = ({ refreshTrigger = 0, searchQuery = '', pmId
                   companyName={client.company_name || 'N/A'}
                   clientName={client.full_name || 'Unknown'}
                   email={client.email}
+                  avatarUrl={client.avatar_url}
                   onViewDetails={() => setSelectedClient(client)}
                 />
               );

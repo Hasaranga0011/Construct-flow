@@ -36,7 +36,7 @@ export const MonthlyAttendanceChart = () => {
 
       (attendanceData || []).forEach(record => {
         const d = record.date;
-        if (counts[d] !== undefined) {
+        if (d && counts[d] !== undefined) {
           counts[d]++;
         }
       });

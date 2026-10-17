@@ -75,6 +75,8 @@ export const CostBreakdown = ({
 
   // Feature contributions: prefer live prop, fall back to parsed JSON from project_name if available
   let parsedContribs: FeatureContrib[] | null = null;
+  let parsedRange: string | null = null;
+  let parsedQuantities: any = null;
   let explanation = "Illustrative split — generate a new estimate to see model-specific contributions";
   
   try {
@@ -82,6 +84,12 @@ export const CostBreakdown = ({
       const parsed = JSON.parse(latestEstimate.project_name);
       if (parsed.contributions) {
         parsedContribs = parsed.contributions;
+      }
+      if (parsed.estimated_range_display) {
+        parsedRange = parsed.estimated_range_display;
+      }
+      if (parsed.physical_quantities) {
+        parsedQuantities = parsed.physical_quantities;
       }
     }
   } catch (e) {
@@ -164,14 +172,14 @@ export const CostBreakdown = ({
       )}
 
       {/* Total Cost + Confidence */}
-      <View className="flex-row flex-wrap items-center mb-6" style={{ gap: 12 }}>
+      <View className="flex-row flex-wrap items-center mb-4" style={{ gap: 12 }}>
         <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 0 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-semibold uppercase mb-1">
             Estimated Total Cost
           </Text>
           <AutoFitText value={formatCurrency(cost)} maxFontSize={30} minFontSize={18} className="font-bold text-brand-orange" />
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">
-            This is an estimate — confirm with a quantity surveyor.
+            Hybrid model — confirm with quantity surveyor.
           </Text>
         </View>
 
@@ -185,6 +193,41 @@ export const CostBreakdown = ({
           </Text>
         </View>
       </View>
+
+      {/* Prediction Range */}
+      {parsedRange && (
+        <View className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-orange-800 uppercase mb-0.5">
+            Prediction Range (±15% Uncertainty)
+          </Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-orange-950">
+            {parsedRange}
+          </Text>
+        </View>
+      )}
+
+      {/* Physical Quantities Preview */}
+      {parsedQuantities && (
+        <View className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-gray-500 uppercase mb-2">
+            Bottom-Up Material Quantities
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <View className="bg-white px-2 py-1 rounded border border-gray-200">
+              <Text className="text-[10px] text-gray-400">Cement</Text>
+              <Text className="text-xs font-bold text-brand-text">{Number(parsedQuantities.cement_bags || 0).toLocaleString()} bags</Text>
+            </View>
+            <View className="bg-white px-2 py-1 rounded border border-gray-200">
+              <Text className="text-[10px] text-gray-400">Steel</Text>
+              <Text className="text-xs font-bold text-brand-text">{Number(parsedQuantities.steel_kg || 0).toLocaleString()} kg</Text>
+            </View>
+            <View className="bg-white px-2 py-1 rounded border border-gray-200">
+              <Text className="text-[10px] text-gray-400">Labour</Text>
+              <Text className="text-xs font-bold text-brand-text">{Number(parsedQuantities.labour_worker_days || 0).toLocaleString()} days</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Feature bar chart */}
       {contribs.length > 0 ? (

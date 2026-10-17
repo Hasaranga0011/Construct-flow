@@ -102,15 +102,14 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
                 </Text>
               </View>
             </View>
-            <View style={{ width: isMobile ? '100%' : 320 }}>
-              <SearchInput
-                placeholder="Search PO, material, project..."
-                value={search}
-                onChangeText={setSearch}
-                getLocalResults={getSuggestions}
-                onSelectResult={(item) => openOrder(item.id)}
-              />
-            </View>
+            <SearchInput
+              placeholder="Search PO, material, project..."
+              value={search}
+              onChangeText={setSearch}
+              className={isMobile ? "w-full" : "w-80"}
+              getLocalResults={getSuggestions}
+              onSelectResult={(item) => openOrder(item.id)}
+            />
           </View>
 
           <View className="flex-row border border-gray-200 rounded-lg overflow-hidden bg-white self-start max-w-full">

@@ -37,7 +37,16 @@ The UI serves `admin`, `super_admin`, `pm`, `site_manager`, `supplier`, `client`
 
 ### Visual direction
 
-Use a light, high-contrast workspace with orange as the action and construction signal, charcoal for brand depth, white surfaces for content, and restrained status colors. The existing landing page uses a darker amber construction-presentation mood; authenticated portals use the quieter dashboard language.
+Use a light, high-contrast workspace with orange as the action and construction signal, charcoal for brand depth, white surfaces for content, and restrained status colors. 
+
+The **Public Landing Page** uses a cinematic dark construction-presentation mood centered around a scroll-scrubbed 3D-orbit construction video background (`homepage_scroll.mp4`). The hero section uses a centralized, high-impact layout:
+- **Hero Alignment**: Full-width centered container (`self-center`, `text-center`, `max-w-5xl mx-auto`).
+- **Hero Typography**: Enlarged responsive headline scaling from 42px on small phones, 48px on standard mobile, 56px on tablet, to 68px/78px on desktop viewports.
+- **Hero Actions**: Centered dual CTA buttons ("Team Portal" and "Partner Portal") with glowing orange accent borders and backdrops.
+- **Metrics Bar**: Centered horizontal stats row (`15+ Modules`, `6 Role Types`, `LKR Native Currency`, `95% ML Accuracy`) positioned directly below the actions.
+- **Compositional Focus**: Floating decorative dashboard cards are removed from the hero to maximize visual focus on the interactive 3D video layer and centralized messaging.
+
+Authenticated portals use the quieter, highly functional dashboard language.
 
 ## 2. Color System
 
@@ -127,7 +136,8 @@ The current code uses Tailwind utilities and a few explicit styles. This is the 
 
 | Level | Size | Line height | Weight | Typical use |
 | --- | ---: | ---: | ---: | --- |
-| Display | 48px | 52px | 600-800 | Marketing/hero only; starter `ThemedText type="title"` is 48/52 |
+| Hero Display | 42px - 78px | 1.1x | 800-900 | Cinematic landing hero only (42px mobile-sm, 48px mobile, 56px tablet, 68-78px desktop) |
+| Display | 48px | 52px | 600-800 | Marketing/presentation headers; starter `ThemedText type="title"` |
 | H1 | 32px | 40px | 700-800 | Major portal page title, e.g. ML Insights or auth heading on wide screens |
 | H2 | 24px | 32px | 700 | Dashboard section or page heading |
 | H3 | 20px | 28px | 700 | Card title, modal title, key panel heading |
@@ -321,6 +331,19 @@ All paths below are relative to `frontend/src/components/`. Props are the public
 | `WebBadge` | `web-badge.tsx` | local badge props from implementation | Starter web-only badge; not part of the ConstructFlow role portal language. |
 | `ToastProvider` web | `common/ToastProvider.web.tsx` | provider-local props from implementation | Web toast host; pair with the existing toast helper and do not introduce multiple competing toast libraries. |
 
+### UI Primitives (frontend/src/components/ui/)
+
+| Component | File | Props | Variants and usage |
+| --- | --- | --- | --- |
+| `Button` | `ui/Button.tsx` | `variant?: 'primary'|'secondary'|'outline'|'danger'|'ghost'`, `size?: 'sm'|'md'|'lg'`, `loading?`, `disabled?` | Standard branded button primitive with orange primary, dark neutral secondary, bordered outline, and loading spinners. |
+| `Card` | `ui/Card.tsx` | `children`, `className?`, `style?` | Rounded-xl white panel container with subtle border (`border-gray-100`) and standard shadow. |
+| `FormField` | `ui/FormField.tsx` | `label`, `error?`, `required?`, `hint?`, `children` | Standardized form label wrapper with required asterisk, helper text, and red validation error message. |
+| `ScreenContainer` | `ui/ScreenContainer.tsx` | `children`, `scrollable?`, `className?` | Standard screen wrapper providing role padding, safe-area boundary, and background surface consistency. |
+| `Section` | `ui/Section.tsx` | `title`, `description?`, `action?`, `children` | Structural section block with consistent H3 heading typography, secondary description, and optional action link/button. |
+| `Select` | `ui/Select.tsx` | `label?`, `placeholder?`, `value`, `options`, `onChange`, `error?`, `disabled?` | Cross-platform customizable dropdown select component with modal bottom sheet on mobile and floating overlay on web. **CRITICAL STYLING RULE**: Must NOT conditionally toggle dynamic Tailwind utility classes that define CSS variables (e.g. `ring-2 ring-orange-100`). Always use explicit inline style overrides `style={open ? { borderColor: '#F97316', borderWidth: 1.5 } : undefined}` to prevent NativeWind CSS-Interop Fiber serialization errors. |
+| `States` | `ui/States.tsx` | `EmptyState`, `LoadingState`, `ErrorState` primitives | Uniform empty states with icons, loading spinners with orange accents, and retryable error panels. |
+| `Toolbar` | `ui/Toolbar.tsx` | `searchQuery?`, `onSearchChange?`, `filterComponent?`, `actions?` | Search input, filter trigger, and action button bar for tables and list surfaces. |
+
 ### Component anti-patterns
 
 - Do not use `StatCard` for a form or an action that needs a clear button.
@@ -329,6 +352,7 @@ All paths below are relative to `frontend/src/components/`. Props are the public
 - Do not use mock data in a screen presented as production-ready.
 - Do not add a new sidebar or header variant when the role layout already supplies `MobileSidebar` and `TopNav`.
 - Do not use inline styles for ordinary spacing/color when NativeWind already expresses the value; inline styles are reserved for dynamic dimensions, theme calculations, charts, Reanimated, and platform-specific controls.
+- **Do not dynamically add CSS variable classes (`ring-*`, `shadow-*`) on state toggles in NativeWind**: In NativeWind v4 with React 19 / React Native 0.81, toggling CSS variable classes causes the CSS Interop layer to promote the component into a CSS variable provider and deep-inspect props. During React dev warnings, this leads to fatal fiber serialization loops (`Couldn't find a navigation context`). Always use explicit React Native inline style overrides (`style={{ borderColor, borderWidth }}`) for dynamic active/focused borders.
 
 ## 6. Role-Based Layout Patterns
 

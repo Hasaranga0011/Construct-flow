@@ -39,13 +39,12 @@ export const ClientMediaGallery = () => {
           return;
         }
 
-        const { data, error: mediaError } = await supabase
-          .from('photos')
+        const { data, error: mediaError } = await (supabase.from as any)('photos')
           .select('id, project_id, url, caption, category, created_at')
           .in('project_id', projectIds)
           .order('created_at', { ascending: false });
         if (mediaError) throw mediaError;
-        if (isMounted) setMedia((data || []) as MediaRecord[]);
+        if (isMounted) setMedia(((data || []) as any) as MediaRecord[]);
       } catch (loadError: any) {
         if (isMounted) setError(loadError.message || 'Failed to load project media.');
       } finally {

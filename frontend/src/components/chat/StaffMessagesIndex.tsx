@@ -30,11 +30,11 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
         if (role === 'super_admin' || role === 'admin') {
           const { data, error } = await supabase.from('projects').select('id, name').order('created_at', { ascending: false });
           if (error) throw error;
-          fetchedProjects = data || [];
+          fetchedProjects = (data || []).filter((p): p is Project => Boolean(p.id && p.name));
         } else if (role === 'pm') {
           const { data, error } = await supabase.from('projects').select('id, name').eq('pm_id', user.id).order('created_at', { ascending: false });
           if (error) throw error;
-          fetchedProjects = data || [];
+          fetchedProjects = (data || []).filter((p): p is Project => Boolean(p.id && p.name));
         } else if (role === 'site_manager') {
           const { data: smSites, error: smError } = await supabase.from('site_manager_sites').select('project_id, projects(id, name)').eq('site_manager_id', user.id);
           if (smError) throw smError;
@@ -61,7 +61,7 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
               .in('project_id', projectIds)
               .order('created_at', { ascending: false });
           if (msgError) throw msgError;
-          messageData = data || [];
+          messageData = (data as any) || [];
         }
 
         if (isMounted) {

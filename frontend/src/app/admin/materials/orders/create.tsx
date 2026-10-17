@@ -79,9 +79,7 @@ export default function AdminMaterialsOrdersCreatePage() {
         // Fetch Catalog via API or distinct materials
         let catalogItems: any[] = [];
         try {
-          const catRes = await fetch(`${supabase.supabaseUrl ? '' : ''}/api/materials/catalog`);
-          // Or query directly from Supabase:
-          const { data: catData } = await supabase.from('material_catalog').select('*').order('name');
+          const { data: catData } = await (supabase as any).from('material_catalog').select('*').order('name');
           if (catData && catData.length > 0) {
             catalogItems = catData;
           }
@@ -133,13 +131,13 @@ export default function AdminMaterialsOrdersCreatePage() {
     }
 
     const loadProjectStock = async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('materials')
-        .select('name, catalog_id, current_stock, minimum_threshold, unit')
+        .select('name, current_stock, minimum_threshold, unit')
         .eq('project_id', selectedProject.id);
 
       const map: Record<string, { current_stock: number; minimum_threshold: number; unit: string }> = {};
-      (data || []).forEach(row => {
+      (data || []).forEach((row: any) => {
         if (row.name) {
           map[row.name.trim().toLowerCase()] = {
             current_stock: row.current_stock || 0,
@@ -147,8 +145,8 @@ export default function AdminMaterialsOrdersCreatePage() {
             unit: row.unit || 'Units',
           };
         }
-        if (row.catalog_id) {
-          map[row.catalog_id] = {
+        if (row.id) {
+          map[row.id] = {
             current_stock: row.current_stock || 0,
             minimum_threshold: row.minimum_threshold || 10,
             unit: row.unit || 'Units',
@@ -170,7 +168,7 @@ export default function AdminMaterialsOrdersCreatePage() {
     try {
       let createdItem: any = null;
       // Try insert into material_catalog
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('material_catalog')
         .insert([{
           name: newMatName.trim(),

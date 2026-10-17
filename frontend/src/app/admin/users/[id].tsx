@@ -9,6 +9,8 @@ import { noAutofill } from '@/lib/formAutofill';
 import { PhoneInput } from '@/components/common/PhoneInput';
 import { AmountInput } from '@/components/common/AmountInput';
 
+import { RoleAvatar } from '@/components/common/RoleAvatar';
+
 const ROLES = [
   { label: 'Admin', value: 'super_admin' },
   { label: 'Project Manager', value: 'pm' },
@@ -22,6 +24,7 @@ const WORKER_TYPES = ['Mason', 'Carpenter', 'Electrician', 'Plumber', 'General L
 
 export default function AdminUsersEditPage() {
   const { id } = useLocalSearchParams();
+  const userId = Array.isArray(id) ? id[0] : (id || '');
   const router = useRouter();
   
   const [initialLoading, setInitialLoading] = useState(true);
@@ -30,6 +33,7 @@ export default function AdminUsersEditPage() {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState('pm');
   const [contactNumber, setContactNumber] = useState('');
   const [isPhoneValid, setIsPhoneValid] = useState(true);
@@ -42,17 +46,18 @@ export default function AdminUsersEditPage() {
     setInitialLoading(true);
     setFullName('');
     setEmail('');
+    setAvatarUrl(null);
     setSelectedRole('');
     setContactNumber('');
     setWorkerType('General Laborer');
-    setDailyRate('');
+    setDailyRate(null);
 
     const fetchUser = async () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', id)
+          .eq('id', userId)
           .single();
 
         if (error) throw error;
@@ -60,6 +65,7 @@ export default function AdminUsersEditPage() {
         if (data && isMounted) {
           setFullName(data.full_name || '');
           setEmail(data.email || '');
+          setAvatarUrl(data.avatar_url || null);
           setSelectedRole(data.role || 'pm');
           setContactNumber(data.contact_number || '');
           if (data.role === 'worker') {
@@ -74,18 +80,20 @@ export default function AdminUsersEditPage() {
       }
     };
     
+    if (!userId) return;
     if (id) fetchUser();
     return () => { isMounted = false; };
-  }, [id]);
+  }, [userId]);
 
   const handleDelete = async () => {
+    if (!userId) return;
     const confirmed = await confirmAction('Delete User', 'Are you sure you want to completely delete this user account? This cannot be undone.');
     if (!confirmed) return;
 
     setIsDeleting(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const response = await fetch(`${getApiUrl()}/admin/users/${id}`, {
+      const response = await fetch(`${getApiUrl()}/admin/users/${userId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -105,6 +113,7 @@ export default function AdminUsersEditPage() {
   };
 
   const handleSave = async () => {
+    if (!userId) return;
     if (!fullName) {
       notify('Error', 'Name is required.');
       return;
@@ -117,8 +126,8 @@ export default function AdminUsersEditPage() {
 
     setSaving(true);
     try {
-      const { error: profileError } = await supabase.rpc('update_user_role', {
-        target_user_id: id,
+      const { error: profileError } = await (supabase.rpc as any)('update_user_role', {
+        target_user_id: userId,
         new_role: selectedRole,
         new_worker_type: selectedRole === 'worker' ? workerType : null,
         new_daily_rate: selectedRole === 'worker' ? dailyRate : null
@@ -133,7 +142,7 @@ export default function AdminUsersEditPage() {
           full_name: fullName,
           contact_number: contactNumber || null
         })
-        .eq('id', id);
+        .eq('id', userId);
 
       notify('Success', 'User profile updated successfully!');
       router.back();
@@ -158,6 +167,26 @@ export default function AdminUsersEditPage() {
       <TopNav title="Manage User" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <View className="max-w-[600px] w-full mx-auto">
+
+          {/* User Profile Header Card */}
+          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4 flex-row items-center gap-4">
+            <RoleAvatar
+              avatarUrl={avatarUrl}
+              role={selectedRole}
+              name={fullName || email}
+              size="lg"
+              showRoleBadge
+            />
+            <View className="flex-1 min-w-0">
+              <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-900">{fullName || 'Unnamed User'}</Text>
+              <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500 mt-0.5">{email || 'No email'}</Text>
+              <View className="mt-2 flex-row items-center">
+                <View className="px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200 self-start">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-brand-orange uppercase">{selectedRole.replace('_', ' ')}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
 
           {/* Basic Info */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">

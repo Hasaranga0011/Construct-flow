@@ -53,3 +53,6 @@ export const FormField = React.forwardRef<TextInput, FormFieldProps>(({
     </View>
   );
 });
+
+FormField.displayName = 'FormField';
+

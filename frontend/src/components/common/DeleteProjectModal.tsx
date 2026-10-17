@@ -68,7 +68,7 @@ export const DeleteProjectModal = ({
             maxFontSizeMultiplier={1.3}
             className={`text-sm leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}
           >
-            Permanently delete <Text className="font-bold">"{projectName}"</Text>? All project data, assignments, and local records will be deleted.
+            Permanently delete <Text className="font-bold">&quot;{projectName}&quot;</Text>? All project data, assignments, and local records will be deleted.
           </Text>
 
           {/* Confirmation Input Instructions */}
@@ -78,7 +78,7 @@ export const DeleteProjectModal = ({
               maxFontSizeMultiplier={1.3}
               className="text-xs text-red-800"
             >
-              To confirm, type the project name <Text className="font-bold underline">"{projectName}"</Text> below:
+              To confirm, type the project name <Text className="font-bold underline">&quot;{projectName}&quot;</Text> below:
             </Text>
           </View>
 

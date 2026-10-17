@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
+import { SearchInput } from '@/components/common/SearchInput';
 import { StatCard } from '../../components/common/StatCard';
 import { ClientAccountsPanel } from '../../components/client/ClientAccountsPanel';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function PMClientPortalScreen() {
+  const { isMobile } = useResponsive();
   const [loadError, setLoadError] = useState('');
   const [retry, setRetry] = useState(0);
   const [stats, setStats] = useState({
@@ -68,11 +71,6 @@ export default function PMClientPortalScreen() {
       <TopNav
         title="Client Updates (Your Projects)"
         showAction={false}
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
-        searchItems={clientProfiles}
-        searchEntityLabel="clients"
-        searchConfig={{ titleColumn: 'full_name', subtitleColumn: 'email', searchColumn: 'full_name' }}
       />
 
       {loadError ? <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetry(v => v + 1)} className="p-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600">{loadError} ? Tap to retry</Text></Pressable> : loading ? (
@@ -81,6 +79,21 @@ export default function PMClientPortalScreen() {
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-6" showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+            <View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-1">Client Updates</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">Updates and communications for your projects.</Text>
+            </View>
+            <SearchInput 
+              placeholder="Search clients..." 
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              items={clientProfiles}
+              entityLabel="clients"
+              className={isMobile ? "w-full" : "w-80"}
+              config={{ table: 'profiles', titleColumn: 'full_name', subtitleColumn: 'email', searchColumn: 'full_name' }}
+            />
+          </View>
           {/* Top Stat Cards Row */}
           <View className="flex-row flex-wrap gap-4 mb-6">
             <View className="w-full md:flex-1">

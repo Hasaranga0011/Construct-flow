@@ -9,12 +9,18 @@ from core.notification_helper import create_notification
 from core.config import settings
 load_dotenv()
 
-def get_admin_supabase():
-    url = settings.SUPABASE_URL or "https://placeholder.supabase.co"
-    key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY or "placeholder-key"
-    return create_client(url, key)
+from typing import List, Optional
+from core.database import get_service_client
+from supabase import create_client
+import logging
 
-from typing import List
+def get_admin_supabase():
+    try:
+        return get_service_client()
+    except Exception:
+        url = settings.SUPABASE_URL or "https://placeholder.supabase.co"
+        key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY or "placeholder-key"
+        return create_client(url, key)
 
 router = APIRouter(
     prefix="/notifications",
@@ -51,20 +57,40 @@ async def send_system_notification(payload: SystemNotificationPayload, current_u
     return {"success": True}
 
 class MarkReadPayload(BaseModel):
-    ids: List[str]
+    ids: Optional[List[str]] = None
+    all: Optional[bool] = False
 
 @router.patch("/mark-read")
 async def mark_notifications_read(payload: MarkReadPayload, current_user: dict = Depends(get_current_user)):
     """Bypass strict RLS to mark notifications as read for the current user."""
-    if not payload.ids:
-        return {"success": True}
-        
     try:
-        # Using get_admin_supabase() to bypass RLS since users can't update role-based notifications
-        get_admin_supabase().table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
-        return {"success": True, "updated": len(payload.ids)}
+        admin_client = get_admin_supabase()
+        updated_count = 0
+
+        if payload.all:
+            user_id = current_user.get("id")
+            role = current_user.get("role", "")
+            
+            # 1. Update notifications targeted specifically at this user
+            if user_id:
+                admin_client.table("notifications").update({"is_read": True}).eq("target_user_id", user_id).eq("is_read", False).execute()
+            
+            # 2. Update role-targeted notifications
+            if role:
+                admin_client.table("notifications").update({"is_read": True}).eq("target_role", role).eq("is_read", False).execute()
+                for r in [role.capitalize(), role.title(), role.lower(), role.upper()]:
+                    if r != role:
+                        admin_client.table("notifications").update({"is_read": True}).eq("target_role", r).eq("is_read", False).execute()
+
+            # 3. Update broadcast 'All' notifications
+            admin_client.table("notifications").update({"is_read": True}).eq("target_role", "All").eq("is_read", False).execute()
+
+        if payload.ids:
+            admin_client.table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
+            updated_count += len(payload.ids)
+
+        return {"success": True, "updated": updated_count}
     except Exception as e:
-        import logging
         logging.error(f"Failed to mark notifications as read: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

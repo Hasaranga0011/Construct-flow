@@ -42,6 +42,8 @@ import { getDashboardForRole } from '../utils/auth';
 import { getApiUrl } from '../lib/apiUrl';
 
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 // ─── Tuneable constants (adjust here — no other file needs changing) ──────────
 const BLUR: string   = '3px';   // CSS blur on the video layer
 const DIM: string    = '0.45';   // dark overlay opacity 0=none 1=black
@@ -49,9 +51,16 @@ const SCROLL_LENGTH  = '600vh';  // scroll distance for one full video pass
 const LERP_FACTOR    = 0.10;    // easing factor (lower=smoother/more lag)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve the bundled asset URL using Metro's require
-const videoAsset = require('../../assets/images/homepage_scroll.mp4');
-const VIDEO_SRC = typeof videoAsset === 'string' ? videoAsset : Image.resolveAssetSource(videoAsset).uri;
+// Resolve the bundled asset URL safely on web only (prevents null .uri crash on Android)
+let VIDEO_SRC = '';
+if (Platform.OS === 'web') {
+  try {
+    const videoAsset = require('../../assets/images/homepage_scroll.mp4');
+    VIDEO_SRC = typeof videoAsset === 'string' ? videoAsset : (Image.resolveAssetSource(videoAsset)?.uri || '');
+  } catch {
+    VIDEO_SRC = '';
+  }
+}
 
 
 function injectVideoBackground(): () => void {
@@ -171,7 +180,7 @@ const PortalToggle = () => {
   const right = anim.interpolate({ inputRange: [0, 1], outputRange: ['50%', '2%'] });
 
   return (
-    <View className="flex-row items-center p-1 rounded-full w-[240px] sm:w-[280px]">
+    <View className="flex-row items-center p-1 rounded-full w-[240px] sm:w-[280px] bg-slate-900/70 border border-white/20 backdrop-blur-md">
       <Animated.View style={{
         position: 'absolute',
         top: 4, bottom: 4,
@@ -276,6 +285,7 @@ export default function LandingPage() {
   const isTablet = ww >= 768 && ww < 1024;
   const isSmallPhone = ww < 480;
   const isSm = ww >= 640;
+  const isWeb = Platform.OS === 'web';
   const cleanup = useRef<() => void>(() => {});
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -336,17 +346,10 @@ export default function LandingPage() {
   return (
     <View className="flex-1" style={{ backgroundColor: 'transparent' }}>
       {Platform.OS !== 'web' && (
-        <View style={{ position: 'absolute', top: -150, bottom: -150, left: -150, right: -150, zIndex: -1, backgroundColor: '#0F172A' }}>
-          <Video
-            source={require('../../assets/images/homepage_scroll.mp4')}
-            style={{ width: '100%', height: '100%', transform: [{ scale: ww > wh ? 1.78 : 1.05 }] }}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay
-            isLooping
-            isMuted
-          />
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)' }} />
-        </View>
+        <LinearGradient
+          colors={['#0F172A', '#1E293B', '#0C1A2E']}
+          style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: -1 }}
+        />
       )}
 
       
@@ -431,111 +434,75 @@ export default function LandingPage() {
 
 
         {/* HERO */}
-        <View className="pt-36 pb-32 px-6 md:px-12 relative overflow-hidden" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh }}>
+        <View className="px-5 md:px-12 relative overflow-hidden flex items-center justify-center" id="home" onLayout={event => { sectionOffsets.current.home = event.nativeEvent.layout.y; }} style={{ minHeight: wh, paddingTop: isMobile ? (Platform.OS === 'web' ? 96 : 64) : 144, paddingBottom: isMobile ? 56 : 110 }}>
           <View style={{ position: 'absolute', top: 0, right: 0, width: '50%', maxWidth: 480, aspectRatio: 1, borderBottomLeftRadius: 480, backgroundColor: 'rgba(249,115,22,0.07)', pointerEvents: 'none' }} />
           <View style={{ position: 'absolute', bottom: 0, left: 0, width: '40%', maxWidth: 360, aspectRatio: 1, borderTopRightRadius: 360, backgroundColor: 'rgba(59,130,246,0.05)', pointerEvents: 'none' }} />
 
-          <View className="max-w-7xl mx-auto w-full flex-row flex-wrap items-center z-10">
+          <View className="w-full z-10 max-w-5xl mx-auto flex-col items-center text-center">
 
-            {/* Left */}
-            <View className="w-full lg:w-1/2 pr-0 lg:pr-16 mb-16 lg:mb-0">
-              <View className="self-start flex-row items-center px-4 py-1.5 rounded-full border mb-6"
+            {/* Centralized Hero Content */}
+            <View className="w-full flex-col items-center text-center py-2 md:py-4">
+              <View className="self-center flex-row items-center px-4 py-1.5 rounded-full border mb-5 sm:mb-6"
                 style={{ borderColor: 'rgba(249,115,22,0.45)', backgroundColor: 'rgba(249,115,22,0.1)' }}>
                 <View className="w-2 h-2 rounded-full bg-brand-orange mr-2" />
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs tracking-widest uppercase">Sri Lanka&apos;s #1 Construction Platform</Text>
               </View>
 
-              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold leading-tight mb-6" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 40 : 52, lineHeight: isMobile ? 48 : 60 }]}>
+              <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold leading-tight mb-5 sm:mb-6 text-center"
+                style={[
+                  { flexShrink: 1, minWidth: 0 },
+                  {
+                    fontSize: ww >= 1024 ? 68 : ww >= 768 ? 54 : (ww < 380 ? 34 : 42),
+                    lineHeight: ww >= 1024 ? 78 : ww >= 768 ? 64 : (ww < 380 ? 42 : 50),
+                    textAlign: 'center'
+                  }
+                ]}
+              >
                 Build Smarter,{'\n'}
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Deliver</Text>{'\n'}
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#F97316' }]}>Deliver</Text>{' '}
                 On Time.
               </Text>
 
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 text-lg leading-relaxed mb-10 max-w-xl">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}
+                className="text-gray-300 leading-relaxed mb-8 md:mb-10 text-center text-sm sm:text-base md:text-lg lg:text-xl max-w-3xl mx-auto px-2"
+              >
                 Complete construction management for Sri Lankan contractors — projects, materials, labour, payroll, client portals, and AI cost estimation in LKR. Trusted by teams from Colombo to Jaffna.
               </Text>
 
-              <View style={{ flexDirection: isSmallPhone ? 'column' : 'row', flexWrap: isSmallPhone ? 'nowrap' : 'wrap', gap: 12, marginBottom: 48, width: '100%' }}>
+              <View style={{
+                flexDirection: isSmallPhone ? 'column' : 'row',
+                flexWrap: isSmallPhone ? 'nowrap' : 'wrap',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 14,
+                marginBottom: isMobile ? 36 : 48,
+                width: '100%'
+              }}>
                 <Link href="/team-login" asChild>
                   <Pressable className="flex-row items-center justify-center rounded-full"
-                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 24, elevation: 8, minHeight: 52, width: isSmallPhone ? '100%' : 'auto', paddingHorizontal: 32 }}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg mr-2">Team Portal</Text>
+                    style={{ backgroundColor: '#F97316', shadowColor: '#F97316', shadowOpacity: 0.45, shadowRadius: 24, elevation: 8, minHeight: 52, width: isSmallPhone ? '100%' : 'auto', maxWidth: isSmallPhone ? 320 : undefined, paddingHorizontal: 32 }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-lg mr-2">Team Portal</Text>
                     <Ionicons name="arrow-forward" size={20} color="white" />
                   </Pressable>
                 </Link>
                 <Link href="/partner-login" asChild>
                   <Pressable className="items-center justify-center rounded-full"
-                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.05)', minHeight: 52, width: isSmallPhone ? '100%' : 'auto', paddingHorizontal: 32 }}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Partner Portal</Text>
+                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.05)', minHeight: 52, width: isSmallPhone ? '100%' : 'auto', maxWidth: isSmallPhone ? 320 : undefined, paddingHorizontal: 32 }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base sm:text-lg">Partner Portal</Text>
                   </Pressable>
                 </Link>
               </View>
 
-              <View className="flex-row flex-wrap gap-8">
+              <View className="flex-row flex-wrap justify-center items-center gap-6 sm:gap-10 md:gap-14">
                 {[{ val: '15+', label: 'Modules' }, { val: '6', label: 'Role Types' }, { val: 'LKR', label: 'Native Currency' }, { val: '95%', label: 'ML Accuracy' }].map(s => (
-                  <View key={s.label}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-extrabold text-3xl mb-0.5">{s.val}</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs tracking-widest uppercase font-semibold">{s.label}</Text>
+                  <View key={s.label} className="items-center text-center px-2" style={{ minWidth: isSmallPhone ? '40%' : 'auto' }}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-extrabold text-2xl sm:text-3xl md:text-4xl mb-0.5 text-center">{s.val}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[11px] sm:text-xs tracking-widest uppercase font-semibold text-center">{s.label}</Text>
                   </View>
                 ))}
               </View>
             </View>
 
-            {/* Right — glass dashboard card */}
-            <View className="w-full lg:w-1/2">
-              <View className="rounded-3xl p-6 md:p-8 relative overflow-hidden"
-                style={{ ...g, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 16 }}>
-                <View style={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, borderBottomLeftRadius: 100, backgroundColor: 'rgba(249,115,22,0.13)', pointerEvents: 'none' }} />
-
-                <View className="flex-row items-center pb-4 mb-5" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
-                  <View className="flex-row mr-3">
-                    {['#EF4444', '#F59E0B', '#22C55E'].map(c => (
-                      <View key={c} className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: c }} />
-                    ))}
-                  </View>
-                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.8)', fontSize: 12, fontWeight: '500' }]}>ConstructAi — Nimal Fernando (PM)</Text>
-                </View>
-
-                <View className={isMobile ? "flex-col mb-4" : "flex-row flex-wrap -mx-1.5 mb-4"}>
-                  {[
-                    { label: 'ACTIVE PROJECTS', value: '15',        color: '#F97316' },
-                    { label: 'WORKERS ON-SITE',  value: '142',       color: '#22C55E' },
-                    { label: 'MATERIALS VALUE',  value: 'LKR 12.4M', color: '#3B82F6' },
-                    { label: 'PENDING PAYROLL',  value: '7',          color: '#A855F7' },
-                  ].map(card => (
-                    <View key={card.label} className={isMobile ? "w-full mb-3" : "w-1/2 px-1.5 mb-3"}>
-                      <View className="p-4 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.9)', fontSize: 10, letterSpacing: 1.2, fontWeight: '700', marginBottom: 6 }]}>{card.label}</Text>
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: card.color, fontWeight: '800', fontSize: isMobile ? 18 : 22 }]}>{card.value}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                <View className="p-5 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
-                  <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.9)', fontSize: 10, letterSpacing: 1.2, fontWeight: '700', marginBottom: 16 }]}>ACTIVE PROJECT PROGRESS</Text>
-                  {[
-                    { name: 'WTC Colombo Expansion',   pct: 72, color: '#F97316' },
-                    { name: 'Kandy Expressway Ph.3',    pct: 45, color: '#3B82F6' },
-                    { name: 'Hambantota Port Zone',     pct: 88, color: '#22C55E' },
-                  ].map(proj => (
-                    <View key={proj.name} className="mb-4">
-                      <View className="flex-row justify-between mb-1.5">
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(209,213,219,0.9)', fontSize: 13 }]}>{proj.name}</Text>
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(156,163,175,0.8)', fontSize: 13 }]}>{proj.pct}%</Text>
-                      </View>
-                      <View className="w-full h-1.5 rounded-full" style={{ backgroundColor: 'rgba(75,85,99,0.5)' }}>
-                        <View className="h-full rounded-full" style={{ width: `${proj.pct}%`, backgroundColor: proj.color }} />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { textAlign: 'center', color: 'rgba(107,114,128,0.8)', fontSize: 11, letterSpacing: 2, marginTop: 16 }]}>
-                  ↓  SCROLL TO ORBIT THE SITE  ↓
-                </Text>
-              </View>
-            </View>
           </View>
         </View>
 

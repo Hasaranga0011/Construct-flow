@@ -109,6 +109,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Public Auth router (self-registration, login helpers)
 app.include_router(auth.router, prefix="/api")
 

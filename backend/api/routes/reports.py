@@ -135,19 +135,11 @@ def get_management_report(
         dt_from = _parse_colombo_date(from_date_str, is_end=False)
         dt_to = _parse_colombo_date(to_date_str, is_end=True)
 
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            fut_projects = executor.submit(_report_rows, client, "projects")
-            fut_materials = executor.submit(_report_rows, client, "materials")
-            fut_orders = executor.submit(_report_rows, client, "purchase_orders")
-            fut_payroll = executor.submit(_report_rows, client, "salary_slips")
-            fut_people = executor.submit(_report_rows, client, "profiles", "id, full_name")
-
-            all_projects = fut_projects.result()
-            all_materials = fut_materials.result()
-            all_orders = fut_orders.result()
-            all_payroll = fut_payroll.result()
-            all_people = fut_people.result()
+        all_projects = _report_rows(client, "projects")
+        all_materials = _report_rows(client, "materials")
+        all_orders = _report_rows(client, "purchase_orders")
+        all_payroll = _report_rows(client, "salary_slips")
+        all_people = _report_rows(client, "profiles", "id, full_name")
 
         all_expenses = []
         all_attendance = []

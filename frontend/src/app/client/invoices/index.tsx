@@ -59,18 +59,18 @@ export default function ClientinvoicesPage() {
         }, {});
 
         const purchaseOrders: InvoiceRow[] = (orderResponse.data || []).map(order => ({
-          id: order.id,
+          id: order.id || '',
           title: order.po_number || 'Delivered purchase order',
-          projectName: projectNames[order.project_id] || 'Project',
+          projectName: (order.project_id && projectNames[order.project_id]) || 'Project',
           amount: Number(order.total_price || 0),
           date: order.actual_delivery,
           source: 'Purchase order',
         }));
 
         const expenses: InvoiceRow[] = (expenseResponse.data || []).map(expense => ({
-          id: expense.id,
-          title: expense.title,
-          projectName: projectNames[expense.project_id] || 'Project',
+          id: expense.id || '',
+          title: expense.title || 'Expense',
+          projectName: (expense.project_id && projectNames[expense.project_id]) || 'Project',
           amount: Number(expense.amount || 0),
           date: expense.expense_date,
           source: 'Expense',

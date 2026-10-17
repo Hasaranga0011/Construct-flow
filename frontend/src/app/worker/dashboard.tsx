@@ -243,25 +243,25 @@ export default function WorkerDashboardScreen() {
             </View>
           ) : (
             <>
-              <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
+              <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
                 <AnimatedCard delay={150} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Days Present" value={daysPresent.toString()} indicatorText={`of ${currentDay} working days`} indicatorType="success" fullWidth />
+                    <StatCard label="Days Present" value={daysPresent.toString()} indicatorText={`of ${currentDay} working days`} indicatorType="success" colorScheme="emerald" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Hours Worked" value={hoursWorked.toFixed(1)} indicatorText="This month" indicatorType="neutral" fullWidth />
+                    <StatCard label="Hours Worked" value={hoursWorked.toFixed(1)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={250} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Overtime Hours" value={overtimeHours.toFixed(1)} indicatorText="This month" indicatorType="warning" fullWidth />
+                    <StatCard label="Overtime Hours" value={overtimeHours.toFixed(1)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/payroll')} className="flex-1">
-                    <StatCard label="Estimated Earnings" value={payroll ? money(payroll.total_pay) : '-'} indicatorText="Estimated" indicatorType="neutral" fullWidth />
+                    <StatCard label="Estimated Earnings" value={payroll ? money(payroll.total_pay) : '-'} indicatorText="Estimated" indicatorType="neutral" colorScheme="purple" fullWidth />
                   </Pressable>
                 </AnimatedCard>
               </View>

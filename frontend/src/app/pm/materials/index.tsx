@@ -9,10 +9,12 @@ import { managedProjects } from '@/services/pmData';
 import { firstRelation } from '@/utils/relations';
 import { notify } from '@/utils/notify';
 import { formatMoney } from '@/utils/format';
+import { useResponsive } from '@/hooks/useResponsive';
 import { sendSystemNotification } from '@/utils/notifications';
 
 export default function PMMaterialsPage() {
   const router = useRouter();
+  const { isMobile } = useResponsive();
   const [tab, setTab] = useState<'queue' | 'stock' | 'orders'>('queue');
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function PMMaterialsPage() {
       const table = tab === 'queue' ? 'material_requests' : tab === 'stock' ? 'materials' : 'purchase_orders';
       const result = await supabase.from(table).select('*').in('project_id', projects.map(p => p.id)).order('created_at', { ascending: false });
       if (result.error) throw result.error;
-      setRows((result.data || []).map(row => ({ ...row, project: projects.find(p => p.id === row.project_id), profiles: firstRelation(row.profiles) })));
+      setRows(((result.data as any[]) || []).map((row: any) => ({ ...row, project: projects.find(p => p.id === row.project_id), profiles: firstRelation(row.profiles) })));
     } catch (e: any) { setError(e.message || 'Unable to load materials.'); }
     finally { setLoading(false); }
   }, [tab]);
@@ -64,13 +66,15 @@ export default function PMMaterialsPage() {
   return <View className="flex-1 bg-brand-light">
     <TopNav title="Materials Management" actionLabel="Refresh" onActionPress={load} />
     <View className="px-4 pt-4">
-      <View className="mb-3 z-50">
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Materials</Text>
         <SearchInput 
           placeholder="Search item, order or project..." 
           value={search} 
           onChangeText={setSearch} 
           items={rows} 
           entityLabel="materials" 
+          className={isMobile ? "w-full" : "w-80"}
           getLocalResults={(query) => rows.filter(row => `${row.item_name || row.name || row.po_number || ''} ${row.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(row => ({ id: row.id, title: row.item_name || row.name || row.po_number || 'Material', subtitle: row.project?.name || '' }))}
         />
       </View>

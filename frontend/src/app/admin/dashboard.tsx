@@ -44,30 +44,25 @@ export default function DashboardScreen() {
       const utcDate = now.toISOString().split('T')[0];
       const todayDates = Array.from(new Set([localDate, utcDate]));
 
-      const [projectsReq, labourReq, materialsReq, budgetReq, allProjectsReq] = await Promise.all([
-        supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['active', 'Active', 'In Progress', 'in progress']),
-        supabase.from('attendance').select('*', { count: 'exact', head: true }).in('date', todayDates).not('check_in_time', 'is', null).is('check_out_time', null),
+      const [projectsReq, labourReq, materialsReq] = await Promise.all([
+        supabase.from('projects').select('id, name, total_budget, status'),
+        supabase.from('attendance').select('id', { count: 'exact', head: true }).in('date', todayDates).not('check_in_time', 'is', null).is('check_out_time', null),
         supabase.from('materials').select('current_stock, minimum_threshold'),
-        supabase.from('projects').select('total_budget').in('status', ['active', 'Active', 'In Progress', 'in progress']),
-        supabase.from('projects').select('id, name')
       ]);
       
-      if (allProjectsReq.data) {
-        setAllProjects(allProjectsReq.data);
-      }
+      const allProj = projectsReq.data || [];
+      setAllProjects(allProj);
+
+      const activeProj = allProj.filter(p => ['active', 'Active', 'In Progress', 'in progress'].includes(p.status || ''));
+      const totalBudget = activeProj.reduce((sum, item) => sum + (Number(item.total_budget) || 0), 0);
 
       let lowStockCount = 0;
       if (materialsReq.data) {
         lowStockCount = materialsReq.data.filter(m => (m.current_stock || 0) < (m.minimum_threshold || 0)).length;
       }
 
-      let totalBudget = 0;
-      if (budgetReq.data) {
-        totalBudget = budgetReq.data.reduce((sum, item) => sum + (Number(item.total_budget) || 0), 0);
-      }
-
       setStats({
-        activeProjects: projectsReq.count || 0,
+        activeProjects: activeProj.length,
         workersOnSite: labourReq.count || 0,
         lowStockAlerts: lowStockCount,
         totalBudget: totalBudget,
@@ -116,14 +111,14 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={true}>
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Admin Dashboard</Text>
             
             <SearchInput 
               placeholder="Search projects..." 
               value={searchQuery} 
               onChangeText={setSearchQuery} 
-              className={isMobile ? "w-full" : "w-64"}
+              className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'projects',
                 searchColumn: 'name',
@@ -136,13 +131,14 @@ export default function DashboardScreen() {
           </View>
 
           {/* Top Stat Cards Row */}
-          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
             <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
                 value={stats.activeProjects.toString()} 
                 indicatorText="Live tracking" 
                 indicatorType="success" 
+                colorScheme="blue"
                 fullWidth
               />
             </AnimatedCard>
@@ -152,6 +148,7 @@ export default function DashboardScreen() {
                 value={stats.workersOnSite.toString()} 
                 indicatorText="Currently checked in" 
                 indicatorType={stats.workersOnSite > 0 ? "success" : "neutral"}
+                colorScheme="emerald"
                 fullWidth
               />
             </AnimatedCard>
@@ -161,6 +158,7 @@ export default function DashboardScreen() {
                 value={stats.lowStockAlerts.toString()} 
                 indicatorText="Requires ordering" 
                 indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"} 
+                colorScheme="amber"
                 fullWidth
               />
             </AnimatedCard>
@@ -169,6 +167,7 @@ export default function DashboardScreen() {
                 label="Total Budget" 
                 value={formatCurrency(stats.totalBudget)} 
                 indicatorText="Approved estimates" 
+                colorScheme="purple"
                 fullWidth
               />
             </AnimatedCard>

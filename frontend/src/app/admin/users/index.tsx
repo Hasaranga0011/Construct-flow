@@ -8,6 +8,7 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
 import { roleLabel } from '../../../utils/roles';
+import { RoleAvatar } from '@/components/common/RoleAvatar';
 
 export default function AdminUsersList() {
   const router = useRouter();
@@ -80,22 +81,24 @@ export default function AdminUsersList() {
 
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'column', marginBottom: 24, gap: 16, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Users</Text>
+            <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 12 : 0 }}>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Users</Text>
 
-            <SearchInput items={users} entityLabel="users"
-              placeholder="Search users..."
-              value={search}
-              onChangeText={setSearch}
-              className="w-full md:w-64"
-              config={{
-                table: 'profiles',
-                searchColumn: 'full_name',
-                secondaryColumn: 'email',
-                titleColumn: 'full_name',
-                subtitleColumn: 'email',
-                routePrefix: '/admin/users/'
-              }}
-            />
+              <SearchInput items={users} entityLabel="users"
+                placeholder="Search users..."
+                value={search}
+                onChangeText={setSearch}
+                className={isMobile ? "w-full" : "w-80"}
+                config={{
+                  table: 'profiles',
+                  searchColumn: 'full_name',
+                  secondaryColumn: 'email',
+                  titleColumn: 'full_name',
+                  subtitleColumn: 'email',
+                  routePrefix: '/admin/users/'
+                }}
+              />
+            </View>
 
             <FilterChipGrid
               options={roles.map(r => ({ id: r, label: formatRoleDisplay(r) }))}
@@ -131,9 +134,14 @@ export default function AdminUsersList() {
                   <View key={u.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm w-full overflow-hidden">
                     <View className="flex-row items-start flex-wrap mb-3 gap-y-2">
                       <View className="flex-row items-center flex-1 min-w-[200px] pr-2">
-                        <View className="w-11 h-11 rounded-full bg-indigo-50 items-center justify-center mr-3 shrink-0">
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-indigo-600 font-bold text-lg">{u.full_name?.charAt(0) || '?'}</Text>
-                        </View>
+                        <RoleAvatar
+                          size="md"
+                          avatarUrl={u.avatar_url}
+                          role={u.role}
+                          name={u.full_name}
+                          showRoleBadge
+                          className="mr-3 shrink-0"
+                        />
                         <View className="flex-1 min-w-0">
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-base">{u.full_name || 'Unnamed User'}</Text>
                           <Text numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs font-medium">{u.email}</Text>
@@ -163,9 +171,14 @@ export default function AdminUsersList() {
               filteredRows.map(u => (
                 <View key={u.id} className="flex-row items-center py-4 border-b border-gray-100">
                   <View className="w-[30%] flex-row items-center pr-4">
-                    <View className="w-8 h-8 bg-indigo-100 rounded-full items-center justify-center mr-3">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-indigo-600 font-bold text-xs">{u.full_name?.charAt(0) || '?'}</Text>
-                    </View>
+                    <RoleAvatar
+                      size="sm"
+                      avatarUrl={u.avatar_url}
+                      role={u.role}
+                      name={u.full_name}
+                      showRoleBadge
+                      className="mr-3 shrink-0"
+                    />
                     <View>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{u.full_name || 'Unnamed User'}</Text>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">ID: {u.id.slice(0, 8)}...</Text>
@@ -183,7 +196,11 @@ export default function AdminUsersList() {
                   </View>
 
                   <View className="w-[15%]">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-500 text-xs font-bold">Active</Text>
+                    <View className={`px-2.5 py-0.5 rounded-full self-start ${u.is_approved === false ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[11px] font-bold ${u.is_approved === false ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {u.is_approved === false ? 'Pending' : 'Active'}
+                      </Text>
+                    </View>
                   </View>
 
                   <View className="flex-1 flex-row justify-end pl-1">

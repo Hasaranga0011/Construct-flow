@@ -90,24 +90,29 @@ export default function SupplierDashboardScreen() {
         </View>
       ) : (
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Scoped search: in normal flow, scrolls with the page */}
-          <View style={{ zIndex: 5, position: 'relative' }} className="mb-6">
+          {/* Header row with Title and Search */}
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+            <View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Supplier Dashboard</Text>
+              <View className="flex-row items-center mt-1">
+                <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
+                  Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}
+                </Text>
+                {searchQuery.trim() !== '' && (
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-brand-orange ml-3">Filtered by &quot;{searchQuery}&quot;</Text>
+                )}
+              </View>
+            </View>
+
             <SearchInput
-              placeholder="Search your orders by PO, material or project..."
+              placeholder="Search orders, PO, material..."
               value={searchQuery}
               onChangeText={setSearchQuery}
+              className={isMobile ? "w-full" : "w-80"}
               getLocalResults={getSuggestions}
               onSelectResult={(item) => router.push(`/supplier/orders/${item.id}` as any)}
             />
-            <View className="flex-row items-center mt-2">
-              <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
-                Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}
-              </Text>
-              {searchQuery.trim() !== '' && (
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-brand-orange ml-3">Panels filtered by &quot;{searchQuery}&quot;</Text>
-              )}
-            </View>
           </View>
 
           {/* Top Stat Cards Row */}
@@ -118,6 +123,7 @@ export default function SupplierDashboardScreen() {
                 value={stats.pendingOrders.toString()} 
                 indicatorText="Requires approval" 
                 indicatorType="warning" 
+                colorScheme="blue"
               />
             </AnimatedCard>
             <AnimatedCard delay={200} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
@@ -126,6 +132,7 @@ export default function SupplierDashboardScreen() {
                 value={stats.confirmedOrders.toString()} 
                 indicatorText="Confirmed, awaiting dispatch" 
                 indicatorType="success"
+                colorScheme="emerald"
               />
             </AnimatedCard>
             <AnimatedCard delay={300} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
@@ -134,7 +141,7 @@ export default function SupplierDashboardScreen() {
                 value={stats.lateDeliveries.toString()} 
                 indicatorText="Overdue items" 
                 indicatorType={stats.lateDeliveries > 0 ? "danger" : "success"} 
-                icon={<Ionicons name={stats.lateDeliveries > 0 ? "warning" : "checkmark-circle"} size={16} color={stats.lateDeliveries > 0 ? "#EF4444" : "#10B981"} />}
+                colorScheme="rose"
               />
             </AnimatedCard>
             <AnimatedCard delay={400} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
@@ -142,6 +149,7 @@ export default function SupplierDashboardScreen() {
                 label="Total Revenue" 
                 value={formatCurrency(stats.totalRevenue)} 
                 indicatorText="Confirmed, delivered & received" 
+                colorScheme="purple"
               />
             </AnimatedCard>
           </View>

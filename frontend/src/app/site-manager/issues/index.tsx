@@ -38,12 +38,12 @@ export default function SMIssuesPage() {
 
       const { data: projectData, error: projectError } = await supabase.from('projects').select('id, name').in('id', assignedProjectIds);
       if (projectError) throw projectError;
-      setProjects(projectData || []);
+      setProjects((projectData || []).filter((p): p is { id: string; name: string } => Boolean(p.id && p.name)));
       const currentProjectId = assignedProjectIds.includes(activeProjectId || '') ? activeProjectId! : assignedProjectIds[0];
       if (currentProjectId !== activeProjectId) setActiveProjectId(currentProjectId);
 
       const linkedSites = await projectSites([currentProjectId]);
-      const ids = linkedSites.map(s => s.id);
+      const ids = linkedSites.map(s => s.id).filter((id): id is string => Boolean(id));
       setSiteIds(ids);
       if (!ids.length) { setIssues([]); return; }
       const { data, error } = await supabase

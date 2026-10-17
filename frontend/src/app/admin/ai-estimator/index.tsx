@@ -139,7 +139,12 @@ export default function AdminAiEstimatorPage() {
         latitude,
         longitude,
         inputs: data.features_used,
-        contributions: data.feature_contributions
+        contributions: data.feature_contributions,
+        estimated_range_display: data.estimated_range_display,
+        prediction_range_pct: data.prediction_range_pct,
+        physical_quantities: data.physical_quantities,
+        physical_breakdown: data.physical_breakdown,
+        cost_per_sqft: data.cost_per_sqft,
       });
 
       await supabase.from('estimations').insert({
@@ -160,7 +165,7 @@ export default function AdminAiEstimatorPage() {
   return (
     <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <TopNav title="AI Cost Estimator" showAction={false} />
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="px-6 py-3 text-sm text-amber-800 bg-amber-50">Prototype estimates use synthetic data. Accuracy is not validated; confirm costs before budgeting.</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="px-6 py-3 text-sm text-amber-800 bg-amber-50">Hybrid Estimator: Combines physical BOQ quantities & live material prices with log-scale ML calibration. Honest prediction ranges shown for reliable planning.</Text>
 
       <ScrollView keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -180,23 +185,21 @@ export default function AdminAiEstimatorPage() {
             }}
           >
             {[
-              { label: 'Active Model', value: insights.active_model, icon: 'cpu-outline' },
+              { label: 'Active Model', value: insights.active_model || 'Log-Scale Hybrid Estimator', icon: 'cpu-outline' },
               {
-                label: 'R² Score',
-                value: insights.accuracy_score != null && insights.accuracy_score !== 'Not validated'
-                  ? `${insights.accuracy_score}`
-                  : 'Not validated',
+                label: 'Real MAPE',
+                value: insights.validation_mape != null
+                  ? `${insights.validation_mape}%`
+                  : 'Not enough data',
                 icon: 'trending-up-outline',
               },
               {
-                label: 'Training Data',
-                value: insights.total_training_samples
-                  ? `${insights.total_training_samples.toLocaleString()} records`
-                  : 'No data',
+                label: 'Real Projects',
+                value: `${insights.real_projects_count ?? 0} benchmarked`,
                 icon: 'server-outline',
               },
               {
-                label: 'Last Trained',
+                label: 'Last Calibrated',
                 value: insights.model_info?.cost_model?.trained_at
                   ? new Date(insights.model_info.cost_model.trained_at).toLocaleDateString()
                   : '—',
@@ -363,17 +366,30 @@ export default function AdminAiEstimatorPage() {
                   Estimated Project Cost
                 </Text>
                 <AutoFitText value={formatCurrency(result.estimated_cost)} maxFontSize={isMobile ? 28 : 36} minFontSize={18} style={{ color: '#fff', fontWeight: 'bold' }} captionStyle={{ color: 'rgba(255,255,255,0.8)' }} containerStyle={{ marginBottom: 4 }} />
-                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 16 }]}>
-                  Estimate only — not a financial commitment. Confirm with a quantity surveyor.
+                
+                {result.estimated_range_display ? (
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 12 }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                      Prediction Range: {result.estimated_range_display}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 }}>
+                      Reflects ±{result.prediction_range_pct || 15}% uncertainty margin for realistic budget envelope.
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginBottom: 16 }]}>
+                  Calibrated via Sri Lanka material prices & physical quantities. Confirm with QS before contract signing.
                 </Text>
+
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
                   {[
-                    { label: 'Confidence', value: result.confidence_score != null ? `${Math.round(result.confidence_score)}%` : 'N/A' },
+                    { label: 'Rate / Sq.Ft.', value: result.cost_per_sqft ? `LKR ${Number(result.cost_per_sqft).toLocaleString()}` : '—' },
                     { label: 'Location', value: result.features_used?.location },
                     { label: 'Type', value: result.features_used?.type },
                     { label: 'Quality', value: result.features_used?.quality },
-                    { label: 'Model', value: result.model_source || 'RandomForest' },
-                    { label: 'Trained', value: result.model_trained_on ? new Date(result.model_trained_on).toLocaleDateString() : '—' },
+                    { label: 'Model', value: result.model_source || 'Log-Scale Hybrid' },
+                    { label: 'Calibrated', value: result.model_trained_on ? new Date(result.model_trained_on).toLocaleDateString() : '—' },
                   ].map(stat => (
                     <View key={stat.label} style={{ minWidth: '40%' }}>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.7)', fontSize: 11 }]}>{stat.label}</Text>
@@ -381,6 +397,41 @@ export default function AdminAiEstimatorPage() {
                     </View>
                   ))}
                 </View>
+
+                {/* Physical BOQ Quantities */}
+                {result.physical_quantities && (
+                  <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.25)' }}>
+                    <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 10 }]}>
+                      Physical Quantities (Bottom-Up BOQ)
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 10, flex: 1, minWidth: '45%' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>Cement (50kg bags)</Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                          {Number(result.physical_quantities.cement_bags || 0).toLocaleString()} bags
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 10, flex: 1, minWidth: '45%' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>Structural Steel</Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                          {Number(result.physical_quantities.steel_kg || 0).toLocaleString()} kg
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 10, flex: 1, minWidth: '45%' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>Sand & Aggregate</Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 2 }}>
+                          {result.physical_quantities.sand_cubes || 0}c sand / {result.physical_quantities.aggregate_cubes || 0}c agg
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 10, flex: 1, minWidth: '45%' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>Site Labour (@Rs. 3.5k/d)</Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                          {Number(result.physical_quantities.labour_worker_days || 0).toLocaleString()} days
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
 
                 {/* Per-prediction feature contributions */}
                 {result.feature_contributions?.length > 0 && (

@@ -122,8 +122,19 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - **Universal API Discovery (`lib/apiUrl.ts`)**: Dynamically resolves API addresses across Web (`window.location.hostname`) and mobile Expo Go (dynamically extracting LAN IP from Metro's `Constants.expoConfig?.hostUri`, `Constants.experienceUrl`, and local network fallback `10.24.163.40`), resolving mobile `Network request failed` errors.
   - **Public Inquiry Endpoint**: Fully wired `/api/public-inquiry` on FastAPI with automatic Supabase admin notification dispatching.
   - **Reanimated Strict Mode Stabilization**: Suppressed strict-mode log flood in `_layout.tsx` via `configureReanimatedLogger({ strict: false })` and `LogBox.ignoreLogs`. Migrated `AnimatedCard.tsx` to React Native's standard `Animated` library for cross-platform stability.
+
+**2026-10-16 completion brief:** Hero Layout Overhaul, Notifications Service-Role Hardening & NativeWind Interop Fixes.
+- **COMPLETE & Working**:
+  - **Hero Section Overhaul (Web & Native)**: Removed the right-side glass dashboard widget card (`ConstructAi — Nimal Fernando (PM)`) in `frontend/src/app/index.tsx`. Re-centered the entire hero layout (`self-center`, `text-center`, `max-w-5xl mx-auto`). Scaled headline typography responsively: 42px on small phones, 48px on standard mobile, 56px on tablet, and 68px/78px on desktop viewports. Kept dual action buttons ("Team Portal" and "Partner Portal") and the horizontal 4-stat metrics bar centered directly below the description.
+  - **Notification "Mark All as Read" Hardening**:
+    - Fixed `backend/api/routes/notifications.py`: Added missing imports `from core.database import get_service_client` and `from supabase import create_client`, resolving `NameError: name 'create_client' is not defined`.
+    - Added support for `payload.all = True` in `mark_notifications_read`: Uses the Supabase service-role client to mark all notifications as read across targeted user IDs, role broadcasts (`target_role`), and system broadcasts (`target_user_id IS NULL AND target_role IS NULL`).
+    - Upgraded `frontend/src/context/NotificationContext.tsx`: Acquired fresh auth sessions prior to marking read, passed `all: true`, and added a direct client-side Supabase update fallback (`supabase.from('notifications').update({ is_read: true })`) to guarantee instant state sync even if backend proxy latency occurs.
+  - **NativeWind & React Native CSS Interop Stabilization**:
+    - In `frontend/src/components/ui/Select.tsx`, replaced dynamic Tailwind CSS variable utility `ring-2 ring-orange-100` with standard React Native inline style override `style={open ? { borderColor: '#F97316', borderWidth: 1.5 } : undefined}`.
+    - Patched `stringify` in `node_modules/react-native-css-interop/dist/runtime/native/render-component.js` with defensive `try/catch` and React internal Fiber checks to prevent dev warning traversals from throwing `Couldn't find a navigation context`.
 - **IN PROGRESS**:
-  - Final end-to-end integration testing and production rollout readiness.
+  - Final end-to-end multi-role flow verification and production deployment preparation.
 - **KNOWN BUGS / ISSUES**:
   - Occasional Expo Router Metro bundler file import pathing issues can occur in deeply nested folders; verify relative import depth.
   - Supplier 'Order Confirmation' actions on the frontend will throw constraint errors until the database check constraint `purchase_orders_status_check` is manually updated in Supabase to permit the `Confirmed` and `Suggested` statuses.
@@ -131,6 +142,7 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
 
 ## 5. Architecture & Key Design Decisions
 - **Client-Server Split**: The frontend handles UI, local state, and direct Supabase Realtime subscriptions (for WebSockets). The backend handles complex business logic (e.g., fulfilling orders, generating alerts, integrations, ML processing, salary generation).
+- **Styling Rule for Dynamic States in NativeWind**: Do NOT toggle Tailwind classes that define or rely on CSS variables (such as `ring-2`, `ring-orange-100`, or complex dynamic `shadow-*`) conditionally on components. NativeWind's CSS Interop runtime promotes components to CSS variable providers and deep-inspects props; on React 19/React Native 0.81, this triggers React internal Fiber traversals during warnings. Use explicit React Native inline style overrides (`style={{ borderColor, borderWidth }}`) for dynamic active/focused borders.
 - **Routing**: Strict role-based URL namespacing (`/admin/dashboard`, `/supplier/dashboard`). If a user logs in, their role from `public.profiles` dictates where they are pushed. Web navigation relies on Expo Router's `<Link asChild>` for stability.
 - **Navigation contract**: Role layouts use suffix-only nav hrefs such as `/dashboard` and provide the role prefix through `basePath`. Sidebar builders defensively avoid duplicate prefixes.
 - **Responsive contract**: `useResponsive()` and role layouts use a 1024px compact breakpoint. Below that width, the mobile drawer is used; content uses responsive padding and stacks dashboard/form columns.
@@ -435,3 +447,70 @@ Auth/public pages (same five widths, including full vertical form scrolling wher
 - `/team-register` ? web responsive/scroll/focus verified at 360, 390, 768, 1024, 1440 px.
 
 Additional interaction checks: 65 passed for drawer, single header, account overlay, new-project modal and assignment dropdown. Site-manager and project-manager functional browser regressions are recorded in `frontend/reviews/RESPONSIVE_AUDIT.md`. Android and iOS JavaScript export passed; physical Expo Go devices, native keyboard/safe-area behavior, camera permission and iPad split view could not be observed in this environment.
+
+---
+
+## 5. Machine Learning & Real Cost Estimator System
+
+### 5.1 Real ML Pipeline & Log-Scale Model
+- **Legacy Synthetic CSVs Deprecated**: The previous files (`construction_project_dataset.csv`, `construction_project_performance_dataset.csv`, `construction_project_data.csv`) contained uniform random noise and artificial formula-fitting producing deceptive $R^2 \approx 0.9527$. They have been decommissioned and moved to `data/legacy_synthetic/` with a README.
+- **Log-Scale Cost Per Square Foot**: The estimator predicts cost per square foot on a log scale:
+  $$\ln(\text{actual\_total\_lkr} / \text{floor\_area\_sqft})$$
+  This stabilizes variance across large and small projects and prevents negative or non-linear blowups.
+- **Physical Bottom-Up Quantity Baseline**: Computes physical quantities of materials (cement bags, steel kg, river sand cubes, aggregate cubes) and site labour worker-days at the configured Sri Lankan daily rate of Rs. 3,500/day + 15% preliminaries/overhead. The ML model predicts local calibration and correction factors.
+- **Honest Prediction Range**: Every estimate presents an uncertainty envelope ($\pm 15\text{--}20\%$, e.g. "LKR 14,500,000 to LKR 18,200,000") reflecting early-stage variance.
+- **Real Project Evaluation Gate**: Model accuracy is measured strictly on real completed projects using **MAPE** (Mean Absolute Percentage Error) and **MAE**. Synthetic rows are excluded from every reported accuracy figure. When real project count $N < 5$, ML Insights displays `"Not enough real data yet (based on N real projects)"`.
+- **Deterministic Delay Risk**: Delay risk is calculated 100% deterministically from operational milestones, late purchase orders, and site attendance rates.
+- **Automated Learning Loop**:
+  - Automatically records completed projects into `historical_projects` upon project status change to `Completed`.
+  - Automatically records supplier-confirmed prices into `material_prices`.
+  - Admin CSV import endpoint (`POST /api/ai/import-historical-projects`) validates 25 Sri Lankan districts, requires positive actuals, checks chronological dates, and skips duplicate entries (`project_name` + `start_date`).
+
+### 5.2 Email Infrastructure & Railway Security
+- **Railway Port 587/465 Policy**: Outbound SMTP ports (587, 465, 25) are blocked on Railway Trial, Free, and Hobby plans.
+- **HTTPS REST Email Delivery**:
+  1. **Resend HTTPS API**: Primary delivery via `https://api.resend.com/emails`.
+  2. **Brevo HTTPS REST API**: Secondary delivery via `https://api.brevo.com/v3/smtp/email`.
+  3. **Legacy SMTP**: Only attempted if `ENABLE_SMTP=true` is explicitly set in environment variables.
+- **Strict Password Redaction**: Plaintext passwords are never written to disk, console, or audit logs (`CREDENTIALS: [PROTECTED / REDACTED]`).
+- **Standardized Error Handling**: Delivery failures record structured error codes (`RATE_LIMIT_EXCEEDED`, `AUTH_KEY_INVALID`, `EMAIL_DELIVERY_FAILED`) allowing administrators to generate one-time invite / password reset links.
+
+---
+
+## 6. Android Build & Deployment (EAS Cloud Build)
+
+### 6.1 Configuration & Architecture
+- **EAS Project Root**: `frontend/`
+- **Application Identifiers**:
+  - App Name: `ConstructAi`
+  - Slug: `construct-flow`
+  - Package: `com.constructflow.app`
+  - Version: `1.0.0` (versionCode: 1)
+  - URL Scheme: `constructflow://`
+- **EAS Build Profiles (`frontend/eas.json`)**:
+  - `preview`: Standalone Android APK (`buildType: "apk"`, `distribution: "internal"`, `environment: "preview"`).
+  - `production`: Android App Bundle (`buildType: "app-bundle"`, `autoIncrement: true`, `environment: "production"`).
+- **Asset Dimensions**:
+  - Icon: `1024×1024` PNG (`frontend/assets/images/icon.png`)
+  - Adaptive Foreground: `1024×1024` PNG (`frontend/assets/images/android-icon-foreground.png`, centered with brand safe margin)
+  - Adaptive Background: `#0F172A`
+
+### 6.2 Scoped Plugins & Android Permissions
+- `expo-camera`: QR scanning for site attendance check-in (`android.permission.CAMERA`).
+- `expo-image-picker`: Photos for site reports, milestones, and user avatars (`android.permission.READ_MEDIA_IMAGES`, `android.permission.READ_EXTERNAL_STORAGE`).
+- `expo-location`: Site geofencing and check-in location verification (`android.permission.ACCESS_FINE_LOCATION`, `android.permission.ACCESS_COARSE_LOCATION`).
+- `expo-notifications`: Push alerts (`android.permission.POST_NOTIFICATIONS`).
+- `expo-router` & `expo-font`: Core routing and typography.
+
+### 6.3 Environment Variables & Release Safety
+- Client-baked variables: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_API_URL` (and optional `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`).
+- **Fail-Fast Enforcement**:
+  - `frontend/src/lib/supabase.ts` throws immediately on app launch if Supabase credentials are missing.
+  - `frontend/src/lib/apiUrl.ts` validates that in release builds (`!__DEV__`), `EXPO_PUBLIC_API_URL` starts with `https://` and strictly rejects `localhost`, `127.0.0.1`, and private/LAN IP addresses (`10.x.x.x`, `172.16-31.x.x`, `192.168.x.x`, `10.0.2.2`). Never falls back to a default host.
+- Zero secrets (service-role keys, SMTP passwords, Cloudinary credentials) are bundled into frontend code.
+
+### 6.4 Verification Scripts
+- `npm run build:apk:local-check`: Runs `npx expo-doctor` (18/18 checks pass), `npx expo install --check` (clean dependencies), and `npx tsc --noEmit` (0 type errors).
+- Android Metro bundle test: `npx expo export -p android` bundles successfully without warnings or missing symbols.
+- Detailed step-by-step user execution instructions, signing keystore backup, and troubleshooting matrix are documented in `frontend/BUILD.md`.
+

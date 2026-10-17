@@ -90,7 +90,12 @@ export const QuotationForm = ({
         latitude,
         longitude,
         inputs: aiData.features_used,
-        contributions: contributions
+        contributions: contributions,
+        estimated_range_display: aiData.estimated_range_display,
+        prediction_range_pct: aiData.prediction_range_pct,
+        physical_quantities: aiData.physical_quantities,
+        physical_breakdown: aiData.physical_breakdown,
+        cost_per_sqft: aiData.cost_per_sqft,
       });
 
       await api.post('/estimations', {
@@ -105,7 +110,8 @@ export const QuotationForm = ({
         project_id: projectId || null,
       });
 
-      toast.success(`AI Estimate Generated: Rs. ${(estimatedCost / 1000000).toFixed(2)}M\nConfidence: ${confidence == null ? 'Not validated' : `${confidence}%`}`);
+      const rangeNotice = aiData.estimated_range_display ? `\nRange: ${aiData.estimated_range_display}` : '';
+      toast.success(`AI Estimate Generated: Rs. ${(estimatedCost / 1000000).toFixed(2)}M${rangeNotice}`);
 
       // Real-time Notification Dispatch
       await sendSystemNotification(

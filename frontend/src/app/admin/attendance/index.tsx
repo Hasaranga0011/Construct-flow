@@ -3,6 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
+import { SearchInput } from '@/components/common/SearchInput';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -100,16 +101,12 @@ export default function AdminAttendanceIndex() {
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-indigo-700 font-bold ml-2">{globalStats.checkedIn} / {globalStats.totalWorkers} Checked In Today</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: isMobile ? '100%' : 256, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="flex-1 ml-2 text-sm text-brand-text outline-none"
-                placeholder="Search sites..."
-                placeholderTextColor="#9CA3AF"
-                value={search}
-                onChangeText={setSearch}
-              />
-            </View>
+            <SearchInput
+              placeholder="Search sites..."
+              value={search}
+              onChangeText={setSearch}
+              className={isMobile ? "w-full" : "w-80"}
+            />
           </View>
         </View>
 

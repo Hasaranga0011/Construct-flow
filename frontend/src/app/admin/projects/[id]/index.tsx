@@ -1,6 +1,6 @@
 import { firstRelation } from '@/utils/relations';
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -11,6 +11,8 @@ import { useResponsive } from '../../../../hooks/useResponsive';
 import { roleLabel } from '../../../../utils/roles';
 import { getApiUrl } from '../../../../lib/apiUrl';
 import { AutoFitText } from '@/components/common/AutoFitText';
+import { ProjectImage } from '@/components/common/ProjectImage';
+import { RoleAvatar } from '@/components/common/RoleAvatar';
 
 export default function AdminProjectDetailsPage() {
   const { id } = useLocalSearchParams();
@@ -23,6 +25,25 @@ export default function AdminProjectDetailsPage() {
   const [supplierStats, setSupplierStats] = useState<any[]>([]);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  const projectGalleryImages: string[] = useMemo(() => {
+    if (!project) return [];
+    const list: string[] = [];
+    if (Array.isArray(project.images)) {
+      project.images.forEach((img: any) => {
+        if (typeof img === 'string' && img.trim().length > 0 && !list.includes(img)) {
+          list.push(img);
+        }
+      });
+    }
+    if (project.image_url && !list.includes(project.image_url)) {
+      list.unshift(project.image_url);
+    }
+    return list;
+  }, [project]);
+
+  const activeHeroImage = projectGalleryImages[selectedImageIndex] || project?.image_url;
 
   useEffect(() => {
     let isMounted = true;
@@ -51,22 +72,23 @@ export default function AdminProjectDetailsPage() {
           throw projError;
         }
 
-        if (projData.pm_id) {
-            const { data: pmData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.pm_id).single();
-            (projData as any).pm = pmData;
-        }
+        const [pmRes, clientRes, roleRes] = await Promise.all([
+          projData.pm_id
+            ? supabase.from('profiles').select('full_name, role, avatar_url').eq('id', projData.pm_id).single()
+            : Promise.resolve({ data: null } as any),
+          projData.client_id
+            ? supabase.from('profiles').select('full_name, role, avatar_url').eq('id', projData.client_id).single()
+            : Promise.resolve({ data: null } as any),
+          supabase
+            .from('project_role_assignments')
+            .select('user_id, role, profiles (full_name, email, role, avatar_url)')
+            .eq('project_id', projectId as string)
+        ]);
 
-        if (projData.client_id) {
-            const { data: clientData } = await supabase.from('profiles').select('full_name, role').eq('id', projData.client_id).single();
-            (projData as any).client = clientData;
-        }
-
-        const { data: roleData, error: roleError } = (await supabase
-          .from('project_role_assignments')
-          .select('user_id, role, profiles (full_name, email, role)')
-          .eq('project_id', projectId as string)) as any;
-
-        if (roleError) console.error("Error fetching assignments:", roleError);
+        if (pmRes.data) (projData as any).pm = pmRes.data;
+        if (clientRes.data) (projData as any).client = clientRes.data;
+        const roleData = roleRes.data;
+        if (roleRes.error) console.error("Error fetching assignments:", roleRes.error);
 
         if (isMounted) {
             setProject(projData);
@@ -176,7 +198,7 @@ export default function AdminProjectDetailsPage() {
       }
 
       notify('Success', `Project "${project.name}" has been archived successfully.`);
-      setProject(prev => prev ? { ...prev, status: 'archived' } : null);
+      setProject((prev: any) => prev ? { ...prev, status: 'archived' } : null);
       router.replace('/admin/projects' as any);
     } catch (err: any) {
       console.error('Failed to archive project:', err);
@@ -232,7 +254,7 @@ export default function AdminProjectDetailsPage() {
         throw new Error(errText);
       }
 
-      setProject(prev => prev ? { ...prev, status: 'active' } : null);
+      setProject((prev: any) => prev ? { ...prev, status: 'active' } : null);
       notify('Success', `Project "${project.name}" has been restored to active status.`);
     } catch (err: any) {
       console.error('Failed to restore project:', err);
@@ -326,24 +348,56 @@ export default function AdminProjectDetailsPage() {
           <View className="max-w-4xl mx-auto w-full">
 
             {/* Header Card */}
-            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 md:p-8 mb-6 relative overflow-hidden">
-              <View className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full" />
-
-              <View className="flex-row flex-wrap gap-3 justify-between items-start mb-6">
-                <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 220, minWidth: 0 }}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-gray-800 mb-2">{project.name}</Text>
-                  <View className="flex-row items-center">
-                    <Ionicons name="location-outline" size={16} color="#6B7280" />
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 ml-1">{project.location}</Text>
+            <View className="bg-white rounded-3xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+              {/* Project Cover Image */}
+              <View className="relative w-full" style={{ height: isMobile ? 150 : 210 }}>
+                <ProjectImage
+                  project={{ ...project, image_url: activeHeroImage }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+                <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                <View className="absolute top-4 right-4">
+                  <View className={`px-3 py-1.5 rounded-full ${project.status === 'active' ? 'bg-[#DCFCE7]' : String(project.status || '').toLowerCase() === 'archived' ? 'bg-amber-100' : 'bg-gray-100'}`}>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider text-xs ${project.status === 'active' ? 'text-brand-success' : String(project.status || '').toLowerCase() === 'archived' ? 'text-amber-800' : 'text-gray-600'}`}>
+                      {project.status}
+                    </Text>
                   </View>
                 </View>
-
-                <View className={`px-4 py-2 rounded-lg ${project.status === 'active' ? 'bg-[#DCFCE7]' : String(project.status || '').toLowerCase() === 'archived' ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider ${project.status === 'active' ? 'text-brand-success' : String(project.status || '').toLowerCase() === 'archived' ? 'text-amber-800' : 'text-gray-600'}`}>
-                    {project.status}
-                  </Text>
+                <View className="absolute bottom-4 left-5 right-5">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-white mb-1 shadow-sm">{project.name}</Text>
+                  <View className="flex-row items-center">
+                    <Ionicons name="location-outline" size={15} color="#E5E7EB" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-200 text-xs md:text-sm ml-1 font-medium">{project.location}</Text>
+                  </View>
                 </View>
               </View>
+
+              {/* Multi-Image Gallery Strip (if > 1 image uploaded) */}
+              {projectGalleryImages.length > 1 && (
+                <View className="bg-slate-900 px-4 py-2.5 flex-row items-center border-b border-slate-800">
+                  <View className="flex-row items-center gap-1.5 mr-3">
+                    <Ionicons name="images" size={14} color="#F97316" />
+                    <Text className="text-[11px] font-bold text-slate-300">
+                      Photos ({projectGalleryImages.length})
+                    </Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+                    {projectGalleryImages.map((imgUrl, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => setSelectedImageIndex(i)}
+                        className={`rounded-lg overflow-hidden border-2 mr-2 ${selectedImageIndex === i ? 'border-brand-orange scale-105' : 'border-slate-700 opacity-60'}`}
+                        style={{ width: 52, height: 38 }}
+                      >
+                        <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              <View className="p-5 md:p-8">
 
               {String(project.status || '').toLowerCase() === 'archived' && (
                 <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex-row items-center justify-between">
@@ -383,26 +437,35 @@ export default function AdminProjectDetailsPage() {
                 </View>
               </View>
             </View>
+          </View>
 
             <View style={isMobile ? { flexDirection: 'column', gap: 24 } : { flexDirection: 'row', gap: 24 }}>
               {/* Personnel Details */}
               <View style={isMobile ? { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#F3F4F6' } : { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#F3F4F6' }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Assigned Personnel</Text>
 
-                <View className="mb-4 flex-row items-center">
-                  <View className="w-11 h-11 bg-blue-50 rounded-full items-center justify-center mr-3">
-                    <Ionicons name="briefcase" size={20} color="#3B82F6" />
-                  </View>
+                <View className="mb-4 flex-row items-center gap-3">
+                  <RoleAvatar
+                    role="pm"
+                    name={project.pm?.full_name || 'Project Manager'}
+                    avatarUrl={project.pm?.avatar_url}
+                    size="md"
+                    showBadge={true}
+                  />
                   <View className="flex-1 min-w-0">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 font-bold uppercase">Project Manager</Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium">{project.pm?.full_name || 'Unassigned'}</Text>
                   </View>
                 </View>
 
-                <View className="mb-4 flex-row items-center">
-                  <View className="w-11 h-11 bg-purple-50 rounded-full items-center justify-center mr-3">
-                    <Ionicons name="person" size={20} color="#8B5CF6" />
-                  </View>
+                <View className="mb-4 flex-row items-center gap-3">
+                  <RoleAvatar
+                    role="client"
+                    name={project.client?.full_name || 'Client'}
+                    avatarUrl={project.client?.avatar_url}
+                    size="md"
+                    showBadge={true}
+                  />
                   <View className="flex-1 min-w-0">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 font-bold uppercase">Client</Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium">{project.client?.full_name || 'Unassigned'}</Text>
@@ -413,13 +476,17 @@ export default function AdminProjectDetailsPage() {
                   <View className="mt-4 pt-4 border-t border-gray-100">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 font-bold uppercase mb-3">Other Assigned Staff</Text>
                     {assignments.map((a: any, i: number) => (
-                      <View key={i} className="flex-row items-center mb-3">
-                        <View className="w-8 h-8 bg-gray-50 rounded-full items-center justify-center mr-3 border border-gray-200">
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-bold text-xs">{a.profiles?.full_name?.charAt(0) || 'U'}</Text>
-                        </View>
-                        <View>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 text-sm font-medium">{a.profiles?.full_name || 'Unknown User'}</Text>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize">{roleLabel(a.role)}</Text>
+                      <View key={i} className="flex-row items-center mb-3 gap-3">
+                        <RoleAvatar
+                          role={a.role}
+                          name={a.profiles?.full_name}
+                          avatarUrl={a.profiles?.avatar_url}
+                          size="sm"
+                          showBadge={false}
+                        />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 text-sm font-medium" numberOfLines={1}>{a.profiles?.full_name || 'Unknown User'}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize" numberOfLines={1}>{roleLabel(a.role)}</Text>
                         </View>
                       </View>
                     ))}
@@ -528,35 +595,51 @@ export default function AdminProjectDetailsPage() {
                  <View className="flex-row flex-wrap" style={{ marginHorizontal: -8 }}>
                    {supplierStats.map(stat => (
                      <View key={stat.id} style={isMobile ? { width: '100%', padding: 8 } : { width: '33.33%', padding: 8 }}>
-                       <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 h-full">
-                         <View className="flex-row items-center mb-4">
-                           <View className="w-10 h-10 bg-blue-50 rounded-full items-center justify-center mr-3">
-                             <Ionicons name="business" size={18} color="#3B82F6" />
+                       <View className="bg-white rounded-2xl shadow-sm border border-gray-200/90 hover:border-orange-200 p-5 h-full flex-col justify-between">
+                         <View>
+                           <View className="flex-row items-center mb-4 gap-3">
+                             <RoleAvatar
+                               role="supplier"
+                               name={stat.name}
+                               size="md"
+                               showRoleBadge
+                             />
+                             <View className="flex-1 min-w-0">
+                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-900 text-base" numberOfLines={1}>{stat.name}</Text>
+                               <View className="bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-full self-start mt-0.5">
+                                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-pink-700 uppercase">Supplier</Text>
+                               </View>
+                             </View>
                            </View>
-                           <View className="flex-1">
-                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">{stat.name}</Text>
-                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400">Supplier</Text>
+
+                           <View className="flex-row justify-between items-center mb-2.5 py-1 px-2.5 rounded-lg bg-gray-50/80">
+                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-medium text-gray-600">Open Orders</Text>
+                             <View className={`px-2 py-0.5 rounded-full border ${stat.openCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-100 border-gray-200'}`}>
+                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold ${stat.openCount > 0 ? 'text-amber-800' : 'text-gray-500'}`}>{stat.openCount}</Text>
+                             </View>
+                           </View>
+
+                           <View className="flex-row justify-between items-center mb-2.5 py-1 px-2.5 rounded-lg bg-gray-50/80">
+                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-medium text-gray-600">Countered / Rejected</Text>
+                             <View className={`px-2 py-0.5 rounded-full border ${stat.counteredCount > 0 ? 'bg-rose-50 border-rose-200' : 'bg-gray-100 border-gray-200'}`}>
+                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold ${stat.counteredCount > 0 ? 'text-rose-700' : 'text-gray-500'}`}>{stat.counteredCount}</Text>
+                             </View>
+                           </View>
+
+                           <View className="flex-row justify-between items-center mb-4 py-1 px-2.5 rounded-lg bg-gray-50/80">
+                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-medium text-gray-600">Last Delivery</Text>
+                             <View className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200">
+                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-blue-700">{stat.lastDelivery}</Text>
+                             </View>
                            </View>
                          </View>
 
-                         <View className="flex-row justify-between mb-2">
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">Open Orders:</Text>
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-800">{stat.openCount}</Text>
-                         </View>
-                         <View className="flex-row justify-between mb-2">
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">Countered/Rejected:</Text>
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-orange-600">{stat.counteredCount}</Text>
-                         </View>
-                         <View className="flex-row justify-between mb-4">
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500">Last Delivery:</Text>
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-medium text-gray-800">{stat.lastDelivery}</Text>
-                         </View>
-
-                         <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
+                         <TouchableOpacity style={{ minHeight: 40, minWidth: 44 }}
                            onPress={() => router.push(`/admin/materials/orders?supplier_id=${stat.id}&project_id=${project.id}`)}
-                           className="mt-auto bg-gray-50 py-2 rounded-lg items-center border border-gray-200"
+                           className="mt-auto bg-brand-orange hover:bg-orange-600 active:bg-orange-700 py-2.5 rounded-xl items-center shadow-sm flex-row justify-center"
                          >
-                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-sm">View Orders</Text>
+                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xs mr-1">View Orders</Text>
+                           <Ionicons name="arrow-forward" size={14} color="white" />
                          </TouchableOpacity>
                        </View>
                      </View>

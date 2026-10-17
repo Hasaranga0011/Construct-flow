@@ -5,6 +5,21 @@ import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
+
+if (!supabaseUrl || !supabaseUrl.trim()) {
+  throw new Error(
+    'Missing required environment variable: EXPO_PUBLIC_SUPABASE_URL. ' +
+    'Please configure EXPO_PUBLIC_SUPABASE_URL in your .env or EAS environment variables.'
+  );
+}
+
+if (!supabaseAnonKey || !supabaseAnonKey.trim()) {
+  throw new Error(
+    'Missing required environment variable: EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
+    'Please configure EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env or EAS environment variables.'
+  );
+}
+
 const isWebServer = Platform.OS === 'web' && typeof window === 'undefined';
 
 // Safe storage adapter that won't crash during SSR

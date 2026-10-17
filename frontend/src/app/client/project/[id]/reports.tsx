@@ -48,7 +48,7 @@ export default function ClientProjectSiteReports() {
             if (p.id) acc[p.id] = { full_name: p.full_name, avatar_url: p.avatar_url };
             return acc;
           }, {});
-          parsedReports.forEach(r => {
+          parsedReports.forEach((r: any) => {
             if (r.site_manager_id && smMap[r.site_manager_id]) {
               r.site_manager = smMap[r.site_manager_id];
             }

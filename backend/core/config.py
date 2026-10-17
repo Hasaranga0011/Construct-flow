@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     SMTP_USE_TLS: bool = True
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    _backend_dir = Path(__file__).resolve().parent.parent
+    _backend_env = _backend_dir / ".env"
+    model_config = SettingsConfigDict(env_file=(_backend_env, ".env"), extra="ignore")
 
 settings = Settings()

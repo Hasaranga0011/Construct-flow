@@ -6,6 +6,8 @@ import { toast } from '../../lib/toast';
 import { Ionicons } from '@expo/vector-icons';
 import { getApiUrl } from '../../lib/apiUrl';
 
+import { ProjectImageUploader } from '../common/ProjectImageUploader';
+
 export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }: { visible: boolean, onClose: () => void, project: any, onProjectUpdated: () => void }) => {
   const [form, setForm] = useState({
     name: '',
@@ -13,6 +15,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
     status: 'active',
     total_budget: '0'
   });
+  const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -23,6 +26,10 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
         status: project.status || 'active',
         total_budget: (project.total_budget || 0).toString()
       });
+      const initialImages = Array.isArray(project.images) && project.images.length > 0
+        ? project.images
+        : (project.image_url ? [project.image_url] : []);
+      setImages(initialImages);
     }
   }, [project]);
 
@@ -40,7 +47,9 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
         name: form.name.trim(),
         location: form.location.trim(),
         status: form.status,
-        total_budget: Number(form.total_budget) || 0
+        total_budget: Number(form.total_budget) || 0,
+        image_url: images[0] || null,
+        images: images
       };
 
       if (__DEV__) {
@@ -87,7 +96,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <ModalViewport>
-        <View className="bg-white rounded-2xl w-full max-w-md max-h-full shadow-xl overflow-hidden">
+        <View className="bg-white rounded-2xl w-full max-w-xl max-h-full shadow-xl overflow-hidden">
           {/* Header */}
           <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-100">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">Edit Project</Text>
@@ -97,6 +106,14 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
+            {/* Project Photos & Cover Uploader */}
+            <ProjectImageUploader
+              images={images}
+              onChangeImages={setImages}
+              maxImages={5}
+              projectName={form.name || project?.name || 'Project'}
+            />
+
             <View className="mb-4">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-1">Project Name</Text>
               <TextInput maxFontSizeMultiplier={1.3}

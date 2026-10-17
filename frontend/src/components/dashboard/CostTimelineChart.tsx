@@ -38,21 +38,21 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
 
       const projectIds = pList.map(p => p.id);
 
-      // 2. Fetch expenses
-      const { data: expData } = await supabase
-        .from('project_expenses')
-        .select('project_id, amount, expense_date')
-        .in('project_id', projectIds);
+      // Fetch expenses & purchase orders concurrently in parallel
+      const [expRes, poRes] = await Promise.all([
+        supabase
+          .from('project_expenses')
+          .select('project_id, amount, expense_date')
+          .in('project_id', projectIds),
+        supabase
+          .from('purchase_orders')
+          .select('project_id, total_price, created_at')
+          .in('project_id', projectIds)
+          .in('status', ['Delivered', 'Received'])
+      ]);
 
-      // 3. Fetch purchase orders
-      const { data: poData } = await supabase
-        .from('purchase_orders')
-        .select('project_id, total_price, created_at')
-        .in('project_id', projectIds)
-        .in('status', ['Delivered', 'Received']);
-
-      setExpenses(expData || []);
-      setPurchaseOrders(poData || []);
+      setExpenses(expRes.data || []);
+      setPurchaseOrders(poRes.data || []);
     } catch (err) {
       console.warn('CostTimelineChart: failed to load data', err);
     } finally {

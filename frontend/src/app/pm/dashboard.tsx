@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
+import { SearchInput } from '@/components/common/SearchInput';
 import { StatCard } from '../../components/common/StatCard';
 import { CostTimelineChart } from '../../components/dashboard/CostTimelineChart';
 import { DelayRiskPanel } from '../../components/dashboard/DelayRiskPanel';
@@ -58,10 +59,12 @@ export default function DashboardScreen() {
       }
 
       if (assignedProjectIds.length > 0) {
-        const materialsReq = await supabase.from('materials').select('current_stock, minimum_threshold').in('project_id', assignedProjectIds);
+        const [materialsReq, attReq] = await Promise.all([
+          supabase.from('materials').select('current_stock, minimum_threshold').in('project_id', assignedProjectIds),
+          supabase.from('attendance').select('id', { count: 'exact', head: true }).in('site_id', assignedProjectIds).eq('date', new Date().toISOString().slice(0, 10)).not('check_in_time', 'is', null).is('check_out_time', null)
+        ]);
         if (materialsReq.error) throw materialsReq.error;
         lowStockAlerts = (materialsReq.data || []).filter(m => m.current_stock != null && m.minimum_threshold != null && Number(m.current_stock) < Number(m.minimum_threshold)).length;
-        const attReq = await supabase.from('attendance').select('id', { count: 'exact', head: true }).in('site_id', assignedProjectIds).eq('date', new Date().toISOString().slice(0, 10)).not('check_in_time', 'is', null).is('check_out_time', null);
         if (attReq.error) throw attReq.error;
         labourCount = attReq.count || 0;
       }
@@ -119,19 +122,6 @@ export default function DashboardScreen() {
         title="Dashboard" 
         actionLabel="+ New Project" 
         onActionPress={() => setModalVisible(true)} 
-        initialSearchQuery={searchQuery}
-        onSearch={setSearchQuery}
-        searchConfig={{
-          table: 'projects',
-          searchColumn: 'name',
-          secondaryColumn: 'location',
-          titleColumn: 'name',
-          subtitleColumn: 'location',
-          routePrefix: '/pm/projects/',
-          filterColumn: 'pm_id',
-          filterValue: currentUserId
-        }}
-        searchEntityLabel="projects"
       />
       
       {!!error && <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} className="text-red-600 p-4" onPress={loadStats}>{error} Tap to retry.</Text>}
@@ -141,14 +131,37 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={true}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">PM Dashboard</Text>
+            
+            <SearchInput 
+              placeholder="Search projects..." 
+              value={searchQuery} 
+              onChangeText={setSearchQuery} 
+              className={isMobile ? "w-full" : "w-80"}
+              config={{
+                table: 'projects',
+                searchColumn: 'name',
+                secondaryColumn: 'location',
+                titleColumn: 'name',
+                subtitleColumn: 'location',
+                routePrefix: '/pm/projects/',
+                filterColumn: 'pm_id',
+                filterValue: currentUserId
+              }}
+              entityLabel="projects"
+            />
+          </View>
+
           {/* Top Stat Cards Row */}
-          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
+          <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
             <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
               <StatCard 
                 label="Active Projects" 
                 value={stats.activeProjects.toString()} 
                 indicatorText="Live tracking" 
                 indicatorType="success" 
+                colorScheme="blue"
                 fullWidth
               />
             </AnimatedCard>
@@ -157,6 +170,7 @@ export default function DashboardScreen() {
                 label="Workers On Site" 
                 value={stats.workersOnSite.toString()} 
                 indicatorText="Currently checked in" 
+                colorScheme="emerald"
                 fullWidth
               />
             </AnimatedCard>
@@ -166,6 +180,7 @@ export default function DashboardScreen() {
                 value={stats.lowStockAlerts.toString()} 
                 indicatorText="Requires ordering" 
                 indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"} 
+                colorScheme="amber"
                 fullWidth
               />
             </AnimatedCard>
@@ -174,6 +189,7 @@ export default function DashboardScreen() {
                 label="Total Budget" 
                 value={formatCurrency(stats.totalBudget)} 
                 indicatorText="Approved estimates" 
+                colorScheme="purple"
                 fullWidth
               />
             </AnimatedCard>

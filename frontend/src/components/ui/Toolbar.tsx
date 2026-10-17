@@ -1,39 +1,39 @@
 import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
 
-export const Toolbar = ({ children }: { children: React.ReactNode }) => {
+export const Toolbar = ({ children, style, className = '' }: { children: React.ReactNode; style?: any; className?: string }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   return (
-    <View style={{ 
+    <View className={className} style={[{ 
       flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'stretch' : 'center',
       gap: 12,
-      marginBottom: 24,
       zIndex: 50
-    }}>
+    }, style]}>
       {children}
     </View>
   );
 };
 
-export const ToolbarSearch = ({ children }: { children: React.ReactNode }) => {
+export const ToolbarSearch = ({ children, style, className = '' }: { children: React.ReactNode; style?: any; className?: string }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   return (
-    <View style={isMobile ? { width: '100%' } : { flex: 1, minWidth: 0, marginRight: 12 }}>
+    <View className={className} style={[{ width: isMobile ? '100%' : 320 }, style]}>
       {children}
     </View>
   );
 };
 
-export const ToolbarFilter = ({ children }: { children: React.ReactNode }) => {
+export const ToolbarFilter = ({ children, style, className = '' }: { children: React.ReactNode; style?: any; className?: string }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   return (
-    <View style={isMobile ? { width: '100%' } : { width: 220 }}>
+    <View className={className} style={[{ width: isMobile ? '100%' : 220 }, style]}>
       {children}
     </View>
   );

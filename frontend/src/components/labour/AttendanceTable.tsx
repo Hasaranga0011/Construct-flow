@@ -3,6 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
 import { Ionicons } from '@expo/vector-icons';
+import { RoleAvatar } from '../common/RoleAvatar';
 
 const AttendanceRow = ({ 
   name, 
@@ -28,14 +29,16 @@ const AttendanceRow = ({
       return { bg: '#FEF9C3', text: '#A16207' };
     };
     const mobileStatus = getMobileStatusColor();
-    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?';
 
     return (
       <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
-            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#1D4ED8', fontWeight: 'bold', fontSize: 16 }]}>{initials}</Text>
-          </View>
+          <RoleAvatar
+            name={name}
+            role="worker"
+            size="md"
+            showBadge={true}
+          />
           <View style={{ flex: 1 }}>
             <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 15, fontWeight: '700', color: '#111827' }]}>
               {name}
@@ -92,9 +95,17 @@ const AttendanceRow = ({
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Worker Name & Role */}
-      <View className="w-1/4">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{name}</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{role}</Text>
+      <View className="w-1/4 flex-row items-center gap-3">
+        <RoleAvatar
+          name={name}
+          role="worker"
+          size="sm"
+          showBadge={false}
+        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm" numberOfLines={1}>{name}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs" numberOfLines={1}>{role}</Text>
+        </View>
       </View>
 
       {/* Project/Site */}

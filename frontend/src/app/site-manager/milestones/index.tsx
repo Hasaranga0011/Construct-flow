@@ -62,14 +62,14 @@ export default function SMMilestonesPage() {
       if (activeProjectId !== currentProject) setActiveProjectId(currentProject);
 
       if (currentProject) {
-        const { data: msData, error: msDataError } = await supabase
+        const { data: msData, error: msDataError } = await (supabase as any)
           .from('milestones')
           .select('*, milestone_media(id, url)')
           .eq('project_id', currentProject)
           .order('due_date', { ascending: true });
-      if (msDataError) throw msDataError;
+        if (msDataError) throw msDataError;
 
-        setMilestones(msData || []);
+        setMilestones((msData || []) as Milestone[]);
       }
     } catch (error) {
       setLoadError(dataError(error));

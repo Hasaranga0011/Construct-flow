@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ConstructAi",
-    "slug": "constructai",
+    "slug": "construct-flow",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -14,12 +14,22 @@
     },
     "android": {
       "package": "com.constructflow.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -28,6 +38,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-splash-screen",
         {
@@ -37,22 +48,36 @@
         }
       ],
       [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to verify site check-ins."
-        }
-      ],
-      [
         "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes for check-in."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for site reports and profiles."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to verify site check-ins."
+        }
+      ],
+      "expo-notifications",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fae94eb1-c97a-489b-8891-9e14652c86b2"
+      }
+    },
+    "owner": "dimuthu1234"
   }
 }

@@ -271,6 +271,8 @@ export interface Database {
           notification_preferences: Json
           qr_code: string | null
           email: string | null
+          is_approved: boolean | null
+          expo_push_token: string | null
         }
         Relationships: []
         Insert: { [key: string]: any }
@@ -352,6 +354,8 @@ export interface Database {
           longitude: number | null
           address: string | null
           spent_cost: number | null
+          image_url: string | null
+          images: Json | null
         }
         Relationships: []
         Insert: { [key: string]: any }

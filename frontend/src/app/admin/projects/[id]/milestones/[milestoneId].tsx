@@ -30,7 +30,7 @@ export default function AdminMilestoneDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: queryError } = await supabase
+        const { data, error: queryError } = await (supabase as any)
           .from('milestones')
           .select('id, title, description, completion_percentage, due_date, status, milestone_media(id, url, caption)')
           .eq('id', milestoneId)
@@ -39,7 +39,7 @@ export default function AdminMilestoneDetailPage() {
         if (queryError) throw queryError;
         if (isMounted) {
           setMilestone(data as Milestone);
-          setMedia((data?.milestone_media || []) as Media[]);
+          setMedia(((data?.milestone_media || []) as unknown) as Media[]);
           setCompletion(String(data?.completion_percentage ?? 0));
         }
       } catch (loadError: any) {

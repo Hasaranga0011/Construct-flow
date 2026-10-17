@@ -81,18 +81,20 @@ export default function ClientPortalScreen() {
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
           
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Clients</Text>
-            <View className="flex-row items-center">
-              <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
+            <View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Clients</Text>
+              <View className="flex-row items-center mt-1">
+                <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
+              </View>
             </View>
             
             <SearchInput items={searchClients} entityLabel="clients" 
               placeholder="Search clients..." 
               value={searchQuery}
               onChangeText={setSearchQuery}
-              className={isMobile ? "w-full" : "w-64"}
+              className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'profiles',
                 searchColumn: 'full_name',

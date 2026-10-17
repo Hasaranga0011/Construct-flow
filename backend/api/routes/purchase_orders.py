@@ -188,6 +188,22 @@ def approve_po(po_id: str, data: PurchaseOrderApprove, current_user: dict = Depe
             raise HTTPException(status_code=404, detail="PO not found")
             
         order = res.data[0]
+
+        # Record confirmed supplier unit price to material_prices
+        try:
+            import datetime
+            from services.historical_data_service import record_material_price
+            record_material_price(
+                material=order.get("item_name") or order.get("material") or "Material",
+                unit_price=float(final_price or 0),
+                supplier_name=current_user.get("full_name") or "Supplier",
+                district=None,
+                order_date=datetime.date.today().isoformat(),
+                purchase_order_id=po_id,
+            )
+        except Exception:
+            pass
+
         # Notify Admin/Manager
         create_notifications([{
             "user_id": "11111111-1111-1111-1111-111111111111",

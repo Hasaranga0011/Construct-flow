@@ -5,8 +5,9 @@ import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { ProjectImage } from '@/components/common/ProjectImage';
 
-type Project = { id: string; name: string; location?: string | null; status?: string | null; total_budget?: number | null; spent_cost?: number | null; completion_percentage?: number | null; end_date?: string | null };
+type Project = { id: string; name: string; location?: string | null; status?: string | null; total_budget?: number | null; spent_cost?: number | null; completion_percentage?: number | null; end_date?: string | null; image_url?: string | null };
 
 const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
 
@@ -52,7 +53,15 @@ export default function ClientProjectPage() {
     <View className="flex-1 bg-brand-light">
       <TopNav title="Client Project" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-6">Assigned Projects</Text>
+        <View className="flex-row justify-between items-center mb-6 flex-wrap gap-2">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Assigned Projects</Text>
+          <Link href="/client/project/map" asChild>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-row items-center bg-white border border-gray-200 px-4 py-2.5 rounded-xl shadow-sm hover:bg-gray-50">
+              <Ionicons name="map" size={18} color="#F97316" />
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm ml-2">Map View</Text>
+            </Pressable>
+          </Link>
+        </View>
         {loading ? (
           <View className="gap-3">{[1, 2].map(item => <View key={item} className="bg-gray-100 rounded-2xl h-48 animate-pulse" />)}</View>
         ) : error ? (
@@ -68,7 +77,14 @@ export default function ClientProjectPage() {
         ) : projects.map(project => {
           const progress = Number(project.completion_percentage || 0);
           return (
-            <View key={project.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
+            <View key={project.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4 overflow-hidden">
+              <ProjectImage
+                project={project}
+                className="w-full h-44 rounded-xl mb-4"
+                showBadge
+                badgeText={project.status || 'Active'}
+                badgeVariant={project.status?.toLowerCase() === 'completed' ? 'completed' : 'active'}
+              />
               <View className="flex-row justify-between items-start">
                 <View className="flex-1 pr-4">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">{project.name}</Text>

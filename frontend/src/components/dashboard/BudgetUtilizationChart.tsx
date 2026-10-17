@@ -14,13 +14,16 @@ export const BudgetUtilizationChart = () => {
     try {
       const { data: projData, error } = await supabase
         .from('projects')
-        .select('id, name, location, total_budget')
+        .select('id, name, location, total_budget, spent_cost')
         .eq('status', 'active');
 
       if (error) throw error;
       
-      // Filter out test projects
-      const activeProjects = (projData || []).filter(p => !p.name.toLowerCase().includes('test'));
+      // Filter out test projects and ensure valid name and id
+      const activeProjects = (projData || []).filter(
+        (p): p is { id: string; name: string; location: string | null; total_budget: number | null; spent_cost: number | null } =>
+          Boolean(p.id && p.name && !p.name.toLowerCase().includes('test'))
+      );
 
       // Count occurrences of each name to handle duplicates
       const nameCounts = activeProjects.reduce((acc, p) => {
@@ -30,13 +33,17 @@ export const BudgetUtilizationChart = () => {
 
       const financialsList = await Promise.all(
         activeProjects.map(async p => {
-          const fin = await api.projects.financials(p.id).catch(() => null);
-          return { ...p, budget: Number(p.total_budget) || 0, fin };
+          let spent = p.spent_cost !== null && p.spent_cost !== undefined ? Number(p.spent_cost) : null;
+          if (spent === null || isNaN(spent)) {
+            const fin = await api.projects.financials(p.id).catch(() => null);
+            spent = fin ? (fin.actual_spend || 0) : 0;
+          }
+          return { ...p, budget: Number(p.total_budget) || 0, spent };
         })
       );
       
       const formatted = financialsList.map(p => {
-        const spent = p.fin ? (p.fin.actual_spend || 0) : 0;
+        const spent = p.spent || 0;
         
         // Division by zero guard
         const isBudgetZero = p.budget <= 0;

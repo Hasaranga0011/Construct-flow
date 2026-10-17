@@ -9,6 +9,7 @@ import { notify } from '@/utils/notify';
 
 export default function PMTeamMemberViewPage() {
   const { id } = useLocalSearchParams();
+  const memberId = Array.isArray(id) ? id[0] : (id || '');
   const router = useRouter();
   const { user } = useAuth();
   
@@ -20,12 +21,12 @@ export default function PMTeamMemberViewPage() {
     let isMounted = true;
     const fetchDetails = async () => {
       try {
-        if (!user) return;
+        if (!user || !memberId) return;
         // 1. Fetch user profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', id)
+          .eq('id', memberId)
           .single();
 
         if (profileError) throw profileError;
@@ -37,7 +38,7 @@ export default function PMTeamMemberViewPage() {
             project_id,
             projects!inner ( id, name, status, pm_id )
           `)
-          .eq('user_id', id)
+          .eq('user_id', memberId)
           .eq('projects.pm_id', user.id);
 
         if (assignError) throw assignError;

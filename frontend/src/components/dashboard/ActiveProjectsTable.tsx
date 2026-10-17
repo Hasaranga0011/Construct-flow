@@ -7,6 +7,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { Ionicons } from '@expo/vector-icons';
+import { ProjectImage } from '../common/ProjectImage';
 
 const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) => void }) => {
   const { name, location, completion_percentage: progress, status } = project;
@@ -17,9 +18,10 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
       <View className="flex-col py-4 border-b border-gray-100 w-full">
         <View className="flex-row justify-between items-start mb-2 w-full">
           <View className="flex-row items-center flex-1 pr-2">
-            <View className="w-11 h-11 bg-orange-50 rounded-lg items-center justify-center mr-3">
-              <Ionicons name="business" size={20} color="#EA580C" />
-            </View>
+            <ProjectImage
+              project={project}
+              className="w-12 h-12 rounded-lg mr-3 shadow-sm shrink-0"
+            />
             <View className="flex-1 min-w-0">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm flex-wrap">{name}</Text>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs flex-wrap">{location}</Text>
@@ -48,9 +50,10 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       {/* Thumbnail */}
-      <View className="w-11 h-11 bg-gray-200 rounded-md mr-4 items-center justify-center">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 font-bold">{name.charAt(0)}</Text>
-      </View>
+      <ProjectImage
+        project={project}
+        className="w-12 h-12 rounded-lg mr-4 shadow-sm shrink-0"
+      />
       
       {/* Details */}
       <View className="flex-1 justify-center pr-2">

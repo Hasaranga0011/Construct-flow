@@ -1,11 +1,16 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { ProjectAssignmentDropdown } from '../../../components/common/ProjectAssignmentDropdown';
+import { InteractiveMap, InteractiveMapRef, MapLocation } from '@/components/common/InteractiveMap';
+import { Ionicons } from '@expo/vector-icons';
+import { PROJECT_IMAGE_PRESETS } from '../../../utils/projectImages';
+import { ProjectImage } from '../../../components/common/ProjectImage';
+import { ProjectImageUploader } from '../../../components/common/ProjectImageUploader';
 
 export default function AdminProjectsCreatePage() {
   const router = useRouter();
@@ -17,6 +22,7 @@ export default function AdminProjectsCreatePage() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
 
+  const [images, setImages] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -31,7 +37,8 @@ export default function AdminProjectsCreatePage() {
     suppliers: [] as string[],
     admins: [] as string[],
     latitude: '',
-    longitude: ''
+    longitude: '',
+    is_test: false
   });
 
   useEffect(() => {
@@ -63,6 +70,51 @@ export default function AdminProjectsCreatePage() {
     return () => { isMounted = false; };
   }, []);
 
+  const mapRef = React.useRef<InteractiveMapRef>(null);
+
+  const handleLocationSelect = async ({ lat, lng }: MapLocation) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: String(lat),
+      longitude: String(lng),
+    }));
+
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/projects/reverse-geocode?lat=${lat}&lng=${lng}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setFormData(prev => ({
+            ...prev,
+            address: data.display_name,
+            location: prev.location || data.display_name.split(',')[0],
+          }));
+          return;
+        }
+      }
+    } catch {}
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+        headers: { 'User-Agent': 'ConstructFlow/1.0' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setFormData(prev => ({
+            ...prev,
+            address: data.display_name,
+            location: prev.location || data.display_name.split(',')[0],
+          }));
+          return;
+        }
+      }
+    } catch {}
+  };
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.location || !formData.start_date || !formData.end_date) {
       alert('Please fill out all required fields');
@@ -76,6 +128,8 @@ export default function AdminProjectsCreatePage() {
         location: formData.location,
         address: formData.address || null,
         status: formData.status,
+        image_url: images[0] || null,
+        images: images,
         start_date: formData.start_date,
         end_date: formData.end_date,
         pm_id: formData.pm_id || null,
@@ -86,6 +140,7 @@ export default function AdminProjectsCreatePage() {
         admins: formData.admins,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+        is_test: formData.is_test,
       };
 
       const response = await fetch(`${getApiUrl()}/projects`, {
@@ -128,9 +183,54 @@ export default function AdminProjectsCreatePage() {
               className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
               placeholder="e.g. Skyline Towers"
               value={formData.name}
-              onChangeText={(t) => setFormData({...formData, name: t})}
+              onChangeText={(t) => {
+                const isAutoTest = /test|demo|sample/i.test(t);
+                setFormData(prev => ({
+                  ...prev,
+                  name: t,
+                  is_test: prev.is_test || isAutoTest
+                }));
+              }}
             />
           </View>
+
+          {/* Project Images Uploader (Up to 5 images) */}
+          <ProjectImageUploader
+            images={images}
+            onChangeImages={setImages}
+            maxImages={5}
+            projectName={formData.name || 'New Project'}
+          />
+
+          {/* Test Project Toggle */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setFormData(prev => ({ ...prev, is_test: !prev.is_test }))}
+            className={`p-4 rounded-xl border mb-5 flex-row items-center justify-between ${
+              formData.is_test ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'
+            }`}
+          >
+            <View className="flex-1 pr-3">
+              <View className="flex-row items-center mb-1">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-800">
+                  Mark as Test / Demo Project
+                </Text>
+                {formData.is_test && (
+                  <View className="ml-2 bg-amber-500/20 px-2 py-0.5 rounded">
+                    <Text className="text-[10px] font-bold text-amber-800">EXCLUDED</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">
+                Excluded from live company stats, Delay Risk alerts, and AI cost estimation training data.
+              </Text>
+            </View>
+            <View className={`w-6 h-6 rounded-md items-center justify-center border ${
+              formData.is_test ? 'bg-amber-600 border-amber-600' : 'bg-white border-gray-300'
+            }`}>
+              {formData.is_test && <Ionicons name="checkmark" size={16} color="#fff" />}
+            </View>
+          </TouchableOpacity>
 
           <View className="mb-4">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Short Location *</Text>
@@ -149,6 +249,25 @@ export default function AdminProjectsCreatePage() {
               placeholder="e.g. 123 Galle Rd, Colombo"
               value={formData.address}
               onChangeText={(t) => setFormData({...formData, address: t})}
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-1">Interactive Site Map</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-2">Tap to pin exact site location or use GPS button.</Text>
+            <InteractiveMap
+              ref={mapRef}
+              markerPos={
+                formData.latitude && formData.longitude
+                  ? { lat: parseFloat(formData.latitude), lng: parseFloat(formData.longitude) }
+                  : null
+              }
+              onLocationSelect={handleLocationSelect}
+              height={220}
+              interactive={true}
+              showControls={true}
+              showCurrentLocationButton={true}
+              showLayerToggle={true}
             />
           </View>
 

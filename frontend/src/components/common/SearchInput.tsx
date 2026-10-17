@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { SearchOverlay } from './SearchOverlay';
 
 export interface SearchConfig {
-  table: string;
+  table?: string;
   searchColumn: string;
   secondaryColumn?: string;
   titleColumn: string;
@@ -34,10 +34,11 @@ interface SearchProps {
   mode?: 'filter' | 'navigate';
   entityLabel?: string;
   className?: string;
+  style?: any;
 }
 
 export function SearchInput({ placeholder = 'Search...', value, onChangeText, config,
-  items, getLocalResults, onSelectResult, mode, entityLabel = 'results', className = '' }: SearchProps) {
+  items, getLocalResults, onSelectResult, mode, entityLabel = 'results', className = '', style }: SearchProps) {
   const router = useRouter();
   const input = useRef<TextInput>(null);
   const container = useRef<View>(null);
@@ -66,14 +67,14 @@ export function SearchInput({ placeholder = 'Search...', value, onChangeText, co
     const debounce = setTimeout(async () => {
       setLoading(true);
       try {
-        let request = supabase.from(table).select('*').limit(8);
-        if (filterColumn && filterValue !== undefined) request = request.eq(filterColumn, filterValue);
+        let request: any = (supabase.from as any)(table).select('*').limit(8);
+        if (filterColumn && filterValue !== undefined && filterValue !== null) request = request.eq(filterColumn, filterValue);
         // Quoted PostgREST values prevent commas/parentheses in a name changing the filter.
         const pattern = `%${queryText.replace(/[\\%_]/g, '\\$&')}%`;
         request = secondaryColumn
           ? request.or(`${searchColumn}.ilike.${JSON.stringify(pattern)},${secondaryColumn}.ilike.${JSON.stringify(pattern)}`)
           : request.ilike(searchColumn, pattern);
-        const response = await Promise.race([
+        const response: any = await Promise.race([
           request.abortSignal(controller.signal),
           new Promise<never>((_, reject) => {
             timeout = setTimeout(() => {
@@ -83,8 +84,8 @@ export function SearchInput({ placeholder = 'Search...', value, onChangeText, co
           }),
         ]);
         if (response.error) throw response.error;
-        if (active) setRemote((response.data || []).map(row => ({
-          id: String(row.id), title: String(row[titleColumn] || ''),
+        if (active) setRemote(((response.data as any[]) || []).map((row: any) => ({
+          id: String(row.id || ''), title: String(row[titleColumn] || ''),
           subtitle: subtitleColumn ? row[subtitleColumn] : undefined, raw: row,
         })));
       } catch (failure) {
@@ -111,12 +112,12 @@ export function SearchInput({ placeholder = 'Search...', value, onChangeText, co
   };
   const dismiss = () => { cancelBlur(); setOpen(false); };
   const results: LocalSearchResult[] = !local ? remote : getLocalResults ? getLocalResults(value).slice(0, 8)
-    : (items || []).filter(row => {
+    : (items || []).filter((row: any) => {
       if (filterColumn && filterValue !== undefined && row[filterColumn] !== filterValue) return false;
       return [row[searchColumn || 'name'], row[secondaryColumn || ''], row[subtitleColumn || '']]
         .some(field => String(field || '').toLowerCase().includes(queryText.toLowerCase()));
-    }).slice(0, 8).map(row => ({ id: String(row.id), title: String(row[titleColumn || 'name'] || ''),
-      subtitle: subtitleColumn ? row[subtitleColumn] : undefined, raw: row }));
+    }).slice(0, 8).map((row: any) => ({ id: String(row?.id || ''), title: String(row?.[titleColumn || 'name'] || ''),
+      subtitle: subtitleColumn ? row?.[subtitleColumn] : undefined, raw: row }));
   const select = (item: LocalSearchResult) => {
     dismiss();
     if (actualMode === 'navigate') onChangeText('');
@@ -125,13 +126,15 @@ export function SearchInput({ placeholder = 'Search...', value, onChangeText, co
     else if (config?.routePrefix && actualMode === 'navigate') router.push(`${config.routePrefix}${item.id}` as any);
   };
   const webPreventBlur = Platform.OS === 'web' ? { onMouseDown: (event: any) => event.preventDefault() } : {};
+  const containerClass = className || 'w-full md:w-80';
 
-  return <View testID="search-field" ref={container} className={`relative min-w-0 ${className}`} style={{ zIndex: 1000, overflow: 'visible' }}>
+  return <View testID="search-field" ref={container} className={`relative min-w-0 ${containerClass}`} style={[{ zIndex: 1000, overflow: 'visible' }, style]}>
     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1,
-      borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: '100%' }}>
+      borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, height: 44, width: '100%',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 }}>
       <Ionicons name="search" size={16} color="#9CA3AF" />
-      <TextInput ref={input} maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 0 }}
-        className="flex-1 ml-2 text-sm text-gray-900 outline-none" placeholder={placeholder}
+      <TextInput ref={input} maxFontSizeMultiplier={1.3} style={{ flex: 1, height: '100%', minWidth: 0, marginLeft: 8, paddingVertical: 0, fontSize: 14, color: '#111827' }}
+        className="outline-none" placeholder={placeholder}
         placeholderTextColor="#9CA3AF" value={value}
         onChangeText={text => { cancelBlur(); onChangeText(text); setOpen(!!text.trim()); }}
         onFocus={() => { cancelBlur(); if (queryText) setOpen(true); }}
@@ -141,8 +144,8 @@ export function SearchInput({ placeholder = 'Search...', value, onChangeText, co
           blurTimer.current = setTimeout(() => { if (!pressingOptions.current) setOpen(false); }, 150);
         }}
         onKeyPress={event => { if (event.nativeEvent.key === 'Escape') dismiss(); }} />
-      <View {...webPreventBlur} style={{ width: 44 }}>
-        {!!value && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" style={{ minWidth: 44, minHeight: 44,
+      <View {...webPreventBlur} style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
+        {!!value && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" style={{ width: 32, height: 32,
           alignItems: 'center', justifyContent: 'center' }} onPress={() => { dismiss(); onChangeText(''); input.current?.focus(); }}>
           <Ionicons name="close-circle" size={18} color="#9CA3AF" />
         </Pressable>}

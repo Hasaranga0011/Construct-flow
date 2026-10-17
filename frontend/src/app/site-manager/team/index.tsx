@@ -67,7 +67,7 @@ export default function SMTeamPage() {
         .select('id, full_name')
                 .eq('qr_code', qrCode)
         .single();
-      if (workerError) throw workerError;
+      if (workerError || !worker || !worker.id) throw workerError || new Error('Worker profile not found');
 
       const { data: record, error: recordError } = await supabase.from('workers').select('id').eq('user_id', worker.id).single();
       if (recordError || !record) throw new Error('This profile is not linked to a worker record. Contact your administrator.');

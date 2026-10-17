@@ -44,7 +44,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         .limit(20);
 
       if (!error && data) {
-        setNotifications(data);
+        setNotifications(data as any as AppNotification[]);
       }
     } catch (e) {
       console.error('Failed to load notifications', e);
@@ -105,7 +105,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Fallback polling for missing realtime config on DB
     const interval = setInterval(() => {
       loadNotifications();
-    }, 15000); // 15s
+    }, 45000); // 45s fallback poll, realtime handles instant events
 
     return () => {
       isMounted = false;
@@ -117,16 +117,34 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const markAsRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ ids: [id] })
-      });
-      if (!response.ok) {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || session?.access_token;
+
+      let apiSuccess = false;
+      if (token) {
+        try {
+          const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ ids: [id] })
+          });
+          if (response.ok) {
+            apiSuccess = true;
+          }
+        } catch (err) {
+          console.warn('API mark-read failed, trying direct supabase fallback', err);
+        }
+      }
+
+      if (!apiSuccess) {
+        const { error } = await supabase.from('notifications').update({ is_read: true } as any).eq('id', id);
+        if (error) {
+          console.warn('Direct supabase mark-read error', error);
+          setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+        }
       }
     } catch (e) {
       console.error('Error marking as read', e);
@@ -135,27 +153,45 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const markAllAsRead = async () => {
+    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+    if (unreadIds.length === 0) return;
+
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
-      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-      if (unreadIds.length > 0) {
-        const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`
-          },
-          body: JSON.stringify({ ids: unreadIds })
-        });
-        if (!response.ok) {
-          setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
-        } else {
-          Alert.alert('Success', 'All notifications marked as read.');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || session?.access_token;
+
+      let apiSuccess = false;
+      if (token) {
+        try {
+          const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ ids: unreadIds, all: true })
+          });
+          if (response.ok) {
+            apiSuccess = true;
+          }
+        } catch (err) {
+          console.warn('API mark-read all failed, trying direct supabase fallback', err);
         }
       }
+
+      if (!apiSuccess) {
+        const { error } = await supabase.from('notifications').update({ is_read: true } as any).in('id', unreadIds);
+        if (error) {
+          console.warn('Direct supabase mark-read all error', error);
+          setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
+          return;
+        }
+      }
+
+      Alert.alert('Success', 'All notifications marked as read.');
     } catch (e) {
       console.error('Error marking all as read', e);
-      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
       setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
     }
   };

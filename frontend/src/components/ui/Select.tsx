@@ -84,9 +84,8 @@ export const Select = ({
           onPress={measureAndOpen}
           disabled={disabled}
           accessibilityRole="button"
-          className={`flex-row items-center justify-between min-h-[48px] px-4 rounded-xl border bg-white dark:bg-[#1E293B] ${
-            open ? 'border-brand-orange ring-2 ring-orange-100' : 'border-gray-300 dark:border-gray-700'
-          } ${disabled ? 'opacity-60' : ''}`}
+          style={open ? { borderColor: '#F97316', borderWidth: 1.5 } : undefined}
+          className={`flex-row items-center justify-between min-h-[48px] px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1E293B] ${disabled ? 'opacity-60' : ''}`}
         >
           <Text
             maxFontSizeMultiplier={1.3}

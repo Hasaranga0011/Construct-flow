@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { LogoutConfirmationModal } from '../common/LogoutConfirmationModal';
+import { RoleAvatar } from '../common/RoleAvatar';
 
 const roleConfig: Record<string, { color: string; label: string }> = {
   admin: { color: '#F97316', label: 'Administrator' },
@@ -188,14 +189,13 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
           >
             <View style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: rc.color + '15', pointerEvents: 'none' }} />
             <View className="p-6 md:p-8 flex-row items-center flex-wrap gap-4">
-              <View className="w-16 h-16 rounded-full items-center justify-center border-2 overflow-hidden flex-shrink-0"
-                style={{ backgroundColor: rc.color + '25', borderColor: rc.color + '50' }}>
-                {profile?.avatar_url ? (
-                  <Image source={{ uri: profile.avatar_url }} className="w-full h-full" resizeMode="cover" />
-                ) : (
-                  <Text maxFontSizeMultiplier={1.3} className="text-xl font-extrabold" style={{ color: rc.color }}>{initials}</Text>
-                )}
-              </View>
+              <RoleAvatar
+                role={role || 'admin'}
+                name={profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}
+                avatarUrl={profile?.avatar_url}
+                size="xl"
+                showBadge={true}
+              />
               <View className="flex-1 min-w-[200px]">
                 <Text maxFontSizeMultiplier={1.3} className="text-white text-xl font-extrabold" numberOfLines={1}>{profile?.full_name || user?.user_metadata?.full_name || 'Your Name'}</Text>
                 <Text maxFontSizeMultiplier={1.3} className="text-slate-400 text-sm mt-0.5" numberOfLines={1}>{profile?.email || user?.email}</Text>

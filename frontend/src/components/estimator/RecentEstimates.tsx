@@ -286,28 +286,24 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
     let title = estToReject.project_name;
     try { title = JSON.parse(estToReject.project_name).title || title; } catch(e) {}
 
-    const confirmReject = () => {
+    const confirmReject = async () => {
       setLoading(true);
-      supabase.from('estimations').update({ status: 'Rejected' }).eq('id', id)
-        .then(({ error }) => {
-          if (error) throw error;
-          setEstimations(prev => prev.map(e => e.id === id ? { ...e, status: 'Rejected' } : e));
-          return sendSystemNotification(
-            'Estimate Rejected',
-            `The estimate for ${title} was rejected.`,
-            'Admin'
-          );
-        })
-        .then(() => {
-          notify('Success', 'Estimate Rejected successfully.');
-        })
-        .catch(err => {
-          console.warn('Failed to reject', err);
-          notify('Error', err.message || 'Failed to reject estimate.');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      try {
+        const { error } = await supabase.from('estimations').update({ status: 'Rejected' }).eq('id', id);
+        if (error) throw error;
+        setEstimations(prev => prev.map(e => e.id === id ? { ...e, status: 'Rejected' } : e));
+        await sendSystemNotification(
+          'Estimate Rejected',
+          `The estimate for ${title} was rejected.`,
+          'Admin'
+        );
+        notify('Success', 'Estimate Rejected successfully.');
+      } catch (err: any) {
+        console.warn('Failed to reject', err);
+        notify('Error', err.message || 'Failed to reject estimate.');
+      } finally {
+        setLoading(false);
+      }
     };
 
     confirmAction(
