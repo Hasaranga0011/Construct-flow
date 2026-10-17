@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { toast } from '../../lib/toast';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getApiUrl } from '../../lib/apiUrl';
 
 import { ProjectImageUploader } from '../common/ProjectImageUploader';

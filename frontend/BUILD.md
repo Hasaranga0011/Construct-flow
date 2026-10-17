@@ -18,6 +18,8 @@ This script verifies:
 2. `npx expo install --check` — ensures all package versions match Expo SDK 54.
 3. `npx tsc --noEmit` — enforces zero TypeScript type errors.
 
+> **Size Optimization Note**: The app is configured with `expo-build-properties` (R8 code & resource shrinking, PNG crunching, and single-arch `arm64-v8a` for preview builds). See [`SIZE_REPORT.md`](SIZE_REPORT.md) for full metrics and the smoke test verification checklist.
+
 ---
 
 ## 2. Step-by-Step Manual Build Instructions

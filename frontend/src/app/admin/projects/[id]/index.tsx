@@ -6,7 +6,7 @@ import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { notify, confirmAction } from '@/utils/notify';
 import { DeleteProjectModal } from '@/components/common/DeleteProjectModal';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { roleLabel } from '../../../../utils/roles';
 import { getApiUrl } from '../../../../lib/apiUrl';

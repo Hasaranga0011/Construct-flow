@@ -3,7 +3,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../../lib/supabase';
 

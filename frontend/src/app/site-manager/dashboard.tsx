@@ -3,7 +3,7 @@ import { projectSites, dataError } from '@/services/siteData';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';

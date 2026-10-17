@@ -14,7 +14,7 @@ import { NewProjectModal } from '../../components/dashboard/NewProjectModal';
 import { supabase } from '../../lib/supabase';
 import { SearchInput } from '../../components/common/SearchInput';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useRealtimeStats } from '../../hooks/useRealtimeStats';
 

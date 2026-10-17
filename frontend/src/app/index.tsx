@@ -35,9 +35,8 @@ import {
   TextInput, useWindowDimensions, Platform, Animated,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { Video, ResizeMode } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
-import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getDashboardForRole } from '../utils/auth';
 import { getApiUrl } from '../lib/apiUrl';
 
@@ -51,89 +50,8 @@ const SCROLL_LENGTH  = '600vh';  // scroll distance for one full video pass
 const LERP_FACTOR    = 0.10;    // easing factor (lower=smoother/more lag)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve the bundled asset URL safely on web only (prevents null .uri crash on Android)
-let VIDEO_SRC = '';
-if (Platform.OS === 'web') {
-  try {
-    const videoAsset = require('../../assets/images/homepage_scroll.mp4');
-    VIDEO_SRC = typeof videoAsset === 'string' ? videoAsset : (Image.resolveAssetSource(videoAsset)?.uri || '');
-  } catch {
-    VIDEO_SRC = '';
-  }
-}
+import { injectVideoBackground } from '@/components/landing/LandingVideoBg';
 
-
-function injectVideoBackground(): () => void {
-  if (typeof document === 'undefined') return () => {};
-
-  // CSS
-  if (!document.getElementById('cf-vbg-style')) {
-    const s = document.createElement('style');
-    s.id = 'cf-vbg-style';
-    s.textContent = `
-      :root{--vblur:${BLUR};--vdim:${DIM};}
-      #cf-vbg{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;z-index:0;overflow:hidden;
-        background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#0c1a2e 100%);}
-      #cf-vbg video{position:absolute;top:50%;left:50%;min-width:100vw;min-height:100vh;width:auto;height:auto;
-        transform:translate(-50%,-50%) scale(1.78);object-fit:cover;object-position:center center;
-        filter:blur(var(--vblur)) brightness(0.65);
-        opacity:0;transition:opacity 1s ease;}
-      #cf-vbg.rdy video{opacity:1;}
-      #cf-vbg video.rdy{opacity:1;}
-      #cf-vbg .dim{position:absolute;inset:0;z-index:1;
-        background:linear-gradient(to bottom,
-          rgba(0,0,0,calc(var(--vdim)*.5)) 0%,
-          rgba(0,0,0,var(--vdim)) 50%,
-          rgba(0,0,0,calc(var(--vdim)*1.5)) 100%);}
-      body{margin:0;overflow-x:hidden;}
-      body, html, #root, [data-rnwstyle]{background-color: transparent !important;}
-      body>[data-rnwstyle],body>#root{position:relative;z-index:1;}
-    `;
-    document.head.appendChild(s);
-  }
-
-  // Container
-  let c = document.getElementById('cf-vbg');
-  if (!c) {
-    c = document.createElement('div'); c.id = 'cf-vbg';
-    const d = document.createElement('div'); d.className = 'dim';
-    c.appendChild(d);
-    document.body.insertBefore(c, document.body.firstChild);
-  }
-
-  // Video
-  let v = c.querySelector('video') as HTMLVideoElement | null;
-  if (!v) {
-    v = document.createElement('video');
-    v.muted = true; v.playsInline = true;
-    v.preload = 'auto'; v.autoplay = false;
-    v.loop = false; v.src = VIDEO_SRC;
-    c.appendChild(v);
-    v.addEventListener('loadedmetadata', () => v!.classList.add('rdy'));
-    v.load(); // iOS/Safari seek unlock
-  }
-
-  // rAF scroll scrubber
-  let raf = 0;
-  let cur = 0;
-  let tgt = 0;
-
-  const progress = () => {
-    return (window as any).__cfScrollProgress || 0;
-  };
-
-  const tick = () => {
-    const vid = c!.querySelector('video') as HTMLVideoElement | null;
-    if (vid && vid.readyState >= 1 && vid.duration > 0) {
-      tgt = progress() * vid.duration;
-      cur += (tgt - cur) * LERP_FACTOR;
-      if (Math.abs(vid.currentTime - cur) > 0.008) vid.currentTime = cur;
-    }
-    raf = requestAnimationFrame(tick);
-  };
-  raf = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(raf);
-}
 
 const AnimatedCounter = ({
   value, suffix = '', isDecimal = false, triggered,
@@ -336,10 +254,10 @@ export default function LandingPage() {
 
   const features = [
     { icon: <Ionicons name="people" size={28} color="#F97316" />,          title: 'Role-Based Portals',  desc: 'Separate dashboards for Admin, PM, Site Manager, Supplier, Client and Worker \u2014 each scoped to their data with live Supabase sync.' },
-    { icon: <FontAwesome5 name="layer-group" size={24} color="#F97316" />, title: 'Live Inventory',      desc: 'Track Portland Cement, River Sand, Steel Rebar and 200+ materials across all sites with instant low-stock alerts to your phone.' },
+    { icon: <Ionicons name="layers" size={26} color="#F97316" />,          title: 'Live Inventory',      desc: 'Track Portland Cement, River Sand, Steel Rebar and 200+ materials across all sites with instant low-stock alerts to your phone.' },
     { icon: <Ionicons name="hammer" size={28} color="#F97316" />,          title: 'QR Attendance',       desc: 'Workers scan site-specific QR codes to check in. Masons, carpenters, plumbers \u2014 all tracked with hours worked and daily snapshots.' },
     { icon: <Ionicons name="pie-chart" size={28} color="#F97316" />,       title: 'AI Cost Estimator',   desc: 'RandomForest ML trained on 50,000 Sri Lankan data points. Get LKR-accurate predictions with R\u00b2 = 0.95 confidence in seconds.' },
-    { icon: <Entypo name="globe" size={28} color="#F97316" />,             title: 'Client Portal',       desc: 'Give clients real-time milestone visibility, LKR budget charts, and direct in-app messaging \u2014 no more phone calls for updates.' },
+    { icon: <Ionicons name="globe-outline" size={28} color="#F97316" />,   title: 'Client Portal',       desc: 'Give clients real-time milestone visibility, LKR budget charts, and direct in-app messaging \u2014 no more phone calls for updates.' },
     { icon: <Ionicons name="notifications" size={28} color="#F97316" />,  title: 'Push Notifications',  desc: 'Instant alerts for delayed deliveries, absent workers, pending approvals, and budget overruns on web and native iOS/Android.' },
   ];
 

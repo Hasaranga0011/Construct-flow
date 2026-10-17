@@ -4,7 +4,7 @@ import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Image } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { InteractiveMap, InteractiveMapRef, MapLocation } from '../common/InteractiveMap';
 import { toast } from '../../lib/toast';
 import { ProjectAssignmentDropdown } from '../common/ProjectAssignmentDropdown';

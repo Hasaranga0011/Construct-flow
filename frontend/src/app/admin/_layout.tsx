@@ -3,21 +3,22 @@ import { View, Platform, useWindowDimensions } from 'react-native';
 import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
 import { SidebarProvider } from '../../context/SidebarContext';
-import { FontAwesome5, MaterialIcons, Ionicons, Entypo } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',    href: '/dashboard',    IconFamily: MaterialIcons, iconName: 'dashboard' },
-  { label: 'Projects',     href: '/projects',     IconFamily: FontAwesome5,  iconName: 'building' },
-  { label: 'Users',        href: '/users',        IconFamily: FontAwesome5,  iconName: 'user-friends' },
-  { label: 'Materials',    href: '/materials',    IconFamily: FontAwesome5,  iconName: 'box' },
-  { label: 'Labour',       href: '/labour',       IconFamily: FontAwesome5,  iconName: 'users' },
-  { label: 'Client Portal',href: '/client',       IconFamily: FontAwesome5,  iconName: 'globe' },
+  { label: 'Dashboard',    href: '/dashboard',    IconFamily: Icon, iconName: 'dashboard' },
+  { label: 'Projects',     href: '/projects',     IconFamily: Icon,  iconName: 'building' },
+  { label: 'Users',        href: '/users',        IconFamily: Icon,  iconName: 'user-friends' },
+  { label: 'Materials',    href: '/materials',    IconFamily: Icon,  iconName: 'box' },
+  { label: 'Labour',       href: '/labour',       IconFamily: Icon,  iconName: 'users' },
+  { label: 'Client Portal',href: '/client',       IconFamily: Icon,  iconName: 'globe' },
   { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
-  { label: 'Suppliers',    href: '/suppliers',    IconFamily: FontAwesome5,  iconName: 'truck' },
-  { label: 'AI Estimator', href: '/estimator',    IconFamily: FontAwesome5,  iconName: 'calculator' },
+  { label: 'Suppliers',    href: '/suppliers',    IconFamily: Icon,  iconName: 'truck' },
+  { label: 'AI Estimator', href: '/estimator',    IconFamily: Icon,  iconName: 'calculator' },
   { label: 'Notifications',href: '/notifications',badge: 4, IconFamily: Ionicons, iconName: 'notifications' },
-  { label: 'ML Insights',  href: '/insights',     IconFamily: Entypo,        iconName: 'line-graph' },
-  { label: 'Reports',      href: '/reports',      IconFamily: FontAwesome5,  iconName: 'chart-bar' },
+  { label: 'ML Insights',  href: '/insights',     IconFamily: Icon,        iconName: 'line-graph' },
+  { label: 'Reports',      href: '/reports',      IconFamily: Icon,  iconName: 'chart-bar' },
   { label: 'Profile',      href: '/profile',      IconFamily: Ionicons,      iconName: 'person-circle-outline' },
   { label: 'Settings',     href: '/settings',     IconFamily: Ionicons,      iconName: 'settings-sharp' },
 ];

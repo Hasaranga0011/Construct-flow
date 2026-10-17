@@ -6,7 +6,7 @@ import { EditProjectModal } from './EditProjectModal';
 import { useDebounce } from '../../hooks/useDebounce';
 
 import { useResponsive } from '../../hooks/useResponsive';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ProjectImage } from '../common/ProjectImage';
 
 const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) => void }) => {

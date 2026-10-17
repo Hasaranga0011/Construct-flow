@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
 
 const ActivityRow = ({ 
@@ -70,10 +71,10 @@ export const RecentClientActivity = ({ refreshTrigger = 0 }: { refreshTrigger?: 
   }, [refreshTrigger]);
 
   const getIconProps = (action: string) => {
-    if (action.toLowerCase().includes('download')) return { iconFamily: FontAwesome5, iconName: 'download', iconColor: '#3B82F6' };
-    if (action.toLowerCase().includes('comment')) return { iconFamily: FontAwesome5, iconName: 'comment-alt', iconColor: '#10B981' };
+    if (action.toLowerCase().includes('download')) return { iconFamily: Icon, iconName: 'download', iconColor: '#3B82F6' };
+    if (action.toLowerCase().includes('comment')) return { iconFamily: Icon, iconName: 'comment-alt', iconColor: '#10B981' };
     if (action.toLowerCase().includes('approval')) return { iconFamily: Ionicons, iconName: 'time', iconColor: '#F59E0B' };
-    return { iconFamily: MaterialIcons, iconName: 'share', iconColor: '#8B5CF6' };
+    return { iconFamily: Icon, iconName: 'share', iconColor: '#8B5CF6' };
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -91,7 +92,7 @@ export const RecentClientActivity = ({ refreshTrigger = 0 }: { refreshTrigger?: 
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6 min-h-[250px]">
       <View className="flex-row items-center mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mr-2">Recent Client Activity</Text>
-        <FontAwesome5 name="chart-line" size={14} color="#9CA3AF" />
+        <Icon name="chart-line" size={14} color="#9CA3AF" />
       </View>
 
       <View>

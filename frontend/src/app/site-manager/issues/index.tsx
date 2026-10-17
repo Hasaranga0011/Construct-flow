@@ -4,7 +4,8 @@ import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { supabase } from '../../../lib/supabase';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '../../../context/AuthContext';
 import { TopNav } from '@/components/common/TopNav';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
@@ -174,11 +175,11 @@ export default function SMIssuesPage() {
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mb-4">{issue.description}</Text>
                       <View className="flex-row flex-wrap items-center gap-3">
                         <View className="flex-row items-center max-w-full flex-shrink">
-                          <MaterialIcons name="person" size={14} color="#9CA3AF" />
+                          <Icon name="person" size={14} color="#9CA3AF" />
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 ml-1">{issue.reporter_name}</Text>
                         </View>
                         <View className="flex-row items-center max-w-full flex-shrink">
-                          <MaterialIcons name="business" size={14} color="#9CA3AF" />
+                          <Icon name="business" size={14} color="#9CA3AF" />
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 ml-1">{issue.projects?.name || 'Unknown Site'}</Text>
                         </View>
                       </View>

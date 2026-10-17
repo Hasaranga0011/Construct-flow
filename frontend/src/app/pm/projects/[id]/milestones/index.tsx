@@ -5,7 +5,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, Linking } 
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { MilestoneRow } from '@/components/common/MilestoneRow';
 import { useResponsive } from '@/hooks/useResponsive';
 

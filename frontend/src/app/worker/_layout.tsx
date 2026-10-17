@@ -3,13 +3,14 @@ import { View, Platform, useWindowDimensions } from 'react-native';
 import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
 import { SidebarProvider } from '../../context/SidebarContext';
-import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 
 const WORKER_NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',  href: '/dashboard',  IconFamily: MaterialIcons, iconName: 'dashboard' },
+  { label: 'Dashboard',  href: '/dashboard',  IconFamily: Icon, iconName: 'dashboard' },
   { label: 'Attendance', href: '/attendance', IconFamily: Ionicons,      iconName: 'calendar' },
   { label: 'Messages',   href: '/messages',   IconFamily: Ionicons,      iconName: 'chatbubbles' },
-  { label: 'Payroll',    href: '/payroll',    IconFamily: FontAwesome5,  iconName: 'money-check-alt' },
+  { label: 'Payroll',    href: '/payroll',    IconFamily: Icon,  iconName: 'money-check-alt' },
   { label: 'Profile',    href: '/profile',    IconFamily: Ionicons,      iconName: 'person' },
   { label: 'Settings',   href: '/settings',   IconFamily: Ionicons,      iconName: 'settings-sharp' },
 ];

@@ -3,7 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-nati
 import { useRouter, Link } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SearchInput } from '@/components/common/SearchInput';
 
 import { useResponsive } from '../../../hooks/useResponsive';

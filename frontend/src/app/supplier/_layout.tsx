@@ -4,12 +4,13 @@ import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
 import { SidebarProvider } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { Text, Pressable } from 'react-native';
 
 const SUPPLIER_NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',    href: '/dashboard',  IconFamily: FontAwesome5, iconName: 'chart-bar' },
-  { label: 'My Deliveries',   href: '/deliveries', IconFamily: FontAwesome5, iconName: 'truck-loading' },
+  { label: 'Dashboard',    href: '/dashboard',  IconFamily: Icon, iconName: 'chart-bar' },
+  { label: 'My Deliveries',   href: '/deliveries', IconFamily: Icon, iconName: 'truck-loading' },
   { label: 'Messages',     href: '/messages',   IconFamily: Ionicons,     iconName: 'chatbubbles' },
   { label: 'My Profile',   href: '/profile',    IconFamily: Ionicons,     iconName: 'person-circle-outline' },
   { label: 'Settings',     href: '/settings',   IconFamily: Ionicons,     iconName: 'settings-sharp' },
@@ -25,7 +26,7 @@ export default function SupplierLayout() {
       <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center p-6">
         <View className="bg-white rounded-2xl p-8 shadow-sm max-w-md w-full items-center">
           <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-6">
-            <FontAwesome5 name="hourglass-half" size={24} color="#F97316" />
+            <Icon name="hourglass-half" size={24} color="#F97316" />
           </View>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800 mb-2 text-center">Account Pending Approval</Text>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mb-8 leading-relaxed">

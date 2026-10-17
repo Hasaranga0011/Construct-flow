@@ -6,7 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { notify } from '@/utils/notify';
 import { noAutofill } from '@/lib/formAutofill';
 import { PhoneInput } from '@/components/common/PhoneInput';

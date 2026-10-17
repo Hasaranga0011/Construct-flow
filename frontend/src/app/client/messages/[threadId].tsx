@@ -4,7 +4,7 @@ import {
   Platform, Pressable, ActivityIndicator,
 } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';

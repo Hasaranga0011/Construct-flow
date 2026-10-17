@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { Icon } from '../ui/Icon';
 
 const DeliveryRow = ({ order, onOpenOrder }: { order: any, onOpenOrder: (id: string) => void }) => {
   const projectName = order.project_name || order.projects?.name || 'Unknown Project';
@@ -13,7 +13,7 @@ const DeliveryRow = ({ order, onOpenOrder }: { order: any, onOpenOrder: (id: str
   return (
     <View className={`flex-row items-center py-3 border-b border-gray-50 ${isLate ? 'bg-red-50/30 -mx-6 px-6' : ''}`}>
       <View className={`w-11 h-11 rounded-full items-center justify-center mr-3 ${isLate ? 'bg-red-100' : 'bg-orange-100'}`}>
-        <FontAwesome5 name="truck" size={16} color={isLate ? '#EF4444' : '#F97316'} />
+        <Icon name="truck" size={16} color={isLate ? '#EF4444' : '#F97316'} />
       </View>
 
       <View className="flex-1">
@@ -72,7 +72,7 @@ export const SupplierPendingDeliveries = ({
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">Confirmed orders awaiting dispatch</Text>
         </View>
         <View className="w-8 h-8 rounded-full bg-orange-50 items-center justify-center">
-          <FontAwesome5 name="boxes" size={14} color="#F97316" />
+          <Icon name="boxes" size={14} color="#F97316" />
         </View>
       </View>
 
@@ -81,7 +81,7 @@ export const SupplierPendingDeliveries = ({
           <ActivityIndicator color="#F97316" className="py-4" />
         ) : orders.length === 0 ? (
           <View className="items-center py-6">
-            <FontAwesome5 name="check-circle" size={24} color="#D1D5DB" className="mb-3" />
+            <Icon name="check-circle" size={24} color="#D1D5DB" className="mb-3" />
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm font-medium">No confirmed orders awaiting dispatch.</Text>
           </View>
         ) : (

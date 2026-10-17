@@ -10,12 +10,10 @@ web-build/
 .env.*
 !.env.example
 
-# Large repo folders outside frontend context
-../backend/
-../.venv/
-../venv/
-../data/
-../Construct-Flow/
+# Unused heavy media for native mobile build
+assets/images/homepage_scroll.mp4
+images/
+public/
 
 # Temporary and test artifacts
 playwright-report/
@@ -23,3 +21,5 @@ test-results/
 .lint-results.json
 .validation-db/
 .validation-web/
+scratch/
+reviews/

@@ -9,7 +9,7 @@ import { SearchInput } from '../../components/common/SearchInput';
 import { SupplierOrdersTable } from '../../components/supplier/SupplierOrdersTable';
 import { SupplierAlertsPanel } from '../../components/supplier/SupplierAlertsPanel';
 import { SupplierPendingDeliveries } from '../../components/supplier/SupplierPendingDeliveries';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../hooks/useResponsive';
 import {
   useSupplierOrders,

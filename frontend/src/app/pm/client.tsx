@@ -4,7 +4,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { StatCard } from '../../components/common/StatCard';
 import { ClientAccountsPanel } from '../../components/client/ClientAccountsPanel';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -101,7 +101,7 @@ export default function PMClientPortalScreen() {
                 label="Your Clients"
                 value={stats.activeClients.toString()}
                 indicatorText=""
-                icon={<FontAwesome5 name="user-friends" size={16} color="#9CA3AF" />}
+                icon={<Icon name="user-friends" size={16} color="#9CA3AF" />}
               />
             </View>
             <View className="w-full md:flex-1">
@@ -109,7 +109,7 @@ export default function PMClientPortalScreen() {
                 label="Your Shared Projects"
                 value={stats.sharedProjects.toString()}
                 indicatorText=""
-                icon={<FontAwesome5 name="folder-open" size={16} color="#9CA3AF" />}
+                icon={<Icon name="folder-open" size={16} color="#9CA3AF" />}
               />
             </View>
           </View>

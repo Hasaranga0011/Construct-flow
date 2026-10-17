@@ -8,7 +8,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';

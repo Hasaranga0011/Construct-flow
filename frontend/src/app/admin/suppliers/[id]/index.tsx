@@ -3,7 +3,8 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
 import { formatMoney } from '@/utils/format';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
@@ -193,7 +194,7 @@ export default function SupplierDetailPage() {
               indicatorText="Fulfilled orders" 
               indicatorType="success" 
               colorScheme="emerald"
-              icon={<MaterialCommunityIcons name="truck-check" size={18} color="#059669" />}
+              icon={<Icon name="truck-check" size={18} color="#059669" />}
               fullWidth
             />
           </AnimatedCard>
@@ -215,7 +216,7 @@ export default function SupplierDetailPage() {
           onPress={() => router.push(`/admin/suppliers/${id}/orders`)}
           className="bg-brand-orange hover:bg-orange-600 active:bg-orange-700 rounded-xl p-4 items-center justify-center mb-6 shadow-sm flex-row"
         >
-          <MaterialCommunityIcons name="truck-delivery" size={20} color="white" className="mr-2" />
+          <Icon name="truck-delivery" size={20} color="white" className="mr-2" />
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">Manage All Purchase Orders</Text>
         </Pressable>
 
@@ -223,7 +224,7 @@ export default function SupplierDetailPage() {
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4 px-1">Recent Orders</Text>
         {recentOrders.length === 0 ? (
           <View className="bg-white rounded-2xl p-8 items-center shadow-sm border border-gray-200/90">
-            <MaterialCommunityIcons name="file-document-outline" size={48} color="#D1D5DB" />
+            <Icon name="file-document-outline" size={48} color="#D1D5DB" />
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-2 font-medium">No purchase orders found for this supplier.</Text>
           </View>
         ) : (

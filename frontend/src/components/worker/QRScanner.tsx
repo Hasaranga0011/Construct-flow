@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 type QRScannerProps = {
   onScan: (data: string) => void | Promise<void>;

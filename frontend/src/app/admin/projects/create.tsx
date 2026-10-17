@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { ProjectAssignmentDropdown } from '../../../components/common/ProjectAssignmentDropdown';
 import { InteractiveMap, InteractiveMapRef, MapLocation } from '@/components/common/InteractiveMap';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { PROJECT_IMAGE_PRESETS } from '../../../utils/projectImages';
 import { ProjectImage } from '../../../components/common/ProjectImage';
 import { ProjectImageUploader } from '../../../components/common/ProjectImageUploader';

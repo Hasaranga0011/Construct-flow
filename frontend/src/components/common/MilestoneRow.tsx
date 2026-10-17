@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, Image, Linking } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../hooks/useResponsive';
 
 export const MilestoneRow = ({ 

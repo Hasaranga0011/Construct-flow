@@ -1,12 +1,15 @@
 import { Platform } from 'react-native';
-import { createExcel, createPdf, ExportFormat, ReportDocument, reportFilename, reportHtml } from './reportDocument';
+import { ExportFormat, ReportDocument, reportFilename, reportHtml } from './reportDocument';
 
-function download(bytes: Uint8Array, mime: string, filename: string) {
-  const buffer = new Uint8Array(bytes).buffer;
-  const url = URL.createObjectURL(new Blob([buffer], { type: mime }));
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url; link.download = filename;
-  document.body.appendChild(link); link.click(); link.remove();
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
@@ -32,33 +35,46 @@ async function printWeb(html: string) {
 }
 
 export async function deliverReport(report: ReportDocument, format: ExportFormat) {
-  if (format === 'print') {
-    if (Platform.OS === 'web') await printWeb(reportHtml(report));
-    else { const Print = await import('expo-print'); await Print.printAsync({ html: reportHtml(report), orientation: Print.Orientation.landscape }); }
-    return 'Print dialog opened.';
+  if (format === 'print' || (format === 'pdf' && Platform.OS === 'web')) {
+    if (Platform.OS === 'web') {
+      await printWeb(reportHtml(report));
+      return format === 'print' ? 'Print dialog opened.' : 'Print to PDF dialog opened.';
+    }
   }
-  if (Platform.OS === 'web') {
-    const bytes = format === 'pdf' ? await createPdf(report) : await createExcel(report);
-    download(bytes, format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', `${reportFilename(report)}.${format === 'pdf' ? 'pdf' : 'xlsx'}`);
-    return `${format === 'pdf' ? 'PDF' : 'Excel'} download ready.`;
-  }
-  const Sharing = await import('expo-sharing');
-  if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable on this device.');
-  let uri: string;
+
   if (format === 'pdf') {
     const Print = await import('expo-print');
     const result = await Print.printToFileAsync({ html: reportHtml(report), width: 842, height: 595 });
-    const { File, Paths } = await import('expo-file-system');
-    const cached = new File(Paths.cache, `${reportFilename(report)}.pdf`);
-    if (cached.exists) cached.delete();
-    new File(result.uri).copy(cached);
-    uri = cached.uri;
-  } else {
-    const { File, Paths } = await import('expo-file-system');
-    const file = new File(Paths.cache, `${reportFilename(report)}.xlsx`);
-    file.write(await createExcel(report)); uri = file.uri;
+    const Sharing = await import('expo-sharing');
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: report.title });
+      return 'PDF report ready.';
+    }
+    return 'PDF generated.';
   }
-  await Sharing.shareAsync(uri, { mimeType: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', UTI: format === 'pdf' ? 'com.adobe.pdf' : 'org.openxmlformats.spreadsheetml.sheet', dialogTitle: report.title });
+
+  // Excel / CSV export:
+  const csvLines: string[] = [report.title, `Exported: ${report.exportedAt}`, ''];
+  report.sections.forEach((s) => {
+    csvLines.push(s.title);
+    csvLines.push(s.headers.join(','));
+    s.rows.forEach((r) => csvLines.push(r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')));
+    csvLines.push('');
+  });
+  const csvContent = csvLines.join('\n');
+
+  if (Platform.OS === 'web') {
+    downloadCsv(csvContent, `${reportFilename(report)}.csv`);
+    return 'Report download ready.';
+  }
+
+  const { File, Paths } = await import('expo-file-system');
+  const file = new File(Paths.cache, `${reportFilename(report)}.csv`);
+  file.write(csvContent);
+  const Sharing = await import('expo-sharing');
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: report.title });
+  }
   return 'Report is ready to save or share.';
 }
 

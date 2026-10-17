@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { useApi } from '@/hooks/useApi';

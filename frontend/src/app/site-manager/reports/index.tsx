@@ -4,7 +4,7 @@ import {
   View, Text, ScrollView, ActivityIndicator, Pressable, Image, Linking,
 } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';

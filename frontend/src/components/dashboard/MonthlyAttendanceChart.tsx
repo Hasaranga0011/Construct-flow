@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { NativeDataChart } from '../common/NativeDataChart';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export const MonthlyAttendanceChart = () => {
   const [data, setData] = useState<any[]>([]);

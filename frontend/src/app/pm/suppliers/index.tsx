@@ -4,7 +4,8 @@ import { TopNav } from '../../../components/common/TopNav';
 import { SearchInput } from '../../../components/common/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';
@@ -171,7 +172,7 @@ export default function PMSuppliersPage() {
 							indicatorText="Past 7 days" 
 							indicatorType="success" 
 							colorScheme="emerald"
-							icon={<MaterialCommunityIcons name="truck-check" size={20} color="#059669" />}
+							icon={<Icon name="truck-check" size={20} color="#059669" />}
 							fullWidth
 						/>
 					</AnimatedCard>

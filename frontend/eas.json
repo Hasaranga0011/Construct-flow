@@ -6,6 +6,9 @@
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "env": {
+        "ANDROID_ARM64_ONLY": "true"
+      },
       "android": {
         "buildType": "apk"
       }

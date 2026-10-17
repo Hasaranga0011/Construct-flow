@@ -7,7 +7,7 @@ import { formatMoney } from '../../../utils/format';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ProjectImage } from '@/components/common/ProjectImage';
 
 export default function PMProjectsList() {

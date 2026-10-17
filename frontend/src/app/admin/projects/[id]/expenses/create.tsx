@@ -4,7 +4,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, ScrollView 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { toast } from '../../../../../lib/toast';
 import { useResponsive } from '@/hooks/useResponsive';
 

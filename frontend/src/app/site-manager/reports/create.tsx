@@ -9,7 +9,7 @@ import {
   ActivityIndicator, Platform, Image,
 } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { useRouter } from 'expo-router';

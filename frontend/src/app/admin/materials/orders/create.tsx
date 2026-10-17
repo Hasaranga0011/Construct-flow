@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { sendSystemNotification } from '../../../../utils/notifications';
 import { ProjectAssignmentDropdown } from '../../../../components/common/ProjectAssignmentDropdown';
 

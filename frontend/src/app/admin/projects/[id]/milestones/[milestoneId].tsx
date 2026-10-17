@@ -5,7 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { api } from '@/services/api';
 import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 
 type Milestone = { id: string; title: string; description?: string | null; completion_percentage?: number | null; due_date?: string | null; status?: string | null };

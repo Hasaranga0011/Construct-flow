@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, Platform, ScrollView } from 'react-native';
 import { useResponsive } from '../../hooks/useResponsive';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export interface HorizontalBarChartData {
   id: string;

@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, Pressable, TextInput,
   ActivityIndicator, Animated, Platform, Image
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';

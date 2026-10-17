@@ -8,7 +8,8 @@ import * as Linking from 'expo-linking';
 WebBrowser.maybeCompleteAuthSession();
 import { getApiUrl } from '../lib/apiUrl';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
-import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { roleLabel } from '../utils/roles';
 import { noAutofill } from '../lib/formAutofill';
 
@@ -225,7 +226,7 @@ export default function RegisterScreen() {
 
           <View className="mb-6 flex-row items-center bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
             <View className="w-12 h-12 bg-orange-500/20 rounded-full items-center justify-center mr-4">
-               <FontAwesome5 name="chart-line" size={20} color="#F97316" />
+               <Icon name="chart-line" size={20} color="#F97316" />
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Real-Time Tracking</Text>
@@ -235,7 +236,7 @@ export default function RegisterScreen() {
 
           <View className="mb-6 flex-row items-center bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
             <View className="w-12 h-12 bg-blue-500/20 rounded-full items-center justify-center mr-4">
-               <FontAwesome5 name="users-cog" size={20} color="#3B82F6" />
+               <Icon name="users-cog" size={20} color="#3B82F6" />
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">Role-Based Access</Text>
@@ -245,7 +246,7 @@ export default function RegisterScreen() {
 
           <View className="flex-row items-center bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
             <View className="w-12 h-12 bg-green-500/20 rounded-full items-center justify-center mr-4">
-               <FontAwesome5 name="robot" size={20} color="#10B981" />
+               <Icon name="robot" size={20} color="#10B981" />
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">AI Estimations</Text>

@@ -2,7 +2,7 @@ import { ModalViewport } from '../common/ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { api } from '../../lib/api';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
 import { notify, confirmAction } from '../../utils/notify';
 

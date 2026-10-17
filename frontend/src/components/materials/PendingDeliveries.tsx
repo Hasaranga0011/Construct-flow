@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Pressable } from 'react-native';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 
@@ -18,7 +19,7 @@ const DeliveryRow = ({ order }: { order: any }) => {
       className={`flex-row items-center py-3 border-b border-gray-50 ${isLate ? 'bg-red-50/30' : ''}`}
     >
       <View className={`w-11 h-11 rounded-full items-center justify-center mr-3 ${isLate ? 'bg-red-100' : 'bg-orange-100'}`}>
-        <FontAwesome5 name="truck-loading" size={16} color={isLate ? '#EF4444' : '#F97316'} />
+        <Icon name="truck-loading" size={16} color={isLate ? '#EF4444' : '#F97316'} />
       </View>
 
       <View className="flex-1">

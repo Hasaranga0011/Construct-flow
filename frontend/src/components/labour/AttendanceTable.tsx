@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { RoleAvatar } from '../common/RoleAvatar';
 
 const AttendanceRow = ({ 

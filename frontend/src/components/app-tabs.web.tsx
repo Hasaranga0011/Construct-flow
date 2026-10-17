@@ -6,7 +6,7 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { SymbolView } from 'expo-symbols';
+import { ExternalLink as LucideExternalLink } from 'lucide-react-native';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 
 import { ExternalLink } from './external-link';
@@ -61,9 +61,8 @@ export function CustomTabList(props: TabListProps) {
         <ExternalLink href="https://docs.expo.dev" asChild>
           <Pressable style={[styles.externalPressable, { minHeight: 44, minWidth: 44 }]}>
             <ThemedText type="link">Docs</ThemedText>
-            <SymbolView
-              tintColor={colors.text}
-              name="arrow.up.right.square"
+            <LucideExternalLink
+              color={colors.text}
               size={12}
             />
           </Pressable>

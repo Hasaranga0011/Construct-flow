@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Image } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 type Photo = { id: string; project_id: string; file_url: string; caption?: string | null; file_type?: string | null; uploaded_at: string };
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Pressable, Text, TextInput, Platform, Modal, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';
 import { useNotifications } from '../../context/NotificationContext';
 import { useSidebar } from '../../context/SidebarContext';

@@ -9,7 +9,7 @@ import { PendingOrders } from '../../../components/materials/PendingOrders';
 import { PendingDeliveries } from '../../../components/materials/PendingDeliveries';
 import { RecentDeliveries } from '../../../components/materials/RecentDeliveries';
 import { NewMaterialModal } from '../../../components/materials/NewMaterialModal';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';

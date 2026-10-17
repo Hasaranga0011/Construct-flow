@@ -91,9 +91,47 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
           }
         }
       } catch (err: any) {
-        if (isMounted) {
-          setError(err.message || 'Insights unavailable');
+        if (!isMounted) return;
+        try {
+          let query = supabase
+            .from('projects')
+            .select('id, name, status, total_budget, spent_cost, start_date, end_date, completion_percentage');
+          if (pmId) query = query.eq('pm_id', pmId);
+          const { data: dbProjects } = await query;
+          if (dbProjects && dbProjects.length > 0) {
+            const mapped = dbProjects.map((p: any) => {
+              const budget = Number(p.total_budget) || 0;
+              const spent = Number(p.spent_cost) || 0;
+              const completion = Number(p.completion_percentage) || 0;
+              let score = 20;
+              if (p.end_date && p.start_date) {
+                const start = new Date(p.start_date).getTime();
+                const end = new Date(p.end_date).getTime();
+                const now = Date.now();
+                if (end > start) {
+                  const elapsedRatio = Math.max(0, Math.min(1, (now - start) / (end - start)));
+                  const expected = elapsedRatio * 100;
+                  if (expected - completion > 20) score += 45;
+                  else if (expected - completion > 10) score += 20;
+                }
+              }
+              if (budget > 0 && spent > budget) score += 25;
+              return {
+                project_id: p.id,
+                project_name: p.name || 'Untitled Project',
+                delay_risk: Math.min(95, Math.max(10, score)),
+                recommendation: score > 60 ? 'Schedule lagging — expedite milestones' : 'On track with milestone schedule',
+              };
+            }).sort((a: any, b: any) => b.delay_risk - a.delay_risk);
+            setRisks(mapped.slice(0, 3));
+            setModelNote('Direct Supabase live tracking · Rule-based risk');
+            setError(null);
+            return;
+          }
+        } catch {
+          // ignore
         }
+        setError(err.message || 'Insights unavailable');
       } finally {
         if (isMounted) setLoading(false);
       }

@@ -7,7 +7,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Modal } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { QRScanner } from '@/components/worker/QRScanner';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';

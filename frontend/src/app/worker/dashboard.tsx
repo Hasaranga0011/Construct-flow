@@ -5,12 +5,12 @@ import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '@/components/common/StatCard';
 import { AnimatedCard } from '@/components/common/AnimatedCard';
 import { RecentAlertsPanel } from '@/components/dashboard/RecentAlertsPanel';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/lib/apiUrl';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { WorkerAttendanceChart } from '@/components/worker/WorkerAttendanceChart';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -287,26 +287,9 @@ export default function WorkerDashboardScreen() {
                       <Text className="text-slate-400 font-medium mt-3">No attendance recorded this month</Text>
                     </View>
                   ) : (
-                    <View className="flex-1 mt-4">
-                      {Platform.OS === 'web' ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                            <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                            <Bar dataKey="regular" stackId="a" fill="#1e293b" radius={[0, 0, 4, 4]} name="Regular Hours" />
-                            <Bar dataKey="overtime" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} name="Overtime" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <View className="flex-1 justify-center items-center bg-slate-50 rounded-lg border border-slate-100">
-                          <Text className="text-slate-400">Chart rendering limited to web interface</Text>
-                        </View>
-                      )}
-                    </View>
+                    <WorkerAttendanceChart chartData={chartData} />
                   )}
-                  {Platform.OS === 'web' && attendance.length > 0 && (
+                  {attendance.length > 0 && (
                     <View className="flex-row justify-center items-center gap-6 mt-6">
                       <View className="flex-row items-center gap-2"><View className="w-3 h-3 rounded-sm bg-slate-900" /><Text className="text-xs text-slate-600 font-medium">Regular Hours</Text></View>
                       <View className="flex-row items-center gap-2"><View className="w-3 h-3 rounded-sm bg-brand-orange" /><Text className="text-xs text-slate-600 font-medium">Overtime</Text></View>

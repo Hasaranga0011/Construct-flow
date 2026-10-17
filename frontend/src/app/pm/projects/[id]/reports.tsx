@@ -3,7 +3,7 @@ import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 

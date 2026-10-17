@@ -9,7 +9,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { ModalViewport } from './ModalViewport';
 import { uploadSitePhotoBlob, uploadSitePhotoAsset } from '@/services/sitePhoto';

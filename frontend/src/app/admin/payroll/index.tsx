@@ -3,7 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { format } from 'date-fns';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { formatMoney } from '../../../utils/format';

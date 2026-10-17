@@ -4,7 +4,8 @@ import { TopNav } from '@/components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { ModalViewport } from '../../components/common/ModalViewport';
 import { NotificationCard } from '../../components/notifications/NotificationCard';
-import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { useNotifications } from '../../context/NotificationContext';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -25,10 +26,10 @@ export default function NotificationsScreen() {
   const { isMobile } = useResponsive();
 
   const getIconProps = (action: string) => {
-    if (action.toLowerCase().includes('download')) return { iconFamily: FontAwesome5, iconName: 'download', iconColor: '#3B82F6' };
-    if (action.toLowerCase().includes('comment')) return { iconFamily: FontAwesome5, iconName: 'comment-alt', iconColor: '#10B981' };
+    if (action.toLowerCase().includes('download')) return { iconFamily: Icon, iconName: 'download', iconColor: '#3B82F6' };
+    if (action.toLowerCase().includes('comment')) return { iconFamily: Icon, iconName: 'comment-alt', iconColor: '#10B981' };
     if (action.toLowerCase().includes('approval')) return { iconFamily: Ionicons, iconName: 'time', iconColor: '#F59E0B' };
-    return { iconFamily: MaterialIcons, iconName: 'notifications', iconColor: '#F97316' };
+    return { iconFamily: Icon, iconName: 'notifications', iconColor: '#F97316' };
   };
 
   const getTimeAgo = (dateString: string) => {

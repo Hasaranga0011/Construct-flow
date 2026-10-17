@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
 WebBrowser.maybeCompleteAuthSession();
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getDashboardForRole } from '../utils/auth';
 import { getRememberedEmail, saveRememberedEmail, clearRememberedEmail } from '../lib/rememberedEmail';
 import { loginEmailAutofill, loginPasswordAutofill } from '../lib/formAutofill';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Image, Text, StyleSheet, ViewStyle, ImageResizeMode } from 'react-native';
 import { getProjectImageUrl } from '../../utils/projectImages';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface ProjectImageProps {
   project?: {

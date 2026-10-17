@@ -7,7 +7,8 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Modal, TextInput 
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
 import { api } from '../../../../services/api';
 import { OrderItemRow } from '@/components/materials/OrderItemRow';
@@ -261,7 +262,7 @@ export default function AdminMaterialsOrdersIdPage() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Supplier</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-3">
-                    <FontAwesome5 name="truck" size={12} color="#3B82F6" />
+                    <Icon name="truck" size={12} color="#3B82F6" />
                   </View>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-medium text-base">{order.supplier_name || 'Unknown'}</Text>
                 </View>
@@ -271,7 +272,7 @@ export default function AdminMaterialsOrdersIdPage() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Site</Text>
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
-                    <FontAwesome5 name="hard-hat" size={12} color="#10B981" />
+                    <Icon name="hard-hat" size={12} color="#10B981" />
                   </View>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-gray-800 font-medium text-base mr-2">{order.project?.name || 'Unassigned'}</Text>
                   {!order.project && (

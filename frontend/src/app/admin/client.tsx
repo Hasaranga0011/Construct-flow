@@ -6,7 +6,8 @@ import { ClientAccountsPanel } from '../../components/client/ClientAccountsPanel
 import { RecentClientActivity } from '../../components/client/RecentClientActivity';
 import { SharedDocuments } from '../../components/client/SharedDocuments';
 import { InviteClientModal } from '../../components/client/InviteClientModal';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/Icon';
 import { supabase } from '../../lib/supabase';
 
 import { useResponsive } from '../../hooks/useResponsive';
@@ -114,13 +115,13 @@ export default function ClientPortalScreen() {
               label="Active Clients" 
               value={stats.activeClients.toString()} 
               indicatorText="" 
-              icon={<FontAwesome5 name="user-friends" size={16} color="#9CA3AF" />}
+              icon={<Icon name="user-friends" size={16} color="#9CA3AF" />}
             />
             <StatCard 
               label="Shared Projects" 
               value={stats.sharedProjects.toString()} 
               indicatorText="" 
-              icon={<FontAwesome5 name="folder-open" size={16} color="#9CA3AF" />}
+              icon={<Icon name="folder-open" size={16} color="#9CA3AF" />}
             />
             <StatCard 
               label="Pending Invoices" 

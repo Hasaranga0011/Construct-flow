@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SRI_LANKA_DISTRICTS, District, filterDistricts, normalizeDistrict } from '@/constants/districts';
 import { supabase } from '../../lib/supabase';
 

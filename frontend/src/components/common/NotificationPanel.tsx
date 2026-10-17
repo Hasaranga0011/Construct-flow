@@ -1,7 +1,7 @@
 import { ModalViewport } from './ModalViewport';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';

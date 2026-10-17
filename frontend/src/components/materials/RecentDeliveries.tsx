@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
 
 const DeliveryRow = ({ title, project, time }: { title: string, project: string, time: string }) => {
@@ -8,7 +8,7 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
     <View className="flex-row items-center py-3 border-b border-gray-50">
       {/* Icon */}
       <View className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center mr-3">
-        <FontAwesome5 name="truck" size={16} color="#F97316" />
+        <Icon name="truck" size={16} color="#F97316" />
       </View>
       
       {/* Content */}

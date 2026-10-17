@@ -9,7 +9,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { PROJECT_IMAGE_PRESETS, ProjectImagePreset } from '../../utils/projectImages';
 import { pickAndUploadProjectPhotos } from '../../services/projectPhoto';
 

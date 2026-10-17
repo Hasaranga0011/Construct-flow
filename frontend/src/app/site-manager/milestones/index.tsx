@@ -6,7 +6,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platfo
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { TopNav } from '@/components/common/TopNav';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';

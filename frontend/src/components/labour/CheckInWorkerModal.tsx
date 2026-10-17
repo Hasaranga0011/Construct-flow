@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { toast } from '../../lib/toast';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
 
