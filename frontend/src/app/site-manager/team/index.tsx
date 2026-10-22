@@ -62,12 +62,30 @@ export default function SMTeamPage() {
   const handleScanQR = async (qrCode: string) => {
     if (!selectedSiteId || !user?.id) return;
     try {
-      const { data: worker, error: workerError } = await supabase
+      let code = (qrCode || '').trim();
+      if (code.startsWith('{') && code.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(code);
+          code = String(parsed.qr_code || parsed.worker_id || parsed.id || parsed.user_id || code).trim();
+        } catch {}
+      }
+
+      let { data: worker } = await supabase
         .from('profiles')
         .select('id, full_name')
-                .eq('qr_code', qrCode)
-        .single();
-      if (workerError || !worker || !worker.id) throw workerError || new Error('Worker profile not found');
+        .eq('qr_code', code)
+        .maybeSingle();
+
+      if (!worker) {
+        const byId = await supabase.from('profiles').select('id, full_name').eq('id', code).maybeSingle();
+        worker = byId.data;
+      }
+      if (!worker) {
+        const byWorkerCode = await supabase.from('profiles').select('id, full_name').eq('worker_code', code).maybeSingle();
+        worker = byWorkerCode.data;
+      }
+
+      if (!worker || !worker.id) throw new Error('Worker profile not found for this QR code');
 
       const { data: record, error: recordError } = await supabase.from('workers').select('id').eq('user_id', worker.id).single();
       if (recordError || !record) throw new Error('This profile is not linked to a worker record. Contact your administrator.');

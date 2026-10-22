@@ -75,7 +75,7 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
     throw new Error(`EXPO_PUBLIC_API_URL is an invalid URL: "${configured}".`);
   }
 
-  if (platform !== 'web' && isPrivateOrLoopbackHost(url.hostname)) {
+  if (platform !== 'web') {
     let developmentHost = '';
     if (rawHostUri) {
       try {
@@ -86,10 +86,15 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
       }
     }
 
-    if (!developmentHost || isPrivateOrLoopbackHost(developmentHost) || developmentHost.endsWith('.exp.direct')) {
-      developmentHost = platform === 'android' ? '10.0.2.2' : 'localhost';
+    const isHostLoopback = !developmentHost || LOOPBACK_HOSTS.has(developmentHost.toLowerCase().trim());
+
+    if (!isHostLoopback && !developmentHost.endsWith('.exp.direct')) {
+      // Use the actual IP of the machine running the Expo bundler and backend API
+      url.hostname = developmentHost;
+    } else if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase().trim())) {
+      // Host was set to loopback localhost, route to development server IP
+      url.hostname = '10.75.221.40';
     }
-    url.hostname = developmentHost;
   }
 
   let finalUrl = url.toString().replace(/\/$/, '');
@@ -100,21 +105,14 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
 }
 
 export function getApiUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL;
+  const configured = process.env.EXPO_PUBLIC_API_URL || 'http://10.75.221.40:8000/api';
 
   if (!__DEV__) {
     return validateReleaseApiUrl(configured);
   }
 
-  if (!configured || !configured.trim()) {
-    throw new Error(
-      'Missing required environment variable: EXPO_PUBLIC_API_URL. ' +
-      'Please configure EXPO_PUBLIC_API_URL in your .env file.'
-    );
-  }
-
   if (Platform.OS === 'web') {
-    const isLoopback = isPrivateOrLoopbackHost(new URL(configured).hostname);
+    const isLoopback = LOOPBACK_HOSTS.has(new URL(configured).hostname.toLowerCase().trim());
     if (!isLoopback) {
       const clean = configured.trim().replace(/\/$/, '');
       return clean.endsWith('/api') ? clean : `${clean}/api`;

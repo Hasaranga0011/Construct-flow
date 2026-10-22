@@ -8,6 +8,7 @@ import { managedProjects } from '@/services/pmData';
 import { assignedWorkers } from '@/services/siteData';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { useResponsive } from '@/hooks/useResponsive';
+import { formatHoursMinutes } from '@/utils/format';
 
 export default function PMLabourScreen() {
   const router = useRouter();
@@ -69,6 +70,6 @@ export default function PMLabourScreen() {
       </View>
     </View>
     {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
-    {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.hours_worked ?? 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{a.status || 'Not recorded'}</Text></View></View>)}
+    {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.hours_worked != null ? formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time) : 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{a.status || 'Not recorded'}</Text></View></View>)}
   </ScrollView></View>;
 }

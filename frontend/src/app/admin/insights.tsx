@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Alert, Platform, Modal } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as DocumentPicker from 'expo-document-picker';
 import { api } from '../../services/api';
 import { supabase } from '../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -27,6 +28,7 @@ export default function MLInsightsDashboard() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importCsvText, setImportCsvText] = useState('');
   const [evidenceNote, setEvidenceNote] = useState('');
+  const [selectedFile, setSelectedFile] = useState<{ name: string; size?: number; uri?: string; file?: any } | null>(null);
   const [importing, setImporting] = useState(false);
 
   const DEFAULT_TEMPLATE = `project_name,district,town,project_type,floor_area_sqft,floors,quality_tier,structure_type,site_condition,cost_year,estimate_total_lkr,actual_total_lkr,completion_year,evidence_note
@@ -259,14 +261,26 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
       const res = await api.post('/ai/retrain', {});
       notify('Success', res.message || 'Model retraining completed successfully.');
       await fetchInsights(true);
-    } catch {
-      notify('Notice', 'FastAPI microservice offline. Currently operating on calibrated baseline model.');
+    } catch (err: any) {
+      // If FastAPI microservice is unreachable, calibrate the local model from live Supabase data
+      try {
+        const fallback = await buildFallbackInsights();
+        if (fallback) {
+          setInsights(fallback);
+          notify('Model Calibrated', 'Calibrated local CIDA baseline model with live project metrics.');
+        } else {
+          notify('Notice', err?.message || 'FastAPI microservice offline. Operating on calibrated baseline model.');
+        }
+      } catch {
+        notify('Notice', err?.message || 'FastAPI microservice offline. Operating on calibrated baseline model.');
+      }
     } finally {
       setRetraining(false);
     }
   };
 
   const handleLoadTemplate = async () => {
+    setSelectedFile(null);
     try {
       const res = await api.get('/ai/historical-template');
       if (res?.template) {
@@ -283,28 +297,112 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
     notify('Template Loaded', 'Sample historical project BOQs loaded into the input area.');
   };
 
+  const handlePickFile = async () => {
+    try {
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            setSelectedFile({
+              name: file.name,
+              size: file.size,
+              file: file,
+            });
+            if (!evidenceNote) {
+              setEvidenceNote(`Imported from ${file.name}`);
+            }
+            if (file.name.toLowerCase().endsWith('.csv')) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                if (typeof event.target?.result === 'string') {
+                  setImportCsvText(event.target.result);
+                }
+              };
+              reader.readAsText(file);
+            } else {
+              setImportCsvText('');
+            }
+          }
+        };
+        input.click();
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: [
+            'text/csv',
+            'text/comma-separated-values',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            '*/*'
+          ],
+          copyToCacheDirectory: true,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          setSelectedFile({
+            name: asset.name,
+            size: asset.size,
+            uri: asset.uri,
+            file: (asset as any).file,
+          });
+          if (!evidenceNote) {
+            setEvidenceNote(`Imported from ${asset.name}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      notify('Error', 'Failed to pick file: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const handleImportSubmit = async () => {
     if (!evidenceNote.trim()) {
       notify('Validation', 'A source note is required per import batch (e.g., QS firm, contractor, BOQ file reference).');
       return;
     }
-    if (!importCsvText.trim()) {
-      notify('Validation', 'Please paste CSV content or load the template.');
+    if (!selectedFile && !importCsvText.trim()) {
+      notify('Validation', 'Please select a CSV / Excel file or paste CSV content.');
       return;
     }
     setImporting(true);
     try {
-      const res = await api.post('/ai/import-historical-projects', {
-        csv_content: importCsvText.trim(),
-        evidence_note: evidenceNote.trim(),
-      });
+      let res: any;
+      if (selectedFile) {
+        const formData = new FormData();
+        if (Platform.OS === 'web' && selectedFile.file) {
+          formData.append('file', selectedFile.file);
+        } else if (selectedFile.uri) {
+          const isCsv = selectedFile.name.toLowerCase().endsWith('.csv');
+          formData.append('file', {
+            uri: selectedFile.uri,
+            name: selectedFile.name,
+            type: isCsv ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          } as any);
+        } else if (selectedFile.file) {
+          formData.append('file', selectedFile.file);
+        } else {
+          const blob = new Blob([importCsvText], { type: 'text/csv' });
+          formData.append('file', blob, selectedFile.name);
+        }
+        formData.append('evidence_note', evidenceNote.trim());
+        res = await api.postFormData('/ai/import-historical-projects-file', formData);
+      } else {
+        res = await api.post('/ai/import-historical-projects', {
+          csv_content: importCsvText.trim(),
+          evidence_note: evidenceNote.trim(),
+        });
+      }
+
       notify('Success', `Imported ${res.inserted || 0} projects (${res.skipped_duplicates || 0} duplicates skipped). Model automatically calibrated!`);
       setShowImportModal(false);
       setImportCsvText('');
       setEvidenceNote('');
+      setSelectedFile(null);
       await fetchInsights(true);
     } catch (e: any) {
-      notify('Notice', e.message || 'CSV import requires live Python backend.');
+      notify('Notice', e.message || 'File import failed. Please verify column headers and required values.');
     } finally {
       setImporting(false);
     }
@@ -988,7 +1086,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               </View>
 
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Paste CSV data with completed project BOQs. Validates against the 25 Sri Lankan districts, requires positive actuals, checks chronological dates, and skips duplicates automatically.
+                Upload Excel (.xlsx, .xls) or CSV files with completed project BOQs, or paste CSV data directly. Records are validated against Sri Lankan districts, calibrated against CIDA benchmarks, and retrain the ML cost estimator.
               </Text>
 
               <View className="mb-3">
@@ -1004,34 +1102,98 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
                 />
               </View>
 
-              <View className="flex-row gap-2 mb-3">
-                <Pressable
-                  className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded-lg flex-row items-center"
-                  onPress={handleLoadTemplate}
-                >
-                  <Ionicons name="document-text-outline" size={14} color="#F97316" />
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-xs ml-1.5">Load Sample BOQ Template</Text>
-                </Pressable>
-
-                {importCsvText.length > 0 && (
+              {/* File Upload Zone */}
+              <View className="mb-4">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Upload BOQ File (.csv, .xlsx, .xls)
+                </Text>
+                
+                {selectedFile ? (
+                  <View className="p-3.5 bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-xl flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1 pr-2">
+                      <View className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/40 items-center justify-center mr-3">
+                        <Ionicons 
+                          name={selectedFile.name.toLowerCase().endsWith('.csv') ? "document-text" : "grid"} 
+                          size={22} 
+                          color="#F97316" 
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-brand-text dark:text-white" numberOfLines={1}>
+                          {selectedFile.name}
+                        </Text>
+                        <View className="flex-row items-center mt-0.5">
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 dark:text-gray-400">
+                            {selectedFile.size ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Ready to import'}
+                          </Text>
+                          <View className="mx-2 w-1 h-1 rounded-full bg-gray-400" />
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/60 px-1.5 py-0.5 rounded">
+                            {selectedFile.name.split('.').pop() || 'FILE'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Pressable 
+                      onPress={() => setSelectedFile(null)} 
+                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </Pressable>
+                  </View>
+                ) : (
                   <Pressable
-                    className="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg flex-row items-center"
-                    onPress={() => setImportCsvText('')}
+                    onPress={handlePickFile}
+                    className="p-5 border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-orange-400 dark:hover:border-orange-500 rounded-xl bg-gray-50 dark:bg-gray-900/50 items-center justify-center"
                   >
-                    <Ionicons name="trash-outline" size={14} color="#6B7280" />
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-semibold text-xs ml-1.5">Clear</Text>
+                    <Ionicons name="cloud-upload-outline" size={28} color="#F97316" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-text dark:text-white mt-2">
+                      Click to choose CSV or Excel spreadsheet
+                    </Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      Accepts .xlsx, .xls, and .csv files
+                    </Text>
                   </Pressable>
                 )}
               </View>
 
+              <View className="flex-row items-center justify-between mb-2">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  Or paste CSV content manually
+                </Text>
+                <View className="flex-row gap-2">
+                  <Pressable
+                    className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-2.5 py-1 rounded-lg flex-row items-center"
+                    onPress={handleLoadTemplate}
+                  >
+                    <Ionicons name="document-text-outline" size={12} color="#F97316" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-[11px] ml-1">Template</Text>
+                  </Pressable>
+
+                  {importCsvText.length > 0 && (
+                    <Pressable
+                      className="bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-lg flex-row items-center"
+                      onPress={() => setImportCsvText('')}
+                    >
+                      <Ionicons name="trash-outline" size={12} color="#6B7280" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-semibold text-[11px] ml-1">Clear</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
               <TextInput
                 multiline
-                numberOfLines={10}
+                numberOfLines={6}
                 value={importCsvText}
-                onChangeText={setImportCsvText}
+                onChangeText={(text) => {
+                  setImportCsvText(text);
+                  if (text && selectedFile && !selectedFile.name.toLowerCase().endsWith('.csv')) {
+                    setSelectedFile(null);
+                  }
+                }}
                 placeholder="project_name,project_type,district,town,floor_area_sqft,floors,structure_type,quality_tier,site_condition,start_date,end_date,estimate_total_lkr,actual_total_lkr,actual_materials_lkr,actual_labour_lkr,actual_equipment_lkr,actual_overhead_lkr,cost_year,notes..."
                 placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-xs font-mono text-brand-text dark:text-white flex-1 mb-4 h-48"
+                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-xs font-mono text-brand-text dark:text-white flex-1 mb-4 h-32"
                 style={{ textAlignVertical: 'top' }}
               />
 

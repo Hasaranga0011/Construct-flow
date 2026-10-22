@@ -259,4 +259,21 @@ export const api = {
   /** Raw fetch with auth — use when the above wrappers don't fit a specific call. */
   get: (path: string) => fetchWithAuth(path),
   post: (path: string, data: any) => fetchWithAuth(path, { method: 'POST', body: JSON.stringify(data) }),
+  postFormData: (path: string, formData: FormData) => {
+    return supabase.auth.getSession().then(({ data: { session } }) => {
+      const token = session?.access_token;
+      return fetch(`${getApiUrl()}${path}`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      }).then(async r => {
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.detail || e.message || 'Upload failed');
+        }
+        return r.json();
+      });
+    });
+  },
 };
+

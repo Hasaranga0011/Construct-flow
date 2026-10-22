@@ -15,6 +15,7 @@ import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
+import { formatHoursMinutes } from '@/utils/format';
 
 type AttendanceRecord = {
   id: string;
@@ -34,6 +35,7 @@ type ScanResult = {
   worker_name: string;
   time: string;
   hours_worked?: number;
+  formatted_hours?: string;
 };
 
 export default function SMAttendancePage() {
@@ -185,12 +187,19 @@ export default function SMAttendancePage() {
       }
       if (existing?.check_in_time && !existing.check_out_time) {
         // Check out
+        const diffMs = Math.max(0, now.getTime() - new Date(existing.check_in_time!).getTime());
+        const calculatedHours = Math.round((diffMs / 3600000) * 100) / 100;
+        const overtime = Math.max(0, Math.round((calculatedHours - 8) * 100) / 100);
         const { error } = await supabase
           .from('attendance')
-          .update({ check_out_time: timeStr, hours_worked: Math.max(0, Math.round((now.getTime() - new Date(existing.check_in_time!).getTime()) / 36000) / 100) })
+          .update({
+            check_out_time: timeStr,
+            hours_worked: calculatedHours,
+            overtime_hours: overtime,
+          })
           .eq('id', existing.id).eq('site_id', attendanceSiteId).is('check_out_time', null).select('id').single();
         if (error) throw error;
-        toast('Checked out successfully');
+        toast(`Checked out successfully (${formatHoursMinutes(calculatedHours, existing.check_in_time, timeStr)} worked)`);
       } else if (existing) {
         const result = await supabase.from('attendance').update({ check_in_time: timeStr }).eq('id', existing.id).select('id').single();
         if (result.error) throw result.error;
@@ -275,7 +284,7 @@ export default function SMAttendancePage() {
                     <View className="flex-1">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{scanResult.worker_name}</Text>
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">
-                        {scanResult.action === 'check_in' ? 'Checked In' : `Checked Out · ${scanResult.hours_worked?.toFixed(1) || 0}h worked`}
+                        {scanResult.action === 'check_in' ? 'Checked In' : `Checked Out · ${scanResult.formatted_hours || formatHoursMinutes(scanResult.hours_worked)} worked`}
                       </Text>
                     </View>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setScanResult(null)} className="p-2">
@@ -328,7 +337,7 @@ export default function SMAttendancePage() {
                       const hours = attRecord?.hours_worked;
                       const checkedIn = attRecord?.check_in_time && !attRecord?.check_out_time;
 
-                      if (isMobile) return <RecordCard key={worker.id} title={worker.full_name || 'Unknown Worker'} fields={[{ label: 'Status', value: checkedIn ? 'Present - active' : status }, { label: 'Hours', value: hours == null ? 'Not recorded' : `${Number(hours).toFixed(1)}h` }]} action={{ label: checkedIn ? 'Check out' : 'Mark attendance', disabled: !!attRecord?.check_out_time, onPress: () => { setManualWorkerId(worker.id); setShowManualModal(true); } }} />;
+                      if (isMobile) return <RecordCard key={worker.id} title={worker.full_name || 'Unknown Worker'} fields={[{ label: 'Status', value: checkedIn ? 'Present - active' : status }, { label: 'Hours', value: hours == null ? (checkedIn ? 'In progress' : 'Not recorded') : formatHoursMinutes(hours, attRecord?.check_in_time, attRecord?.check_out_time) }]} action={{ label: checkedIn ? 'Check out' : 'Mark attendance', disabled: !!attRecord?.check_out_time, onPress: () => { setManualWorkerId(worker.id); setShowManualModal(true); } }} />;
                       return (
                         <View key={worker.id} className="flex-row items-center py-4 px-6 border-b border-gray-50">
                           <View className="flex-1 flex-row items-center">
@@ -357,7 +366,7 @@ export default function SMAttendancePage() {
 
                           <View className="w-[15%] items-end justify-center">
                             {hours != null ? (
-                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{hours.toFixed(1)}h</Text>
+                              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm">{formatHoursMinutes(hours, attRecord?.check_in_time, attRecord?.check_out_time)}</Text>
                             ) : checkedIn ? (
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-xs font-semibold">Active</Text>
                             ) : (

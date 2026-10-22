@@ -12,6 +12,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/lib/apiUrl';
 import { WorkerAttendanceChart } from '@/components/worker/WorkerAttendanceChart';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
+import { formatHoursMinutes } from '@/utils/format';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -251,12 +252,12 @@ export default function WorkerDashboardScreen() {
                 </AnimatedCard>
                 <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Hours Worked" value={hoursWorked.toFixed(1)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
+                    <StatCard label="Hours Worked" value={formatHoursMinutes(hoursWorked)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={250} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Overtime Hours" value={overtimeHours.toFixed(1)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
+                    <StatCard label="Overtime Hours" value={formatHoursMinutes(overtimeHours)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
@@ -385,8 +386,8 @@ export default function WorkerDashboardScreen() {
                           <Text className="flex-1 font-bold text-slate-700">{dateLabel(a.date)}</Text>
                           <Text className="flex-[1.5] text-slate-500">{timeLabel(a.check_in_time)} - {timeLabel(a.check_out_time)}</Text>
                           <View className="flex-1 items-end">
-                            <Text className="font-medium text-slate-700">{a.hours_worked || 0}h</Text>
-                            {a.overtime_hours > 0 && <Text className="text-xs text-brand-orange font-bold">+{a.overtime_hours}h OT</Text>}
+                            <Text className="font-medium text-slate-700">{formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time)}</Text>
+                            {a.overtime_hours > 0 && <Text className="text-xs text-brand-orange font-bold">+{formatHoursMinutes(a.overtime_hours)} OT</Text>}
                           </View>
                           <View className="flex-1 items-end">
                             <View className={`px-2 py-1 rounded-md ${a.status === 'Present' ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'} border`}>
@@ -405,7 +406,7 @@ export default function WorkerDashboardScreen() {
                             <Text className={`text-xs font-bold ${a.status === 'Present' ? 'text-emerald-600' : 'text-slate-500'}`}>{a.status}</Text>
                           </View>
                           <Text className="text-sm text-slate-600 mb-2">{timeLabel(a.check_in_time)} to {timeLabel(a.check_out_time)}</Text>
-                          <Text className="text-sm font-medium text-slate-700">Hours: {a.hours_worked || 0} {a.overtime_hours > 0 && <Text className="text-brand-orange">(+{a.overtime_hours} OT)</Text>}</Text>
+                          <Text className="text-sm font-medium text-slate-700">Hours: {formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time)} {a.overtime_hours > 0 && <Text className="text-brand-orange">(+{formatHoursMinutes(a.overtime_hours)} OT)</Text>}</Text>
                         </View>
                       ))}
                     </View>

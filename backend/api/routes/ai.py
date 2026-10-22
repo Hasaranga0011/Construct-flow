@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel, Field, field_validator
 
 from core.notification_helper import create_notifications, create_notification
@@ -34,6 +34,7 @@ from data_pipeline.model_engine import (
 )
 from services.historical_data_service import (
     import_historical_projects_from_csv,
+    import_historical_projects_from_file,
     import_price_indices_from_csv,
     get_all_real_projects,
     get_real_projects_count,
@@ -260,20 +261,20 @@ _QUAL_MAP  = {"Standard": 0, "Premium": 1, "Luxury": 2}
 
 class PredictRequest(BaseModel):
     square_footage: float = Field(..., gt=50, le=500_000)
-    num_floors: int = Field(..., gt=0, le=100)
+    num_floors: int = Field(1, gt=0, le=100)
     location: Optional[str] = None
     district: Optional[str] = None
     town: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    project_type: str = Field(...)
-    quality_tier: str = Field(...)
-    site_condition: str = Field(...)
-    structure_type: str = Field(...)
-    finishing_flooring: str = Field(...)
-    finishing_sanitary: str = Field(...)
-    finishing_electrical: str = Field(...)
-    target_timeline: str = Field(...)
+    project_type: str = Field("Residential")
+    quality_tier: str = Field("Standard")
+    site_condition: str = Field("Level")
+    structure_type: str = Field("RCC frame")
+    finishing_flooring: str = Field("Standard")
+    finishing_sanitary: str = Field("Standard")
+    finishing_electrical: str = Field("Standard")
+    target_timeline: str = Field("Standard")
 
 
 class PredictResponse(BaseModel):
@@ -762,8 +763,8 @@ def retrain_models(current_user: dict = Depends(get_current_user)):
     Retrains the Cost Predictor on real completed projects.
     Excludes synthetic rows from accuracy evaluation.
     """
-    if current_user["role"] not in ("admin", "super_admin"):
-        raise HTTPException(403, "Only admins can trigger model retraining.")
+    if current_user["role"] not in ("admin", "super_admin", "pm"):
+        raise HTTPException(403, "Only administrators and project managers can trigger model retraining.")
 
     meta = train_and_evaluate_cost_model()
     _INSIGHTS_CACHE.clear()
@@ -797,8 +798,8 @@ def import_historical_projects_endpoint(
       - End date after start date
       - Deduplicates by (project_name, start_date)
     """
-    if current_user["role"] not in ("admin", "super_admin"):
-        raise HTTPException(403, "Only administrators can import historical project data.")
+    if current_user["role"] not in ("admin", "super_admin", "pm"):
+        raise HTTPException(403, "Only administrators and project managers can import historical project data.")
 
     evidence = str(payload.evidence_note or "").strip()
     if not evidence:
@@ -822,6 +823,48 @@ def import_historical_projects_endpoint(
         return res
     except Exception as e:
         logger.error("Error importing historical projects: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/import-historical-projects-file")
+async def import_historical_projects_file_endpoint(
+    file: UploadFile = File(...),
+    evidence_note: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Admin file upload import (CSV, XLSX, XLS) for past projects' actual costs from QS / contractor BOQs.
+    Requires evidence_note (QS firm, contractor, BOQ file reference).
+    """
+    if current_user["role"] not in ("admin", "super_admin", "pm"):
+        raise HTTPException(403, "Only administrators and project managers can import historical project data.")
+
+    evidence = str(evidence_note or "").strip()
+    if not evidence:
+        raise HTTPException(
+            status_code=400,
+            detail="A source note / evidence note is required per batch (e.g., QS firm, contractor, BOQ file reference)."
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        user_identity = current_user.get("email") or current_user.get("id") or "Admin"
+        res = import_historical_projects_from_file(
+            file_bytes=file_bytes,
+            filename=file.filename or "import.csv",
+            evidence_note=evidence,
+            imported_by=user_identity,
+        )
+        if res.get("inserted", 0) > 0:
+            train_and_evaluate_cost_model()
+            _INSIGHTS_CACHE.clear()
+            _load_models()
+        return res
+    except Exception as e:
+        logger.error("Error importing historical projects from file: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
 

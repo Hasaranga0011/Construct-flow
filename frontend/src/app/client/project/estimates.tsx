@@ -88,11 +88,12 @@ export default function ClientProjectEstimatesPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session?.access_token || ''}` },
         body: JSON.stringify({
           square_footage: area,
+          num_floors: 1,
           location: resolvedDistrict,
           district: resolvedDistrict,
           project_type: projectType,
           quality_tier: qualityTier,
-          site_condition: 'Flat',
+          site_condition: 'Level',
           structure_type: 'RCC frame',
           finishing_flooring: 'Standard',
           finishing_sanitary: 'Standard',

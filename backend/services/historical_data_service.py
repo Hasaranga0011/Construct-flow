@@ -567,3 +567,44 @@ def get_sample_csv_template() -> str:
     for r in sample_rows:
         writer.writerow(r)
     return output.getvalue()
+
+
+def import_historical_projects_from_file(
+    file_bytes: bytes,
+    filename: str,
+    evidence_note: str,
+    imported_by: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Imports historical completed project records from CSV or Excel (.xlsx, .xls) files.
+    """
+    import pandas as pd
+
+    lower_name = filename.lower()
+    if lower_name.endswith(".xlsx") or lower_name.endswith(".xls"):
+        try:
+            # Read first sheet
+            df = pd.read_excel(io.BytesIO(file_bytes))
+            # Normalize column names: strip whitespace
+            df.columns = [str(c).strip() for c in df.columns]
+            # Convert NaN to empty string
+            df = df.fillna("")
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_content = csv_buffer.getvalue()
+        except Exception as e:
+            raise ValueError(f"Failed to parse Excel file '{filename}': {str(e)}")
+    elif lower_name.endswith(".csv") or lower_name.endswith(".txt"):
+        try:
+            csv_content = file_bytes.decode("utf-8-sig", errors="replace")
+        except Exception as e:
+            raise ValueError(f"Failed to read CSV file: {str(e)}")
+    else:
+        raise ValueError("Unsupported file format. Please upload a .csv, .xlsx, or .xls file.")
+
+    return import_historical_projects_from_csv(
+        csv_content=csv_content,
+        evidence_note=evidence_note,
+        imported_by=imported_by
+    )
+

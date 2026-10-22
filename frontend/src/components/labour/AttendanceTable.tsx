@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { RoleAvatar } from '../common/RoleAvatar';
+import { formatHoursMinutes } from '@/utils/format';
 
 const AttendanceRow = ({ 
   name, 
@@ -66,7 +67,7 @@ const AttendanceRow = ({
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="time-outline" size={14} color="#6B7280" />
-              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: '#6B7280' }]}>{hours}h</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: '#6B7280' }]}>{formatHoursMinutes(hours)}</Text>
             </View>
           </View>
         </View>
@@ -120,7 +121,7 @@ const AttendanceRow = ({
 
       {/* Hours Worked */}
       <View className="w-1/6">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">{hours}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">{formatHoursMinutes(hours)}</Text>
       </View>
 
       {/* Status Badge */}

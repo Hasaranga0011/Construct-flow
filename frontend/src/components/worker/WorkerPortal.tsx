@@ -42,6 +42,7 @@ import {
   todayKey,
   monthRange,
 } from "@/services/workerData";
+import { formatHoursMinutes } from "@/utils/format";
 import { deliverReport } from "@/components/reports/reportDelivery";
 
 type Resource = ReturnType<typeof useAsyncData<any>>;
@@ -427,7 +428,7 @@ function RecordDetails({ record: r }: { record: Attendance }) {
         In {timeLabel(r.check_in_time)} · Out {timeLabel(r.check_out_time)}
       </BodyText>
       <BodyText>
-        {r.hours_worked ?? 0} hours · {r.overtime_hours ?? 0} overtime hours
+        {formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time)} worked · {formatHoursMinutes(r.overtime_hours)} overtime
       </BodyText>
       <BodyText>{r.site_name || "Site name not recorded"}</BodyText>
     </View>
@@ -450,7 +451,7 @@ function RecordList({ records }: { records: Attendance[] }) {
             </Text>
             <BodyText>
               {timeLabel(r.check_in_time)} · {timeLabel(r.check_out_time)} ·{" "}
-              {r.hours_worked ?? 0} h · OT {r.overtime_hours ?? 0} h
+              {formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time)} · OT {formatHoursMinutes(r.overtime_hours)}
             </BodyText>
           </Pressable>
           {open === r.id && <RecordDetails record={r} />}
@@ -856,30 +857,32 @@ export default function WorkerPortal({
           {[
             [
               "Days Present",
-              new Set(
-                (attendance.data || [])
-                  .filter((r: Attendance) => r.status === "Present")
-                  .map((r: Attendance) => r.date),
-              ).size,
+              String(
+                new Set(
+                  (attendance.data || [])
+                    .filter((r: Attendance) => r.status === "Present")
+                    .map((r: Attendance) => r.date),
+                ).size
+              ),
             ],
             [
               "Hours Worked",
-              (attendance.data || [])
-                .reduce(
+              formatHoursMinutes(
+                (attendance.data || []).reduce(
                   (n: number, r: Attendance) => n + Number(r.hours_worked || 0),
                   0,
                 )
-                .toLocaleString("en-LK", { maximumFractionDigits: 2 }),
+              ),
             ],
             [
               "Overtime Hours",
-              (attendance.data || [])
-                .reduce(
+              formatHoursMinutes(
+                (attendance.data || []).reduce(
                   (n: number, r: Attendance) =>
                     n + Number(r.overtime_hours || 0),
                   0,
                 )
-                .toLocaleString("en-LK", { maximumFractionDigits: 2 }),
+              ),
             ],
             [
               p.final ? "Final Earnings (LKR)" : "Estimated Earnings (LKR)",
@@ -894,7 +897,7 @@ export default function WorkerPortal({
                 fullWidth
                 compact
                 label={label}
-                value={value ?? "Not recorded"}
+                value={String(value ?? "Not recorded")}
               />
             </View>
           ))}
@@ -1049,14 +1052,14 @@ export default function WorkerPortal({
                       leave
                     </BodyText>
                     <BodyText>
-                      {data
-                        .reduce((n, r) => n + Number(r.hours_worked || 0), 0)
-                        .toFixed(2)}{" "}
-                      hours ·{" "}
-                      {data
-                        .reduce((n, r) => n + Number(r.overtime_hours || 0), 0)
-                        .toFixed(2)}{" "}
-                      overtime hours
+                      {formatHoursMinutes(
+                        data.reduce((n, r) => n + Number(r.hours_worked || 0), 0)
+                      )}{" "}
+                      worked ·{" "}
+                      {formatHoursMinutes(
+                        data.reduce((n, r) => n + Number(r.overtime_hours || 0), 0)
+                      )}{" "}
+                      overtime
                     </BodyText>
                   </View>
                 )}
