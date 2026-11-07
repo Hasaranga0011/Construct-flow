@@ -13,6 +13,7 @@ import { SearchInput } from '@/components/common/SearchInput';
 
 import { useResponsive } from '../../../hooks/useResponsive';
 import { useTableRealtime } from '../../../hooks/useTableRealtime';
+import { formatHoursMinutes } from '@/utils/format';
 
 export default function LabourForceScreen() {
   const router = useRouter();
@@ -153,7 +154,7 @@ export default function LabourForceScreen() {
             />
             <StatCard 
               label="Today's Overtime" 
-              value={`${stats.pendingPayroll} hrs`} 
+              value={formatHoursMinutes(stats.pendingPayroll)} 
               indicatorText="Additional hours" 
               indicatorType="warning" 
             />

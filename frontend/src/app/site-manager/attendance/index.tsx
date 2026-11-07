@@ -15,7 +15,7 @@ import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
-import { formatHoursMinutes } from '@/utils/format';
+import { formatHoursMinutes, calculateWorkedMinutes } from '@/utils/format';
 
 type AttendanceRecord = {
   id: string;
@@ -187,9 +187,10 @@ export default function SMAttendancePage() {
       }
       if (existing?.check_in_time && !existing.check_out_time) {
         // Check out
-        const diffMs = Math.max(0, now.getTime() - new Date(existing.check_in_time!).getTime());
-        const calculatedHours = Math.round((diffMs / 3600000) * 100) / 100;
-        const overtime = Math.max(0, Math.round((calculatedHours - 8) * 100) / 100);
+        const totalMinutes = calculateWorkedMinutes(null, existing.check_in_time, timeStr);
+        const calculatedHours = Math.round((totalMinutes / 60) * 100) / 100;
+        const overtimeMinutes = Math.max(0, totalMinutes - 480);
+        const overtime = Math.round((overtimeMinutes / 60) * 100) / 100;
         const { error } = await supabase
           .from('attendance')
           .update({

@@ -6,6 +6,7 @@ import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useResponsive } from '@/hooks/useResponsive';
+import { formatHoursMinutes } from '@/utils/format';
 
 type Attendance = { id: string; worker_id: string; worker_name?: string; date: string; check_in_time: string | null; check_out_time: string | null; hours_worked: number | null };
 export default function AdminSiteAttendancePage() {
@@ -79,7 +80,7 @@ export default function AdminSiteAttendancePage() {
           <Text maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{record.worker_name}</Text>
           <Text maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{new Date(record.date).toLocaleDateString('en-GB')}</Text>
           <Text maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold mt-2">{status}</Text>
-          <Text maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-2">Hours worked: {record.hours_worked ?? 0}</Text>
+          <Text maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-2">Hours worked: {record.check_out_time || record.hours_worked != null ? formatHoursMinutes(record.hours_worked, record.check_in_time, record.check_out_time) : (record.check_in_time ? 'In progress' : '0h 0m')}</Text>
         </View>;
       })}
     </ScrollView>

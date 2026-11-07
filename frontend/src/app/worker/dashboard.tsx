@@ -12,7 +12,16 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/lib/apiUrl';
 import { WorkerAttendanceChart } from '@/components/worker/WorkerAttendanceChart';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
-import { formatHoursMinutes } from '@/utils/format';
+import {
+  formatHoursMinutes,
+  formatOvertimeHoursMinutes,
+  formatMinutes,
+  getAttendanceStatus,
+  calculateWorkedMinutes,
+  calculateOvertimeMinutes,
+  sumWorkedMinutes,
+  sumOvertimeMinutes,
+} from '@/utils/format';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -183,9 +192,15 @@ export default function WorkerDashboardScreen() {
     statusBadge = <View className="bg-amber-100 px-3 py-1 rounded-full"><Text className="text-amber-700 text-xs font-bold">Not checked in</Text></View>;
   }
 
-  const daysPresent = attendance.filter(a => a.status === 'Present').length;
-  const hoursWorked = attendance.reduce((acc, a) => acc + (a.hours_worked || 0), 0);
-  const overtimeHours = attendance.reduce((acc, a) => acc + (a.overtime_hours || 0), 0);
+  const daysPresent = new Set(
+    attendance
+      .filter(a => getAttendanceStatus(a) === 'Present')
+      .map(a => a.date)
+  ).size;
+  const totalWorkedMinutes = sumWorkedMinutes(attendance);
+  const totalOvertimeMinutes = sumOvertimeMinutes(attendance);
+  const hoursWorked = totalWorkedMinutes / 60;
+  const overtimeHours = totalOvertimeMinutes / 60;
   
   const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
   const currentDay = month === todayStr.slice(0,7) ? new Date().getDate() : daysInMonth;
@@ -196,13 +211,14 @@ export default function WorkerDashboardScreen() {
     const data = [];
     for(let i=1; i<=endDay; i++) {
       const d = `${month}-${i.toString().padStart(2, '0')}`;
-      const att = attendance.find(a => a.date === d);
-      const hw = att?.hours_worked || 0;
-      const ot = att?.overtime_hours || 0;
+      const dayRecords = attendance.filter(a => a.date === d);
+      const workedMins = sumWorkedMinutes(dayRecords);
+      const otMins = sumOvertimeMinutes(dayRecords);
+      const regMins = Math.max(0, workedMins - otMins);
       data.push({
         label: i.toString(),
-        regular: Math.max(0, hw - ot),
-        overtime: ot
+        regular: Math.round((regMins / 60) * 100) / 100,
+        overtime: Math.round((otMins / 60) * 100) / 100
       });
     }
     return data;
@@ -252,12 +268,12 @@ export default function WorkerDashboardScreen() {
                 </AnimatedCard>
                 <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Hours Worked" value={formatHoursMinutes(hoursWorked)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
+                    <StatCard label="Hours Worked" value={formatMinutes(totalWorkedMinutes)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={250} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
                   <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Overtime Hours" value={formatHoursMinutes(overtimeHours)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
+                    <StatCard label="Overtime Hours" value={formatMinutes(totalOvertimeMinutes)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
                   </Pressable>
                 </AnimatedCard>
                 <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
@@ -325,7 +341,7 @@ export default function WorkerDashboardScreen() {
                       <View className="h-2 bg-slate-100 rounded-full mb-1">
                         <View className="h-full rounded-full bg-slate-800" style={{ width: `${Math.min((hoursWorked/(Math.max(1, currentDay)*8))*100, 100)}%` }} />
                       </View>
-                      <Text className="text-slate-500 text-xs">{hoursWorked.toFixed(1)} worked vs {currentDay*8} expected</Text>
+                      <Text className="text-slate-500 text-xs">{formatMinutes(totalWorkedMinutes)} worked vs {currentDay*8}h 0m expected</Text>
                     </View>
 
                     <View className="mb-6">
@@ -381,34 +397,48 @@ export default function WorkerDashboardScreen() {
                         <Text className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Hours</Text>
                         <Text className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Status</Text>
                       </View>
-                      {attendance.slice(0, 7).map(a => (
+                      {attendance.slice(0, 7).map(a => {
+                        const status = getAttendanceStatus(a);
+                        const otMins = calculateOvertimeMinutes(a.overtime_hours, a.hours_worked, a.check_in_time, a.check_out_time);
+                        const hoursLabel = a.check_in_time && !a.check_out_time && a.hours_worked == null
+                          ? 'In progress'
+                          : formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time);
+                        return (
                         <View key={a.id} className="flex-row items-center border-b border-slate-50 py-3 last:border-0">
                           <Text className="flex-1 font-bold text-slate-700">{dateLabel(a.date)}</Text>
                           <Text className="flex-[1.5] text-slate-500">{timeLabel(a.check_in_time)} - {timeLabel(a.check_out_time)}</Text>
                           <View className="flex-1 items-end">
-                            <Text className="font-medium text-slate-700">{formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time)}</Text>
-                            {a.overtime_hours > 0 && <Text className="text-xs text-brand-orange font-bold">+{formatHoursMinutes(a.overtime_hours)} OT</Text>}
+                            <Text className="font-medium text-slate-700">{hoursLabel}</Text>
+                            {otMins > 0 && <Text className="text-xs text-brand-orange font-bold">+{formatMinutes(otMins)} OT</Text>}
                           </View>
                           <View className="flex-1 items-end">
-                            <View className={`px-2 py-1 rounded-md ${a.status === 'Present' ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'} border`}>
-                              <Text className={`text-xs font-bold ${a.status === 'Present' ? 'text-emerald-700' : 'text-slate-600'}`}>{a.status}</Text>
+                            <View className={`px-2 py-1 rounded-md ${status === 'Present' ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'} border`}>
+                              <Text className={`text-xs font-bold ${status === 'Present' ? 'text-emerald-700' : 'text-slate-600'}`}>{status}</Text>
                             </View>
                           </View>
                         </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ) : (
                     <View className="gap-3">
-                      {attendance.slice(0, 5).map(a => (
+                      {attendance.slice(0, 5).map(a => {
+                        const status = getAttendanceStatus(a);
+                        const otMins = calculateOvertimeMinutes(a.overtime_hours, a.hours_worked, a.check_in_time, a.check_out_time);
+                        const hoursLabel = a.check_in_time && !a.check_out_time && a.hours_worked == null
+                          ? 'In progress'
+                          : formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time);
+                        return (
                         <View key={a.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50">
                           <View className="flex-row justify-between items-center mb-2">
                             <Text className="font-bold text-slate-800">{dateLabel(a.date)}</Text>
-                            <Text className={`text-xs font-bold ${a.status === 'Present' ? 'text-emerald-600' : 'text-slate-500'}`}>{a.status}</Text>
+                            <Text className={`text-xs font-bold ${status === 'Present' ? 'text-emerald-600' : 'text-slate-500'}`}>{status}</Text>
                           </View>
                           <Text className="text-sm text-slate-600 mb-2">{timeLabel(a.check_in_time)} to {timeLabel(a.check_out_time)}</Text>
-                          <Text className="text-sm font-medium text-slate-700">Hours: {formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time)} {a.overtime_hours > 0 && <Text className="text-brand-orange">(+{formatHoursMinutes(a.overtime_hours)} OT)</Text>}</Text>
+                          <Text className="text-sm font-medium text-slate-700">Hours: {hoursLabel} {otMins > 0 && <Text className="text-brand-orange">(+{formatMinutes(otMins)} OT)</Text>}</Text>
                         </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   )}
                   </AnimatedCard>

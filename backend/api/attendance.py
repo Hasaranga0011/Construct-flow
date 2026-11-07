@@ -61,10 +61,13 @@ def check_out(req: CheckOutRequest, user=Depends(get_current_user)):
             
         check_in_time = datetime.fromisoformat(record["check_in_time"].replace("Z", "+00:00"))
         
-        # Calculate hours
-        diff = now.timestamp() - check_in_time.timestamp()
-        hours_worked = round(diff / 3600, 2)
-        overtime_hours = round(max(0, hours_worked - 8), 2)
+        # Calculate hours and minutes
+        diff_seconds = max(0.0, now.timestamp() - check_in_time.timestamp())
+        total_minutes = max(0, round(diff_seconds / 60.0))
+        hours_worked = round(total_minutes / 60.0, 2)
+        overtime_minutes = max(0, total_minutes - 480)
+        overtime_hours = round(overtime_minutes / 60.0, 2)
+        formatted_hours = f"{total_minutes // 60}h {total_minutes % 60}m"
         
         # Update record
         update_data = {
@@ -72,12 +75,13 @@ def check_out(req: CheckOutRequest, user=Depends(get_current_user)):
             "hours_worked": hours_worked,
             "overtime_hours": overtime_hours
         }
-        update_res = supabase_db.table("attendance").update(update_data).eq("id", record["id"])
+        update_res = supabase_db.table("attendance").update(update_data).eq("id", record["id"]).execute()
         
         return {
             "message": "Checked out successfully",
             "hours_worked": hours_worked,
             "overtime_hours": overtime_hours,
+            "formatted_hours": formatted_hours,
             "data": update_res.data[0]
         }
     except HTTPException:

@@ -42,7 +42,14 @@ import {
   todayKey,
   monthRange,
 } from "@/services/workerData";
-import { formatHoursMinutes } from "@/utils/format";
+import {
+  formatHoursMinutes,
+  formatOvertimeHoursMinutes,
+  formatMinutes,
+  getAttendanceStatus,
+  sumWorkedMinutes,
+  sumOvertimeMinutes,
+} from "@/utils/format";
 import { deliverReport } from "@/components/reports/reportDelivery";
 
 type Resource = ReturnType<typeof useAsyncData<any>>;
@@ -373,7 +380,7 @@ export function AttendanceCalendar({
               );
             const key = `${month}-${String(day).padStart(2, "0")}`;
             const record = records.find((r) => r.date === key);
-            const status = record?.status || "Not scheduled";
+            const status = record ? getAttendanceStatus(record) : "Not scheduled";
             return (
               <View
                 key={key}
@@ -421,14 +428,20 @@ export function AttendanceCalendar({
   );
 }
 function RecordDetails({ record: r }: { record: Attendance }) {
+  const status = getAttendanceStatus(r);
+  const workedLabel =
+    r.check_in_time && !r.check_out_time && r.hours_worked == null
+      ? "In progress"
+      : `${formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time)} worked`;
+  const overtimeLabel = `${formatOvertimeHoursMinutes(r.overtime_hours, r.hours_worked, r.check_in_time, r.check_out_time)} overtime`;
   return (
     <View className="gap-2">
-      <StatusBadge status={r.status} />
+      <StatusBadge status={status} />
       <BodyText>
         In {timeLabel(r.check_in_time)} · Out {timeLabel(r.check_out_time)}
       </BodyText>
       <BodyText>
-        {formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time)} worked · {formatHoursMinutes(r.overtime_hours)} overtime
+        {workedLabel} · {overtimeLabel}
       </BodyText>
       <BodyText>{r.site_name || "Site name not recorded"}</BodyText>
     </View>
@@ -438,25 +451,38 @@ function RecordList({ records }: { records: Attendance[] }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <View className="gap-3">
-      {records.map((r) => (
-        <View key={r.id} className="border-b border-slate-100 pb-3">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: open === r.id }}
-            onPress={() => setOpen(open === r.id ? null : r.id)}
-            className="min-h-[48px] justify-center"
-          >
-            <Text className="font-semibold text-sm dark:text-white">
-              {dateLabel(r.date)} · {r.status}
-            </Text>
-            <BodyText>
-              {timeLabel(r.check_in_time)} · {timeLabel(r.check_out_time)} ·{" "}
-              {formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time)} · OT {formatHoursMinutes(r.overtime_hours)}
-            </BodyText>
-          </Pressable>
-          {open === r.id && <RecordDetails record={r} />}
-        </View>
-      ))}
+      {records.map((r) => {
+        const status = getAttendanceStatus(r);
+        const workedLabel =
+          r.check_in_time && !r.check_out_time && r.hours_worked == null
+            ? "In progress"
+            : formatHoursMinutes(r.hours_worked, r.check_in_time, r.check_out_time);
+        const otLabel = formatOvertimeHoursMinutes(
+          r.overtime_hours,
+          r.hours_worked,
+          r.check_in_time,
+          r.check_out_time,
+        );
+        return (
+          <View key={r.id} className="border-b border-slate-100 pb-3">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: open === r.id }}
+              onPress={() => setOpen(open === r.id ? null : r.id)}
+              className="min-h-[48px] justify-center"
+            >
+              <Text className="font-semibold text-sm dark:text-white">
+                {dateLabel(r.date)} · {status}
+              </Text>
+              <BodyText>
+                {timeLabel(r.check_in_time)} · {timeLabel(r.check_out_time)} ·{" "}
+                {workedLabel} · OT {otLabel}
+              </BodyText>
+            </Pressable>
+            {open === r.id && <RecordDetails record={r} />}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -614,7 +640,7 @@ function PaySummary({ pay }: { pay: any }) {
         {money(pay.basic_pay)}
       </BodyText>
       <BodyText>
-        {pay.overtime_hours ?? 0} overtime hours x hourly rate x 1.5 ={" "}
+        {formatHoursMinutes(pay.overtime_hours ?? 0)} overtime x hourly rate x 1.5 ={" "}
         {money(pay.overtime_pay)}
       </BodyText>
       <BodyText>Deductions: {money(pay.deductions ?? 0)}</BodyText>
@@ -657,8 +683,8 @@ function Slip({
               headers: ["Item", "Value"],
               rows: [
                 ["Days", slip.total_days ?? null],
-                ["Hours", slip.total_hours ?? null],
-                ["Overtime hours", slip.overtime_hours ?? null],
+                ["Hours", slip.total_hours != null ? formatHoursMinutes(slip.total_hours) : null],
+                ["Overtime hours", slip.overtime_hours != null ? formatHoursMinutes(slip.overtime_hours) : null],
                 ["Base pay", money(slip.basic_pay)],
                 ["Overtime pay", money(slip.overtime_pay)],
                 ["Gross", money(gross)],
@@ -698,8 +724,8 @@ function Slip({
           <BodyText>
             {slip.slip_number || "Payslip"} ·{" "}
             {slip.total_days ?? "Not recorded"} days |{" "}
-            {slip.total_hours ?? "Not recorded"} hours ·{" "}
-            {slip.overtime_hours ?? "Not recorded"} overtime hours
+            {slip.total_hours != null ? formatHoursMinutes(slip.total_hours) : "Not recorded"} worked ·{" "}
+            {slip.overtime_hours != null ? formatHoursMinutes(slip.overtime_hours) : "Not recorded"} overtime
           </BodyText>
           <BodyText>
             Gross {money(gross)} | Deductions {money(slip.deductions ?? 0)} |
@@ -820,11 +846,22 @@ export default function WorkerPortal({
           </BodyText>
           {today?.check_in_time && !today?.check_out_time && (
             <Text className="text-2xl font-bold dark:text-white">
-              {Math.max(
-                0,
-                (now - new Date(today.check_in_time).getTime()) / 3600000,
-              ).toFixed(2)}{" "}
-              hours so far
+              {formatHoursMinutes(
+                null,
+                today.check_in_time,
+                new Date(now).toISOString(),
+              )}{" "}
+              so far
+            </Text>
+          )}
+          {today?.check_in_time && today?.check_out_time && (
+            <Text className="text-2xl font-bold dark:text-white">
+              {formatHoursMinutes(
+                today.hours_worked,
+                today.check_in_time,
+                today.check_out_time,
+              )}{" "}
+              worked today
             </Text>
           )}
           <Button
@@ -860,29 +897,18 @@ export default function WorkerPortal({
               String(
                 new Set(
                   (attendance.data || [])
-                    .filter((r: Attendance) => r.status === "Present")
+                    .filter((r: Attendance) => getAttendanceStatus(r) === "Present")
                     .map((r: Attendance) => r.date),
                 ).size
               ),
             ],
             [
               "Hours Worked",
-              formatHoursMinutes(
-                (attendance.data || []).reduce(
-                  (n: number, r: Attendance) => n + Number(r.hours_worked || 0),
-                  0,
-                )
-              ),
+              formatMinutes(sumWorkedMinutes(attendance.data || [])),
             ],
             [
               "Overtime Hours",
-              formatHoursMinutes(
-                (attendance.data || []).reduce(
-                  (n: number, r: Attendance) =>
-                    n + Number(r.overtime_hours || 0),
-                  0,
-                )
-              ),
+              formatMinutes(sumOvertimeMinutes(attendance.data || [])),
             ],
             [
               p.final ? "Final Earnings (LKR)" : "Estimated Earnings (LKR)",
@@ -1045,21 +1071,15 @@ export default function WorkerPortal({
                 {(data: Attendance[]) => (
                   <View className="gap-2">
                     <BodyText>
-                      {data.filter((r) => r.status === "Present").length} days
+                      {new Set(data.filter((r) => getAttendanceStatus(r) === "Present").map((r) => r.date)).size} days
                       present |{" "}
-                      {data.filter((r) => r.status === "Absent").length} absent
-                      | {data.filter((r) => r.status === "On Leave").length} on
+                      {new Set(data.filter((r) => getAttendanceStatus(r) === "Absent").map((r) => r.date)).size} absent
+                      | {new Set(data.filter((r) => getAttendanceStatus(r) === "On Leave").map((r) => r.date)).size} on
                       leave
                     </BodyText>
                     <BodyText>
-                      {formatHoursMinutes(
-                        data.reduce((n, r) => n + Number(r.hours_worked || 0), 0)
-                      )}{" "}
-                      worked ·{" "}
-                      {formatHoursMinutes(
-                        data.reduce((n, r) => n + Number(r.overtime_hours || 0), 0)
-                      )}{" "}
-                      overtime
+                      {formatMinutes(sumWorkedMinutes(data))} worked ·{" "}
+                      {formatMinutes(sumOvertimeMinutes(data))} overtime
                     </BodyText>
                   </View>
                 )}

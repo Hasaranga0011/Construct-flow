@@ -90,30 +90,118 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
         };
       });
 
+      // Query historical projects directly from Supabase instead of using hardcoded mock data
+      const { data: dbHist } = await (supabase as any)
+        .from('historical_projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const mappedHistorical = (dbHist || []).map((hp: any) => {
+        const sqft = Number(hp.floor_area_sqft) || 0;
+        const est = hp.estimate_total_lkr ? Number(hp.estimate_total_lkr) : null;
+        const act = hp.actual_total_lkr ? Number(hp.actual_total_lkr) : null;
+        const estSqft = est && sqft > 0 ? Math.round(est / sqft) : null;
+        const actSqft = act && sqft > 0 ? Math.round(act / sqft) : null;
+        const varPct = est && act ? Math.round(((act - est) / est) * 1000) / 10 : null;
+        return {
+          id: hp.id,
+          project_name: hp.project_name,
+          district: hp.district,
+          town: hp.town,
+          project_type: hp.project_type,
+          floor_area_sqft: sqft,
+          cost_year: hp.cost_year || 2024,
+          estimate_cost_per_sqft: estSqft,
+          actual_cost_per_sqft: actSqft,
+          estimate_total_lkr: est,
+          actual_total_lkr: act,
+          variance_pct: varPct,
+          source: hp.source || 'real',
+          verified: Boolean(hp.verified ?? true),
+          evidence_note: hp.evidence_note || '',
+        };
+      });
+
+      const validVariances = mappedHistorical
+        .filter((h: any) => h.variance_pct !== null && h.source !== 'sample')
+        .map((h: any) => h.variance_pct);
+      const summaryCount = validVariances.length;
+      const meanVar = summaryCount > 0 ? Math.round((validVariances.reduce((a: number, b: number) => a + b, 0) / summaryCount) * 10) / 10 : 0;
+      const meanAbsVar = summaryCount > 0 ? Math.round((validVariances.reduce((a: number, b: number) => a + Math.abs(b), 0) / summaryCount) * 10) / 10 : 0;
+
+      // Dynamic market trends from live and historical projects
+      const trendGroups: Record<string, { costs: number[]; location: string; project_type: string }> = {};
+      mappedHistorical.forEach((hp: any) => {
+        if (hp.floor_area_sqft > 0 && hp.actual_total_lkr) {
+          const key = `${hp.district}__${hp.project_type}`;
+          if (!trendGroups[key]) trendGroups[key] = { costs: [], location: hp.district, project_type: hp.project_type };
+          trendGroups[key].costs.push(hp.actual_total_lkr / hp.floor_area_sqft);
+        }
+      });
+      projectsList.forEach((p: any) => {
+        if (p.status === 'Completed' && p.square_footage && p.spent_cost) {
+          const loc = p.location || 'Colombo';
+          const ptype = p.project_type || 'Residential';
+          const key = `${loc}__${ptype}`;
+          if (!trendGroups[key]) trendGroups[key] = { costs: [], location: loc, project_type: ptype };
+          trendGroups[key].costs.push(Number(p.spent_cost) / Number(p.square_footage));
+        }
+      });
+
+      const dynamicMarketTrends: any[] = [];
+      const dynamicPendingTrends: any[] = [];
+      Object.values(trendGroups).forEach((grp) => {
+        const sz = grp.costs.length;
+        const avg = Math.round(grp.costs.reduce((a, b) => a + b, 0) / sz);
+        if (sz >= 3) {
+          dynamicMarketTrends.push({
+            location: grp.location,
+            project_type: grp.project_type,
+            avg_cost_per_sqft: avg,
+            sample_size: sz,
+          });
+        } else {
+          dynamicPendingTrends.push({
+            location: grp.location,
+            project_type: grp.project_type,
+            group_label: `${grp.location} / ${grp.project_type}`,
+            sample_size: sz,
+            needed: 3,
+            short: 3 - sz,
+            message: `${grp.location} / ${grp.project_type}: ${sz} of 3 needed`,
+          });
+        }
+      });
+
       return {
         is_standalone: true,
         model_info: {
           cost_model: {
-            trained_at: '2026-03-15T00:00:00Z',
+            trained_at: null,
             algorithm: 'RandomForestRegressor (Hybrid AI + CIDA)',
           },
           delay_classifier: {
-            trained_at: '2026-03-15T00:00:00Z',
+            trained_at: null,
             algorithm: 'Rule-Based Weighted Composite Engine',
           }
         },
-        real_projects_count: Math.max(total, 24),
-        verified_real_count: Math.max(total, 24),
-        baseline_mape: 14.8,
-        validation_mape: 12.4,
-        cost_driver_is_indicative: false,
+        real_projects_count: mappedHistorical.length,
+        verified_real_count: mappedHistorical.length,
+        baseline_mape: null,
+        validation_mape: null,
+        accuracy_score: 'Backend connection required',
+        accuracy_status: 'Connect to backend API to view trained model validation metrics',
+        cost_driver_is_indicative: true,
         feature_importance: [
-          { key: 'floor_area_sqft', name: 'Floor Area (Sq Ft)', value: 38.2 },
-          { key: 'structure_type', name: 'Structure Type', value: 18.5 },
-          { key: 'floors', name: 'Number of Floors', value: 14.1 },
-          { key: 'finishing', name: 'Finishing & Services', value: 12.6 },
-          { key: 'district', name: 'Location / District', value: 9.4 },
-          { key: 'quality_tier', name: 'Quality Tier', value: 7.2 },
+          { key: 'project_type', name: 'Project Type', value: 49.2 },
+          { key: 'quality_tier', name: 'Quality Tier', value: 46.0 },
+          { key: 'floor_area_sqft', name: 'Floor Area (Sq Ft)', value: 1.6 },
+          { key: 'floors', name: 'Number of Floors', value: 0.9 },
+          { key: 'district', name: 'District / Location', value: 0.6 },
+          { key: 'cost_year', name: 'Cost Year', value: 0.7 },
+          { key: 'price_index', name: 'Price Index (CIDA)', value: 0.7 },
+          { key: 'site_condition', name: 'Site Condition', value: 0.3 },
+          { key: 'structure_type', name: 'Structure Type', value: 0.0 },
         ],
         projects: mappedProjects,
         project_health: {
@@ -123,72 +211,13 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
           trending_over_budget: overBudget,
           on_budget_percent: onBudgetPct,
         },
-        market_trends: [
-          { location: 'Colombo', project_type: 'Residential', avg_cost_per_sqft: 14720, sample_size: 8 },
-          { location: 'Gampaha', project_type: 'Residential', avg_cost_per_sqft: 13225, sample_size: 5 },
-          { location: 'Kandy', project_type: 'Commercial', avg_cost_per_sqft: 20160, sample_size: 4 },
-        ],
-        pending_market_trends: [
-          { location: 'Galle', project_type: 'Residential', sample_size: 2 },
-          { location: 'Kalutara', project_type: 'Industrial', sample_size: 1 },
-        ],
-        historical_projects: [
-          {
-            id: 'hist-1',
-            project_name: 'Colombo Residencies Tower B',
-            district: 'Colombo',
-            town: 'Kollupitiya',
-            project_type: 'Residential',
-            floor_area_sqft: 2400,
-            cost_year: 2024,
-            estimate_cost_per_sqft: 14500,
-            actual_cost_per_sqft: 14850,
-            estimate_total_lkr: 34800000,
-            actual_total_lkr: 35640000,
-            variance_pct: 2.4,
-            source: 'real',
-            verified: true,
-            evidence_note: 'Audited Final Account 2024'
-          },
-          {
-            id: 'hist-2',
-            project_name: 'Kandy Commercial Plaza',
-            district: 'Kandy',
-            town: 'Peradeniya',
-            project_type: 'Commercial',
-            floor_area_sqft: 4500,
-            cost_year: 2024,
-            estimate_cost_per_sqft: 19800,
-            actual_cost_per_sqft: 20250,
-            estimate_total_lkr: 89100000,
-            actual_total_lkr: 91125000,
-            variance_pct: 2.3,
-            source: 'imported_boq',
-            verified: true,
-            evidence_note: 'CIDA Certified BOQ'
-          },
-          {
-            id: 'hist-3',
-            project_name: 'Negombo Warehouse Logistics Hub',
-            district: 'Gampaha',
-            town: 'Negombo',
-            project_type: 'Industrial',
-            floor_area_sqft: 6000,
-            cost_year: 2023,
-            estimate_cost_per_sqft: 10800,
-            actual_cost_per_sqft: 11100,
-            estimate_total_lkr: 64800000,
-            actual_total_lkr: 66600000,
-            variance_pct: 2.8,
-            source: 'real',
-            verified: true,
-            evidence_note: 'QS Completion Certificate'
-          }
-        ],
+        market_trends: dynamicMarketTrends,
+        pending_market_trends: dynamicPendingTrends,
+        historical_projects: mappedHistorical,
         historical_summary_metrics: {
-          count: 3,
-          mean_variance_pct: 2.5,
-          mean_abs_variance_pct: 2.5,
+          count: summaryCount,
+          mean_variance_pct: meanVar,
+          mean_abs_variance_pct: meanAbsVar,
         }
       };
     } catch {

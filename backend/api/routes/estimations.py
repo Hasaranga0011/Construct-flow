@@ -10,8 +10,8 @@ router = APIRouter(
     tags=["Estimations"]
 )
 
-import numpy as np
-from sklearn.linear_model import LinearRegression
+from data_pipeline.model_engine import predict_cost_hybrid
+from services.historical_data_service import DISTRICTS_LOWER
 
 class PredictRequest(BaseModel):
     project_name: str
@@ -19,6 +19,8 @@ class PredictRequest(BaseModel):
     num_floors: int = Field(gt=0, le=200)
     material_quality: str
     location_index: float = Field(gt=0, allow_inf_nan=False)
+    district: Optional[str] = None
+    project_type: Optional[str] = "Residential House"
 
 import json
 from typing import Optional
@@ -116,27 +118,20 @@ def create_estimation(estimation: EstimationCreate, request: Request):
 @router.post("/predict")
 def predict_cost(req: PredictRequest, request: Request):
     try:
-        # Dummy Training Data for a Simulated ML Model
-        # Features: [sqft, floors, location_index]
-        X_train = np.array([
-            [1000, 1, 1.0], [2000, 2, 1.2], [1500, 1, 1.1],
-            [3000, 3, 1.5], [5000, 5, 2.0], [800, 1, 0.9]
-        ])
-        # Target: Total cost
-        y_train = np.array([150000, 350000, 230000, 600000, 1200000, 110000])
+        # Use the real hybrid ML model engine instead of hardcoded dummy arrays
+        target_district = "Colombo"
+        if req.district:
+            target_district = DISTRICTS_LOWER.get(req.district.strip().lower(), "Colombo")
 
-        model = LinearRegression()
-        model.fit(X_train, y_train)
+        hybrid_result = predict_cost_hybrid(
+            floor_area_sqft=req.square_footage,
+            num_floors=req.num_floors,
+            district=target_district,
+            project_type=req.project_type or "Residential House",
+            quality_tier=req.material_quality,
+        )
 
-        # Quality multiplier
-        quality_map = {"Standard": 1.0, "Premium": 1.35, "Luxury": 1.8}
-        quality_mult = quality_map.get(req.material_quality, 1.0)
-
-        # Predict using scikit-learn
-        features = np.array([[req.square_footage, req.num_floors, req.location_index]])
-        base_prediction = model.predict(features)[0]
-        
-        final_cost = max(0.0, float(base_prediction * quality_mult))
+        final_cost = float(hybrid_result["estimated_cost_lkr"])
         
         # Save to DB
         estimation_data = {

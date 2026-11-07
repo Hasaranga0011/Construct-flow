@@ -30,7 +30,7 @@ def get_labour(project_id: Optional[str] = Query(None, description="Filter by pr
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
         query = client.table("attendance").select(
-            "id, date, status, check_in_time, check_out_time, hours_worked, site_id, worker_id, workers(profiles(full_name))"
+            "id, date, check_in_time, check_out_time, hours_worked, site_id, worker_id, workers(profiles(full_name))"
         )
         if project_id:
             if allowed_projects is not None and project_id not in allowed_projects:
@@ -52,7 +52,7 @@ def get_labour(project_id: Optional[str] = Query(None, description="Filter by pr
                 "project_id": row["site_id"],
                 "worker_name": prof.get("full_name", "Unknown Worker"),
                 "date": row["date"],
-                "status": row["status"],
+                "status": row.get("status") or "Present",
                 "check_in_time": row.get("check_in_time"),
                 "check_out_time": row.get("check_out_time"),
                 "hours_worked": row.get("hours_worked")
@@ -69,8 +69,8 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
         query = client.table("attendance").select(
-            "hours_worked, date, status, site_id, workers(profiles(full_name, daily_rate))"
-        ).eq("status", "Present")
+            "hours_worked, check_in_time, check_out_time, date, site_id, workers(profiles(full_name, daily_rate))"
+        )
         
         if allowed_projects is not None and not allowed_projects:
             return []
@@ -192,46 +192,44 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
         if not profile_res.data:
             raise HTTPException(status_code=404, detail="Invalid QR Code: Worker not found")
             
-        worker = profile_res.data[0]
+        worker = profile_res.data[0] if isinstance(profile_res.data, list) else profile_res.data
         worker_profile_id = worker["id"]
 
         worker_res = supabase.table("workers").select("id, user_id, site_id").eq("user_id", worker_profile_id).execute()
         if not worker_res.data:
             raise HTTPException(status_code=409, detail="Worker profile is not linked to a worker record")
-        worker_id = worker_res.data[0]["id"]
+        worker_row = worker_res.data[0] if isinstance(worker_res.data, list) else worker_res.data
+        worker_id = worker_row["id"]
         
         # 2. Resolve target project and linked attendance site
         raw_target_id = payload.site_id
+        project_id = raw_target_id
+        site_id = None
         direct_site = supabase.table("sites").select("id, project_id").eq("id", raw_target_id).execute()
-        if direct_site.data:
+        if direct_site.data and isinstance(direct_site.data, list) and direct_site.data[0].get("project_id"):
             site_id = direct_site.data[0]["id"]
             project_id = direct_site.data[0]["project_id"]
-        else:
-            project_id = raw_target_id
-            site_query = supabase.table("sites").select("id").eq("project_id", project_id).order("id").execute()
-            if site_query.data:
-                site_id = site_query.data[0]["id"]
-            else:
-                try:
-                    new_site = supabase.table("sites").insert({
-                        "project_id": project_id,
-                        "address": "Default Site",
-                        "site_manager_id": current_user["id"] if current_user["role"] == "site_manager" else None
-                    }).execute()
-                    site_id = new_site.data[0]["id"] if new_site.data else project_id
-                except Exception:
-                    site_id = project_id
 
         allowed = managed_project_ids(supabase, current_user)
         if allowed is not None and project_id not in allowed:
             raise HTTPException(status_code=403, detail="This project is not assigned to you")
 
+        if not site_id:
+            site_query = supabase.table("sites").select("id").eq("project_id", project_id)
+            if current_user["role"] == "site_manager":
+                site_query = site_query.eq("site_manager_id", current_user["id"])
+            sites = site_query.order("id").execute()
+            if not sites.data:
+                raise HTTPException(status_code=409, detail="This project has no linked attendance site")
+            site_id = sites.data[0]["id"]
+
+        assigned_site_id = worker_row.get("site_id")
+        if assigned_site_id and assigned_site_id != site_id:
+            raise HTTPException(status_code=403, detail="This worker is assigned to a different site. Ask the Project Manager to update their assignment.")
+
         assignment_res = supabase.table("site_workers").select("worker_id").eq("project_id", project_id).execute()
-        is_assigned = any(row["worker_id"] in {worker_id, worker_profile_id} for row in (assignment_res.data or []))
-        if not is_assigned:
-            assigned_site_id = worker_res.data[0].get("site_id")
-            if assigned_site_id and assigned_site_id != site_id:
-                raise HTTPException(status_code=403, detail="This worker is not assigned to your site. Ask the Project Manager to update their assignment.")
+        if not any(row["worker_id"] in {worker_id, worker_profile_id} for row in (assignment_res.data or [])):
+            raise HTTPException(status_code=403, detail="This worker is not assigned to your site. Ask the Project Manager to update their assignment.")
 
         # 3. Check today's attendance record
         today = datetime.now(ZoneInfo("Asia/Colombo")).date().isoformat()
@@ -265,12 +263,14 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
             if check_in_dt.tzinfo is None:
                 check_in_dt = check_in_dt.replace(tzinfo=timezone.utc)
             
-            diff_seconds = max(0, int((now_dt - check_in_dt).total_seconds()))
-            hours = diff_seconds // 3600
-            minutes = (diff_seconds % 3600) // 60
+            diff_seconds = max(0.0, (now_dt - check_in_dt).total_seconds())
+            total_minutes = max(0, round(diff_seconds / 60.0))
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
             formatted_duration = f"{hours}h {minutes}m"
-            diff_hours = round(diff_seconds / 3600.0, 2)
-            overtime_hours = round(max(diff_hours - 8.0, 0.0), 2)
+            diff_hours = round(total_minutes / 60.0, 2)
+            overtime_minutes = max(0, total_minutes - 480)
+            overtime_hours = round(overtime_minutes / 60.0, 2)
             
             upd_res = supabase.table("attendance").update({
                 "check_out_time": now_iso,
@@ -283,6 +283,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
                 "worker_name": worker["full_name"],
                 "time": now_iso,
                 "hours_worked": diff_hours,
+                "overtime_hours": overtime_hours,
                 "formatted_hours": formatted_duration
             }
             

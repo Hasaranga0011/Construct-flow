@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatHoursMinutes } from '@/utils/format';
 
 interface ChartItem {
   label: string;
@@ -16,7 +17,11 @@ export function WorkerAttendanceChart({ chartData }: { chartData: ChartItem[] })
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-          <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+          <Tooltip
+            cursor={{ fill: '#f8fafc' }}
+            contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            formatter={(value: any) => formatHoursMinutes(Number(value))}
+          />
           <Bar dataKey="regular" stackId="a" fill="#1e293b" radius={[0, 0, 4, 4]} name="Regular Hours" />
           <Bar dataKey="overtime" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} name="Overtime" />
         </BarChart>

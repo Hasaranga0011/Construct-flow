@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
+import { formatHoursMinutes } from '@/utils/format';
 
 interface ChartItem {
   label: string;
@@ -19,9 +20,9 @@ export function WorkerAttendanceChart({ chartData }: { chartData: ChartItem[] })
           const otHeight = Math.min(60, (item.overtime / maxHours) * 180);
 
           return (
-            <View key={idx} className="items-center" style={{ width: 36 }}>
+            <View key={idx} className="items-center" style={{ width: 42 }}>
               <Text className="text-[10px] font-semibold text-slate-500 mb-1">
-                {total > 0 ? `${total}h` : ''}
+                {total > 0 ? formatHoursMinutes(total) : ''}
               </Text>
               <View className="w-6 rounded-t overflow-hidden bg-slate-100 items-center justify-end" style={{ height: 180 }}>
                 {item.overtime > 0 && (

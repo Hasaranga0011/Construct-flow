@@ -5,7 +5,12 @@ const ts = require('../../frontend/node_modules/typescript');
 const source = fs.readFileSync(path.join(__dirname, '../../frontend/src/utils/notifications.ts'), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const loaded = { exports: {} };
-new Function('exports', compiled.outputText)(loaded.exports);
+const customRequire = (mod) => {
+  if (mod.includes('supabase')) return { supabase: {} };
+  if (mod.includes('apiUrl')) return { getApiUrl: () => '' };
+  return require(mod);
+};
+new Function('exports', 'require', compiled.outputText)(loaded.exports, customRequire);
 const { isNotificationForUser: visible, buildNotificationFilter: filter } = loaded.exports;
 assert.equal(visible({ target_user_id: 'other', target_role: 'pm' }, 'me', 'pm'), false);
 assert.equal(visible({ target_user_id: 'other', target_role: 'All' }, 'me', 'pm'), false);

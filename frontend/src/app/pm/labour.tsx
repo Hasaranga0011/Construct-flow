@@ -8,7 +8,7 @@ import { managedProjects } from '@/services/pmData';
 import { assignedWorkers } from '@/services/siteData';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { useResponsive } from '@/hooks/useResponsive';
-import { formatHoursMinutes } from '@/utils/format';
+import { formatHoursMinutes, formatMinutes, getAttendanceStatus, sumOvertimeMinutes } from '@/utils/format';
 
 export default function PMLabourScreen() {
   const router = useRouter();
@@ -42,7 +42,7 @@ export default function PMLabourScreen() {
         workers: workersList.length, 
         present: records.filter(a => a.check_in_time && !a.check_out_time).length, 
         sites: projects.length, 
-        overtime: records.reduce((n, a) => n + Math.max(0, (Number(a.hours_worked) || 0) - 8), 0) 
+        overtime: sumOvertimeMinutes(records)
       });
     } catch (e: any) { setError(e.message || 'Unable to load attendance.'); }
     finally { setLoading(false); }
@@ -51,7 +51,7 @@ export default function PMLabourScreen() {
   const visible = rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
   const time = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not recorded';
   return <View className="flex-1 bg-brand-light"><TopNav title="Project Labour" actionLabel="Refresh" onActionPress={load} /><ScrollView className="flex-1 p-4 md:p-6" keyboardShouldPersistTaps="handled">
-    <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',stats.overtime.toFixed(1)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><AutoFitText value={value} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>)}</View>
+    <View className="flex-row flex-wrap gap-3 mb-5">{[['Assigned Workers',stats.workers],['Currently Present',stats.present],['Managed Projects',stats.sites],['Overtime Hours',formatMinutes(stats.overtime)]].map(([label,value]) => <View key={label} className="bg-white rounded-xl p-4 flex-grow min-w-[130px]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{label}</Text><AutoFitText value={value} maxFontSize={24} minFontSize={16} className="font-bold" containerStyle={{ marginTop: 8 }} /></View>)}</View>
     <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Today&apos;s Attendance</Text>
       <View style={{ flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
@@ -70,6 +70,6 @@ export default function PMLabourScreen() {
       </View>
     </View>
     {!!error && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 mb-4">{error}</Text>}
-    {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.hours_worked != null ? formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time) : 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{a.status || 'Not recorded'}</Text></View></View>)}
+    {loading ? <ActivityIndicator color="#F97316" /> : visible.length === 0 ? <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 p-4">No attendance records match this view.</Text> : visible.map(a => <View key={a.id} className="bg-white rounded-xl p-5 mb-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-lg">{a.person?.full_name || 'Worker'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">{a.project?.name}</Text><View className="flex-row flex-wrap gap-4 mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-in: {time(a.check_in_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Check-out: {time(a.check_out_time)}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>Hours: {a.check_out_time || a.hours_worked != null ? formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time) : 'In progress'}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3}>{getAttendanceStatus(a)}</Text></View></View>)}
   </ScrollView></View>;
 }

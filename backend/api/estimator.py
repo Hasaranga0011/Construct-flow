@@ -22,35 +22,53 @@ class EstimationRequest(BaseModel):
 async def generate_estimation(req: EstimationRequest, user=Depends(get_current_user)):
     try:
         if not settings.ANTHROPIC_API_KEY:
-            # Fallback mock for testing if no API key
-            mock_data = {
-                "material_cost": 15000000,
-                "labour_cost": 5000000,
-                "equipment_cost": 1000000,
-                "overhead": 1500000,
-                "total_cost": 22500000,
-                "timeline_days": 180,
+            # Dynamically compute engineering BOQ quantities and costs instead of hardcoding
+            from data_pipeline.model_engine import compute_hybrid_bottom_up
+            bottom_up = compute_hybrid_bottom_up(
+                floor_area_sqft=req.sq_footage,
+                floors=1,
+                project_type=req.project_type,
+                quality_tier=req.quality_tier,
+                district=req.location,
+            )
+            bd = bottom_up["breakdown"]
+            tot = bottom_up["bottom_up_total_lkr"] or 1.0
+            worker_days = bottom_up["quantities"]["worker_days"]
+            # Realistic timeline assuming average site crew of 6 workers
+            timeline = max(30, int(worker_days / 6.0))
+            
+            calculated_data = {
+                "material_cost": bd["materials_lkr"],
+                "labour_cost": bd["labour_lkr"],
+                "equipment_cost": bd["equipment_lkr"],
+                "overhead": bd["overhead_lkr"],
+                "total_cost": tot,
+                "timeline_days": timeline,
                 "confidence_score": 85,
                 "breakdown": {
-                    "materials_pct": 66.6,
-                    "labour_pct": 22.2,
-                    "equipment_pct": 4.4,
-                    "overhead_pct": 6.8
+                    "materials_pct": round((bd["materials_lkr"] / tot) * 100, 1),
+                    "labour_pct": round((bd["labour_lkr"] / tot) * 100, 1),
+                    "equipment_pct": round((bd["equipment_lkr"] / tot) * 100, 1),
+                    "overhead_pct": round((bd["overhead_lkr"] / tot) * 100, 1),
                 },
-                "recommendations": ["Optimize material bulk ordering"]
+                "recommendations": [
+                    f"Procure {bottom_up['quantities']['cement_bags']:,} cement bags and {bottom_up['quantities']['steel_kg']:,} kg steel in phased deliveries.",
+                    "Engage skilled trades at standard daily labour rates (Rs. 3,500/day).",
+                    "Monitor material wastage and track bulk discount opportunities."
+                ]
             }
             res = supabase_db.table("quotations").insert({
                 "project_id": req.project_id,
                 "created_by": user["id"],
-                "material_cost": mock_data["material_cost"],
-                "labour_cost": mock_data["labour_cost"],
-                "equipment_cost": mock_data["equipment_cost"],
-                "overhead": mock_data["overhead"],
-                "total_cost": mock_data["total_cost"],
-                "timeline_days": mock_data["timeline_days"],
+                "material_cost": calculated_data["material_cost"],
+                "labour_cost": calculated_data["labour_cost"],
+                "equipment_cost": calculated_data["equipment_cost"],
+                "overhead": calculated_data["overhead"],
+                "total_cost": calculated_data["total_cost"],
+                "timeline_days": calculated_data["timeline_days"],
                 "ai_generated": True
             }).execute()
-            return {"data": {**mock_data, "id": res.data[0]["quotation_id"]}}
+            return {"data": {**calculated_data, "id": res.data[0]["quotation_id"]}}
 
         # Actual Claude API call
         system_prompt = "You are a Sri Lanka construction cost expert. Always respond with valid JSON only. No explanation text."
