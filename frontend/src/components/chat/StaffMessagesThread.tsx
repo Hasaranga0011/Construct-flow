@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { normalizeFetchError } from '../../lib/apiUrl';
 import { ChatComposer } from './ChatComposer';
 
 type Message = {
@@ -30,6 +31,8 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!user || !threadId || !role) return;
@@ -54,7 +57,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
         if (msgRes.error) throw msgRes.error;
         if (isMounted) setMessages((msgRes.data || []) as Message[]);
       } catch (err: any) {
-        if (isMounted) setError(err.message || 'Failed to load.');
+        if (isMounted) setError(normalizeFetchError(err).message || 'Failed to load.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -83,7 +86,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
       isMounted = false;
       supabase.removeChannel(realtimeChannel);
     };
-  }, [user, threadId, role, effectiveRole]);
+  }, [user, threadId, role, effectiveRole, retryKey]);
 
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
@@ -112,7 +115,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
     const trimmed = input.trim();
     if (!trimmed || !user || !threadId || sending) return;
     setSending(true);
-    setError(null);
+    setSendError(null);
     try {
       const data = await api.messages.send({
         project_id: threadId,
@@ -127,7 +130,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
       }
       setInput('');
     } catch (err: any) {
-      setError(err.message || 'Failed to send.');
+      setSendError(normalizeFetchError(err).message || 'Failed to send.');
     } finally {
       setSending(false);
     }
@@ -136,13 +139,18 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
   const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-brand-light dark:bg-[#0F172A]" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView className="flex-1 bg-brand-light dark:bg-[#0F172A]" behavior={Platform.OS === 'web' ? undefined : Platform.OS === 'ios' ? 'padding' : 'height'}>
       <TopNav title={projectName + " Chat"} showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1 p-4" showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color="#F97316" className="mt-10" />
         ) : error && messages.length === 0 ? (
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500 mt-10 text-center">{error}</Text>
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-5 items-center mt-10">
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-center">{error}</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetryKey(k => k + 1)} className="bg-brand-orange px-5 py-2.5 rounded-lg mt-4">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Retry</Text>
+            </Pressable>
+          </View>
         ) : messages.length === 0 ? (
           <View className="items-center py-20">
             <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
@@ -159,13 +167,23 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
                     {senderName}
                   </Text>
                 )}
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800 dark:text-gray-200'}>{message.message_text}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800 dark:text-gray-200'}>
+                  {message.message_text || (message as any).content || (message as any).message}
+                </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] mt-1 ${isSender ? 'text-orange-100 text-right' : 'text-gray-400 text-left'}`}>{formatTime(message.created_at)}</Text>
               </View>
             </View>
           );
         })}
       </ScrollView>
+      {sendError ? (
+        <View className="mx-4 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl flex-row items-center justify-between">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-xs flex-1 mr-2">{sendError}</Text>
+          <Pressable onPress={() => setSendError(null)} hitSlop={8}>
+            <Ionicons name="close" size={16} color="#B91C1C" />
+          </Pressable>
+        </View>
+      ) : null}
       <ChatComposer
         value={input}
         onChangeText={setInput}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 const DeliveryRow = ({ title, project, time }: { title: string, project: string, time: string }) => {
   return (
@@ -24,6 +25,8 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
 };
 
 export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +41,19 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
           return;
         }
 
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) {
+              setDeliveries([]);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
         let query = supabase
           .from('purchase_orders')
           .select(`
@@ -49,6 +65,8 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
 
         if (projectId) {
           query = query.eq('project_id', projectId);
+        } else if (isPM) {
+          query = query.in('project_id', pmProjectIds);
         }
 
         const { data, error } = await query
@@ -68,7 +86,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
     loadDeliveries();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId]);
+  }, [refreshTrigger, projectId, isPM, user?.id]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">

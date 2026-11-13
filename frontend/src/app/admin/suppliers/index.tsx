@@ -13,9 +13,12 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
 import { StatCard } from '@/components/common/StatCard';
 import { AnimatedCard } from '@/components/common/AnimatedCard';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminSuppliersIndex() {
   const router = useRouter();
+  const { role } = useAuth();
+  const basePath = role === 'pm' ? '/pm/suppliers' : '/admin/suppliers';
   const { isMobile } = useResponsive();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +182,7 @@ export default function AdminSuppliersIndex() {
                 secondaryColumn: 'email',
                 titleColumn: 'full_name',
                 subtitleColumn: 'email',
-                routePrefix: '/admin/suppliers/',
+                routePrefix: `${basePath}/`,
                 filterColumn: 'role',
                 filterValue: 'supplier'
               }}
@@ -303,7 +306,7 @@ export default function AdminSuppliersIndex() {
 
                   {/* Action Button */}
                   <Pressable
-                    onPress={() => router.push(`/admin/suppliers/${sup.id}` as any)}
+                    onPress={() => router.push(`${basePath}/${sup.id}` as any)}
                     style={{ minHeight: 40 }}
                     className="bg-brand-orange hover:bg-orange-600 active:bg-orange-700 rounded-xl py-2.5 px-4 flex-row items-center justify-center shadow-sm"
                   >
@@ -381,7 +384,7 @@ export default function AdminSuppliersIndex() {
 
                 <View className="flex-1 flex-row justify-end pl-1">
                   <Pressable style={{ minHeight: 36, minWidth: 44 }}
-                    onPress={() => router.push(`/admin/suppliers/${sup.id}` as any)}
+                    onPress={() => router.push(`${basePath}/${sup.id}` as any)}
                     className="bg-brand-orange hover:bg-orange-600 px-4 py-1.5 rounded-lg shadow-sm"
                   >
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">Profile</Text>

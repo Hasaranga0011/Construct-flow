@@ -50,10 +50,18 @@ export const MaterialsStockChart = () => {
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { loadData(); }, 600);
+    };
     const channel = supabase.channel('msc-materials')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, trigger)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {

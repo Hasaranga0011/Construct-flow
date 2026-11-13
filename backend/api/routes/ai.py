@@ -47,7 +47,7 @@ from services.historical_data_service import (
 router = APIRouter(prefix="/ai", tags=["AI Models"])
 
 _INSIGHTS_CACHE: Dict[str, Tuple[float, Any]] = {}
-_INSIGHTS_CACHE_TTL = 20  # seconds
+_INSIGHTS_CACHE_TTL = 120  # seconds
 
 # ---------------------------------------------------------------------------
 # Model registry — loaded once at startup
@@ -575,40 +575,46 @@ def get_insights(
     # ---- 3. Per-project Delay Risk & Labour Count (Excluding test data) ----
     project_risks: List[Dict] = []
     labour_count = 0
+    milestones = []
+    pos = []
 
-    if project_ids:
+    def _fetch_milestones():
         try:
-            mil_res = db.table("milestones").select(
+            return db.table("milestones").select(
                 "project_id, status, due_date, completion_percentage"
-            ).in_("project_id", project_ids).execute()
-            milestones = mil_res.data or []
+            ).in_("project_id", project_ids).execute().data or []
         except Exception as e:
             logger.warning("Failed fetching milestones: %s", e)
-            milestones = []
+            return []
 
+    def _fetch_pos():
         try:
-            po_res = db.table("purchase_orders").select(
+            return db.table("purchase_orders").select(
                 "project_id, status, expected_date"
-            ).in_("project_id", project_ids).execute()
-            pos = po_res.data or []
+            ).in_("project_id", project_ids).execute().data or []
         except Exception as e:
             logger.warning("Failed fetching purchase orders: %s", e)
-            pos = []
+            return []
 
+    def _fetch_attendance():
         try:
             att_res = db.table("attendance").select("id", count="exact", head=True).execute()
-            labour_count = att_res.count if att_res.count is not None else len(att_res.data or [])
+            return att_res.count if att_res.count is not None else len(att_res.data or [])
         except Exception as e:
             logger.warning("Failed fetching attendance: %s", e)
-            labour_count = 0
+            return 0
+
+    from concurrent.futures import ThreadPoolExecutor
+    if project_ids:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_mil = pool.submit(_fetch_milestones)
+            f_pos = pool.submit(_fetch_pos)
+            f_att = pool.submit(_fetch_attendance)
+            milestones = f_mil.result()
+            pos = f_pos.result()
+            labour_count = f_att.result()
     else:
-        milestones = []
-        pos = []
-        try:
-            att_res = db.table("attendance").select("id", count="exact", head=True).execute()
-            labour_count = att_res.count if att_res.count is not None else len(att_res.data or [])
-        except Exception:
-            labour_count = 0
+        labour_count = _fetch_attendance()
 
     if project_ids:
         today = datetime.date.today().isoformat()

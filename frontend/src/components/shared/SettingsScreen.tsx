@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable,
-  ActivityIndicator, Switch, Animated, Image
+  ActivityIndicator, Switch, Animated, Image, Modal, TextInput
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +34,11 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
   const [signingOut, setSigningOut] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const [profile, setProfile] = useState<any>(null);
 
   const [prefs, setPrefs] = useState({
@@ -82,16 +87,51 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
   const initials = (profile?.full_name || user?.user_metadata?.full_name || user?.email || 'U')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
+  const openPasswordModal = () => {
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setShowNewPassword(false);
+    setPasswordModalVisible(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    setPasswordError('');
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordModalVisible(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast('Password updated successfully!', 'success');
+    } catch (e: any) {
+      setPasswordError(e.message || 'Failed to update password.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   const handlePasswordReset = async () => {
     const email = profile?.email || user?.email;
     if (!email || passwordLoading) return;
     setPasswordLoading(true);
+    setPasswordError('');
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, typeof window !== 'undefined' ? { redirectTo: `${window.location.origin}/reset-password` } : undefined);
       if (error) throw error;
+      setPasswordModalVisible(false);
       showToast(`Reset link sent to ${email}`, 'success');
     } catch (e: any) {
-      showToast(e.message || 'Failed to send reset email', 'error');
+      setPasswordError(e.message || 'Failed to send reset email');
     } finally {
       setPasswordLoading(false);
     }
@@ -101,7 +141,8 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
     setSigningOut(true);
     try {
       await signOut();
-      router.replace('/team-login' as any);
+      const normalized = String(role || '').toLowerCase();
+      router.replace((normalized === 'client' || normalized === 'supplier' ? '/partner-login' : '/team-login') as any);
     } catch { setSigningOut(false); }
   };
 
@@ -165,6 +206,85 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
         onCancel={() => setLogoutModalVisible(false)}
         onConfirm={() => { setLogoutModalVisible(false); void completeSignOut(); }}
       />
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !passwordLoading && setPasswordModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <View className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-slate-700">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text maxFontSizeMultiplier={1.3} className="text-lg font-extrabold text-slate-900 dark:text-white">Change Password</Text>
+              <Pressable onPress={() => !passwordLoading && setPasswordModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+              </Pressable>
+            </View>
+            <Text maxFontSizeMultiplier={1.3} className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              Enter a new password (minimum 6 characters) for your account.
+            </Text>
+
+            {passwordError ? (
+              <View className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3 mb-4 flex-row items-center">
+                <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                <Text maxFontSizeMultiplier={1.3} className="text-xs text-red-700 dark:text-red-300 flex-1">{passwordError}</Text>
+              </View>
+            ) : null}
+
+            <Text maxFontSizeMultiplier={1.3} className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">New Password</Text>
+            <View className="flex-row items-center border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 bg-gray-50 dark:bg-slate-900 mb-3" style={{ minHeight: 46 }}>
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry={!showNewPassword}
+                placeholder="At least 6 characters"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                className="flex-1 text-sm text-slate-900 dark:text-white py-2.5"
+              />
+              <Pressable onPress={() => setShowNewPassword(v => !v)} hitSlop={8}>
+                <Ionicons name={showNewPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#94A3B8" />
+              </Pressable>
+            </View>
+
+            <Text maxFontSizeMultiplier={1.3} className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Confirm New Password</Text>
+            <View className="flex-row items-center border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 bg-gray-50 dark:bg-slate-900 mb-5" style={{ minHeight: 46 }}>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showNewPassword}
+                placeholder="Re-enter new password"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                className="flex-1 text-sm text-slate-900 dark:text-white py-2.5"
+              />
+            </View>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => !passwordLoading && setPasswordModalVisible(false)}
+                disabled={passwordLoading}
+                className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-slate-700 items-center justify-center"
+                style={{ minHeight: 44 }}
+              >
+                <Text className="text-sm font-bold text-slate-700 dark:text-slate-200">Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleUpdatePassword}
+                disabled={passwordLoading}
+                className="flex-1 py-3 rounded-xl bg-brand-orange items-center justify-center"
+                style={{ minHeight: 44 }}
+              >
+                {passwordLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text className="text-sm font-bold text-white">Update Password</Text>}
+              </Pressable>
+            </View>
+
+            <Pressable onPress={handlePasswordReset} disabled={passwordLoading} className="mt-4 py-2 items-center">
+              <Text className="text-xs font-semibold text-brand-orange">Or send password reset link to email</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       {/* Toast */}
       {toast && (
         <Animated.View style={{ opacity: toastOpacity, position: 'absolute', bottom: 32, alignSelf: 'center', zIndex: 999 }}>
@@ -267,8 +387,8 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
                 onPress={() => router.push(profileHref as any)} />
             )}
             <ActionRow icon="key-outline" iconBg="#F5F3FF" iconColor="#8B5CF6"
-              title="Change Password" subtitle="Send a password reset link to your email"
-              onPress={handlePasswordReset} loading={passwordLoading} />
+              title="Change Password" subtitle="Update your account password"
+              onPress={openPasswordModal} loading={passwordLoading} />
           </Section>
 
           {/* About */}

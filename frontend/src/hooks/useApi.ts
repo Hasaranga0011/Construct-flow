@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getApiUrl } from '../lib/apiUrl';
+import { getApiUrl, normalizeFetchError } from '../lib/apiUrl';
 
 interface UseApiState<T> {
   data: T | null;
@@ -64,12 +64,7 @@ export function useApi<T = any>() {
       return data;
     } catch (err: any) {
       clearTimeout(timeoutId);
-      
-      let errorMessage = err.message || 'An unexpected error occurred.';
-      if (err.name === 'AbortError') {
-        errorMessage = 'Request timed out. Please check your connection and retry.';
-      }
-      
+      const errorMessage = normalizeFetchError(err).message;
       setState(prev => ({ ...prev, loading: false, error: errorMessage }));
       throw new Error(errorMessage);
     }

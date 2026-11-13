@@ -9,6 +9,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
+import { normalizeFetchError } from '../../../lib/apiUrl';
 import { ChatComposer } from '../../../components/chat/ChatComposer';
 
 type Message = {
@@ -51,6 +52,8 @@ export default function ClientMessagesThreadPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Load project info and fetch the right receiver for the active channel.
   useEffect(() => {
@@ -61,52 +64,89 @@ export default function ClientMessagesThreadPage() {
       if (!isMounted) return;
       setLoading(true);
       setError(null);
+      setSendError(null);
+      setReceiverId(null);
       setMessages([]); // Clear messages when switching channels
       try {
-        // Fetch project + roles assigned to the project.
-        const projectRes = await supabase
-          .from('projects')
-          .select('name, pm_id, client_id')
-          .eq('id', threadId)
-          .eq('client_id', user.id)
-          .maybeSingle();
+        // Build messages query for this channel (both directions).
+        let msgQuery = supabase
+          .from('client_messages')
+          .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
+          .eq('project_id', threadId);
+
+        if (activeChannel === 'All') {
+          msgQuery = msgQuery.or(`receiver_role.eq.All,receiver_id.is.null`);
+        } else {
+          msgQuery = msgQuery.or(
+            `and(sender_role.eq.client,receiver_role.eq.${activeChannel}),` +
+            `and(sender_role.eq.${activeChannel},receiver_role.eq.client)`
+          );
+        }
+
+        // Timeout contacts fetch after 5s so a slow backend never stalls the chat thread
+        const contactsWithTimeout = Promise.race([
+          api.messages.getContacts(threadId).catch(() => ({} as Record<string, string>)),
+          new Promise<Record<string, string>>((resolve) => setTimeout(() => resolve({}), 5000)),
+        ]);
+
+        // Fetch project, contacts, direct role assignments, and messages in parallel
+        const [projectRes, apiContacts, praRes, msgRes] = await Promise.all([
+          supabase
+            .from('projects')
+            .select('name, pm_id, client_id')
+            .eq('id', threadId)
+            .eq('client_id', user.id)
+            .maybeSingle(),
+          contactsWithTimeout,
+          supabase
+            .from('project_role_assignments')
+            .select('user_id, role')
+            .eq('project_id', threadId),
+          msgQuery.order('created_at', { ascending: true }),
+        ]);
+
         if (projectRes.error) throw projectRes.error;
+        if (msgRes.error) throw msgRes.error;
 
         if (isMounted) setProjectName(projectRes.data?.name || 'Project Conversation');
 
-        // Use the new proxy endpoint to get contacts safely
-        const contacts = await api.messages.getContacts(threadId).catch(() => ({}));
+        const contacts: Record<string, string> = { ...(apiContacts || {}) };
+        for (const row of praRes.data || []) {
+          const r = String(row.role || '').trim().toLowerCase().replace(/\s+/g, '_');
+          if (!row.user_id || !r) continue;
+          if ((r === 'super_admin' || r === 'admin') && !contacts.super_admin) {
+            contacts.super_admin = row.user_id;
+            contacts.admin = row.user_id;
+          } else if ((r === 'pm' || r === 'project_manager') && !contacts.pm) {
+            contacts.pm = row.user_id;
+          } else if ((r === 'site_manager' || r === 'sitemanager') && !contacts.site_manager) {
+            contacts.site_manager = row.user_id;
+          } else if (r === 'supplier' && !contacts.supplier) {
+            contacts.supplier = row.user_id;
+          } else if (r === 'worker' && !contacts.worker) {
+            contacts.worker = row.user_id;
+          }
+        }
 
         // Determine receiver_id based on active channel.
         let rId: string | null = null;
         if (activeChannel === 'pm') {
           rId = projectRes.data?.pm_id || contacts.pm || null;
         } else if (activeChannel === 'super_admin') {
-          rId = contacts.super_admin || null;
+          rId = contacts.super_admin || contacts.admin || null;
         } else if (activeChannel === 'site_manager') {
           rId = contacts.site_manager || null;
+        } else if (activeChannel === 'supplier') {
+          rId = contacts.supplier || null;
+        } else if (activeChannel === 'worker') {
+          rId = contacts.worker || null;
         }
-        if (isMounted) setReceiverId(rId);
-
-        // Fetch messages for this channel (both directions).
-        let query = supabase
-          .from('client_messages')
-          .select('id, project_id, message_text, sender_id, receiver_id, sender_role, receiver_role, created_at')
-          .eq('project_id', threadId);
-
-        if (activeChannel === 'All') {
-          query = query.or(`receiver_role.eq.All,receiver_id.is.null`);
-        } else {
-          query = query.or(
-            `and(sender_role.eq.client,receiver_role.eq.${activeChannel}),` +
-            `and(sender_role.eq.${activeChannel},receiver_role.eq.client)`
-          );
+        if (isMounted) {
+          setReceiverId(rId);
+          setMessages((msgRes.data || []) as Message[]);
         }
-        const msgRes = await query.order('created_at', { ascending: true });
-        if (msgRes.error) throw msgRes.error;
-        if (isMounted) setMessages((msgRes.data || []) as Message[]);
       } catch (loadError: any) {
-        if (isMounted) setError(loadError.message || 'Failed to load conversation.');
+        if (isMounted) setError(normalizeFetchError(loadError).message || 'Failed to load conversation.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -142,7 +182,7 @@ export default function ClientMessagesThreadPage() {
       isMounted = false;
       supabase.removeChannel(realtimeChannel);
     };
-  }, [user, threadId, activeChannel]);
+  }, [user, threadId, activeChannel, retryKey]);
 
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
@@ -152,9 +192,11 @@ export default function ClientMessagesThreadPage() {
       if (missingIds.length > 0) {
         const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
         if (data) {
-          const newProfiles = { ...profiles };
-          data.forEach(p => { if (p.id) newProfiles[p.id] = p.full_name || 'Unknown'; });
-          setProfiles(newProfiles);
+          setProfiles(prev => {
+            const next = { ...prev };
+            data.forEach(p => { if (p.id) next[p.id] = p.full_name || 'Unknown'; });
+            return next;
+          });
         }
       }
     };
@@ -172,12 +214,12 @@ export default function ClientMessagesThreadPage() {
     const trimmed = input.trim();
     if (!trimmed || !user || !threadId || (activeChannel !== 'All' && !receiverId) || sending) return;
     setSending(true);
-    setError(null);
+    setSendError(null);
     try {
       const data = await api.messages.send({
         project_id: threadId,
         sender_id: user.id,
-        ...(activeChannel !== 'All' && receiverId ? { receiver_id: receiverId } : {}),
+        receiver_id: (activeChannel !== 'All' && receiverId) ? receiverId : undefined,
         sender_role: 'client',
         receiver_role: activeChannel,
         content: trimmed,
@@ -190,8 +232,8 @@ export default function ClientMessagesThreadPage() {
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       }
       setInput('');
-    } catch (sendError: any) {
-      setError(sendError.message || 'Failed to send message.');
+    } catch (err: any) {
+      setSendError(normalizeFetchError(err).message || 'Failed to send message.');
     } finally {
       setSending(false);
     }
@@ -203,12 +245,17 @@ export default function ClientMessagesThreadPage() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-brand-light"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'web' ? undefined : Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TopNav title={projectName} showAction={false} />
 
-      {/* Channel tab strip */}
-      <View className="bg-white border-b border-gray-100 flex-row px-4">
+      {/* Channel tab strip (horizontally scrollable so Worker/Supplier never clip on small screens) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="bg-white border-b border-gray-100 flex-grow-0"
+        contentContainerStyle={{ paddingHorizontal: 16, alignItems: 'center' }}
+      >
         {CHANNELS.map(ch => (
           <Pressable style={{ minHeight: 44, minWidth: 44 }}
             key={ch.key}
@@ -220,7 +267,7 @@ export default function ClientMessagesThreadPage() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Messages list */}
       <ScrollView keyboardShouldPersistTaps="handled"
@@ -235,6 +282,9 @@ export default function ClientMessagesThreadPage() {
         ) : error && messages.length === 0 ? (
           <View className="bg-red-50 border border-red-200 rounded-2xl p-5 items-center mt-10">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-center">{error}</Text>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setRetryKey(k => k + 1)} className="bg-brand-orange px-5 py-2.5 rounded-lg mt-4">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">Retry</Text>
+            </Pressable>
           </View>
         ) : messages.length === 0 ? (
           <View className="items-center py-20">
@@ -255,7 +305,9 @@ export default function ClientMessagesThreadPage() {
                     {senderName}
                   </Text>
                 )}
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800'}>{text}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isSender ? 'text-white' : 'text-gray-800'}>
+                  {text || (message as any).content || (message as any).message}
+                </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] mt-1 ${isSender ? 'text-orange-100 text-right' : 'text-gray-400 text-left'}`}>
                   {formatTime(message.created_at)}
                 </Text>
@@ -265,14 +317,29 @@ export default function ClientMessagesThreadPage() {
         })}
       </ScrollView>
 
+      {sendError ? (
+        <View className="mx-4 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl flex-row items-center justify-between">
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-xs flex-1 mr-2">{sendError}</Text>
+          <Pressable onPress={() => setSendError(null)} hitSlop={8}>
+            <Ionicons name="close" size={16} color="#B91C1C" />
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* Input bar */}
       <ChatComposer
         value={input}
         onChangeText={setInput}
         onSend={sendMessage}
         sending={sending}
-        disabled={!receiverId}
-        placeholder={receiverId ? `Message your ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}...` : 'No contact assigned to this project yet'}
+        disabled={activeChannel !== 'All' && !receiverId}
+        placeholder={
+          activeChannel === 'All'
+            ? 'Broadcast message to project team...'
+            : receiverId
+            ? `Message your ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'}...`
+            : `No ${CHANNELS.find(c => c.key === activeChannel)?.label || 'contact'} assigned yet`
+        }
       />
     </KeyboardAvoidingView>
   );

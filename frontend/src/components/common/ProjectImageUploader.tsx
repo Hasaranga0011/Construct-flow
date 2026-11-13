@@ -257,7 +257,7 @@ export const ProjectImageUploader: React.FC<ProjectImageUploaderProps> = ({
 
       {/* Action Buttons Row */}
       <View className="flex-row flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
           {images.length < maxImages && (
             <TouchableOpacity
               onPress={handlePickImages}

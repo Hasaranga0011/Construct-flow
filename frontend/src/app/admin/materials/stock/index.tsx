@@ -12,9 +12,12 @@ import { format } from 'date-fns';
 import { Modal } from 'react-native';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminStockLevels() {
   const router = useRouter();
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const { isMobile } = useResponsive();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,10 +29,24 @@ export default function AdminStockLevels() {
     let isMounted = true;
     const fetchStock = async () => {
       try {
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) setMaterials([]);
+            return;
+          }
+        }
+
         let query = supabase.from('materials').select(`
           id, name, unit, current_stock, minimum_threshold, last_updated, project_id,
           project:projects(name)
         `).order('last_updated', { ascending: false });
+
+        if (pmProjectIds.length > 0) {
+          query = query.in('project_id', pmProjectIds);
+        }
 
         const { data, error } = await query;
         if (error) throw error;
@@ -46,7 +63,7 @@ export default function AdminStockLevels() {
 
     fetchStock();
     return () => { isMounted = false; };
-  }, [loading, tick]); // Refresh after assignment; typing only filters loaded rows.
+  }, [loading, tick, isPM, user?.id]); // Refresh after assignment; typing only filters loaded rows.
 
   const statuses = ['All', 'In Stock', 'Low Stock', 'Out of Stock'];
 

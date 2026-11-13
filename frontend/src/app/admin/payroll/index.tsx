@@ -18,7 +18,7 @@ export default function AdminPayrollIndex() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const { tick, lastUpdated } = useTableRealtime(['legacy_labour', 'profiles', 'salary_slips']);
+  const { tick, lastUpdated } = useTableRealtime(['attendance', 'profiles', 'salary_slips', 'workers']);
 
   const [stats, setStats] = useState({ totalPending: 0, lastRun: 'Never', nextRun: 'End of Month' });
 
@@ -29,57 +29,96 @@ export default function AdminPayrollIndex() {
         // Fetch all workers
         const { data: workerData, error: workerErr } = await supabase
           .from('profiles')
-          .select('id, full_name')
+          .select('id, full_name, daily_rate, contact_number, worker_type')
           .eq('role', 'worker');
 
         if (workerErr) throw workerErr;
 
+        // Fetch worker table mappings (worker_id -> user_id)
+        const { data: workersList } = await supabase
+          .from('workers')
+          .select('id, user_id');
+
+        const workerToUser: Record<string, string> = {};
+        (workersList || []).forEach(w => {
+          if (w.id && w.user_id) workerToUser[w.id] = w.user_id;
+        });
+
         // Fetch all attendance logs
         const { data: attData, error: attErr } = await supabase
-          .from('legacy_labour')
-          .select('worker_name, status, hours_worked');
+          .from('attendance')
+          .select('id, worker_id, date, check_in_time, check_out_time, hours_worked, overtime_hours');
 
         if (attErr) throw attErr;
 
+        // Fetch salary slips to identify already generated periods and last run
+        const { data: slipsData } = await supabase
+          .from('salary_slips')
+          .select('id, worker_id, total_days, overtime_hours, total_amount, period_start, period_end, status, created_at')
+          .order('created_at', { ascending: false });
+
         if (isMounted) {
           let totalPending = 0;
-          const defaultDailyRate = 3500;
 
           const enrichedWorkers = (workerData || []).map(w => {
-            const records = (attData || []).filter(a => a.worker_name === w.full_name && a.status === 'Present');
-            const totalDays = records.length;
+            const workerId = w.id;
+            const linkedWorkerRecordIds = (workersList || [])
+              .filter(wl => wl.user_id === workerId)
+              .map(wl => wl.id);
 
-            // Calculate overtime dynamically
+            const allWorkerIds = new Set([workerId, ...linkedWorkerRecordIds]);
+
+            // All attendance records for this worker
+            const records = (attData || []).filter(a =>
+              allWorkerIds.has(a.worker_id) || (a.worker_id && workerToUser[a.worker_id] === workerId)
+            );
+
+            // Filter valid attendance days
+            const validRecords = records.filter(r =>
+              Boolean(r.check_in_time || r.check_out_time || (Number(r.hours_worked) > 0) || r.date)
+            );
+
+            const uniqueDates = new Set(validRecords.map(r => r.date).filter(Boolean));
+            const totalDays = uniqueDates.size;
+
             let totalOvertime = 0;
-            records.forEach(r => {
-              const hours = Number(r.hours_worked) || 0;
-              if (hours > 8) {
-                totalOvertime += (hours - 8);
+            validRecords.forEach(r => {
+              let ot = Number(r.overtime_hours);
+              if (isNaN(ot) || ot === 0) {
+                const hours = Number(r.hours_worked) || 8;
+                ot = hours > 8 ? hours - 8 : 0;
               }
+              totalOvertime += Math.max(0, ot);
             });
 
-            // Simplified calculation
-            const overtimeRate = (defaultDailyRate / 8) * 1.5;
-            const pendingAmount = (totalDays * defaultDailyRate) + (totalOvertime * overtimeRate);
+            const workerRate = Number(w.daily_rate) > 0 ? Number(w.daily_rate) : 3500;
+            const overtimeRate = (workerRate / 8) * 1.5;
+            const pendingAmount = (totalDays * workerRate) + (totalOvertime * overtimeRate);
 
             totalPending += pendingAmount;
 
             return {
               ...w,
-              name: w.full_name, // Map for ui
+              name: w.full_name || 'Worker',
               role: 'Worker',
-              daily_rate: defaultDailyRate,
+              daily_rate: workerRate,
               totalDays,
-              totalOvertime,
+              totalOvertime: Math.round(totalOvertime * 10) / 10,
               pendingAmount
             };
           }).sort((a, b) => b.pendingAmount - a.pendingAmount);
 
           setWorkers(enrichedWorkers);
+
+          const latestSlip = (slipsData && slipsData.length > 0) ? slipsData[0] : null;
+          const lastRunText = latestSlip?.created_at
+            ? format(new Date(latestSlip.created_at), 'MMM dd, yyyy')
+            : 'Never';
+
           setStats({
             totalPending,
-            lastRun: format(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), 'MMM dd, yyyy'),
-            nextRun: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'MMM dd, yyyy')
+            lastRun: lastRunText,
+            nextRun: format(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), 'MMM dd, yyyy')
           });
         }
       } catch (err) {
@@ -188,7 +227,7 @@ export default function AdminPayrollIndex() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                     <View style={{ flex: 1 }}>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#111827', fontWeight: 'bold', fontSize: 16 }]}>{w.name}</Text>
-                      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#6B7280', fontSize: 12 }]}>{w.skill_type || 'General'} • {w.contact_no}</Text>
+                      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#6B7280', fontSize: 12 }]}>{w.worker_type || 'General'}{w.contact_number ? ` • ${w.contact_number}` : ''}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#16A34A', fontWeight: 'bold', fontSize: 18 }]}>
@@ -224,7 +263,7 @@ export default function AdminPayrollIndex() {
                 <View key={w.id} className="flex-row items-center py-4 border-b border-gray-50">
                   <View className="w-[30%] pr-2">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm truncate">{w.name}</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs truncate">{w.skill_type || 'General'} • {w.contact_no}</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs truncate">{w.worker_type || 'General'}{w.contact_number ? ` • ${w.contact_number}` : ''}</Text>
                   </View>
 
                   <View className="w-[20%] pr-2">

@@ -1,6 +1,6 @@
 {
   "model_type": "Log-Scale Cost-Per-SqFt RandomForestRegressor",
-  "trained_at": "2026-10-22T04:47:31.992366+00:00",
+  "trained_at": "2026-11-12T14:21:51.717843+00:00",
   "real_projects_count": 3,
   "total_training_samples": 303,
   "synthetic_rows_included": true,

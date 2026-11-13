@@ -4,9 +4,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 const DeliveryRow = ({ order }: { order: any }) => {
   const router = useRouter();
+  const { role } = useAuth();
+  const basePath = role === 'pm' ? '/pm/materials/orders' : '/admin/materials/orders';
   const projectName = order.projects?.name || 'Unknown';
 
   // Check if expected delivery date has passed
@@ -15,7 +18,7 @@ const DeliveryRow = ({ order }: { order: any }) => {
 
   return (
     <Pressable style={{ minHeight: 44, minWidth: 44 }}
-      onPress={() => router.push(`/admin/materials/orders/${order.id}`)}
+      onPress={() => router.push(`${basePath}/${order.id}` as any)}
       className={`flex-row items-center py-3 border-b border-gray-50 ${isLate ? 'bg-red-50/30' : ''}`}
     >
       <View className={`w-11 h-11 rounded-full items-center justify-center mr-3 ${isLate ? 'bg-red-100' : 'bg-orange-100'}`}>
@@ -43,6 +46,8 @@ const DeliveryRow = ({ order }: { order: any }) => {
 };
 
 export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +62,19 @@ export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refr
           return;
         }
 
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) {
+              setOrders([]);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
         let query = supabase
           .from('purchase_orders')
           .select(`
@@ -67,6 +85,8 @@ export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refr
 
         if (projectId) {
           query = query.eq('project_id', projectId);
+        } else if (isPM) {
+          query = query.in('project_id', pmProjectIds);
         }
 
         const { data, error } = await query
@@ -86,7 +106,7 @@ export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refr
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId]);
+  }, [refreshTrigger, projectId, isPM, user?.id]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">

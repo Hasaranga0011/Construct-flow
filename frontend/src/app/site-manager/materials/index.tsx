@@ -4,14 +4,30 @@ import { api } from '@/services/api';
 import { positiveQuantity } from '@/utils/siteWorkflow';
 import { firstRelation } from '@/utils/relations';
 import { notify } from '@/utils/notify';
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
+import { ModalViewport } from '@/components/common/ModalViewport';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
+
+const COMMON_MATERIALS: Array<{ name: string; unit: string }> = [
+  { name: 'Cement (50kg Bag)', unit: 'bags' },
+  { name: 'River Sand', unit: 'cubes' },
+  { name: 'Aggregate / Crushed Stone', unit: 'cubes' },
+  { name: 'Steel Rebar', unit: 'kg' },
+  { name: 'Concrete Blocks', unit: 'nos' },
+  { name: 'Clay Bricks', unit: 'nos' },
+  { name: 'Timber / Plywood', unit: 'sheets' },
+  { name: 'PVC Pipes', unit: 'lengths' },
+  { name: 'Emulsion Paint', unit: 'liters' },
+  { name: 'Ceramic Tiles', unit: 'sq.ft' },
+  { name: 'Electrical Wire', unit: 'rolls' },
+  { name: 'Nails & Fasteners', unit: 'kg' },
+];
 
 export default function SMMaterialsPage() {
   const { isMobile } = useResponsive();
@@ -33,6 +49,37 @@ export default function SMMaterialsPage() {
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('units');
+  const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [isCustomMaterial, setIsCustomMaterial] = useState(false);
+
+  const materialOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const options: Array<{ name: string; unit: string; stock?: number; inProject: boolean }> = [];
+    for (const m of projectStock) {
+      const name = String(m.name || '').trim();
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      options.push({
+        name,
+        unit: m.unit || 'units',
+        stock: m.current_stock ?? 0,
+        inProject: true,
+      });
+    }
+    for (const c of COMMON_MATERIALS) {
+      if (seen.has(c.name.toLowerCase())) continue;
+      seen.add(c.name.toLowerCase());
+      options.push({ name: c.name, unit: c.unit, inProject: false });
+    }
+    return options;
+  }, [projectStock]);
+
+  const filteredMaterialOptions = useMemo(() => {
+    const q = materialSearch.trim().toLowerCase();
+    if (!q) return materialOptions;
+    return materialOptions.filter(opt => opt.name.toLowerCase().includes(q));
+  }, [materialOptions, materialSearch]);
 
   const fetchMaterialsData = useCallback(async () => {
     if (!user?.id || sitesLoading) return;
@@ -121,6 +168,7 @@ export default function SMMaterialsPage() {
       notify('Success', 'Material request submitted to Project Manager!');
       setItemName('');
       setQuantity('');
+      setIsCustomMaterial(false);
       setActiveTab('request');
       await fetchMaterialsData();
     } catch (error: any) {
@@ -220,7 +268,7 @@ export default function SMMaterialsPage() {
               ) : (
                 projectStock.map(item => {
                   const isLow = (item.current_stock || 0) < (item.minimum_threshold || 0);
-                  if (isMobile) return <RecordCard key={item.id} title={item.name} fields={[{ label: 'Stock', value: `${item.current_stock ?? 0} ${item.unit || ''}` }, { label: 'Status', value: isLow ? 'Low stock' : 'In stock' }]} action={{ label: 'Request material', onPress: () => { setItemName(item.name); setUnit(item.unit || ''); setActiveTab('request'); } }} />;
+                  if (isMobile) return <RecordCard key={item.id} title={item.name} fields={[{ label: 'Stock', value: `${item.current_stock ?? 0} ${item.unit || ''}` }, { label: 'Status', value: isLow ? 'Low stock' : 'In stock' }]} action={{ label: 'Request material', onPress: () => { setIsCustomMaterial(false); setItemName(item.name); setUnit(item.unit || ''); setActiveTab('request'); } }} />;
                   return (
                     <View key={item.id} className="flex-row items-center py-4 px-6 border-b border-gray-50">
                       <View className="flex-[2]">
@@ -252,35 +300,33 @@ export default function SMMaterialsPage() {
 
               <View>
                 <View className="mb-4">
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-700 mb-2">Item Name</Text>
-                  
-                  <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 mb-2">
-                    {projectStock.map(m => (
-                      <Pressable 
-                        key={m.id}
-                        style={{ minHeight: 44, minWidth: 44 }}
-                        onPress={() => {
-                          setItemName(m.name);
-                          setUnit(m.unit || 'units');
-                        }}
-                        className={`px-4 py-2 rounded-full border ${itemName === m.name ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
-                      >
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm font-semibold ${itemName === m.name ? 'text-white' : 'text-gray-600'}`}>
-                          {m.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    {projectStock.length === 0 && (
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">No materials found.</Text>
-                    )}
-                  </ScrollView>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-700 mb-2">Material Item</Text>
 
-                  <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                    value={itemName}
-                    onChangeText={setItemName}
-                    placeholder="Or type a custom material name..."
-                    className="border border-gray-200 rounded-xl p-4 bg-gray-50"
-                  />
+                  <Pressable
+                    style={{ minHeight: 48, minWidth: 44 }}
+                    onPress={() => setMaterialDropdownOpen(true)}
+                    className="border border-gray-200 rounded-xl px-4 py-3.5 bg-gray-50 flex-row items-center justify-between"
+                  >
+                    <Text
+                      style={{ flexShrink: 1, minWidth: 0 }}
+                      maxFontSizeMultiplier={1.3}
+                      className={`text-sm font-medium ${itemName || isCustomMaterial ? 'text-gray-800' : 'text-gray-400'}`}
+                    >
+                      {isCustomMaterial ? (itemName ? `Other: ${itemName}` : 'Other (Custom Material)') : (itemName || 'Select a material...')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color="#6B7280" />
+                  </Pressable>
+
+                  {isCustomMaterial && (
+                    <TextInput
+                      maxFontSizeMultiplier={1.3}
+                      style={{ minHeight: 44, minWidth: 44 }}
+                      value={itemName}
+                      onChangeText={setItemName}
+                      placeholder="Enter custom material name..."
+                      className="border border-gray-200 rounded-xl p-4 bg-gray-50 mt-3"
+                    />
+                  )}
                 </View>
 
                 <View className="flex-row gap-4 mb-4">
@@ -359,6 +405,85 @@ export default function SMMaterialsPage() {
           </ScrollView>
         )}
       </View>
+      <Modal
+        visible={materialDropdownOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMaterialDropdownOpen(false)}
+      >
+        <ModalViewport>
+          <View className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ maxHeight: '80%' }}>
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-gray-100">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800">
+                Select Material
+              </Text>
+              <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setMaterialDropdownOpen(false)} className="items-center justify-center">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </Pressable>
+            </View>
+
+            <View className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <TextInput
+                maxFontSizeMultiplier={1.3}
+                style={{ minHeight: 42 }}
+                value={materialSearch}
+                onChangeText={setMaterialSearch}
+                placeholder="Search materials..."
+                className="bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800"
+              />
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled" className="px-3 py-2">
+              {filteredMaterialOptions.map(opt => {
+                const selected = !isCustomMaterial && itemName === opt.name;
+                return (
+                  <Pressable
+                    key={opt.name}
+                    style={{ minHeight: 48 }}
+                    onPress={() => {
+                      setIsCustomMaterial(false);
+                      setItemName(opt.name);
+                      setUnit(opt.unit || 'units');
+                      setMaterialSearch('');
+                      setMaterialDropdownOpen(false);
+                    }}
+                    className={`flex-row items-center justify-between px-3 py-3 rounded-xl mb-1 ${selected ? 'bg-orange-50 border border-brand-orange' : 'bg-white'}`}
+                  >
+                    <View className="flex-1 pr-3">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-semibold text-sm ${selected ? 'text-brand-orange' : 'text-gray-800'}`}>
+                        {opt.name}
+                      </Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mt-0.5">
+                        {opt.inProject ? `In project stock: ${opt.stock ?? 0} ${opt.unit}` : `Standard unit: ${opt.unit}`}
+                      </Text>
+                    </View>
+                    {selected && <Ionicons name="checkmark-circle" size={20} color="#F97316" />}
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                style={{ minHeight: 48 }}
+                onPress={() => {
+                  setIsCustomMaterial(true);
+                  setItemName('');
+                  setMaterialSearch('');
+                  setMaterialDropdownOpen(false);
+                }}
+                className={`flex-row items-center justify-between px-3 py-3 rounded-xl mt-1 mb-2 border ${isCustomMaterial ? 'bg-orange-50 border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
+              >
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="add-circle-outline" size={18} color="#F97316" />
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-sm text-gray-800">
+                    Other (Enter custom material)
+                  </Text>
+                </View>
+                {isCustomMaterial && <Ionicons name="checkmark-circle" size={20} color="#F97316" />}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </ModalViewport>
+      </Modal>
     </View>
   );
 }

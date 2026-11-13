@@ -34,11 +34,34 @@ const RiskRow = ({
   </View>
 );
 
+const _insightsCache: Record<string, { data: any; ts: number }> = {};
+const INSIGHTS_CACHE_TTL_MS = 60_000;
+
 export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
-  const [risks, setRisks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = pmId || 'all';
+  const cachedEntry = _insightsCache[cacheKey];
+  const hasFreshCache = cachedEntry && Date.now() - cachedEntry.ts < INSIGHTS_CACHE_TTL_MS;
+
+  const [risks, setRisks] = useState<any[]>(() => {
+    if (hasFreshCache) {
+      return [...(cachedEntry.data?.projects || [])]
+        .sort((a: any, b: any) => b.delay_risk - a.delay_risk)
+        .slice(0, 3);
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(!hasFreshCache);
   const [error, setError] = useState<string | null>(null);
-  const [modelNote, setModelNote] = useState<string>('');
+  const [modelNote, setModelNote] = useState<string>(() => {
+    if (hasFreshCache) {
+      const trained = cachedEntry.data?.model_info?.delay_model?.trained_at
+        ? new Date(cachedEntry.data.model_info.delay_model.trained_at).toLocaleDateString()
+        : null;
+      const n = cachedEntry.data?.model_info?.delay_model?.dataset_size;
+      return trained ? `Trained on ${n ? n.toLocaleString() + ' records · ' : ''}${trained}` : '';
+    }
+    return '';
+  });
 
   const [retryKey, setRetryKey] = useState(0);
 
@@ -48,7 +71,11 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
     let isMounted = true;
 
     const loadRisks = async () => {
-      setLoading(true);
+      const cached = _insightsCache[cacheKey];
+      if (cached && Date.now() - cached.ts < INSIGHTS_CACHE_TTL_MS && retryKey === 0) {
+        return;
+      }
+      if (!cached) setLoading(true);
       setError(null);
       try {
         let { data: { session } } = await supabase.auth.getSession();
@@ -56,7 +83,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
 
         if (!token) {
           // Wait briefly in case session is hydrating from storage
-          await new Promise(resolve => setTimeout(resolve, 400));
+          await new Promise(resolve => setTimeout(resolve, 150));
           const retryRes = await supabase.auth.getSession();
           token = retryRes.data.session?.access_token;
         }
@@ -74,6 +101,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
         }, 30000);
 
         if (isMounted && data) {
+          _insightsCache[cacheKey] = { data, ts: Date.now() };
           // Use real per-project delay risks from the backend
           const projectRisks: any[] = data.projects || [];
           const sorted = [...projectRisks].sort(

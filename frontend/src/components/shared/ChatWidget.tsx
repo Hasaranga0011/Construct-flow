@@ -26,7 +26,7 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
+        table: 'client_messages',
         filter: `project_id=eq.${projectId}`
       }, (payload) => {
         const msg = payload.new;
@@ -49,7 +49,7 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
   const fetchMessages = async () => {
     try {
       let query = supabase
-        .from('messages')
+        .from('client_messages')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: true });
@@ -57,8 +57,8 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filter locally for now
-      const filtered = data.filter(m =>
+      // Filter locally for this conversation channel
+      const filtered = (data || []).filter(m =>
         (m.sender_role === currentUserRole && m.receiver_role === targetRole) ||
         (m.sender_role === targetRole && m.receiver_role === currentUserRole) ||
         (targetUserId && (m.sender_id === targetUserId || m.receiver_id === targetUserId)) ||
@@ -78,13 +78,16 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
     try {
-      const { error } = await supabase.from('messages').insert([{
+      const text = newMessage.trim();
+      const { error } = await supabase.from('client_messages').insert([{
         project_id: projectId,
         sender_id: currentUserId,
         sender_role: currentUserRole,
         receiver_role: targetRole,
         receiver_id: targetUserId || null,
-        content: newMessage.trim(),
+        message_text: text,
+        content: text,
+        message: text,
       }]);
       if (error) throw error;
       setNewMessage('');
@@ -115,7 +118,9 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
             return (
               <View key={m.id} className={`mb-3 max-w-[80%] ${isMe ? 'self-end' : 'self-start'}`}>
                 <View className={`p-3 rounded-2xl ${isMe ? 'bg-brand-orange rounded-tr-none' : 'bg-gray-100 rounded-tl-none'}`}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isMe ? 'text-white' : 'text-gray-800'}>{m.content}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={isMe ? 'text-white' : 'text-gray-800'}>
+                    {m.message_text || m.content || m.message}
+                  </Text>
                 </View>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] text-gray-400 mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
                   {format(new Date(m.created_at), 'HH:mm')}

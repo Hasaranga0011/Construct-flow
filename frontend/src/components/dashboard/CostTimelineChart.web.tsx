@@ -38,18 +38,18 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
 
       const projectIds = pList.map(p => p.id);
 
-      // 2. Fetch expenses
-      const { data: expData } = await supabase
-        .from('project_expenses')
-        .select('project_id, amount, expense_date')
-        .in('project_id', projectIds);
-
-      // 3. Fetch purchase orders
-      const { data: poData } = await supabase
-        .from('purchase_orders')
-        .select('project_id, total_price, created_at')
-        .in('project_id', projectIds)
-        .in('status', ['Delivered', 'Received']);
+      // 2 & 3. Fetch expenses and purchase orders in parallel
+      const [{ data: expData }, { data: poData }] = await Promise.all([
+        supabase
+          .from('project_expenses')
+          .select('project_id, amount, expense_date')
+          .in('project_id', projectIds),
+        supabase
+          .from('purchase_orders')
+          .select('project_id, total_price, created_at')
+          .in('project_id', projectIds)
+          .in('status', ['Delivered', 'Received']),
+      ]);
 
       setExpenses(expData || []);
       setPurchaseOrders(poData || []);
@@ -63,12 +63,22 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    const trigger = () => loadData();
-    const chan1 = supabase.channel('ctc-po').on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, trigger).subscribe();
-    const chan2 = supabase.channel('ctc-proj').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger).subscribe();
-    const chan3 = supabase.channel('ctc-exp').on('postgres_changes', { event: '*', schema: 'public', table: 'project_expenses' }, trigger).subscribe();
-    return () => { supabase.removeChannel(chan1); supabase.removeChannel(chan2); supabase.removeChannel(chan3); };
-  }, [loadData]);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { loadData(); }, 600);
+    };
+    const channel = supabase
+      .channel(`ctc-all-${pmId || 'admin'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_expenses' }, trigger)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [loadData, pmId]);
 
   const chartData = useMemo(() => {
     if (projects.length === 0) return [];

@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
+import { useAuth } from '@/context/AuthContext';
 
 const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) => void }) => {
   const projectName = order.projects?.name || 'Unknown';
@@ -32,6 +33,8 @@ const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) =>
 };
 
 export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNeeded }: { refreshTrigger?: number, projectId?: string, onRefreshNeeded: () => void }) => {
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +49,19 @@ export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNee
           return;
         }
 
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) {
+              setOrders([]);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
         let query = supabase
           .from('purchase_orders')
           .select(`
@@ -56,6 +72,8 @@ export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNee
 
         if (projectId) {
           query = query.eq('project_id', projectId);
+        } else if (isPM) {
+          query = query.in('project_id', pmProjectIds);
         }
 
         const { data, error } = await query
@@ -75,7 +93,7 @@ export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNee
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId]);
+  }, [refreshTrigger, projectId, isPM, user?.id]);
 
   const handleDeliver = async (id: string) => {
     try {

@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .database import supabase, client_for_token
 from typing import Optional
+import httpx
 
 security = HTTPBearer()
 
@@ -13,10 +14,21 @@ def normalize_role(value):
 import time
 
 _TOKEN_CACHE = {}
-_TOKEN_CACHE_TTL = 60  # seconds
+_TOKEN_CACHE_TTL = 300  # seconds
+
+
+def _fetch_auth_user(token: str):
+    try:
+        return supabase.auth.get_user(token)
+    except (httpx.HTTPError, OSError, TimeoutError):
+        # Retry once with a fresh client if the shared keep-alive socket was reset
+        return client_for_token(token).auth.get_user(token)
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
-    token = credentials.credentials
+    token = (credentials.credentials or "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
     now = time.time()
     cached = _TOKEN_CACHE.get(token)
     if cached and (now - cached["cached_at"]) < _TOKEN_CACHE_TTL:
@@ -24,7 +36,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
 
     try:
         # Validate the token directly with Supabase
-        user_response = supabase.auth.get_user(token)
+        user_response = _fetch_auth_user(token)
         if not user_response.user:
              raise HTTPException(status_code=401, detail="Invalid authentication credentials")
              

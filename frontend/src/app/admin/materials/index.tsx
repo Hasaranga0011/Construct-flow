@@ -14,11 +14,14 @@ import { supabase } from '../../../lib/supabase';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
 import { Toolbar, ToolbarSearch, ToolbarFilter, Select } from '@/components/ui';
-
+import { useAuth } from '@/context/AuthContext';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function MaterialsScreen() {
   const router = useRouter();
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
+  const basePath = isPM ? '/pm/materials' : '/admin/materials';
   const searchParams = useLocalSearchParams();
   const initialProjectId = (Array.isArray(searchParams?.project) ? searchParams.project[0] : searchParams?.project) || '';
 
@@ -47,19 +50,40 @@ export default function MaterialsScreen() {
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return;
 
+        let projQuery = supabase.from('projects').select('id, name, status').neq('status', 'archived').order('name');
+        if (isPM && user?.id) {
+          projQuery = projQuery.eq('pm_id', user.id);
+        }
+
+        const { data: userProjects, error: projErr } = await projQuery;
+        if (projErr) throw projErr;
+
+        const pmProjectIds = (userProjects || []).map(p => p.id);
+
+        if (isPM && pmProjectIds.length === 0) {
+          if (isMounted) {
+            setSearchMaterials([]);
+            setStats({ totalMaterials: 0, pendingDeliveries: 0, lowStockAlerts: 0, totalValue: 0 });
+            setProjects([]);
+            setLoading(false);
+          }
+          return;
+        }
+
         let matQuery = supabase.from('materials').select('id, name, category, project_id, current_stock, minimum_threshold, unit_price');
         let poQuery = supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).in('status', ['Pending Delivery', 'Confirmed']);
-        let projQuery = supabase.from('projects').select('id, name, status').neq('status', 'archived').order('name');
 
         if (selectedProjectId) {
           matQuery = matQuery.eq('project_id', selectedProjectId);
           poQuery = poQuery.eq('project_id', selectedProjectId);
+        } else if (isPM) {
+          matQuery = matQuery.in('project_id', pmProjectIds);
+          poQuery = poQuery.in('project_id', pmProjectIds);
         }
 
-        const [materialsReq, ordersReq, projectsReq] = await Promise.all([
+        const [materialsReq, ordersReq] = await Promise.all([
           matQuery,
-          poQuery,
-          projQuery
+          poQuery
         ]);
 
         let totalMaterials = 0;
@@ -80,9 +104,7 @@ export default function MaterialsScreen() {
             lowStockAlerts,
             totalValue,
           });
-          if (projectsReq.data) {
-            setProjects(projectsReq.data);
-          }
+          setProjects(userProjects || []);
         }
       } catch (error) {
         console.warn('Failed to load material stats:', error);
@@ -96,7 +118,7 @@ export default function MaterialsScreen() {
     return () => {
       isMounted = false;
     };
-  }, [refreshTrigger, tick, selectedProjectId]);
+  }, [refreshTrigger, tick, selectedProjectId, isPM, user?.id]);
 
   const handleOrderCreated = () => {
     setModalVisible(false);
@@ -108,7 +130,7 @@ export default function MaterialsScreen() {
       <TopNav
         title="Materials"
         actionLabel="+ New Order"
-        onActionPress={() => router.push('/admin/materials/orders/create')}
+        onActionPress={() => router.push(`${basePath}/orders/create` as any)}
       />
 
       {loading ? (
@@ -187,11 +209,11 @@ export default function MaterialsScreen() {
 
           {/* Quick Actions */}
           <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 24 }}>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/materials/orders')} className="bg-emerald-50 px-4 py-3 rounded-lg border border-emerald-100 flex-row items-center">
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`${basePath}/orders` as any)} className="bg-emerald-50 px-4 py-3 rounded-lg border border-emerald-100 flex-row items-center">
               <Ionicons name="cart-outline" size={20} color="#10B981" />
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-emerald-700 font-bold ml-2">All Purchase Orders</Text>
             </Pressable>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/materials/stock')} className="bg-blue-50 px-4 py-3 rounded-lg border border-blue-100 flex-row items-center">
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`${basePath}/stock` as any)} className="bg-blue-50 px-4 py-3 rounded-lg border border-blue-100 flex-row items-center">
               <Ionicons name="cube-outline" size={20} color="#3B82F6" />
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-blue-700 font-bold ml-2">Site Stock Levels</Text>
             </Pressable>

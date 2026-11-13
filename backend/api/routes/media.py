@@ -25,6 +25,9 @@ def _get_storage_client():
     if not url or not key:
         return None
     try:
+        if settings.SUPABASE_SERVICE_ROLE_KEY:
+            from core.database import get_service_client
+            return get_service_client()
         return create_client(url, key)
     except Exception as e:
         print(f"Error creating Supabase storage client: {e}")

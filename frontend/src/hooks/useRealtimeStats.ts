@@ -32,51 +32,28 @@ export function useRealtimeStats(
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         refetchRef.current();
-      }, 250);
+      }, 600);
     };
 
     const subId = Math.random().toString(36).slice(2, 8);
 
-    // attendance → Workers On Site (admin / site / site-manager dashboards)
-    const attendanceChannel = supabase
-      .channel(`realtime-att-${subId}`)
+    // Multiplex all stat table listeners onto a single WebSocket channel
+    let channel = supabase
+      .channel(`realtime-stats-${subId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, trigger)
-      .subscribe();
-
-    // projects → Active Projects, Total Budget (admin / PM dashboards)
-    const projectsChannel = supabase
-      .channel(`realtime-proj-${subId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, trigger)
-      .subscribe();
-
-    // labour / legacy_labour → fallback worker status
-    const labourChannel = supabase
-      .channel(`realtime-lab-${subId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'legacy_labour' }, trigger)
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, trigger);
 
-    // materials → Low Stock Alerts
-    const materialsChannel = supabase
-      .channel(`realtime-mat-${subId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, trigger)
-      .subscribe();
-
-    // site_materials → Low Stock Alerts (site-manager only)
-    let siteMaterialsChannel: ReturnType<typeof supabase.channel> | null = null;
     if (includeSiteMaterials) {
-      siteMaterialsChannel = supabase
-        .channel(`realtime-sm-${subId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'site_materials' }, trigger)
-        .subscribe();
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: 'site_materials' }, trigger);
     }
+
+    channel.subscribe();
 
     return () => {
       if (timer) clearTimeout(timer);
-      supabase.removeChannel(attendanceChannel);
-      supabase.removeChannel(projectsChannel);
-      supabase.removeChannel(labourChannel);
-      supabase.removeChannel(materialsChannel);
-      if (siteMaterialsChannel) supabase.removeChannel(siteMaterialsChannel);
+      supabase.removeChannel(channel);
     };
   }, [includeSiteMaterials]);
 }

@@ -9,9 +9,13 @@ import { format } from 'date-fns';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { formatMoney } from '../../../../utils/format';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminPurchaseOrders() {
   const router = useRouter();
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
+  const basePath = isPM ? '/pm/materials/orders' : '/admin/materials/orders';
   const { isMobile } = useResponsive();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +26,21 @@ export default function AdminPurchaseOrders() {
     let isMounted = true;
     const fetchOrders = async () => {
       try {
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) setOrders([]);
+            return;
+          }
+        }
+
         let query = supabase.from('purchase_orders').select(`*`).order('created_at', { ascending: false });
+
+        if (pmProjectIds.length > 0) {
+          query = query.in('project_id', pmProjectIds);
+        }
 
         if (statusFilter !== 'All') {
           query = query.eq('status', statusFilter);
@@ -51,7 +69,7 @@ export default function AdminPurchaseOrders() {
 
     fetchOrders();
     return () => { isMounted = false; };
-  }, [search, statusFilter]);
+  }, [search, statusFilter, isPM, user?.id]);
 
   const statuses = ['All', 'Pending Delivery', 'Suggested', 'Rejected', 'Confirmed', 'Delivered', 'Cancelled'];
 
@@ -153,7 +171,7 @@ export default function AdminPurchaseOrders() {
                   </View>
 
                   <Pressable
-                    onPress={() => router.push(`/admin/materials/orders/${o.id}`)}
+                    onPress={() => router.push(`${basePath}/${o.id}` as any)}
                     style={[{ backgroundColor: '#F97316', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }, { minHeight: 44, minWidth: 44 }]}
                   >
                     <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#fff', fontSize: 14, fontWeight: 'bold' }]}>View Order</Text>
@@ -195,7 +213,7 @@ export default function AdminPurchaseOrders() {
 
                   <View className="flex-1 flex-row justify-end pl-1">
                     <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                      onPress={() => router.push(`/admin/materials/orders/${o.id}`)}
+                      onPress={() => router.push(`${basePath}/${o.id}` as any)}
                       className="bg-brand-orange px-3 py-1.5 rounded-md shadow-sm"
                     >
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">View</Text>

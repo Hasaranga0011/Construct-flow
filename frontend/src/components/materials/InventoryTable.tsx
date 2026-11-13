@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAuth } from '@/context/AuthContext';
 
 const InventoryRow = ({ 
   material, 
@@ -113,6 +114,8 @@ const InventoryRow = ({
 
 export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId = '' }: { refreshTrigger?: number, searchQuery?: string, projectId?: string }) => {
   const { isMobile } = useResponsive();
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -127,6 +130,19 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
           return;
         }
 
+        let pmProjectIds: string[] = [];
+        if (isPM && user?.id) {
+          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (pmProjectIds.length === 0) {
+            if (isMounted) {
+              setMaterials([]);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
         let query = supabase
           .from('materials')
           .select(`
@@ -137,6 +153,8 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
 
         if (projectId) {
           query = query.eq('project_id', projectId);
+        } else if (isPM) {
+          query = query.in('project_id', pmProjectIds);
         } else {
           // Scope to active / non-archived projects if no specific project is selected
           query = query.neq('projects.status', 'archived');
@@ -158,7 +176,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
     loadMaterials();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId]);
+  }, [refreshTrigger, projectId, isPM, user?.id]);
 
   const filteredMaterials = materials.filter(m => String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
 

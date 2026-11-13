@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { normalizeRole } from '../utils/auth';
 import { getApiUrl } from '../lib/apiUrl';
+import { consumeLoginPortal, portalAccessError } from '../lib/loginPortal';
 
 type AuthContextType = {
   session: Session | null;
@@ -12,6 +13,9 @@ type AuthContextType = {
   fullName: string | null;
   isLoading: boolean;
   isApproved: boolean;
+  /** Set when an account was rejected by the Team/Partner login portal gate. */
+  portalError: string | null;
+  clearPortalError: () => void;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -24,6 +28,8 @@ const AuthContext = createContext<AuthContextType>({
   fullName: null,
   isLoading: true,
   isApproved: true,
+  portalError: null,
+  clearPortalError: () => {},
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -36,6 +42,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [fullName, setFullName] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [portalError, setPortalError] = useState<string | null>(null);
+  const clearPortalError = () => setPortalError(null);
 
   const fetchProfileDetails = async (userId: string) => {
     try {
@@ -86,18 +94,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      const isSameUser = prevUserId === nextSession.user.id;
       // Only show loading screen if the user has actually changed.
       // This prevents the app from unmounting and losing local form state 
       // when Supabase triggers a session refresh on window refocus.
-      if (prevUserId !== nextSession.user.id) {
+      if (!isSameUser) {
         setIsLoading(true);
       }
       prevUserId = nextSession.user.id;
 
-      try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const pendingRole = await AsyncStorage.getItem('pending_google_role');
-        if (pendingRole) {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const [pendingRole, hasLoginPortal] = await Promise.all([
+        AsyncStorage.getItem('pending_google_role').catch(() => null),
+        AsyncStorage.getItem('login_portal').catch(() => null),
+      ]);
+
+      if (pendingRole) {
+        try {
            await fetch(`${getApiUrl()}/auth/google-role`, {
               method: 'POST',
               headers: {
@@ -107,12 +120,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               body: JSON.stringify({ role: pendingRole })
            });
            await AsyncStorage.removeItem('pending_google_role');
-           // Also update user metadata locally to reflect immediately
-           nextSession.user.user_metadata = nextSession.user.user_metadata || {};
-           nextSession.user.user_metadata.role = pendingRole;
+           // The backend only assigns this role to brand-new (pending) accounts;
+           // the authoritative role is read from `profiles` below.
+        } catch (e) {
+          console.warn("Failed to sync google role", e);
         }
-      } catch (e) {
-        console.warn("Failed to sync google role", e);
+      }
+
+      // Fast path: on token refresh/window refocus for the same user without a pending portal check,
+      // skip redundant profile fetch so UI never stalls.
+      if (isSameUser && !pendingRole && !hasLoginPortal) {
+        if (mounted && requestId === roleRequest) setIsLoading(false);
+        return;
       }
 
       try {
@@ -124,6 +143,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         let resolvedAvatarUrl = (nextSession.user.user_metadata as any)?.avatar_url || null;
         let resolvedFullName = (nextSession.user.user_metadata as any)?.full_name || null;
 
+        // Fast startup: if we already have a role from metadata and no portal gate or Google role sync is pending,
+        // unblock the UI immediately and refresh the profile in the background.
+        if (resolvedRole && !pendingRole && !hasLoginPortal) {
+          if (mounted && requestId === roleRequest) {
+            setRole(resolvedRole);
+            setIsApproved(resolvedIsApproved);
+            setAvatarUrl(resolvedAvatarUrl);
+            setFullName(resolvedFullName);
+            setIsLoading(false);
+          }
+          void fetchProfileDetails(nextSession.user.id);
+          return;
+        }
+
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role, is_approved, avatar_url, full_name')
@@ -134,6 +167,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (profile.is_approved !== undefined && profile.is_approved !== null) resolvedIsApproved = Boolean(profile.is_approved);
           if (profile.avatar_url) resolvedAvatarUrl = profile.avatar_url;
           if (profile.full_name) resolvedFullName = profile.full_name;
+        }
+
+        // Portal gate: Team Login only admits team roles, Partner Login only partner roles.
+        const loginPortal = await consumeLoginPortal();
+        const gateError = loginPortal ? portalAccessError(loginPortal, resolvedRole) : null;
+        if (gateError) {
+          if (mounted) {
+            setPortalError(gateError);
+            // Drop the session from state right away so the layout never routes to a dashboard.
+            setSession(null);
+            setUser(null);
+            setRole(null);
+          }
+          // Signing out fires onAuthStateChange(null), which clears the session state.
+          await supabase.auth.signOut();
+          return;
         }
 
         if (mounted && requestId === roleRequest) {
@@ -177,7 +226,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, avatarUrl, fullName, isLoading, isApproved, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, role, avatarUrl, fullName, isLoading, isApproved, portalError, clearPortalError, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

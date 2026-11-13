@@ -153,7 +153,7 @@ export default function SMAttendancePage() {
       return;
     }
     try {
-      const result = await api.labour.scan({ qr_code: qrCode, site_id: activeProjectId });
+      const result = await api.labour.scan({ qr_code: qrCode, site_id: siteId });
 
       // Show scan result card instead of just an alert
       setScanResult(result as ScanResult);
@@ -165,6 +165,7 @@ export default function SMAttendancePage() {
       } else {
         notify('Scan Error', error.message);
       }
+      throw error;
     }
   };
 

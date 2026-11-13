@@ -39,6 +39,8 @@ export default function AdminUsersEditPage() {
   const [isPhoneValid, setIsPhoneValid] = useState(true);
   const [workerType, setWorkerType] = useState('General Laborer');
   const [dailyRate, setDailyRate] = useState<number | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(true);
+  const [approving, setApproving] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,6 +70,7 @@ export default function AdminUsersEditPage() {
           setAvatarUrl(data.avatar_url || null);
           setSelectedRole(data.role || 'pm');
           setContactNumber(data.contact_number || '');
+          setIsApproved(data.is_approved !== false);
           if (data.role === 'worker') {
             setWorkerType(data.worker_type || 'General Laborer');
             setDailyRate(data.daily_rate !== null && data.daily_rate !== undefined ? Number(data.daily_rate) : null);
@@ -84,6 +87,28 @@ export default function AdminUsersEditPage() {
     if (id) fetchUser();
     return () => { isMounted = false; };
   }, [userId]);
+
+  const handleApprove = async () => {
+    if (!userId) return;
+    setApproving(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const response = await fetch(`${getApiUrl()}/admin/users/${userId}/approve`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to approve user');
+      }
+      setIsApproved(true);
+      notify('Success', `${fullName || 'User'} has been approved and can now access the portal.`);
+    } catch (err: any) {
+      notify('Error', err.message || 'Failed to approve user.');
+    } finally {
+      setApproving(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!userId) return;
@@ -180,13 +205,61 @@ export default function AdminUsersEditPage() {
             <View className="flex-1 min-w-0">
               <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-900">{fullName || 'Unnamed User'}</Text>
               <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500 mt-0.5">{email || 'No email'}</Text>
-              <View className="mt-2 flex-row items-center">
+              <View className="mt-2 flex-row items-center gap-2">
                 <View className="px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200 self-start">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-brand-orange uppercase">{selectedRole.replace('_', ' ')}</Text>
+                </View>
+                <View className={`px-2.5 py-0.5 rounded-full self-start ${isApproved ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[11px] font-bold uppercase ${isApproved ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {isApproved ? 'Active' : 'Pending Approval'}
+                  </Text>
                 </View>
               </View>
             </View>
           </View>
+
+          {!isApproved && (
+            <View className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-4 flex-row flex-wrap items-center justify-between gap-3">
+              <View className="flex-1 min-w-[200px]">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-amber-900">
+                  Account Pending Approval
+                </Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-amber-700 mt-0.5">
+                  This user cannot access dashboard features until approved by an administrator.
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Pressable
+                  style={{ minHeight: 44 }}
+                  onPress={handleApprove}
+                  disabled={approving || isDeleting}
+                  className="bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-xl items-center justify-center"
+                >
+                  {approving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-sm">
+                      Approve Account
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={{ minHeight: 44 }}
+                  onPress={handleDelete}
+                  disabled={approving || isDeleting}
+                  className="bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-xl items-center justify-center"
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color="#DC2626" />
+                  ) : (
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 font-bold text-sm">
+                      Reject
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           {/* Basic Info */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">

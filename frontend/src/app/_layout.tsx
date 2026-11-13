@@ -37,7 +37,7 @@ const DASHBOARD_MAP: Record<string, string> = {
   supplier: '/supplier/dashboard',
 };
 
-const AUTH_PAGES = ['team-login', 'team-register', 'partner-login', 'partner-register', 'admin-login', 'forgot-password', 'reset-password'];
+const AUTH_PAGES = ['register', 'team-login', 'team-register', 'partner-login', 'partner-register', 'admin-login', 'forgot-password', 'reset-password'];
 const ROLE_PORTALS = ['admin', 'pm', 'site-manager', 'client', 'worker', 'supplier'];
 
 function InitialLayout() {
@@ -111,6 +111,26 @@ function InitialLayout() {
   }, [session, role, isLoading, segments, rootNavigationState, router]);
 
 
+  // Login/register pages: always render the SAME tree (Slot + optional spinner
+  // overlay). Swapping wrappers remounts the page — that reset navigation to "/"
+  // and wiped the login form and the Access Denied popup.
+  const currentSegment = (segments as string[])[0] ?? '';
+  if (AUTH_PAGES.includes(currentSegment)) {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={undefined}>
+        <Slot />
+        {isLoading ? (
+          <View
+            pointerEvents="auto"
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.55)' }}
+          >
+            <ActivityIndicator size="large" color="#F97316" />
+          </View>
+        ) : null}
+      </KeyboardAvoidingView>
+    );
+  }
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
@@ -137,7 +157,7 @@ function InitialLayout() {
     );
   }
 
-  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={inRolePortal && Platform.OS !== 'web' ? Platform.OS === 'ios' ? 'padding' : 'height' : undefined}><Slot /></KeyboardAvoidingView>;
+  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={inRolePortal && Platform.OS !== 'web' ? Platform.OS === 'ios' ? 'padding' : 'height' : undefined}><Slot />{null}</KeyboardAvoidingView>;
 }
 
 export default function RootLayout() {

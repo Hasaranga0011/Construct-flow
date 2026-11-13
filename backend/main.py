@@ -1,8 +1,10 @@
 import os
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from core.config import settings
+from core.database import get_service_client
 from core.security import get_current_user
 from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports, admin, auth
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -14,6 +16,7 @@ app = FastAPI(
     description="Backend API for ConstructFlow",
     version="1.0.0"
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Setup Background Scheduler
 scheduler = BackgroundScheduler()
@@ -109,9 +112,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from fastapi.middleware.gzip import GZipMiddleware
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
 # Public Auth router (self-registration, login helpers)
 app.include_router(auth.router, prefix="/api")
 
@@ -193,9 +193,11 @@ def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(g
         
     client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
     
-    # Only update if the user has no role or is a basic worker
+    # Only assign a role to brand-new accounts that have none yet. Existing
+    # accounts (including workers) must never be re-roled by signing in through
+    # another portal — the portal gate rejects them instead.
     res = client.table('profiles').select('role').eq('id', current_user['id']).single().execute()
-    if res.data and res.data.get('role') in [None, '', 'worker', 'pending']:
+    if res.data and res.data.get('role') in [None, '', 'pending']:
         client.table('profiles').update({'role': payload.role}).eq('id', current_user['id']).execute()
         client.auth.admin.update_user_by_id(current_user['id'], {"user_metadata": {'role': payload.role}})
         

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { toast } from '../../lib/toast';
+import { useAuth } from '@/context/AuthContext';
 
 type NewMaterialModalProps = {
   visible: boolean;
@@ -14,6 +15,8 @@ type NewMaterialModalProps = {
 };
 
 export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialModalProps) => {
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [supplierName, setSupplierName] = useState('');
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [materialId, setMaterialId] = useState<string | null>(null);
@@ -39,8 +42,13 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     const fetchData = async () => {
       setFetchingData(true);
       try {
+        let projQuery = supabase.from('projects').select('id, name').eq('status', 'active');
+        if (isPM && user?.id) {
+          projQuery = projQuery.eq('pm_id', user.id);
+        }
+
         const [projectsReq, materialsReq] = await Promise.all([
-          supabase.from('projects').select('id, name').eq('status', 'active'),
+          projQuery,
           supabase.from('materials').select('id, name')
         ]);
 
@@ -59,7 +67,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     };
     fetchData();
     return () => { isMounted = false; };
-  }, [visible]);
+  }, [visible, isPM, user?.id]);
 
   useEffect(() => {
     let isMounted = true;

@@ -52,6 +52,8 @@ def send_message(payload: MessageCreate, current_user: dict = Depends(get_curren
             "sender_role": payload.sender_role or current_user.get("role"),
             "receiver_role": receiver_role_val,
             "message_text": payload.content,
+            "content": payload.content,
+            "message": payload.content,
             "is_read": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -120,23 +122,73 @@ def mark_message_read(message_id: str, current_user: dict = Depends(get_current_
 @router.get("/{project_id}/contacts")
 def get_project_contacts(project_id: str, current_user: dict = Depends(get_current_user)):
     service_client = get_service_client()
+    contacts = {}
+
+    # 1. Fetch project PM and Client
     try:
-        contacts = {}
-        # Fetch project PM
-        proj = service_client.table("projects").select("pm_id").eq("id", project_id).limit(1).execute()
-        if proj.data and isinstance(proj.data, list) and len(proj.data) > 0 and proj.data[0].get("pm_id"):
-            contacts["pm"] = proj.data[0]["pm_id"]
-        
-        # Fetch site manager
-        sm_res = service_client.table("site_manager_sites").select("site_manager_id").eq("project_id", project_id).limit(1).execute()
-        if sm_res.data and isinstance(sm_res.data, list) and len(sm_res.data) > 0 and sm_res.data[0].get("site_manager_id"):
-            contacts["site_manager"] = sm_res.data[0]["site_manager_id"]
-            
-        # Fetch admin
-        admin_res = service_client.table("profiles").select("id").eq("role", "super_admin").limit(1).execute()
-        if admin_res.data and isinstance(admin_res.data, list) and len(admin_res.data) > 0 and admin_res.data[0].get("id"):
-            contacts["super_admin"] = admin_res.data[0]["id"]
-            
-        return contacts
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        proj = service_client.table("projects").select("pm_id, client_id").eq("id", project_id).limit(1).execute()
+        if proj.data and isinstance(proj.data, list) and len(proj.data) > 0:
+            if proj.data[0].get("pm_id"):
+                contacts["pm"] = proj.data[0]["pm_id"]
+            if proj.data[0].get("client_id"):
+                contacts["client"] = proj.data[0]["client_id"]
+    except Exception:
+        pass
+
+    # 2. Fetch all role assignments from project_role_assignments (canonical assignment table)
+    try:
+        pra_res = service_client.table("project_role_assignments").select("user_id, role").eq("project_id", project_id).execute()
+        for row in (pra_res.data or []):
+            uid = row.get("user_id")
+            r = (row.get("role") or "").strip().lower().replace(" ", "_")
+            if not uid or not r:
+                continue
+            if r in ("super_admin", "admin"):
+                contacts.setdefault("super_admin", uid)
+                contacts.setdefault("admin", uid)
+            elif r in ("pm", "project_manager"):
+                contacts.setdefault("pm", uid)
+            elif r in ("site_manager", "sitemanager"):
+                contacts.setdefault("site_manager", uid)
+            elif r == "client":
+                contacts.setdefault("client", uid)
+            elif r == "supplier":
+                contacts.setdefault("supplier", uid)
+            elif r == "worker":
+                contacts.setdefault("worker", uid)
+    except Exception:
+        pass
+
+    # 3. Fallback to legacy/dedicated assignment tables (isolated so one missing table never breaks others)
+    def _try_fill(key: str, table: str, col: str, extra_filter=None):
+        if key in contacts:
+            return
+        try:
+            q = service_client.table(table).select(col).eq("project_id", project_id)
+            if extra_filter:
+                q = extra_filter(q)
+            res = q.limit(1).execute()
+            if res.data and res.data[0].get(col):
+                contacts[key] = res.data[0][col]
+                if key == "super_admin":
+                    contacts["admin"] = res.data[0][col]
+        except Exception:
+            pass
+
+    _try_fill("super_admin", "project_admins", "admin_id")
+    _try_fill("site_manager", "site_manager_sites", "site_manager_id")
+    _try_fill("supplier", "project_suppliers", "supplier_id")
+    _try_fill("supplier", "purchase_orders", "supplier_id", lambda q: q.not_.is_("supplier_id", "null"))
+    _try_fill("worker", "site_workers", "worker_id")
+
+    # 4. Global Admin fallback so clients can always message an Admin
+    if "super_admin" not in contacts:
+        try:
+            admin_res = service_client.table("profiles").select("id").in_("role", ["super_admin", "admin"]).limit(1).execute()
+            if admin_res.data and admin_res.data[0].get("id"):
+                contacts["super_admin"] = admin_res.data[0]["id"]
+                contacts["admin"] = admin_res.data[0]["id"]
+        except Exception:
+            pass
+
+    return contacts

@@ -1,4 +1,4 @@
-import { getApiUrl } from './apiUrl';
+import { getApiUrl, normalizeFetchError } from './apiUrl';
 import { supabase } from './supabase';
 
 
@@ -27,10 +27,7 @@ async function fetchWithTimeout(path: string, options: RequestInit) {
     return res.json();
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your connection.');
-    }
-    throw err;
+    throw normalizeFetchError(err);
   }
 }
 

@@ -43,10 +43,25 @@ export function QRScanner({ onScan, onClose }: Props) {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera access requires HTTPS or localhost. You can upload a QR image or enter code below.');
       }
-      const media = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      });
+      let media: MediaStream;
+      try {
+        media = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+      } catch (constraintErr) {
+        if (
+          constraintErr instanceof Error &&
+          (constraintErr.name === 'OverconstrainedError' || constraintErr.name === 'NotFoundError')
+        ) {
+          media = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } else {
+          throw constraintErr;
+        }
+      }
       if (!mounted.current) {
         media.getTracks().forEach(t => t.stop());
         return;
@@ -63,7 +78,9 @@ export function QRScanner({ onScan, onClose }: Props) {
       setRunning(false);
       setError(
         e instanceof Error && e.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access in your browser settings, then retry, or upload/enter code.'
+          ? 'Camera permission was denied. Allow camera access in your browser settings, then retry, or upload/enter code below.'
+          : e instanceof Error && (e.name === 'NotFoundError' || /device not found/i.test(e.message))
+          ? 'No camera detected on this device. Upload a QR image or enter the worker code below.'
           : e instanceof Error
           ? e.message
           : 'Camera unavailable. Try uploading an image or entering code below.'
@@ -137,43 +154,58 @@ export function QRScanner({ onScan, onClose }: Props) {
   };
 
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      style={{ flex: 1, backgroundColor: '#111827' }}
-      contentContainerStyle={{ padding: 20, alignItems: 'center' }}
-    >
-      <View style={{ width: '100%', maxWidth: 640, gap: 16 }}>
-        <View className="flex-row justify-between items-center border-b border-gray-800 pb-3">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="qr-code-outline" size={24} color="#F97316" />
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xl font-bold">
-              Scan Worker QR Code
-            </Text>
-          </View>
-          <Pressable
-            style={{ minHeight: 44, minWidth: 44 }}
-            accessibilityLabel="Close QR scanner"
-            onPress={onClose}
-            className="p-2"
-          >
-            <Ionicons name="close" size={24} color="#9CA3AF" />
-          </Pressable>
+    <View style={{ flex: 1, backgroundColor: '#111827' }}>
+      {/* Fixed Header */}
+      <View className="flex-row justify-between items-center border-b border-gray-800 px-5 py-3.5 bg-gray-900">
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="qr-code-outline" size={24} color="#F97316" />
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-lg font-bold">
+            Scan Worker QR Code
+          </Text>
         </View>
+        <Pressable
+          style={{ minHeight: 44, minWidth: 44 }}
+          accessibilityLabel="Close QR scanner"
+          onPress={onClose}
+          className="p-2 items-center justify-center"
+        >
+          <Ionicons name="close" size={24} color="#9CA3AF" />
+        </Pressable>
+      </View>
 
-        <video
-          ref={video}
-          muted
-          playsInline
-          aria-label="QR camera preview"
-          style={{
-            width: '100%',
-            maxHeight: '45vh',
-            minHeight: 220,
-            background: '#000',
-            borderRadius: 12,
-            objectFit: 'cover',
-          }}
-        />
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 20, alignItems: 'center' }}
+      >
+        <View style={{ width: '100%', maxWidth: 640, gap: 16 }}>
+          {running && (
+            <video
+              ref={video}
+              muted
+              playsInline
+              autoPlay
+              aria-label="QR camera preview"
+              style={{
+                width: '100%',
+                maxHeight: '40vh',
+                minHeight: 200,
+                background: '#000',
+                borderRadius: 12,
+                objectFit: 'cover',
+              }}
+            />
+          )}
+
+          {!running && (
+            <video
+              ref={video}
+              muted
+              playsInline
+              aria-hidden="true"
+              style={{ display: 'none' }}
+            />
+          )}
 
         {!!error && (
           <View className="bg-red-900/40 border border-red-700/50 p-3 rounded-xl flex-row items-center gap-2">
@@ -254,6 +286,7 @@ export function QRScanner({ onScan, onClose }: Props) {
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

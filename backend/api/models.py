@@ -1,6 +1,6 @@
 from core.notification_helper import create_notifications
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Any
 from datetime import date, datetime
 import uuid
 
@@ -30,6 +30,8 @@ class ProjectCreate(ProjectBase):
     suppliers: Optional[list[str]] = None
     admins: Optional[list[str]] = None
     milestones: Optional[list[dict]] = None
+    boq_data: Optional[Dict[str, Any]] = None
+    boq_file_url: Optional[str] = None
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None

@@ -63,6 +63,9 @@ def check_order_access(client, po_id, user):
         if project.data and project.data[0].get("pm_id") == user["id"]:
             return order
     if user["role"] == "site_manager":
+        site_assignment = client.table("site_manager_sites").select("id").eq("project_id", order.get("project_id")).eq("site_manager_id", user["id"]).execute()
+        if site_assignment.data:
+            return order
         assignment = client.table("project_role_assignments").select("user_id").eq("project_id", order.get("project_id")).eq("user_id", user["id"]).eq("role", "site_manager").execute()
         if assignment.data:
             return order
@@ -540,6 +543,11 @@ def _transition_order(po_id: str, current_user: dict, operation: str):
 
         # Handle known Postgres stored procedure notification bugs (enum 22P02, null user_id 23502, etc.) gracefully
         if code in ("22P02", "23502") or "notification" in err_msg or "invalid input value for enum" in err_msg or "user_id" in err_msg:
+            return _fallback_transition_order(po_id, current_user, operation)
+
+        # For receive_purchase_order, check_order_access has already authorized the caller;
+        # fall back to the safe service transition if the Postgres RPC fails for any schema/RLS reason.
+        if operation == "receive_purchase_order" and code != "P0002":
             return _fallback_transition_order(po_id, current_user, operation)
 
         status = {"42501": 403, "P0002": 404, "P0001": 409, "23514": 409}.get(code, 500)

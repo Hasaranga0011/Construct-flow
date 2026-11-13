@@ -215,7 +215,7 @@ export default function LandingPage() {
 
   const handleCTA = () => {
     if (session) router.push((role ? getDashboardForRole(role) : '/') as any);
-    else router.push('/team-register');
+    else router.push('/register');
   };
 
   const handleScroll = (e: any) => {

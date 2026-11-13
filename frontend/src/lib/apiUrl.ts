@@ -92,8 +92,8 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
       // Use the actual IP of the machine running the Expo bundler and backend API
       url.hostname = developmentHost;
     } else if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase().trim())) {
-      // Host was set to loopback localhost, route to development server IP
-      url.hostname = '10.75.221.40';
+      // Host was set to loopback localhost; route to emulator host or localhost
+      url.hostname = platform === 'android' ? '10.0.2.2' : 'localhost';
     }
   }
 
@@ -105,22 +105,25 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
 }
 
 export function getApiUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL || 'http://10.75.221.40:8000/api';
+  const configured = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
 
   if (!__DEV__) {
     return validateReleaseApiUrl(configured);
   }
 
   if (Platform.OS === 'web') {
-    const isLoopback = LOOPBACK_HOSTS.has(new URL(configured).hostname.toLowerCase().trim());
-    if (!isLoopback) {
-      const clean = configured.trim().replace(/\/$/, '');
-      return clean.endsWith('/api') ? clean : `${clean}/api`;
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(configured.trim());
+    } catch {
+      parsed = null;
     }
 
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `http://${window.location.hostname}:8000/api`;
+    if (parsed && isPrivateOrLoopbackHost(parsed.hostname) && typeof window !== 'undefined' && window.location?.hostname) {
+      const port = parsed.port || '8000';
+      return `http://${window.location.hostname}:${port}/api`;
     }
+
     const clean = configured.trim().replace(/\/$/, '');
     return clean.endsWith('/api') ? clean : `${clean}/api`;
   }
@@ -134,4 +137,16 @@ export function getApiUrl(): string {
     Constants.experienceUrl;
 
   return resolveApiUrl(configured, Platform.OS, debuggerHost);
+}
+
+/** Converts low-level browser/RN fetch errors into a clear, actionable message. */
+export function normalizeFetchError(err: any): Error {
+  if (err?.name === 'AbortError') {
+    return new Error('Request timed out. Please check your connection.');
+  }
+  const msg = String(err?.message || '');
+  if (/failed to fetch|network request failed|load failed|networkerror/i.test(msg)) {
+    return new Error('Unable to connect to the server. Please check your connection and try again.');
+  }
+  return err instanceof Error ? err : new Error(msg || 'An unexpected error occurred.');
 }

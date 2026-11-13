@@ -11,6 +11,7 @@ import { ModalViewport } from './ModalViewport';
 import { useAuth } from '../../context/AuthContext';
 import { SearchInput } from './SearchInput';
 import { RoleAvatar } from './RoleAvatar';
+import { roleLabel } from '../../utils/roles';
 
 interface TopNavProps {
   shell?: boolean;
@@ -156,7 +157,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
           </Text>
           <View className="self-center mt-2 px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-orange uppercase">
-              {userRole || 'User'}
+              {userRole ? roleLabel(userRole) : 'User'}
             </Text>
           </View>
           <View className={`h-px my-4 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />

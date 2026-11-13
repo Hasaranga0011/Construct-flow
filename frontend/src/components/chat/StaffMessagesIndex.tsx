@@ -57,9 +57,10 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
         if (projectIds.length > 0) {
             const { data, error: msgError } = await supabase
               .from('client_messages')
-              .select('*')
+              .select('id, project_id, message_text, content, message, created_at, sender_id, sender_role, receiver_role, receiver_id, is_read, read_at')
               .in('project_id', projectIds)
-              .order('created_at', { ascending: false });
+              .order('created_at', { ascending: false })
+              .limit(100);
           if (msgError) throw msgError;
           messageData = (data as any) || [];
         }
@@ -105,6 +106,7 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
           projects.map(project => {
             const message = latestMessages.find(m => m.project_id === project.id);
             const isUnread = message && message.sender_role === 'client' && !message.is_read;
+            const messagePreview = message ? (message.message_text || (message as any).content || (message as any).message || 'Message') : 'No messages yet';
             return (
               <Link key={project.id} href={`${basePath}/messages/${project.id}` as any} asChild>
                 <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-white dark:bg-[#1E293B] rounded-2xl border border-gray-100 dark:border-gray-800 p-5 mb-3 flex-row items-center">
@@ -114,7 +116,7 @@ export default function StaffMessagesIndex({ basePath }: { basePath: string }) {
                   <View className="flex-1">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-white font-bold">{project.name}</Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-sm mt-1 ${isUnread ? 'text-brand-orange font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
-                      {message ? message.message_text : 'No messages yet'}
+                      {messagePreview}
                     </Text>
                   </View>
                   {isUnread && <View className="w-3 h-3 bg-brand-orange rounded-full mr-3" />}

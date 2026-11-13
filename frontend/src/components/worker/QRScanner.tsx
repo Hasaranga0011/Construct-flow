@@ -21,6 +21,7 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
   const [submittingManual, setSubmittingManual] = useState(false);
   const processing = useRef(false);
   const [cameraError, setCameraError] = useState('');
+  const [scanError, setScanError] = useState('');
 
   if (!permission) {
     return (
@@ -89,8 +90,11 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
     if (processing.current || scanned) return;
     processing.current = true;
     setScanned(true);
+    setScanError('');
     try {
       await onScan(data);
+    } catch (e: any) {
+      setScanError(e?.message || 'Unable to process this QR code.');
     } finally {
       processing.current = false;
     }
@@ -100,10 +104,13 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
     if (!manualCode.trim() || processing.current) return;
     setSubmittingManual(true);
     processing.current = true;
+    setScanError('');
     try {
       await onScan(manualCode.trim());
       setManualCode('');
       setShowManual(false);
+    } catch (e: any) {
+      setScanError(e?.message || 'Unable to process this worker code.');
     } finally {
       setSubmittingManual(false);
       processing.current = false;
@@ -168,11 +175,22 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
               Point your camera at the worker QR code.
             </Text>
 
+            {!!scanError && (
+              <View className="mt-4 mx-6 bg-red-900/80 border border-red-500/60 px-4 py-3 rounded-xl max-w-sm">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-100 text-xs text-center font-semibold">
+                  {scanError}
+                </Text>
+              </View>
+            )}
+
             {scanned && (
               <Pressable
                 style={{ minHeight: 44, minWidth: 44 }}
                 onPress={() => {
-                  if (!processing.current) setScanned(false);
+                  if (!processing.current) {
+                    setScanError('');
+                    setScanned(false);
+                  }
                 }}
                 className="bg-brand-orange rounded-xl px-6 py-3 mt-4"
               >

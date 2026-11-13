@@ -19,7 +19,7 @@ from supabase import create_client
 
 from core.config import settings
 from core.notification_helper import create_notifications, create_notification
-from core.database import client_for_token
+from core.database import client_for_token, get_service_client
 from core.security import get_current_user
 from services.email_service import send_credentials_welcome_email
 
@@ -35,16 +35,13 @@ def _require_admin(current_user: dict) -> dict:
 
 
 def _admin_supabase():
-    """Service-role client — has full table access regardless of RLS."""
+    """Service-role client — has full table access regardless of RLS (pooled)."""
     if not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(
             status_code=503,
             detail="Service role key not configured; admin operations unavailable",
         )
-    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-    if hasattr(client, "auth") and hasattr(client.auth, "_http_client"):
-        client.auth._http_client.timeout = httpx.Timeout(25.0)
-    return client
+    return get_service_client()
 
 
 # -----------------------------------------------------------------------
@@ -394,20 +391,70 @@ def set_user_role(
 
 
 # -----------------------------------------------------------------------
-# PATCH /admin/users/{user_id}/approve  — approve a supplier
+# PATCH /admin/users/{user_id}/approve  — approve any pending user
 # -----------------------------------------------------------------------
 
 @router.patch("/users/{user_id}/approve")
-def approve_supplier(
+def approve_user(
     user_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Dict:
     _require_admin(current_user)
-    db = client_for_token(current_user["token"])
-    res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}).execute()
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Supplier not found or already approved")
-    return res.data
+    admin_db = _admin_supabase()
+
+    # Check user exists
+    existing = admin_db.table("profiles").select("id, full_name, email, role, is_approved").eq("id", user_id).maybe_single().execute()
+    if not existing.data:
+        # Fallback to RPC if needed
+        db = client_for_token(current_user["token"])
+        res = db.rpc("admin_approve_supplier", {"p_user_id": user_id}).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        return res.data
+
+    user_row = existing.data
+    if user_row.get("is_approved") is True:
+        return {"ok": True, "id": user_id, "is_approved": True, "message": "User is already approved"}
+
+    upd = admin_db.table("profiles").update({"is_approved": True}).eq("id", user_id).execute()
+    if not upd.data:
+        raise HTTPException(status_code=500, detail="Failed to approve user")
+
+    # Best-effort in-app notification to the approved user
+    try:
+        create_notification(
+            type="general",
+            user_id=user_id,
+            title="Account Approved",
+            message=f"Hi {user_row.get('full_name') or 'User'}, your ConstructFlow account has been approved by an administrator.",
+            target_user_id=user_id,
+            sent_via="in_app",
+        )
+    except Exception as notif_err:
+        logger.warning(f"Approval notification failed for {user_id}: {notif_err}")
+
+    return {"ok": True, "id": user_id, "is_approved": True, "user": upd.data[0]}
+
+
+# -----------------------------------------------------------------------
+# PATCH /admin/users/{user_id}/reject  — revoke approval / mark pending
+# -----------------------------------------------------------------------
+
+@router.patch("/users/{user_id}/reject")
+def reject_user(
+    user_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> Dict:
+    _require_admin(current_user)
+    if user_id == current_user.get("id"):
+        raise HTTPException(status_code=400, detail="You cannot unapprove your own admin account")
+
+    admin_db = _admin_supabase()
+    upd = admin_db.table("profiles").update({"is_approved": False}).eq("id", user_id).execute()
+    if not upd.data:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"ok": True, "id": user_id, "is_approved": False, "user": upd.data[0]}
 
 
 # -----------------------------------------------------------------------

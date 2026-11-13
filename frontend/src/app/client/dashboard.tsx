@@ -160,20 +160,23 @@ export default function ClientDashboardPage() {
           }
         });
 
-        // Only fetch financials via API if spent_cost is not cached on project
-        if (missingFinancialIds.length > 0) {
-          await Promise.all(
-            missingFinancialIds.map(async id => {
-              const fin = await api.projects.financials(id).catch(() => null);
-              if (fin) expenseTotals[id] = fin.actual_spend || 0;
-            })
-          );
-        }
-
         if (isMounted) {
           setProjects(clientProjects);
           setMilestones((milestoneResponse.data || []) as Milestone[]);
           setSpentCosts(expenseTotals);
+          setLoading(false);
+        }
+
+        // Fill any missing financials asynchronously without blocking dashboard render
+        if (missingFinancialIds.length > 0) {
+          void Promise.all(
+            missingFinancialIds.map(async id => {
+              const fin = await api.projects.financials(id).catch(() => null);
+              if (fin && isMounted) {
+                setSpentCosts(prev => ({ ...prev, [id]: fin.actual_spend || 0 }));
+              }
+            })
+          );
         }
       } catch (loadError: any) {
         if (isMounted) setError(loadError.message || 'Failed to load your project dashboard.');

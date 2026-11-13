@@ -7,23 +7,45 @@ export type AssignedSiteInfo = {
   projectId: string;    // ID from projects
 };
 
+type CachedAssignments = {
+  assignedProjectIds: string[];
+  siteAssignmentIds: string[];
+  assignments: AssignedSiteInfo[];
+  timestamp: number;
+};
+
+const ASSIGNMENTS_CACHE = new Map<string, CachedAssignments>();
+const ASSIGNMENTS_TTL = 120_000; // 2 minutes
+
 export function useAssignedSites(userId: string | undefined) {
-  const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>([]);
-  const [siteAssignmentIds, setSiteAssignmentIds] = useState<string[]>([]);
-  const [assignments, setAssignments] = useState<AssignedSiteInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initial = userId ? ASSIGNMENTS_CACHE.get(userId) : undefined;
+  const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>(initial?.assignedProjectIds || []);
+  const [siteAssignmentIds, setSiteAssignmentIds] = useState<string[]>(initial?.siteAssignmentIds || []);
+  const [assignments, setAssignments] = useState<AssignedSiteInfo[]>(initial?.assignments || []);
+  const [loading, setLoading] = useState(!initial);
   const requestVersion = useRef(0);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAssignments = useCallback(async () => {
+  const fetchAssignments = useCallback(async (force = false) => {
     const version = ++requestVersion.current;
     if (!userId) {
       setAssignedProjectIds([]); setSiteAssignmentIds([]); setAssignments([]); setError(null);
       setLoading(false);
       return;
     }
-    
-    setLoading(true);
+
+    const cached = ASSIGNMENTS_CACHE.get(userId);
+    if (cached) {
+      setAssignedProjectIds(cached.assignedProjectIds);
+      setSiteAssignmentIds(cached.siteAssignmentIds);
+      setAssignments(cached.assignments);
+      setLoading(false);
+      if (!force && Date.now() - cached.timestamp < ASSIGNMENTS_TTL) {
+        return;
+      }
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const { data, error } = await supabase
@@ -44,13 +66,21 @@ export function useAssignedSites(userId: string | undefined) {
           projectId: a.project_id
         }));
 
+        ASSIGNMENTS_CACHE.set(userId, {
+          assignedProjectIds: pIds,
+          siteAssignmentIds: aIds,
+          assignments: formatted,
+          timestamp: Date.now(),
+        });
         setAssignedProjectIds(pIds);
         setSiteAssignmentIds(aIds);
         setAssignments(formatted);
       }
     } catch (e) {
       if (version !== requestVersion.current) return;
-      setAssignedProjectIds([]); setSiteAssignmentIds([]); setAssignments([]);
+      if (!cached) {
+        setAssignedProjectIds([]); setSiteAssignmentIds([]); setAssignments([]);
+      }
       setError(dataError(e, 'Unable to load site assignments'));
     } finally {
       if (version === requestVersion.current) setLoading(false);
@@ -69,6 +99,6 @@ export function useAssignedSites(userId: string | undefined) {
     assignments,
     loading,
     error,
-    refresh: fetchAssignments
+    refresh: () => fetchAssignments(true)
   };
 }

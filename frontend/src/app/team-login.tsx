@@ -10,6 +10,9 @@ import AuthPageLayout from '../components/auth/AuthPageLayout';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getRememberedEmail, saveRememberedEmail, clearRememberedEmail } from '../lib/rememberedEmail';
 import { loginEmailAutofill, loginPasswordAutofill } from '../lib/formAutofill';
+import { setLoginPortal, clearLoginPortal } from '../lib/loginPortal';
+import { useAuth } from '../context/AuthContext';
+import AccessDeniedModal from '../components/auth/AccessDeniedModal';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -18,15 +21,31 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const router = useRouter();
-  const { error: portalError } = useLocalSearchParams<{ error?: string }>();
+  const { error: portalError, registered } = useLocalSearchParams<{ error?: string; registered?: string }>();
 
-  // Show error passed via URL (e.g. wrong portal)
+  // Show error or success passed via URL
   useEffect(() => {
     if (portalError === 'wrong_portal') {
       setErrorMsg('This portal is for team members only. Clients and suppliers must use the Partner Portal.');
     }
-  }, [portalError]);
+    if (registered) {
+      setSuccessMsg('Account created successfully! Please sign in with your credentials.');
+    }
+  }, [portalError, registered]);
+
+  // Account rejected by the portal gate (e.g. a Client/Supplier using Team Login).
+  // The popup reads the error from AuthContext and stays until the user presses OK.
+  const { portalError: gateError, clearPortalError } = useAuth();
+  useEffect(() => {
+    if (gateError) {
+      setSuccessMsg('');
+      setErrorMsg('');
+      setPassword('');
+      setLoading(false);
+    }
+  }, [gateError]);
 
   useEffect(() => {
     setPassword('');
@@ -54,9 +73,12 @@ export default function LoginScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Team Login only admits pm/site_manager/worker/admin accounts — enforced in AuthContext.
+    await setLoginPortal('team');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
+      await clearLoginPortal();
       setPassword('');
       setErrorMsg('Incorrect email or password');
       setLoading(false);
@@ -81,6 +103,7 @@ export default function LoginScreen() {
       // Save selected role to local storage so it survives the OAuth redirect
       const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       await AsyncStorage.setItem('pending_google_role', 'pm');
+      await setLoginPortal('team');
 
       const redirectTo = Linking.createURL('auth/callback');
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -184,9 +207,26 @@ export default function LoginScreen() {
         </View>
       </View>
 
+      {successMsg ? (
+        <View className="bg-green-50 p-3 rounded-lg border border-green-200 mb-6 flex-row items-center">
+          <Ionicons name="checkmark-circle" size={20} color="#16A34A" style={{ marginRight: 8 }} />
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-700 text-sm flex-1">{successMsg}</Text>
+        </View>
+      ) : null}
+
       {errorMsg ? (
-        <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-sm text-center">{errorMsg}</Text>
+        <View className="bg-red-50 p-3.5 rounded-lg border border-red-200 mb-6">
+          <View className="flex-row items-center mb-1">
+            <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8 }} />
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-sm font-semibold flex-1">{errorMsg}</Text>
+          </View>
+          {errorMsg.includes('Partner Login') ? (
+            <Link href="/partner-login" asChild>
+              <Pressable style={{ minHeight: 40 }} className="mt-2 bg-brand-orange py-2 px-4 rounded-lg items-center">
+                <Text className="text-white font-bold text-xs">Switch to Partner Login →</Text>
+              </Pressable>
+            </Link>
+          ) : null}
         </View>
       ) : null}
 
@@ -284,14 +324,15 @@ export default function LoginScreen() {
         </Pressable>
       </View>
 
-      <View className="flex-row flex-wrap justify-center">
+      <View className="flex-row flex-wrap justify-center mb-4">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Don&apos;t have an account? </Text>
-        <Link href="/team-register" asChild>
+        <Link href="/register?portal=team" asChild>
           <Pressable style={{ minHeight: 44, minWidth: 44 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Register Now</Text>
           </Pressable>
         </Link>
       </View>
+      <AccessDeniedModal visible={!!gateError} message={gateError ?? ''} switchTo="partner" onClose={clearPortalError} />
     </AuthPageLayout>
   );
 }

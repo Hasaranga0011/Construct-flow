@@ -1,13 +1,26 @@
-import { getApiUrl } from '../lib/apiUrl';
+import { getApiUrl, normalizeFetchError } from '../lib/apiUrl';
 import { supabase } from '../lib/supabase';
 
 
 const apiCache = new Map<string, { data: any, timestamp: number, promise?: Promise<any> }>();
 const CACHE_TTL = 60000; // 60 seconds
 
-async function executeFetch(endpoint: string, options: RequestInit) {
+async function getFreshAccessToken(forceRefresh = false): Promise<string | undefined> {
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+  const isExpiringSoon = !session?.access_token || (expiresAtMs > 0 && expiresAtMs < Date.now() + 30_000);
+
+  if (forceRefresh || isExpiringSoon) {
+    const { data } = await supabase.auth.refreshSession();
+    if (data?.session?.access_token) {
+      return data.session.access_token;
+    }
+  }
+  return session?.access_token;
+}
+
+async function executeFetch(endpoint: string, options: RequestInit, hasRetriedAuth = false): Promise<any> {
+  const token = await getFreshAccessToken(hasRetriedAuth);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -27,6 +40,10 @@ async function executeFetch(endpoint: string, options: RequestInit) {
 
     clearTimeout(timeoutId);
 
+    if (response.status === 401 && !hasRetriedAuth) {
+      return executeFetch(endpoint, options, true);
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       let errMsg = 'API request failed';
@@ -43,19 +60,21 @@ async function executeFetch(endpoint: string, options: RequestInit) {
     return response.json();
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your connection.');
-    }
-    throw err;
+    throw normalizeFetchError(err);
   }
 }
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const method = (options.method || 'GET').toUpperCase();
 
-  // On mutation (POST, PATCH, DELETE, PUT), clear the entire cache to ensure fresh data
+  // On mutation (POST, PATCH, DELETE, PUT), invalidate matching resource cache instead of wiping everything
   if (method !== 'GET') {
-    apiCache.clear();
+    const resourceRoot = '/' + (endpoint.split('/').filter(Boolean)[0] || '');
+    for (const key of apiCache.keys()) {
+      if (resourceRoot === '/' || key.startsWith(resourceRoot)) {
+        apiCache.delete(key);
+      }
+    }
     return executeFetch(endpoint, options);
   }
 

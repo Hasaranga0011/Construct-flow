@@ -295,7 +295,7 @@ export default function LoginScreen() {
 
           <View className="flex-row flex-wrap justify-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Don&apos;t have an account? </Text>
-            <Link href="/team-register" asChild>
+            <Link href="/register" asChild>
               <Pressable style={{ minHeight: 44, minWidth: 44 }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Register Now</Text>
               </Pressable>

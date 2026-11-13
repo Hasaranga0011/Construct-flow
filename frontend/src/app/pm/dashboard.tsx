@@ -42,7 +42,7 @@ export default function DashboardScreen() {
       // Fetch PM's projects directly via pm_id foreign key
       const projectsReq = await supabase
         .from('projects')
-        .select('*', { count: 'exact' })
+        .select('id, status, total_budget')
         .eq('pm_id', userId);
 
       if (projectsReq.error) throw projectsReq.error;

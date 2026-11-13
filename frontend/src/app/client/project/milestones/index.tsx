@@ -59,17 +59,19 @@ export default function ClientProjectMilestonesPage() {
   }, [user, activeProjectId]);
 
   return (
-    <View className="flex-1 bg-brand-light">
+    <View className="flex-1 bg-brand-light" style={{ flex: 1, minHeight: 0 }}>
       <TopNav title="Project Milestones" showAction={false} />
-      <View className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
+      <View className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`} style={{ flex: 1, minHeight: 0 }}>
         {projects.length > 0 && <View className="flex-row mb-5"><FlatList keyboardShouldPersistTaps="handled" data={projects} horizontal showsHorizontalScrollIndicator={false} keyExtractor={item => item.id} renderItem={({ item }) => <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setActiveProjectId(item.id)} className={`mr-5 pb-3 border-b-2 ${activeProjectId === item.id ? 'border-brand-orange' : 'border-transparent'}`}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold ${activeProjectId === item.id ? 'text-brand-orange' : 'text-gray-500'}`}>{item.name}</Text></Pressable>} /></View>}
         {error ? <View className="bg-red-50 border border-red-200 rounded-2xl p-5"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{error}</Text></View> : loading ? <View className="gap-3"><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /><View className="bg-gray-100 rounded-2xl h-20 animate-pulse" /></View> : milestones.length === 0 ? <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center"><Ionicons name="flag-outline" size={48} color="#D1D5DB" /><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-4">No milestones have been created for this project.</Text></View> : (
-          <View className={`bg-white rounded-3xl shadow-sm border border-gray-100 ${isMobile ? 'p-4' : 'p-8'}`}>
-            <FlatList 
-              keyboardShouldPersistTaps="handled" 
-              data={milestones} 
-              keyExtractor={(item) => item.id} 
-              showsVerticalScrollIndicator={false} 
+          <View className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden" style={{ flex: 1, minHeight: 0 }}>
+            <FlatList
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: isMobile ? 16 : 32 }}
+              keyboardShouldPersistTaps="handled"
+              data={milestones}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={true}
               renderItem={({ item, index }) => {
                 const progress = Number(item.completion_percentage || 0);
                 return (

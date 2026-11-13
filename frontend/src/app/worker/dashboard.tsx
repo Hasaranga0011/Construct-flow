@@ -116,42 +116,46 @@ export default function WorkerDashboardScreen() {
     setError(null);
     try {
       const range = monthRange(month);
-
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      setProfile(prof);
-
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token;
-      
-      let siteRes = null;
-      if (token) {
+
+      const fetchJson = async (url: string) => {
+        if (!token) return null;
         try {
-          const res = await fetch(`${getApiUrl()}/labour/worker/site`, { headers: { Authorization: `Bearer ${token}` } });
-          if (res.ok) siteRes = await res.json();
-        } catch (e) {}
-      }
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          return res.ok ? await res.json() : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const [profRes, siteRes, attRes, payrollRes, slipsRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email, role, avatar_url, contact_number').eq('id', user.id).single(),
+        fetchJson(`${getApiUrl()}/labour/worker/site`),
+        supabase.from('attendance')
+          .select('*')
+          .eq('worker_id', user.id)
+          .gte('date', range.start)
+          .lte('date', range.end)
+          .order('date', { ascending: false }),
+        fetchJson(`${getApiUrl()}/labour/worker/payroll?month=${month}`),
+        supabase.from('salary_slips')
+          .select('*')
+          .eq('worker_id', user.id)
+          .order('period_start', { ascending: false }),
+      ]);
+
+      setProfile(profRes.data || null);
       setSiteAssignment(siteRes);
-
-      const { data: att } = await supabase.from('attendance')
-        .select('*')
-        .eq('worker_id', user.id)
-        .gte('date', range.start)
-        .lte('date', range.end)
-        .order('date', { ascending: false });
-      setAttendance(att || []);
-
-      if (token) {
-        try {
-          const res = await fetch(`${getApiUrl()}/labour/worker/payroll?month=${month}`, { headers: { Authorization: `Bearer ${token}` } });
-          if (res.ok) setPayroll(await res.json());
-        } catch (e) {}
-      }
-
-      const { data: slips } = await supabase.from('salary_slips')
-        .select('*')
-        .eq('worker_id', user.id)
-        .order('period_start', { ascending: false });
-      setPayslips(slips || []);
+      setAttendance(attRes.data || []);
+      if (payrollRes) setPayroll(payrollRes);
+      setPayslips(slipsRes.data || []);
 
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data.');

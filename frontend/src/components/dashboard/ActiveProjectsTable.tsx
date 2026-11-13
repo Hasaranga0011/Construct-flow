@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { EditProjectModal } from './EditProjectModal';
@@ -108,20 +108,18 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
 
         let query = supabase
           .from('projects')
-          .select('*')
+          .select('id, name, location, status, image_url, images, start_date, end_date, total_budget, spent_cost, completion_percentage, pm_id, client_id, created_at')
           .in('status', ['active', 'Active', 'In Progress', 'in progress'])
           .order('created_at', { ascending: false });
           
         if (pmId) {
           query = query.eq('pm_id', pmId);
         }
-          
-
 
         const { data: projectsData, error } = await query;
         if (error) throw error;
         
-        let finalProjects = (projectsData || []).filter(p => `${p.name || ''} ${p.location || ''}`.toLowerCase().includes(debouncedSearchQuery.toLowerCase()));
+        let finalProjects = projectsData || [];
         
         // Fetch milestones to calculate progress
         if (finalProjects.length > 0) {
@@ -132,14 +130,17 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
              .in('project_id', projectIds);
              
            if (milestonesData) {
+             const milsByProj: Record<string, number[]> = {};
+             milestonesData.forEach(m => {
+               if (!m.project_id) return;
+               if (!milsByProj[m.project_id]) milsByProj[m.project_id] = [];
+               milsByProj[m.project_id].push(m.completion_percentage || 0);
+             });
              finalProjects = finalProjects.map(p => {
-               const p_mils = milestonesData.filter(m => m.project_id === p.id);
-               let progress = 0;
-               if (p_mils.length > 0) {
-                 const total = p_mils.reduce((sum, m) => sum + (m.completion_percentage || 0), 0);
-                 progress = Math.round(total / p_mils.length);
-               }
-               return { ...p, completion_percentage: progress };
+               const pMils = p.id ? milsByProj[p.id] : undefined;
+               if (!pMils || pMils.length === 0) return p;
+               const total = pMils.reduce((sum: number, val: number) => sum + val, 0);
+               return { ...p, completion_percentage: Math.round(total / pMils.length) };
              });
            }
         }
@@ -155,7 +156,13 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
     loadProjects();
     
     return () => { isMounted = false; };
-  }, [refreshTrigger, debouncedSearchQuery, localRefresh, pmId]);
+  }, [refreshTrigger, localRefresh, pmId]);
+
+  const filteredProjects = useMemo(() => {
+    const q = debouncedSearchQuery.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter(p => `${p.name || ''} ${p.location || ''}`.toLowerCase().includes(q));
+  }, [projects, debouncedSearchQuery]);
 
   const handleManage = (project: any) => {
     setSelectedProject(project);
@@ -176,12 +183,12 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator color="#F97316" />
           </View>
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <View className="flex-1 justify-center items-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No active projects found.</Text>
           </View>
         ) : (
-          projects.map(p => (
+          filteredProjects.map(p => (
             <ProjectRow 
               key={p.id}
               project={p}

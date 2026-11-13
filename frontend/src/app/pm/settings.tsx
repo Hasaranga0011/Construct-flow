@@ -7,7 +7,7 @@ export default function PMSettingsPage() {
   return (
     <View className="flex-1 bg-brand-light dark:bg-brand-dark">
       <TopNav title="Settings" showAction={false} />
-      <SettingsScreen showNotificationPreferences={false} profileHref="/pm/profile" />
+      <SettingsScreen profileHref="/pm/profile" />
     </View>
   );
 }

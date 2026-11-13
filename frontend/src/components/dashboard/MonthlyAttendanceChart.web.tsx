@@ -63,10 +63,18 @@ export const MonthlyAttendanceChart = () => {
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { loadData(); }, 600);
+    };
     const channel = supabase.channel('mac-attendance')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, trigger)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {

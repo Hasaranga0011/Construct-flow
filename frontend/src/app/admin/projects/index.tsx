@@ -11,9 +11,13 @@ import { formatMoney } from '../../../utils/format';
 
 import { ProjectImage } from '@/components/common/ProjectImage';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminProjectsList() {
   const router = useRouter();
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
+  const basePath = isPM ? '/pm/projects' : '/admin/projects';
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -25,6 +29,9 @@ export default function AdminProjectsList() {
     const fetchProjects = async () => {
       try {
         let query = supabase.from('projects').select('*').order('created_at', { ascending: false });
+        if (isPM && user?.id) {
+          query = query.eq('pm_id', user.id);
+        }
         const { data, error } = await query;
         if (error) throw error;
         
@@ -79,7 +86,7 @@ export default function AdminProjectsList() {
       isMounted = false; 
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isPM, user?.id]);
 
   const getStatusBadge = (status: string) => {
     const s = String(status || '').toLowerCase();
@@ -105,11 +112,11 @@ export default function AdminProjectsList() {
   return (
     <View className="flex-1 bg-gray-50">
       <View className="flex-1 flex-col min-h-0 overflow-hidden">
-        <TopNav title="Projects" actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
+        <TopNav title="Projects" showAction={!isPM} actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
         
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Projects</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">{isPM ? 'My Assigned Projects' : 'All Projects'}</Text>
             
             <SearchInput items={projects} entityLabel="projects" 
               placeholder="Search projects..." 
@@ -122,7 +129,7 @@ export default function AdminProjectsList() {
                 secondaryColumn: 'location',
                 titleColumn: 'name',
                 subtitleColumn: 'location',
-                routePrefix: '/admin/projects/'
+                routePrefix: `${basePath}/`
               }}
             />
           </View>
@@ -207,7 +214,7 @@ export default function AdminProjectsList() {
                       <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-600 font-medium">{p.client_name || 'No Client'}</Text>
                     </View>
                   </View>
-                  <Link href={`/admin/projects/${p.id}` as any} asChild>
+                  <Link href={`${basePath}/${p.id}` as any} asChild>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange py-3 rounded-lg items-center">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-sm font-bold">View Details</Text>
                     </Pressable>
@@ -260,7 +267,7 @@ export default function AdminProjectsList() {
                   </View>
                 
                 <View className="flex-1 flex-row justify-end space-x-2 pl-1">
-                  <Link href={`/admin/projects/${p.id}` as any} asChild>
+                  <Link href={`${basePath}/${p.id}` as any} asChild>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }} className="bg-brand-orange px-3.5 py-2 rounded-lg shadow-sm active:opacity-80">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">View Details</Text>
                     </Pressable>

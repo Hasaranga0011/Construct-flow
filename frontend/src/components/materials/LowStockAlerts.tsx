@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
 import { useRealtimeStats } from '../../hooks/useRealtimeStats';
+import { useAuth } from '@/context/AuthContext';
 
 
 const AlertRow = ({ material, project, remaining }: { material: string, project: string, remaining: string }) => {
@@ -21,6 +22,8 @@ const AlertRow = ({ material, project, remaining }: { material: string, project:
 };
 
 export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+  const { user, role } = useAuth();
+  const isPM = role === 'pm';
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +35,17 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
         return;
       }
 
+      let pmProjectIds: string[] = [];
+      if (isPM && user?.id) {
+        const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+        pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+        if (pmProjectIds.length === 0) {
+          setAlerts([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       let query = supabase
         .from('materials')
         .select(`
@@ -41,6 +55,8 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
 
       if (projectId) {
         query = query.eq('project_id', projectId);
+      } else if (isPM) {
+        query = query.in('project_id', pmProjectIds);
       } else {
         query = query.neq('projects.status', 'archived');
       }
@@ -66,7 +82,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, isPM, user?.id]);
 
   useEffect(() => { loadAlerts(); }, [loadAlerts, refreshTrigger, projectId]);
 

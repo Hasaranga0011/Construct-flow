@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
 import { useSidebar } from '../../context/SidebarContext';
+import { useNotifications } from '../../context/NotificationContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LogoutConfirmationModal } from './LogoutConfirmationModal';
-import { buildNotificationFilter } from '../../utils/notifications';
+import { roleLabel } from '../../utils/roles';
 
 export type NavItem = {
   label: string;
@@ -154,28 +155,11 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
     return email ? email.substring(0, 2).toUpperCase() : 'U';
   };
 
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (!user) return;
-    let isMounted = true;
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_read', false)
-        .or(buildNotificationFilter(user.id, role));
-      if (count !== null && isMounted) setUnreadCount(count);
-    };
-    fetchUnread();
-
-    const interval = setInterval(fetchUnread, 15000);
-    return () => { isMounted = false; clearInterval(interval); };
-  }, [user, role]);
+  const { unreadCount } = useNotifications();
 
   const isCollapsed = !isMobile && !isOpen;
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <View className={`w-full h-full py-5 flex-col border-r ${isMobile ? 'bg-slate-900 border-slate-800' : (isDark ? 'bg-[#0B0F19] border-gray-900' : 'bg-white border-gray-100')}`}>
       {/* Logo Area without marked close icon */}
       <View className={`${isCollapsed ? 'px-2 mb-6 items-center justify-center' : 'px-4 mb-6 flex-row items-center'}`}>
@@ -382,7 +366,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
                     maxFontSizeMultiplier={1.3}
                     className={`text-xs ${isMobile || isDark ? 'text-gray-400' : 'text-gray-500'}`}
                   >
-                    {role || 'Loading...'}
+                    {role ? roleLabel(role) : 'Loading...'}
                   </Text>
                 </View>
               </View>
@@ -412,7 +396,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
             height: '100%',
           }}
         >
-          <SidebarContent />
+          {sidebarContent}
         </Animated.View>
         <LogoutConfirmationModal
           visible={logoutModalVisible}
@@ -438,7 +422,7 @@ export const MobileSidebar = ({ navItems, basePath = '' }: { navItems: NavItem[]
           {...panResponder.panHandlers}
           style={{ width: Math.min(260, width - 32), height: '100%', transform: [{ translateX: slideAnim }] }}
         >
-          <SidebarContent />
+          {sidebarContent}
         </Animated.View>
       </View>
       <LogoutConfirmationModal

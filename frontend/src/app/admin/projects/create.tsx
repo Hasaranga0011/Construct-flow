@@ -1,6 +1,6 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
@@ -11,6 +11,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { PROJECT_IMAGE_PRESETS } from '../../../utils/projectImages';
 import { ProjectImage } from '../../../components/common/ProjectImage';
 import { ProjectImageUploader } from '../../../components/common/ProjectImageUploader';
+import * as DocumentPicker from 'expo-document-picker';
+import { formatMoney } from '../../../utils/format';
 
 export default function AdminProjectsCreatePage() {
   const router = useRouter();
@@ -23,6 +25,12 @@ export default function AdminProjectsCreatePage() {
   const [admins, setAdmins] = useState<any[]>([]);
 
   const [images, setImages] = useState<string[]>([]);
+  const [totalBudget, setTotalBudget] = useState('');
+  const [boqData, setBoqData] = useState<any | null>(null);
+  const [boqFileName, setBoqFileName] = useState('');
+  const [parsingBoq, setParsingBoq] = useState(false);
+  const [showBoqDetails, setShowBoqDetails] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -46,20 +54,19 @@ export default function AdminProjectsCreatePage() {
 
     const fetchUsers = async () => {
       try {
-        const { data: pmData } = await supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']);
-        const { data: clientData } = await supabase.from('profiles').select('*').in('role', ['client', 'Client']);
-        const { data: smData } = await supabase.from('profiles').select('*').in('role', ['site_manager', 'Site Manager', 'site manager']);
-        const { data: workerData } = await supabase.from('profiles').select('*').in('role', ['worker', 'Worker']);
-        const { data: supplierData } = await supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']);
-        const { data: adminData } = await supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']);
+        const { data: allProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, role, avatar_url')
+          .order('full_name');
 
-        if (isMounted) {
-          if (pmData) setPms(pmData);
-          if (clientData) setClients(clientData);
-          if (smData) setSiteManagers(smData);
-          if (workerData) setAvailableWorkers(workerData);
-          if (supplierData) setSuppliers(supplierData);
-          if (adminData) setAdmins(adminData);
+        if (isMounted && allProfiles) {
+          const norm = (r?: string | null) => String(r || '').trim().toLowerCase().replace(/\s+/g, '_');
+          setPms(allProfiles.filter(u => ['pm', 'project_manager', 'manager'].includes(norm(u.role))));
+          setClients(allProfiles.filter(u => norm(u.role) === 'client'));
+          setSiteManagers(allProfiles.filter(u => ['site_manager', 'sitemanager'].includes(norm(u.role))));
+          setAvailableWorkers(allProfiles.filter(u => norm(u.role) === 'worker'));
+          setSuppliers(allProfiles.filter(u => norm(u.role) === 'supplier'));
+          setAdmins(allProfiles.filter(u => ['admin', 'super_admin', 'superadmin'].includes(norm(u.role))));
         }
       } catch (err) {
         console.error("Failed to fetch users", err);
@@ -115,19 +122,130 @@ export default function AdminProjectsCreatePage() {
     } catch {}
   };
 
+  const handleParseBoq = async (fileObj?: any, csvText?: string, filename: string = 'boq.csv') => {
+    setParsingBoq(true);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      if (!token) throw new Error('Authentication required.');
+
+      const formDataUpload = new FormData();
+      if (fileObj) {
+        if (Platform.OS === 'web') {
+          formDataUpload.append('file', fileObj);
+        } else {
+          formDataUpload.append('file', {
+            uri: fileObj.uri,
+            name: fileObj.name || filename,
+            type: fileObj.type || 'text/csv'
+          } as any);
+        }
+      } else if (csvText) {
+        formDataUpload.append('csv_data', csvText);
+      }
+
+      const res = await fetch(`${getApiUrl()}/projects/parse-boq`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataUpload
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Failed to parse BOQ file');
+      }
+
+      setBoqData(data);
+      setBoqFileName(filename);
+      if (data.total_budget) {
+        setTotalBudget(String(data.total_budget));
+      }
+      Alert.alert(
+        'BOQ Processed Successfully',
+        `Extracted ${data.items_count} items across ${data.milestones?.length || 0} milestones. Calculated Budget: ${formatMoney(data.total_budget)}`
+      );
+    } catch (err: any) {
+      Alert.alert('BOQ Parsing Error', err.message || 'Unable to parse BOQ');
+    } finally {
+      setParsingBoq(false);
+    }
+  };
+
+  const handlePickBoqFile = async () => {
+    try {
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleParseBoq(file, undefined, file.name);
+          }
+        };
+        input.click();
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: [
+            'text/csv',
+            'text/comma-separated-values',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            '*/*'
+          ],
+          copyToCacheDirectory: true,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          handleParseBoq(asset, undefined, asset.name);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('File Error', err.message || 'Failed to pick file');
+    }
+  };
+
+  const handleLoadSampleBoq = async () => {
+    setParsingBoq(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/projects/boq-template`);
+      if (!res.ok) throw new Error('Failed to fetch sample BOQ template');
+      const data = await res.json();
+      if (data.template) {
+        await handleParseBoq(undefined, data.template, 'Sample_CIDA_Construction_BOQ.csv');
+      }
+    } catch (err: any) {
+      Alert.alert('Template Error', err.message || 'Failed to load sample BOQ');
+    } finally {
+      setParsingBoq(false);
+    }
+  };
+
+  const handleClearBoq = () => {
+    setBoqData(null);
+    setBoqFileName('');
+    setTotalBudget('');
+    setShowBoqDetails(false);
+  };
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.location || !formData.start_date || !formData.end_date) {
-      alert('Please fill out all required fields');
+      Alert.alert('Validation Error', 'Please fill out all required fields (*)');
       return;
     }
 
     setLoading(true);
     try {
+      const parsedBudget = totalBudget ? parseFloat(totalBudget) : (boqData?.total_budget || 0);
+
       const payload = {
         name: formData.name,
         location: formData.location,
         address: formData.address || null,
         status: formData.status,
+        total_budget: isNaN(parsedBudget) ? 0 : parsedBudget,
         image_url: images[0] || null,
         images: images,
         start_date: formData.start_date,
@@ -141,6 +259,7 @@ export default function AdminProjectsCreatePage() {
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         is_test: formData.is_test,
+        boq_data: boqData || null,
       };
 
       const response = await fetch(`${getApiUrl()}/projects`, {
@@ -290,6 +409,236 @@ export default function AdminProjectsCreatePage() {
                 onChangeText={(t) => setFormData({...formData, end_date: t})}
               />
             </View>
+          </View>
+
+          {/* BOQ & Budget Baseline Section */}
+          <View className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-lg bg-orange-100 items-center justify-center mr-3">
+                  <Ionicons name="calculator-outline" size={20} color="#EA580C" />
+                </View>
+                <View>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
+                    Bill of Quantities (BOQ) & Budget
+                  </Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">
+                    Upload an Excel/CSV BOQ to auto-calculate budget and establish material baselines
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Total Budget Input */}
+            <View className="mt-3 mb-4">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 mb-1">
+                Total Project Budget (LKR)
+              </Text>
+              <TextInput
+                maxFontSizeMultiplier={1.3}
+                style={{ minHeight: 44 }}
+                keyboardType="numeric"
+                className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-800 font-semibold"
+                placeholder="e.g. 25000000"
+                value={totalBudget}
+                onChangeText={setTotalBudget}
+              />
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1">
+                {totalBudget && !isNaN(Number(totalBudget))
+                  ? `Formatted: ${formatMoney(Number(totalBudget))}`
+                  : 'Enter manually or upload a BOQ file below to auto-calculate.'}
+              </Text>
+            </View>
+
+            {/* If no BOQ loaded yet */}
+            {!boqData && (
+              <View className="bg-white border border-dashed border-gray-300 rounded-xl p-4 items-center">
+                <Ionicons name="cloud-upload-outline" size={32} color="#9CA3AF" />
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mt-2">
+                  Upload Project BOQ Document
+                </Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 text-center mt-0.5 mb-3">
+                  Supports Excel (.xlsx, .xls) and CSV with items, quantities, and rates
+                </Text>
+
+                {parsingBoq ? (
+                  <View className="flex-row items-center py-2">
+                    <ActivityIndicator color="#EA580C" size="small" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-orange-600 ml-2">
+                      Parsing BOQ & verifying CIDA rates...
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="flex-row flex-wrap gap-2 justify-center">
+                    <TouchableOpacity
+                      style={{ minHeight: 40 }}
+                      onPress={handlePickBoqFile}
+                      className="bg-brand-orange px-4 py-2 rounded-lg flex-row items-center"
+                    >
+                      <Ionicons name="document-attach-outline" size={16} color="#fff" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-white ml-1.5">
+                        Choose File (.xlsx, .csv)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ minHeight: 40 }}
+                      onPress={handleLoadSampleBoq}
+                      className="bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3.5 py-2 rounded-lg flex-row items-center"
+                    >
+                      <Ionicons name="sparkles" size={15} color="#4B5563" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 ml-1.5">
+                        Load Sample CIDA BOQ
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* If BOQ successfully loaded & parsed */}
+            {boqData && (
+              <View className="bg-white border border-green-200 rounded-xl p-4 shadow-sm">
+                <View className="flex-row items-center justify-between pb-3 border-b border-gray-100">
+                  <View className="flex-row items-center flex-1 pr-2">
+                    <View className="w-8 h-8 rounded-lg bg-green-100 items-center justify-center mr-2.5">
+                      <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                    </View>
+                    <View className="flex-1">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-900" numberOfLines={1}>
+                        {boqFileName || 'Uploaded BOQ'}
+                      </Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
+                        {boqData.items_count} Line Items Analyzed
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center gap-2">
+                    <View className="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-emerald-700">
+                        {boqData.feasibility_score}% Feasibility Score
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={{ minHeight: 32, minWidth: 32 }}
+                      onPress={handleClearBoq}
+                      className="p-1.5 rounded-lg hover:bg-red-50"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Metrics Breakdown */}
+                <View className="flex-row flex-wrap gap-3 py-3 border-b border-gray-100">
+                  <View className="flex-1 min-w-[130px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-gray-400 uppercase">
+                      Calculated Budget
+                    </Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-orange-600 mt-0.5">
+                      {formatMoney(boqData.total_budget)}
+                    </Text>
+                  </View>
+                  <View className="flex-1 min-w-[130px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-gray-400 uppercase">
+                      Project Milestones
+                    </Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-gray-800 mt-0.5">
+                      {boqData.milestones?.length || 0} Stages
+                    </Text>
+                  </View>
+                  <View className="flex-1 min-w-[130px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-gray-400 uppercase">
+                      Core Materials
+                    </Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-blue-600 mt-0.5">
+                      {boqData.materials?.length || 0} Baselines
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Extracted Milestones List */}
+                <View className="mt-3">
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 mb-1.5">
+                    Auto-Generated Milestones (Work Breakdown):
+                  </Text>
+                  <View className="flex-row flex-wrap gap-1.5">
+                    {boqData.milestones?.map((m: any, idx: number) => (
+                      <View key={idx} className="bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg flex-row items-center">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-semibold text-gray-800">
+                          {m.title}
+                        </Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500 ml-1.5 font-bold">
+                          {formatMoney(m.allocated_budget)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Extracted Materials Baseline */}
+                {boqData.materials && boqData.materials.length > 0 && (
+                  <View className="mt-3">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 mb-1.5">
+                      Material Consumption Baselines:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {boqData.materials.map((mat: any, idx: number) => (
+                        <View key={idx} className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-semibold text-blue-900">
+                            {mat.name}: <Text className="font-bold">{mat.allocated_quantity} {mat.unit}</Text>
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Rate Warnings */}
+                {boqData.rate_warnings && boqData.rate_warnings.length > 0 && (
+                  <View className="mt-3 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                    <View className="flex-row items-center mb-1">
+                      <Ionicons name="warning-outline" size={14} color="#D97706" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-amber-800 ml-1">
+                        CIDA Market Benchmark Variances ({boqData.rate_warnings.length}):
+                      </Text>
+                    </View>
+                    {boqData.rate_warnings.slice(0, 3).map((w: any, idx: number) => (
+                      <Text key={idx} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-amber-700">
+                        • {w.message}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={{ minHeight: 32 }}
+                  onPress={() => setShowBoqDetails(!showBoqDetails)}
+                  className="mt-3 py-1 flex-row items-center justify-center border-t border-gray-100"
+                >
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-orange mr-1">
+                    {showBoqDetails ? 'Hide Itemized Breakdown' : `View All ${boqData.items_count} Items`}
+                  </Text>
+                  <Ionicons name={showBoqDetails ? "chevron-up" : "chevron-down"} size={14} color="#EA580C" />
+                </TouchableOpacity>
+
+                {showBoqDetails && boqData.items && (
+                  <View className="mt-2 max-h-48 overflow-scroll border-t border-gray-100 pt-2">
+                    {boqData.items.slice(0, 20).map((it: any, i: number) => (
+                      <View key={i} className="flex-row justify-between py-1 border-b border-gray-50">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-700 flex-1 pr-2" numberOfLines={1}>
+                          {it.description}
+                        </Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-semibold text-gray-900">
+                          {formatMoney(it.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6 mt-4">Assignments</Text>

@@ -41,9 +41,10 @@ export default function ClientMessagesPage() {
         if (projectIds.length > 0) {
           const { data, error: messageError } = await supabase
             .from('client_messages')
-            .select('id, project_id, message_text, created_at, sender_id, sender_role, receiver_role, receiver_id, read_at')
+            .select('id, project_id, message_text, content, message, created_at, sender_id, sender_role, receiver_role, receiver_id, read_at')
             .in('project_id', projectIds)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(100);
           if (messageError) throw messageError;
           messageData = (data || []) as Message[];
         }
