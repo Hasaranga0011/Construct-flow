@@ -10,9 +10,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { roleLabel } from '../../../../utils/roles';
 import { getApiUrl } from '../../../../lib/apiUrl';
+import { getFreshAccessToken } from '../../../../services/api';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { ProjectImage } from '@/components/common/ProjectImage';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
+import * as DocumentPicker from 'expo-document-picker';
+import { formatMoney } from '../../../../utils/format';
 
 export default function AdminProjectDetailsPage() {
   const { id } = useLocalSearchParams();
@@ -26,6 +29,8 @@ export default function AdminProjectDetailsPage() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [projectMaterials, setProjectMaterials] = useState<any[]>([]);
+  const [applyingBoq, setApplyingBoq] = useState(false);
 
   const projectGalleryImages: string[] = useMemo(() => {
     if (!project) return [];
@@ -72,7 +77,7 @@ export default function AdminProjectDetailsPage() {
           throw projError;
         }
 
-        const [pmRes, clientRes, roleRes] = await Promise.all([
+        const [pmRes, clientRes, roleRes, matRes] = await Promise.all([
           projData.pm_id
             ? supabase.from('profiles').select('full_name, role, avatar_url').eq('id', projData.pm_id).single()
             : Promise.resolve({ data: null } as any),
@@ -82,7 +87,12 @@ export default function AdminProjectDetailsPage() {
           supabase
             .from('project_role_assignments')
             .select('user_id, role, profiles (full_name, email, role, avatar_url)')
+            .eq('project_id', projectId as string),
+          supabase
+            .from('materials')
+            .select('id, name, unit, unit_price, current_stock, quantity, category, status, minimum_threshold')
             .eq('project_id', projectId as string)
+            .order('name')
         ]);
 
         if (pmRes.data) (projData as any).pm = pmRes.data;
@@ -92,6 +102,7 @@ export default function AdminProjectDetailsPage() {
 
         if (isMounted) {
             setProject(projData);
+            setProjectMaterials(matRes.data || []);
             if (roleData) {
               const normalizedRoles = (roleData as any[]).map((assignment: any) => ({ ...assignment, profiles: firstRelation(assignment.profiles) }));
               const otherStaff = normalizedRoles.filter((a: any) => a.role !== 'pm' && a.role !== 'client' && a.role !== 'supplier');
@@ -571,6 +582,180 @@ export default function AdminProjectDetailsPage() {
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#EF4444" />
                  </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* BOQ Materials & Labour Rates Section */}
+            <View className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <View className="flex-row flex-wrap items-center justify-between gap-3 mb-5 border-b border-gray-100 pb-3">
+                <View>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">
+                    BOQ Materials & Labour Rates
+                  </Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">
+                    Materials baseline, site stock & project labour trade rates
+                  </Text>
+                </View>
+
+                <View className="flex-row flex-wrap items-center gap-2">
+                  <TouchableOpacity
+                    style={{ minHeight: 38 }}
+                    onPress={async () => {
+                      const uploadFile = async (fileObj: any, name: string) => {
+                        setApplyingBoq(true);
+                        try {
+                          const token = await getFreshAccessToken();
+                          const fd = new FormData();
+                          if (Platform.OS === 'web') {
+                            fd.append('file', fileObj);
+                          } else {
+                            fd.append('file', { uri: fileObj.uri, name: fileObj.name || name, type: fileObj.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } as any);
+                          }
+                          const res = await fetch(`${getApiUrl()}/projects/${project.id}/apply-boq`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` },
+                            body: fd,
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.detail || 'Failed to apply BOQ');
+                          setProject((prev: any) => ({
+                            ...prev,
+                            total_budget: data.boq_data?.total_budget || prev.total_budget,
+                            boq_data: data.boq_data,
+                          }));
+                          const { data: refreshedMats } = await supabase
+                            .from('materials')
+                            .select('id, name, unit, unit_price, current_stock, quantity, category, status, minimum_threshold')
+                            .eq('project_id', project.id)
+                            .order('name');
+                          if (refreshedMats) setProjectMaterials(refreshedMats);
+                          notify('Success', 'BOQ applied! Budget, milestones, materials, and labour rates updated.');
+                        } catch (err: any) {
+                          notify('Error', err.message || 'Could not apply BOQ');
+                        } finally {
+                          setApplyingBoq(false);
+                        }
+                      };
+
+                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.xlsx,.xls,.csv';
+                        input.onchange = (e: any) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadFile(f, f.name);
+                        };
+                        input.click();
+                      } else {
+                        const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+                        if (!result.canceled && result.assets?.[0]) {
+                          uploadFile(result.assets[0], result.assets[0].name);
+                        }
+                      }
+                    }}
+                    disabled={applyingBoq}
+                    className="bg-brand-orange px-3.5 py-2 rounded-lg flex-row items-center"
+                  >
+                    {applyingBoq ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-upload-outline" size={15} color="#fff" />
+                        <Text className="text-white text-xs font-bold ml-1.5">Upload / Update BOQ</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View className="flex-col md:flex-row gap-6">
+                {/* Materials List */}
+                <View className="flex-1 min-w-0">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-sm font-bold text-gray-800">
+                      Project Materials ({projectMaterials.length})
+                    </Text>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity
+                        onPress={() => router.push(`/admin/projects/${project.id}/expenses/create` as any)}
+                        className="bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg"
+                      >
+                        <Text className="text-[11px] font-bold text-red-700">- Log Material Expense</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => router.push('/admin/materials/orders/create' as any)}
+                        className="bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-lg"
+                      >
+                        <Text className="text-[11px] font-bold text-brand-orange">+ Order Material</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {projectMaterials.length === 0 ? (
+                    <Text className="text-xs text-gray-400 italic py-4">
+                      No materials linked yet. Upload a BOQ Excel/CSV to auto-populate project materials.
+                    </Text>
+                  ) : (
+                    projectMaterials.slice(0, 12).map((mat: any) => (
+                      <View key={mat.id} className="flex-row items-center justify-between py-2.5 border-b border-gray-100">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-xs font-bold text-gray-800">{mat.name}</Text>
+                          <Text className="text-[10px] text-gray-500">
+                            {mat.category || 'General'} • Rate: {formatMoney(Number(mat.unit_price || 0))}/{mat.unit || 'unit'}
+                          </Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-xs font-bold text-gray-800">
+                            Stock: {mat.current_stock ?? 0} {mat.unit || ''}
+                          </Text>
+                          {mat.quantity ? (
+                            <Text className="text-[10px] text-gray-400">BOQ Qty: {mat.quantity}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+
+                {/* Labour Rates List */}
+                <View className="flex-1 min-w-0 md:border-l border-gray-100 md:pl-6">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-sm font-bold text-gray-800">
+                      BOQ Labour Rates ({project.boq_data?.labour_rates?.length || 0})
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => router.push(`/admin/projects/${project.id}/edit` as any)}
+                      className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg"
+                    >
+                      <Text className="text-[11px] font-bold text-blue-700">+ Assign Workers</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {!project.boq_data?.labour_rates || project.boq_data.labour_rates.length === 0 ? (
+                    <Text className="text-xs text-gray-400 italic py-4">
+                      No BOQ labour rates loaded yet. Include the Labour_Rates sheet in your BOQ Excel file.
+                    </Text>
+                  ) : (
+                    project.boq_data.labour_rates.slice(0, 12).map((lr: any, idx: number) => (
+                      <View key={idx} className="flex-row items-center justify-between py-2.5 border-b border-gray-100">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-xs font-bold text-gray-800">{lr.role}</Text>
+                          <Text className="text-[10px] text-gray-500">
+                            {lr.skill_level || 'Standard'} {lr.supply ? `• Supply: ${lr.supply}` : ''}
+                          </Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-xs font-bold text-emerald-700">
+                            {formatMoney(Number(lr.daily_rate || 0))}/day
+                          </Text>
+                          {lr.ot_rate ? (
+                            <Text className="text-[10px] text-gray-400">OT: {formatMoney(Number(lr.ot_rate))}/hr</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
               </View>
             </View>
 

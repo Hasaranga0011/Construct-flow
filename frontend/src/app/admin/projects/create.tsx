@@ -4,7 +4,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator,
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
-import { api } from '../../../services/api';
+import { api, getFreshAccessToken } from '../../../services/api';
 import { ProjectAssignmentDropdown } from '../../../components/common/ProjectAssignmentDropdown';
 import { InteractiveMap, InteractiveMapRef, MapLocation } from '@/components/common/InteractiveMap';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -13,6 +13,15 @@ import { ProjectImage } from '../../../components/common/ProjectImage';
 import { ProjectImageUploader } from '../../../components/common/ProjectImageUploader';
 import * as DocumentPicker from 'expo-document-picker';
 import { formatMoney } from '../../../utils/format';
+import { downloadBoqTemplateXlsx } from '../../../utils/boqDownload';
+import {
+  EditableMilestone,
+  recalculateScheduleFromStart,
+  seedMilestonesFromBoq,
+  isValidYMD,
+  addDaysToYMD,
+  getTodayYMD,
+} from '../../../utils/boqSchedule';
 
 export default function AdminProjectsCreatePage() {
   const router = useRouter();
@@ -30,6 +39,10 @@ export default function AdminProjectsCreatePage() {
   const [boqFileName, setBoqFileName] = useState('');
   const [parsingBoq, setParsingBoq] = useState(false);
   const [showBoqDetails, setShowBoqDetails] = useState(false);
+  const [boqSqft, setBoqSqft] = useState('2000');
+  const [comparingAi, setComparingAi] = useState(false);
+  const [aiComparison, setAiComparison] = useState<any | null>(null);
+  const [milestones, setMilestones] = useState<EditableMilestone[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -125,9 +138,7 @@ export default function AdminProjectsCreatePage() {
   const handleParseBoq = async (fileObj?: any, csvText?: string, filename: string = 'boq.csv') => {
     setParsingBoq(true);
     try {
-      const session = (await supabase.auth.getSession()).data.session;
-      const token = session?.access_token;
-      if (!token) throw new Error('Authentication required.');
+      const token = await getFreshAccessToken().catch(() => undefined);
 
       const formDataUpload = new FormData();
       if (fileObj) {
@@ -147,7 +158,7 @@ export default function AdminProjectsCreatePage() {
       const res = await fetch(`${getApiUrl()}/projects/parse-boq`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: formDataUpload
       });
@@ -161,6 +172,15 @@ export default function AdminProjectsCreatePage() {
       setBoqFileName(filename);
       if (data.total_budget) {
         setTotalBudget(String(data.total_budget));
+      }
+      if (Array.isArray(data.milestones) && data.milestones.length > 0) {
+        const schedule = seedMilestonesFromBoq(data.milestones, formData.start_date);
+        setFormData((prev) => ({
+          ...prev,
+          start_date: schedule.startDate,
+          end_date: schedule.endDate,
+        }));
+        setMilestones(schedule.milestones);
       }
       Alert.alert(
         'BOQ Processed Successfully',
@@ -210,7 +230,12 @@ export default function AdminProjectsCreatePage() {
   const handleLoadSampleBoq = async () => {
     setParsingBoq(true);
     try {
-      const res = await fetch(`${getApiUrl()}/projects/boq-template`);
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/projects/boq-template`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error('Failed to fetch sample BOQ template');
       const data = await res.json();
       if (data.template) {
@@ -223,11 +248,117 @@ export default function AdminProjectsCreatePage() {
     }
   };
 
+  const handleDownloadBlankTemplate = async () => {
+    await downloadBoqTemplateXlsx('blank');
+  };
+
+  const handleDownloadSampleTemplate = async () => {
+    await downloadBoqTemplateXlsx('sample');
+  };
+
+  const handleCompareBoqWithAi = async (boqTotalOverride?: number) => {
+    const total = boqTotalOverride ?? boqData?.total_budget ?? Number(totalBudget);
+    if (!total || total <= 0) {
+      Alert.alert('Missing Budget', 'Upload a BOQ or enter a budget first to compare with AI Estimator.');
+      return;
+    }
+    setComparingAi(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/ai/compare-boq`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          boq_total: Number(total),
+          square_footage: Number(boqSqft) > 0 ? Number(boqSqft) : 2000,
+          num_floors: 1,
+          district: formData.location || 'Colombo',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'AI comparison failed');
+      }
+      const data = await res.json();
+      setAiComparison(data);
+    } catch (err: any) {
+      Alert.alert('AI Comparison Error', err.message || 'Failed to compare with AI Estimator');
+    } finally {
+      setComparingAi(false);
+    }
+  };
+
   const handleClearBoq = () => {
     setBoqData(null);
     setBoqFileName('');
     setTotalBudget('');
     setShowBoqDetails(false);
+    setAiComparison(null);
+    setMilestones([]);
+  };
+
+  const handleStartDateChange = (newStart: string) => {
+    setFormData((prev) => ({ ...prev, start_date: newStart }));
+    if (isValidYMD(newStart)) {
+      const calc = recalculateScheduleFromStart(newStart, milestones);
+      setFormData((prev) => ({ ...prev, start_date: newStart, end_date: calc.endDate }));
+      if (milestones.length > 0) {
+        setMilestones(calc.milestones);
+      }
+    }
+  };
+
+  const handleRecalculateSchedule = () => {
+    const baseStart = isValidYMD(formData.start_date) ? formData.start_date : getTodayYMD();
+    const calc = recalculateScheduleFromStart(baseStart, milestones);
+    setFormData((prev) => ({ ...prev, start_date: calc.startDate, end_date: calc.endDate }));
+    setMilestones(calc.milestones);
+  };
+
+  const addMilestone = () => {
+    const baseStart = isValidYMD(formData.start_date) ? formData.start_date : getTodayYMD();
+    const lastDue =
+      milestones.length > 0 && isValidYMD(milestones[milestones.length - 1].due_date)
+        ? milestones[milestones.length - 1].due_date
+        : isValidYMD(formData.end_date)
+        ? formData.end_date
+        : baseStart;
+    const nextDue = addDaysToYMD(lastDue, 14);
+    setMilestones([...milestones, { title: '', description: '', duration_days: 14, due_date: nextDue }]);
+    setFormData((prev) => ({ ...prev, start_date: baseStart, end_date: nextDue }));
+  };
+
+  const updateMilestone = (index: number, field: string, value: string) => {
+    const next = [...milestones];
+    next[index] = { ...next[index], [field]: value };
+    setMilestones(next);
+    if (field === 'due_date' && index === next.length - 1 && isValidYMD(value)) {
+      setFormData((prev) => ({ ...prev, end_date: value }));
+    }
+  };
+
+  const updateMilestoneDuration = (index: number, daysStr: string) => {
+    const days = Math.max(1, parseInt(daysStr.replace(/[^0-9]/g, ''), 10) || 1);
+    const copy = [...milestones];
+    copy[index] = { ...copy[index], duration_days: days };
+    const baseStart = isValidYMD(formData.start_date) ? formData.start_date : getTodayYMD();
+    const calc = recalculateScheduleFromStart(baseStart, copy);
+    setFormData((prev) => ({ ...prev, start_date: calc.startDate, end_date: calc.endDate }));
+    setMilestones(calc.milestones);
+  };
+
+  const removeMilestone = (index: number) => {
+    const remaining = milestones.filter((_, i) => i !== index);
+    if (remaining.length > 0 && isValidYMD(formData.start_date)) {
+      const calc = recalculateScheduleFromStart(formData.start_date, remaining);
+      setMilestones(calc.milestones);
+      setFormData((prev) => ({ ...prev, end_date: calc.endDate }));
+    } else {
+      setMilestones(remaining);
+    }
   };
 
   const handleSubmit = async () => {
@@ -239,6 +370,10 @@ export default function AdminProjectsCreatePage() {
     setLoading(true);
     try {
       const parsedBudget = totalBudget ? parseFloat(totalBudget) : (boqData?.total_budget || 0);
+
+      const validMilestones = milestones
+        .filter((m) => m.title)
+        .map((m) => ({ ...m, due_date: m.due_date || formData.end_date }));
 
       const payload = {
         name: formData.name,
@@ -256,20 +391,34 @@ export default function AdminProjectsCreatePage() {
         workers: formData.workers,
         suppliers: formData.suppliers,
         admins: formData.admins,
+        milestones: validMilestones,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         is_test: formData.is_test,
         boq_data: boqData || null,
       };
 
-      const response = await fetch(`${getApiUrl()}/projects`, {
+      let token = await getFreshAccessToken();
+      let response = await fetch(`${getApiUrl()}/projects/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload)
       });
+
+      if (response.status === 401) {
+        token = await getFreshAccessToken(true);
+        response = await fetch(`${getApiUrl()}/projects/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!response.ok) {
         const err = await response.json();
@@ -397,8 +546,11 @@ export default function AdminProjectsCreatePage() {
                 className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
                 placeholder="2025-01-01"
                 value={formData.start_date}
-                onChangeText={(t) => setFormData({...formData, start_date: t})}
+                onChangeText={handleStartDateChange}
               />
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1">
+                Auto-calculates End Date & Milestone dates
+              </Text>
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">End Date (YYYY-MM-DD) *</Text>
@@ -408,6 +560,9 @@ export default function AdminProjectsCreatePage() {
                 value={formData.end_date}
                 onChangeText={(t) => setFormData({...formData, end_date: t})}
               />
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1">
+                Auto-calculated from BOQ durations (Editable)
+              </Text>
             </View>
           </View>
 
@@ -483,12 +638,34 @@ export default function AdminProjectsCreatePage() {
 
                     <TouchableOpacity
                       style={{ minHeight: 40 }}
+                      onPress={handleDownloadBlankTemplate}
+                      className="bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-2 rounded-lg flex-row items-center"
+                    >
+                      <Ionicons name="download-outline" size={15} color="#2563EB" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-blue-700 ml-1.5">
+                        Download Blank (.xlsx)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ minHeight: 40 }}
+                      onPress={handleDownloadSampleTemplate}
+                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 rounded-lg flex-row items-center"
+                    >
+                      <Ionicons name="document-text-outline" size={15} color="#059669" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-emerald-700 ml-1.5">
+                        Download Sample (.xlsx)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ minHeight: 40 }}
                       onPress={handleLoadSampleBoq}
                       className="bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3.5 py-2 rounded-lg flex-row items-center"
                     >
                       <Ionicons name="sparkles" size={15} color="#4B5563" />
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 ml-1.5">
-                        Load Sample CIDA BOQ
+                        Auto-Fill Sample
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -550,12 +727,59 @@ export default function AdminProjectsCreatePage() {
                   </View>
                   <View className="flex-1 min-w-[130px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-gray-400 uppercase">
-                      Core Materials
+                      Core Materials & Trades
                     </Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-blue-600 mt-0.5">
-                      {boqData.materials?.length || 0} Baselines
+                      {boqData.materials?.length || 0} Mats • {boqData.labour_rates?.length || 0} Trades
                     </Text>
                   </View>
+                </View>
+
+                {/* AI Estimator Comparison */}
+                <View className="py-3 border-b border-gray-100">
+                  <View className="flex-row items-center gap-2 flex-wrap">
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-600">
+                      Est. Area (sq.ft):
+                    </Text>
+                    <TextInput
+                      keyboardType="numeric"
+                      value={boqSqft}
+                      onChangeText={setBoqSqft}
+                      style={{ minHeight: 34, width: 90 }}
+                      className="bg-slate-50 border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-800"
+                    />
+                    <TouchableOpacity
+                      onPress={() => handleCompareBoqWithAi()}
+                      disabled={comparingAi}
+                      style={{ minHeight: 34 }}
+                      className="bg-indigo-600 px-3 py-1.5 rounded-lg flex-row items-center"
+                    >
+                      {comparingAi ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="analytics-outline" size={14} color="#fff" />
+                      )}
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-white ml-1.5">
+                        Compare with AI Estimator
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {aiComparison && (
+                    <View className="mt-2.5 bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+                      <View className="flex-row items-center justify-between">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-indigo-900">
+                          AI Estimate: {formatMoney(aiComparison.ai_estimated_cost)}
+                        </Text>
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-indigo-700">
+                          {aiComparison.verdict} ({aiComparison.variance_pct > 0 ? '+' : ''}{aiComparison.variance_pct}%)
+                        </Text>
+                      </View>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-indigo-800 mt-1">
+                        {aiComparison.recommendation}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Extracted Milestones List */}
@@ -638,6 +862,120 @@ export default function AdminProjectsCreatePage() {
                   </View>
                 )}
               </View>
+            )}
+          </View>
+
+          {/* Editable Project Milestones & Schedule */}
+          <View className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+            <View className="flex-row flex-wrap gap-3 justify-between items-center mb-3">
+              <View>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
+                  Project Milestones & Schedule
+                </Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">
+                  Auto-calculated from Start Date & BOQ phases — edit titles, durations, or due dates below
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                {milestones.length > 0 && (
+                  <TouchableOpacity
+                    style={{ minHeight: 38 }}
+                    onPress={handleRecalculateSchedule}
+                    className="flex-row items-center bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg"
+                  >
+                    <Ionicons name="calendar-outline" size={14} color="#EA580C" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-700 font-semibold ml-1.5 text-xs">
+                      Recalculate Dates
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={{ minHeight: 38 }}
+                  onPress={addMilestone}
+                  className="flex-row items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg"
+                >
+                  <Ionicons name="add" size={16} color="#374151" />
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-semibold ml-1 text-xs">
+                    Add Milestone
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {milestones.length === 0 ? (
+              <View className="bg-white border border-dashed border-gray-200 rounded-xl p-4 items-center">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-xs">
+                  No milestones added yet. Uploading a BOQ will automatically seed milestones & calculate due dates, or you can add them manually.
+                </Text>
+              </View>
+            ) : (
+              milestones.map((ms, index) => (
+                <View key={index} className="bg-white border border-gray-200 rounded-xl p-3.5 mb-3">
+                  <View className="flex-row justify-between items-center mb-2">
+                    <View className="flex-row items-center gap-2">
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700">
+                        Phase {index + 1}
+                      </Text>
+                      {ms.allocated_budget ? (
+                        <View className="bg-orange-100 px-2 py-0.5 rounded">
+                          <Text className="text-[10px] font-bold text-orange-800">
+                            {formatMoney(ms.allocated_budget)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity style={{ minHeight: 32, minWidth: 32 }} onPress={() => removeMilestone(index)}>
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View className="flex-row flex-wrap gap-3 mb-2">
+                    <View className="flex-[2] min-w-[180px]">
+                      <Text className="text-[10px] font-semibold text-gray-500 mb-1">Milestone Title</Text>
+                      <TextInput
+                        maxFontSizeMultiplier={1.3}
+                        style={{ minHeight: 40 }}
+                        placeholder="Title (e.g. Substructure & Foundation)"
+                        className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800"
+                        value={ms.title}
+                        onChangeText={(t) => updateMilestone(index, 'title', t)}
+                      />
+                    </View>
+                    <View className="w-28">
+                      <Text className="text-[10px] font-semibold text-gray-500 mb-1">Duration (Days)</Text>
+                      <TextInput
+                        maxFontSizeMultiplier={1.3}
+                        style={{ minHeight: 40 }}
+                        keyboardType="numeric"
+                        placeholder="21"
+                        className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800"
+                        value={String(ms.duration_days || '')}
+                        onChangeText={(val) => updateMilestoneDuration(index, val)}
+                      />
+                    </View>
+                    <View className="flex-1 min-w-[140px]">
+                      <Text className="text-[10px] font-semibold text-gray-500 mb-1">Due Date (YYYY-MM-DD)</Text>
+                      <TextInput
+                        maxFontSizeMultiplier={1.3}
+                        style={{ minHeight: 40 }}
+                        placeholder="YYYY-MM-DD"
+                        className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800"
+                        value={ms.due_date}
+                        onChangeText={(val) => updateMilestone(index, 'due_date', val)}
+                      />
+                    </View>
+                  </View>
+
+                  <TextInput
+                    maxFontSizeMultiplier={1.3}
+                    style={{ minHeight: 40 }}
+                    placeholder="Description / BOQ phase notes (Editable)"
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800"
+                    value={ms.description}
+                    onChangeText={(t) => updateMilestone(index, 'description', t)}
+                  />
+                </View>
+              ))
             )}
           </View>
 

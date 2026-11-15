@@ -12,6 +12,16 @@ import { PROJECT_IMAGE_PRESETS } from '../../utils/projectImages';
 import { ProjectImageUploader } from '../common/ProjectImageUploader';
 import * as DocumentPicker from 'expo-document-picker';
 import { formatMoney } from '../../utils/format';
+import { downloadBoqTemplateXlsx } from '../../utils/boqDownload';
+import { getFreshAccessToken } from '../../services/api';
+import {
+  EditableMilestone,
+  recalculateScheduleFromStart,
+  seedMilestonesFromBoq,
+  isValidYMD,
+  addDaysToYMD,
+  getTodayYMD,
+} from '../../utils/boqSchedule';
 
 type NewProjectModalProps = {
   visible: boolean;
@@ -53,23 +63,82 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   const [boqFileName, setBoqFileName] = useState<string>('');
   const [parsingBoq, setParsingBoq] = useState<boolean>(false);
   const [showBoqDetails, setShowBoqDetails] = useState<boolean>(false);
+  const [boqSqft, setBoqSqft] = useState<string>('2000');
+  const [comparingAi, setComparingAi] = useState<boolean>(false);
+  const [aiComparison, setAiComparison] = useState<any>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Milestones State
-  const [milestones, setMilestones] = useState<{ title: string, description: string, due_date: string }[]>([]);
+  const [milestones, setMilestones] = useState<EditableMilestone[]>([]);
 
-  const addMilestone = () => setMilestones([...milestones, { title: '', description: '', due_date: '' }]);
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    if (isValidYMD(newStart)) {
+      const calc = recalculateScheduleFromStart(newStart, milestones);
+      setEndDate(calc.endDate);
+      if (milestones.length > 0) {
+        setMilestones(calc.milestones);
+      }
+    }
+  };
+
+  const handleRecalculateSchedule = () => {
+    const baseStart = isValidYMD(startDate) ? startDate : getTodayYMD();
+    const calc = recalculateScheduleFromStart(baseStart, milestones);
+    setStartDate(calc.startDate);
+    setEndDate(calc.endDate);
+    setMilestones(calc.milestones);
+  };
+
+  const addMilestone = () => {
+    const baseStart = isValidYMD(startDate) ? startDate : getTodayYMD();
+    const lastDue =
+      milestones.length > 0 && isValidYMD(milestones[milestones.length - 1].due_date)
+        ? milestones[milestones.length - 1].due_date
+        : isValidYMD(endDate)
+        ? endDate
+        : baseStart;
+    const nextDue = addDaysToYMD(lastDue, 14);
+    const updated = [
+      ...milestones,
+      { title: '', description: '', duration_days: 14, due_date: nextDue },
+    ];
+    setMilestones(updated);
+    if (!isValidYMD(startDate)) setStartDate(baseStart);
+    setEndDate(nextDue);
+  };
 
   const updateMilestone = (index: number, field: string, value: string) => {
     const newMilestones = [...milestones];
     newMilestones[index] = { ...newMilestones[index], [field]: value };
     setMilestones(newMilestones);
+    if (field === 'due_date' && index === newMilestones.length - 1 && isValidYMD(value)) {
+      setEndDate(value);
+    }
+  };
+
+  const updateMilestoneDuration = (index: number, daysStr: string) => {
+    const days = Math.max(1, parseInt(daysStr.replace(/[^0-9]/g, ''), 10) || 1);
+    const copy = [...milestones];
+    copy[index] = { ...copy[index], duration_days: days };
+    const baseStart = isValidYMD(startDate) ? startDate : getTodayYMD();
+    const calc = recalculateScheduleFromStart(baseStart, copy);
+    if (!isValidYMD(startDate)) setStartDate(calc.startDate);
+    setEndDate(calc.endDate);
+    setMilestones(calc.milestones);
   };
 
   const removeMilestone = (index: number) => {
-    setMilestones(milestones.filter((_, i) => i !== index));
+    const remaining = milestones.filter((_, i) => i !== index);
+    if (remaining.length > 0 && isValidYMD(startDate)) {
+      const calc = recalculateScheduleFromStart(startDate, remaining);
+      setMilestones(calc.milestones);
+      setEndDate(calc.endDate);
+    } else {
+      setMilestones(remaining);
+    }
   };
 
   // Map state
@@ -276,9 +345,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     setParsingBoq(true);
     setErrorMsg('');
     try {
-      const session = (await supabase.auth.getSession()).data.session;
-      const token = session?.access_token;
-      if (!token) throw new Error('Authentication required.');
+      const token = await getFreshAccessToken().catch(() => undefined);
 
       const formDataUpload = new FormData();
       if (fileObj) {
@@ -298,7 +365,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       const res = await fetch(`${getApiUrl()}/projects/parse-boq`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: formDataUpload
       });
@@ -314,14 +381,12 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         setTotalBudget(String(data.total_budget));
       }
 
-      // Seed milestones if empty
-      if (milestones.length === 0 && Array.isArray(data.milestones) && data.milestones.length > 0) {
-        const seeded = data.milestones.map((m: any) => ({
-          title: m.title || '',
-          description: m.description || '',
-          due_date: endDate || ''
-        }));
-        setMilestones(seeded);
+      // Seed milestones and auto-calculate Start Date, End Date & Milestone Due Dates from BOQ
+      if (Array.isArray(data.milestones) && data.milestones.length > 0) {
+        const schedule = seedMilestonesFromBoq(data.milestones, startDate);
+        setStartDate(schedule.startDate);
+        setEndDate(schedule.endDate);
+        setMilestones(schedule.milestones);
       }
 
       toast.success(`BOQ parsed: ${data.items_count} items. Total: ${formatMoney(data.total_budget)}`);
@@ -371,7 +436,12 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   const handleLoadSampleBoq = async () => {
     setParsingBoq(true);
     try {
-      const res = await fetch(`${getApiUrl()}/projects/boq-template`);
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/projects/boq-template`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error('Failed to fetch sample BOQ template');
       const data = await res.json();
       if (data.template) {
@@ -388,6 +458,50 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     setBoqData(null);
     setBoqFileName('');
     setShowBoqDetails(false);
+    setAiComparison(null);
+  };
+
+  const handleDownloadBlankTemplate = async () => {
+    await downloadBoqTemplateXlsx('blank');
+  };
+
+  const handleDownloadSampleTemplate = async () => {
+    await downloadBoqTemplateXlsx('sample');
+  };
+
+  const handleCompareBoqWithAi = async (boqTotalOverride?: number) => {
+    const total = boqTotalOverride ?? boqData?.total_budget ?? Number(totalBudget);
+    if (!total || total <= 0) {
+      toast.error('Upload a BOQ or enter a budget first to compare with AI Estimator.');
+      return;
+    }
+    setComparingAi(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/ai/compare-boq`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          boq_total: Number(total),
+          square_footage: Number(boqSqft) > 0 ? Number(boqSqft) : 2000,
+          num_floors: 1,
+          district: location || 'Colombo',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'AI comparison failed');
+      }
+      const data = await res.json();
+      setAiComparison(data);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not compare with AI Estimator');
+    } finally {
+      setComparingAi(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -422,7 +536,9 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         }
       }
 
-      const validMilestones = milestones.filter(m => m.title && m.due_date);
+      const validMilestones = milestones
+        .filter(m => m.title)
+        .map(m => ({ ...m, due_date: m.due_date || endDate }));
       const computedBudget = Number(totalBudget) || (boqData?.total_budget ? Number(boqData.total_budget) : 0);
 
       const payload = {
@@ -448,19 +564,31 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
         boq_data: boqData || null,
       };
 
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      let token = await getFreshAccessToken();
       if (__DEV__) {
         console.log('[DEBUG POST /projects Request]:', payload);
       }
 
-      const response = await fetch(`${getApiUrl()}/projects`, {
+      let response = await fetch(`${getApiUrl()}/projects/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload),
       });
+
+      if (response.status === 401) {
+        token = await getFreshAccessToken(true);
+        response = await fetch(`${getApiUrl()}/projects/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
         let detailMsg = 'Failed to create project';
@@ -720,12 +848,34 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
 
                           <Pressable
                             style={{ minHeight: 36 }}
+                            onPress={handleDownloadBlankTemplate}
+                            className="bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg flex-row items-center transition-colors"
+                          >
+                            <Ionicons name="download-outline" size={14} color="#2563EB" />
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-blue-700 ml-1.5">
+                              Download Blank (.xlsx)
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={{ minHeight: 36 }}
+                            onPress={handleDownloadSampleTemplate}
+                            className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg flex-row items-center transition-colors"
+                          >
+                            <Ionicons name="document-text-outline" size={14} color="#059669" />
+                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-emerald-700 ml-1.5">
+                              Download Sample (.xlsx)
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={{ minHeight: 36 }}
                             onPress={handleLoadSampleBoq}
                             className="bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3 py-1.5 rounded-lg flex-row items-center transition-colors"
                           >
                             <Ionicons name="sparkles" size={13} color="#4B5563" />
                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 ml-1.5">
-                              Sample CIDA BOQ
+                              Auto-Fill Sample
                             </Text>
                           </Pressable>
                         </View>
@@ -741,7 +891,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                               {boqFileName || 'Uploaded BOQ'}
                             </Text>
                             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500">
-                              {boqData.items_count} items analyzed • Feasibility: {boqData.feasibility_score}%
+                              {boqData.items_count} items • {boqData.materials?.length || 0} materials • {boqData.labour_rates?.length || 0} trades • Feasibility: {boqData.feasibility_score}%
                             </Text>
                           </View>
                         </View>
@@ -763,6 +913,62 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                         <Text className="text-xs font-bold text-gray-800">
                           {formatMoney(boqData.total_budget || 0)}
                         </Text>
+                      </View>
+
+                      {/* AI Estimator BOQ Verification */}
+                      <View className="mt-2.5 pt-2 border-t border-gray-100">
+                        <View className="flex-row items-center justify-between gap-2">
+                          <View className="flex-row items-center flex-1">
+                            <Text className="text-[10px] text-gray-500 mr-1.5">Area (sq.ft):</Text>
+                            <TextInput
+                              className="border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-800 bg-gray-50 w-20"
+                              keyboardType="numeric"
+                              value={boqSqft}
+                              onChangeText={setBoqSqft}
+                              placeholder="2000"
+                            />
+                          </View>
+                          <Pressable
+                            onPress={() => handleCompareBoqWithAi()}
+                            disabled={comparingAi}
+                            className="bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg flex-row items-center"
+                          >
+                            {comparingAi ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <>
+                                <Ionicons name="analytics-outline" size={13} color="#fff" />
+                                <Text className="text-[11px] font-bold text-white ml-1">Compare AI Estimator</Text>
+                              </>
+                            )}
+                          </Pressable>
+                        </View>
+
+                        {aiComparison && (
+                          <View className={`mt-2 p-2.5 rounded-lg border ${
+                            aiComparison.status === 'Aligned'
+                              ? 'bg-emerald-50 border-emerald-200'
+                              : aiComparison.status === 'Under-Budget Risk'
+                              ? 'bg-red-50 border-red-200'
+                              : 'bg-amber-50 border-amber-200'
+                          }`}>
+                            <View className="flex-row items-center justify-between mb-0.5">
+                              <Text className={`text-[11px] font-bold ${
+                                aiComparison.status === 'Aligned'
+                                  ? 'text-emerald-800'
+                                  : aiComparison.status === 'Under-Budget Risk'
+                                  ? 'text-red-800'
+                                  : 'text-amber-800'
+                              }`}>
+                                AI Check: {aiComparison.status} ({aiComparison.variance_pct > 0 ? '+' : ''}{aiComparison.variance_pct}%)
+                              </Text>
+                              <Text className="text-[10px] font-semibold text-gray-600">
+                                Est: {formatMoney(aiComparison.ai_predicted_cost)}
+                              </Text>
+                            </View>
+                            <Text className="text-[10px] text-gray-700">{aiComparison.message}</Text>
+                          </View>
+                        )}
                       </View>
 
                       {showBoqDetails && (
@@ -802,13 +1008,19 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-1.5">
                       Start Date *
                     </Text>
-                    <DateField label="Start date" mode="date" value={startDate} onChange={setStartDate} />
+                    <DateField label="Start date" mode="date" value={startDate} onChange={handleStartDateChange} />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500 mt-1">
+                      Setting Start Date auto-calculates End Date & Milestone dates
+                    </Text>
                   </View>
                   <View className="flex-1">
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-1.5">
                       End Date *
                     </Text>
                     <DateField label="End date" mode="date" value={endDate} onChange={setEndDate} />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-500 mt-1">
+                      Auto-calculated from BOQ durations (Editable)
+                    </Text>
                   </View>
                 </View>
 
@@ -969,33 +1181,56 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
               <View className="flex-row flex-wrap gap-3 justify-between items-center mb-3">
                 <View>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
-                    Project Milestones
+                    Project Milestones & Schedule
                   </Text>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400">
-                    Key project stages and delivery checkpoints
+                    Auto-calculated from Start Date & BOQ phases — edit titles, durations, or due dates below
                   </Text>
                 </View>
-                <Pressable style={{ minHeight: 38, minWidth: 44 }} onPress={addMilestone} className="flex-row items-center bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">
-                  <Ionicons name="add" size={16} color="#374151" />
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-semibold ml-1 text-xs">
-                    Add Milestone
-                  </Text>
-                </Pressable>
+                <View className="flex-row items-center gap-2">
+                  {milestones.length > 0 && (
+                    <Pressable
+                      style={{ minHeight: 38 }}
+                      onPress={handleRecalculateSchedule}
+                      className="flex-row items-center bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Ionicons name="calendar-outline" size={14} color="#EA580C" />
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-700 font-semibold ml-1.5 text-xs">
+                        Recalculate Dates
+                      </Text>
+                    </Pressable>
+                  )}
+                  <Pressable style={{ minHeight: 38, minWidth: 44 }} onPress={addMilestone} className="flex-row items-center bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">
+                    <Ionicons name="add" size={16} color="#374151" />
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 font-semibold ml-1 text-xs">
+                      Add Milestone
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
 
               {milestones.length === 0 ? (
                 <View className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 items-center">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-xs">
-                    No milestones added yet. Uploading a BOQ will automatically seed milestones, or you can add them manually.
+                    No milestones added yet. Uploading a BOQ will automatically seed milestones & calculate due dates, or you can add them manually.
                   </Text>
                 </View>
               ) : (
                 milestones.map((ms, index) => (
                   <View key={index} className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 mb-3">
-                    <View className="flex-row justify-between mb-2">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700">
-                        Milestone {index + 1}
-                      </Text>
+                    <View className="flex-row justify-between items-center mb-2">
+                      <View className="flex-row items-center gap-2">
+                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700">
+                          Phase {index + 1}
+                        </Text>
+                        {ms.allocated_budget ? (
+                          <View className="bg-orange-100 px-2 py-0.5 rounded">
+                            <Text className="text-[10px] font-bold text-orange-800">
+                              {formatMoney(ms.allocated_budget)}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Pressable style={{ minHeight: 32, minWidth: 32 }} onPress={() => removeMilestone(index)}>
                         <Ionicons name="trash-outline" size={16} color="#EF4444" />
                       </Pressable>
@@ -1003,6 +1238,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
 
                     <View className="flex-col sm:flex-row gap-3 mb-2">
                       <View className="flex-[2]">
+                        <Text className="text-[10px] font-semibold text-gray-500 mb-1">Milestone Title</Text>
                         <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 40, minWidth: 44 }}
                           placeholder="Title (e.g. Substructure & Foundation)"
                           className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs"
@@ -1010,13 +1246,26 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                           onChangeText={(t) => updateMilestone(index, 'title', t)}
                         />
                       </View>
+                      <View className="w-28">
+                        <Text className="text-[10px] font-semibold text-gray-500 mb-1">Duration (Days)</Text>
+                        <TextInput
+                          maxFontSizeMultiplier={1.3}
+                          style={{ minHeight: 40 }}
+                          keyboardType="numeric"
+                          placeholder="21"
+                          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800"
+                          value={String(ms.duration_days || '')}
+                          onChangeText={(val) => updateMilestoneDuration(index, val)}
+                        />
+                      </View>
                       <View className="flex-1">
+                        <Text className="text-[10px] font-semibold text-gray-500 mb-1">Calculated Due Date (Editable)</Text>
                         <DateField label="Milestone due date" mode="date" value={ms.due_date} onChange={(value) => updateMilestone(index, 'due_date', value)} />
                       </View>
                     </View>
 
                     <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 40, minWidth: 44 }}
-                      placeholder="Description (Optional)"
+                      placeholder="Description / BOQ phase notes (Editable)"
                       className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs"
                       value={ms.description}
                       onChangeText={(t) => updateMilestone(index, 'description', t)}

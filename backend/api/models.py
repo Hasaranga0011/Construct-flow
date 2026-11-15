@@ -107,6 +107,7 @@ class ProjectResponse(ProjectBase):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     images: Optional[List[str]] = Field(default_factory=list)
+    boq_data: Optional[Dict[str, Any]] = None
     notifications_failed: Optional[bool] = False
 
     model_config = {"from_attributes": True}
@@ -214,6 +215,9 @@ class ExpenseBase(BaseModel):
     description: Optional[str] = None
     amount: float = Field(..., ge=0)
     expense_date: Optional[date] = None
+    category: Optional[str] = None
+    material_id: Optional[str] = None
+    quantity_used: Optional[float] = Field(None, ge=0)
 
 class ExpenseCreate(ExpenseBase):
     pass

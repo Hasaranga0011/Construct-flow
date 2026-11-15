@@ -273,7 +273,30 @@ def notify_assigned_client(client, project):
 
 
 @router.get("/boq-template")
-def get_boq_template():
+def get_boq_template(format: str = "csv", kind: str = "blank"):
+    from fastapi.responses import StreamingResponse
+    from pathlib import Path
+    import io
+
+    if format.lower() == "xlsx":
+        if kind.lower() == "sample":
+            sample_path = Path(__file__).resolve().parents[3] / "ConstructAI_BOQ_Template.xlsx"
+            if not sample_path.exists():
+                raise HTTPException(status_code=404, detail="Sample BOQ template file not found")
+            return StreamingResponse(
+                io.BytesIO(sample_path.read_bytes()),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": 'attachment; filename="ConstructAI_BOQ_Template.xlsx"'},
+            )
+
+        from core.boq_parser import generate_blank_boq_xlsx
+        xlsx_bytes = generate_blank_boq_xlsx()
+        return StreamingResponse(
+            io.BytesIO(xlsx_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="ConstructFlow_Blank_BOQ_Template.xlsx"'},
+        )
+
     from core.boq_parser import get_sample_boq_csv
     return {
         "template": get_sample_boq_csv(),
@@ -281,11 +304,90 @@ def get_boq_template():
     }
 
 
+def _persist_boq_to_project(
+    service_client,
+    project_id: str,
+    boq_data: Dict[str, Any],
+    start_date_str: Optional[str],
+    end_date_str: Optional[str],
+    create_milestones: bool = True,
+):
+    """Persist parsed BOQ data, baseline materials, and milestones onto a project."""
+    import logging
+    from datetime import timedelta
+
+    # 1. Best-effort save boq_data JSONB onto projects row
+    try:
+        service_client.table("projects").update({"boq_data": boq_data}).eq("id", project_id).execute()
+    except Exception as e:
+        logging.warning(f"Could not store boq_data column on project {project_id}: {e}")
+
+    # 2. Create milestones from BOQ if requested
+    if create_milestones and boq_data.get("milestones"):
+        try:
+            cur_date = None
+            if start_date_str:
+                try:
+                    cur_date = datetime.fromisoformat(str(start_date_str)[:10]).date()
+                except Exception:
+                    cur_date = None
+
+            milestones_to_insert = []
+            for m in boq_data["milestones"]:
+                if not m.get("title"):
+                    continue
+                dur = int(m.get("duration_days") or 0)
+                if cur_date and dur > 0:
+                    cur_date = cur_date + timedelta(days=dur)
+                    due_str = cur_date.isoformat()
+                else:
+                    due_str = str(end_date_str) if end_date_str else None
+                milestones_to_insert.append({
+                    "project_id": project_id,
+                    "title": m.get("title"),
+                    "description": m.get("description", ""),
+                    "due_date": due_str,
+                    "planned_date": due_str,
+                    "status": "Pending",
+                    "completion_percentage": 0,
+                })
+            if milestones_to_insert:
+                service_client.table("milestones").insert(milestones_to_insert).execute()
+        except Exception as e:
+            logging.warning(f"Failed to create BOQ milestones: {e}")
+
+    # 3. Create baseline materials from BOQ
+    if boq_data.get("materials"):
+        try:
+            existing_mats = service_client.table("materials").select("id, name").eq("project_id", project_id).execute()
+            existing_names = {str(x.get("name") or "").strip().lower() for x in (existing_mats.data or [])}
+            materials_to_insert = []
+            for mat in boq_data["materials"]:
+                mat_name = str(mat.get("name") or "").strip()
+                if not mat_name or mat_name.lower() in existing_names:
+                    continue
+                qty = float(mat.get("allocated_quantity", 0) or 0)
+                materials_to_insert.append({
+                    "project_id": project_id,
+                    "name": mat_name,
+                    "unit": mat.get("unit", "units"),
+                    "current_stock": 0,
+                    "minimum_threshold": max(10, round(qty * 0.1)),
+                    "quantity": str(round(qty, 1)),
+                    "unit_price": float(mat.get("unit_price", 0) or 0),
+                    "category": mat.get("category", "General"),
+                    "status": "Pending Order",
+                })
+            if materials_to_insert:
+                service_client.table("materials").insert(materials_to_insert).execute()
+        except Exception as e:
+            logging.warning(f"Failed to create BOQ baseline materials: {e}")
+
+
 @router.post("/parse-boq")
 async def parse_boq_endpoint(
     file: Optional[UploadFile] = File(None),
     csv_data: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user)
 ):
     try:
         from core.boq_parser import parse_boq_file, parse_boq_dataframe
@@ -308,6 +410,7 @@ async def parse_boq_endpoint(
         raise HTTPException(status_code=500, detail=f"BOQ processing error: {str(e)}")
 
 
+@router.post("", response_model=ProjectResponse, include_in_schema=False)
 @router.post("/", response_model=ProjectResponse)
 def create_project(project: ProjectCreate, request: Request):
     client = get_auth_client(request)
@@ -360,7 +463,7 @@ def create_project(project: ProjectCreate, request: Request):
         import logging
         logging.warning(f"Failed to sync site managers, workers or suppliers: {e}")
 
-    # 3. Create milestones from explicit input OR parsed BOQ
+    # 3. Create milestones from explicit input (when provided)
     milestones_to_insert = []
     if project.milestones:
         for m in project.milestones:
@@ -374,18 +477,6 @@ def create_project(project: ProjectCreate, request: Request):
                     "status": m.get("status", "Pending"),
                     "completion_percentage": 0
                 })
-    elif project.boq_data and project.boq_data.get("milestones"):
-        for m in project.boq_data["milestones"]:
-            if m.get("title"):
-                milestones_to_insert.append({
-                    "project_id": saved["id"],
-                    "title": m.get("title"),
-                    "description": m.get("description", ""),
-                    "due_date": str(project.end_date),
-                    "planned_date": str(project.end_date),
-                    "status": "Pending",
-                    "completion_percentage": 0
-                })
 
     if milestones_to_insert:
         try:
@@ -394,29 +485,17 @@ def create_project(project: ProjectCreate, request: Request):
             import logging
             logging.warning(f"Failed to create project milestones: {e}")
 
-    # 4. Create baseline materials from BOQ
-    if project.boq_data and project.boq_data.get("materials"):
-        try:
-            materials_to_insert = []
-            for mat in project.boq_data["materials"]:
-                if mat.get("name"):
-                    qty = float(mat.get("allocated_quantity", 0) or 0)
-                    materials_to_insert.append({
-                        "project_id": saved["id"],
-                        "name": mat.get("name"),
-                        "unit": mat.get("unit", "units"),
-                        "current_stock": 0,
-                        "minimum_threshold": max(10, round(qty * 0.1)),
-                        "quantity": str(round(qty, 1)),
-                        "unit_price": float(mat.get("unit_price", 0) or 0),
-                        "category": mat.get("category", "General"),
-                        "status": "Pending Order"
-                    })
-            if materials_to_insert:
-                service_client.table("materials").insert(materials_to_insert).execute()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to create BOQ baseline materials: {e}")
+    # 4. Persist BOQ data, baseline materials, and BOQ milestones (if explicit milestones weren't supplied)
+    if project.boq_data:
+        _persist_boq_to_project(
+            service_client,
+            saved["id"],
+            project.boq_data,
+            str(project.start_date) if project.start_date else None,
+            str(project.end_date) if project.end_date else None,
+            create_milestones=not bool(milestones_to_insert),
+        )
+        saved["boq_data"] = project.boq_data
 
     # 5. Save BOQ document reference in shared_documents
     if project.boq_file_url:
@@ -1151,23 +1230,101 @@ def get_project_expenses(project_id: str, current_user: dict = Depends(get_curre
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/{project_id}/apply-boq")
+async def apply_boq_to_existing_project(
+    project_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a BOQ Excel/CSV to an existing project and auto-update budget, milestones, materials & labour rates."""
+    if current_user["role"] not in {"super_admin", "pm"}:
+        raise HTTPException(status_code=403, detail="Not enough privileges")
+    client = authorized_project_client(project_id, current_user, write=True)
+    service_client = setup_client()
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    from core.boq_parser import parse_boq_file
+    boq_data = parse_boq_file(content, file.filename or "boq.xlsx")
+
+    proj_res = client.table("projects").select("id, start_date, end_date, total_budget").eq("id", project_id).single().execute()
+    proj = proj_res.data or {}
+
+    # Update total_budget from BOQ
+    if boq_data.get("total_budget", 0) > 0:
+        service_client.table("projects").update({"total_budget": float(boq_data["total_budget"])}).eq("id", project_id).execute()
+
+    _persist_boq_to_project(
+        service_client,
+        project_id,
+        boq_data,
+        proj.get("start_date"),
+        proj.get("end_date"),
+        create_milestones=True,
+    )
+    _FINANCIALS_CACHE.pop(project_id, None)
+    return {"ok": True, "boq_data": boq_data}
+
+
 @router.post("/{project_id}/expenses", response_model=ExpenseResponse)
 def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in {"super_admin", "pm"}:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     supabase = authorized_project_client(project_id, current_user, write=True)
+    service_client = setup_client()
     try:
         if expense.project_id != project_id:
             raise HTTPException(status_code=400, detail="Expense project does not match URL")
-        expense_data = expense.model_dump()
+        expense_data = expense.model_dump(exclude={"category", "material_id", "quantity_used"})
         if expense_data.get('expense_date'):
             expense_data['expense_date'] = expense_data['expense_date'].isoformat()
         else:
             del expense_data['expense_date']
 
-        res = supabase.table("project_expenses").insert(expense_data).execute()
+        # Try inserting with optional material metadata if columns exist, fallback safely
+        full_expense_data = {**expense_data}
+        if expense.category:
+            full_expense_data["category"] = expense.category
+        if expense.material_id:
+            full_expense_data["material_id"] = expense.material_id
+        if expense.quantity_used is not None:
+            full_expense_data["quantity_used"] = expense.quantity_used
+
+        try:
+            res = supabase.table("project_expenses").insert(full_expense_data).execute()
+        except Exception:
+            res = supabase.table("project_expenses").insert(expense_data).execute()
+
         if not res.data:
             raise HTTPException(status_code=400, detail="Failed to create expense")
+
+        # Deduct material stock when material_id + quantity_used are supplied
+        if expense.material_id and expense.quantity_used and expense.quantity_used > 0:
+            try:
+                mat_res = service_client.table("materials").select("id, name, current_stock, minimum_threshold, unit").eq("id", expense.material_id).maybe_single().execute()
+                if mat_res.data:
+                    mat = mat_res.data
+                    cur_stock = float(mat.get("current_stock") or 0)
+                    new_stock = max(0.0, round(cur_stock - float(expense.quantity_used), 2))
+                    min_thresh = float(mat.get("minimum_threshold") or 0)
+                    new_status = "Out of Stock" if new_stock <= 0 else ("Low Stock" if new_stock < min_thresh else "In Stock")
+                    service_client.table("materials").update({
+                        "current_stock": new_stock,
+                        "status": new_status,
+                    }).eq("id", expense.material_id).execute()
+
+                    if new_stock < min_thresh:
+                        create_notification(
+                            type="Alert",
+                            project_id=project_id,
+                            title=f"Low Stock Alert: {mat.get('name', 'Material')}",
+                            message=f"{mat.get('name', 'Material')} dropped to {new_stock} {mat.get('unit', '')} after expense deduction (threshold: {min_thresh}).",
+                        )
+            except Exception as mat_err:
+                import logging
+                logging.warning(f"Material stock deduction failed for {expense.material_id}: {mat_err}")
 
         # Recalculate spent_cost
         all_exp = supabase.table("project_expenses").select("amount").eq("project_id", project_id).execute()

@@ -115,6 +115,13 @@ app.add_middleware(
 # Public Auth router (self-registration, login helpers)
 app.include_router(auth.router, prefix="/api")
 
+# Public stateless BOQ template, parser, geocoding, and AI comparison endpoints
+app.add_api_route("/api/projects/boq-template", projects.get_boq_template, methods=["GET"], tags=["Projects"])
+app.add_api_route("/api/projects/parse-boq", projects.parse_boq_endpoint, methods=["POST"], tags=["Projects"])
+app.add_api_route("/api/projects/geocode", projects.geocode_location, methods=["GET"], tags=["Projects"])
+app.add_api_route("/api/projects/reverse-geocode", projects.reverse_geocode, methods=["GET"], tags=["Projects"])
+app.add_api_route("/api/ai/compare-boq", ai.compare_boq_with_ai, methods=["POST"], tags=["AI"])
+
 # Routers
 secure_dependency = [Depends(get_current_user)]
 

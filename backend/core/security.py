@@ -17,12 +17,40 @@ _TOKEN_CACHE = {}
 _TOKEN_CACHE_TTL = 300  # seconds
 
 
+def _decode_jwt_claims(token: str) -> dict:
+    import base64
+    import json
+    parts = token.split(".")
+    if len(parts) != 3:
+        return {}
+    payload_b64 = parts[1]
+    padding = "=" * (-len(payload_b64) % 4)
+    return json.loads(base64.urlsafe_b64decode(payload_b64 + padding).decode("utf-8"))
+
+
 def _fetch_auth_user(token: str):
     try:
         return supabase.auth.get_user(token)
     except (httpx.HTTPError, OSError, TimeoutError):
         # Retry once with a fresh client if the shared keep-alive socket was reset
         return client_for_token(token).auth.get_user(token)
+    except Exception as exc:
+        if "session_id" in str(exc):
+            from types import SimpleNamespace
+            claims = _decode_jwt_claims(token)
+            sub = str(claims.get("sub") or "").strip()
+            exp = float(claims.get("exp") or 0)
+            if sub and exp > time.time():
+                # Verify token cryptographic signature & RLS via Supabase PostgREST
+                prof = client_for_token(token).table("profiles").select("id, email").eq("id", sub).single().execute()
+                if prof.data and prof.data.get("id") == sub:
+                    return SimpleNamespace(
+                        user=SimpleNamespace(
+                            id=sub,
+                            email=claims.get("email") or prof.data.get("email"),
+                        )
+                    )
+        raise
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):

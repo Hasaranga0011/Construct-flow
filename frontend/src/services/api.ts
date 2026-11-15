@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 const apiCache = new Map<string, { data: any, timestamp: number, promise?: Promise<any> }>();
 const CACHE_TTL = 60000; // 60 seconds
 
-async function getFreshAccessToken(forceRefresh = false): Promise<string | undefined> {
+export async function getFreshAccessToken(forceRefresh = false): Promise<string | undefined> {
   const { data: { session } } = await supabase.auth.getSession();
   const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
   const isExpiringSoon = !session?.access_token || (expiresAtMs > 0 && expiresAtMs < Date.now() + 30_000);

@@ -910,6 +910,74 @@ def import_price_indices_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class CompareBOQRequest(BaseModel):
+    boq_total: float = Field(..., ge=0)
+    square_footage: float = Field(2000.0, gt=0)
+    num_floors: int = Field(1, ge=1)
+    district: Optional[str] = "Colombo"
+    project_type: str = "Residential House"
+    quality_tier: str = "Standard"
+
+
+@router.post("/compare-boq")
+def compare_boq_with_ai(
+    payload: CompareBOQRequest,
+):
+    """
+    Compare an uploaded BOQ's total budget against the AI Cost Estimator's
+    CIDA-calibrated prediction range for the given project specs.
+    """
+    raw_loc = (payload.district or "Colombo").strip()
+    matched_district = _DISTRICTS_LOWER.get(raw_loc.lower())
+    if not matched_district:
+        # Try extracting any known district name from an address string
+        lower_loc = raw_loc.lower()
+        for d_lower, d_canon in _DISTRICTS_LOWER.items():
+            if d_lower in lower_loc:
+                matched_district = d_canon
+                break
+    if not matched_district:
+        matched_district = "Colombo"
+
+    pred_req = PredictRequest(
+        square_footage=payload.square_footage,
+        num_floors=payload.num_floors,
+        district=matched_district,
+        project_type=payload.project_type,
+        quality_tier=payload.quality_tier,
+    )
+    pred = predict_cost(pred_req, {})
+    ai_cost = float(pred.estimated_cost or 0)
+    low = float(pred.estimated_range_min or ai_cost * 0.85)
+    high = float(pred.estimated_range_max or ai_cost * 1.15)
+    boq_total = float(payload.boq_total or 0)
+
+    variance_pct = round(((boq_total - ai_cost) / ai_cost) * 100.0, 1) if ai_cost > 0 else 0.0
+    if boq_total < low:
+        status = "Under-Budget Risk"
+        message = f"BOQ total is {abs(variance_pct):.1f}% below AI estimate (Rs. {ai_cost:,.0f}). Verify quantities and rates to avoid mid-project shortfall."
+    elif boq_total > high:
+        status = "Over-Budget"
+        message = f"BOQ total is {abs(variance_pct):.1f}% above AI estimate (Rs. {ai_cost:,.0f}). Review high-rate items against CIDA benchmarks."
+    else:
+        status = "Aligned"
+        message = f"BOQ total falls within the AI estimated range (Rs. {low:,.0f} – Rs. {high:,.0f})."
+
+    return {
+        "boq_total": round(boq_total, 2),
+        "ai_predicted_cost": round(ai_cost, 2),
+        "ai_estimated_cost": round(ai_cost, 2),
+        "ai_range_low": round(low, 2),
+        "ai_range_high": round(high, 2),
+        "variance_pct": variance_pct,
+        "status": status,
+        "verdict": status,
+        "message": message,
+        "recommendation": message,
+        "district_used": matched_district,
+    }
+
+
 @router.get("/model-info")
 def get_model_info(current_user: dict = Depends(get_current_user)):
     """
