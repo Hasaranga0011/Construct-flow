@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { MaterialRequestReview } from '@/components/materials/MaterialRequestReview';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
@@ -39,8 +40,9 @@ export default function MaterialsScreen() {
   const { tick } = useTableRealtime(['materials']);
   const [searchMaterials, setSearchMaterials] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const allowedProjectIds = useMemo(() => isPM ? projects.map(project => String(project.id)) : undefined, [isPM, projects]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
-  const [showProjectDrop, setShowProjectDrop] = useState(false);
+  useState(false);
   const { isMobile } = useResponsive();
 
   useEffect(() => {
@@ -139,6 +141,7 @@ export default function MaterialsScreen() {
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
+          <MaterialRequestReview projectId={selectedProjectId} onChanged={() => setRefreshTrigger(value => value + 1)} />
 
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-4 md:mb-0">All Materials</Text>
@@ -222,16 +225,16 @@ export default function MaterialsScreen() {
           {/* Main Content Layout */}
           <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Inventory Table) */}
-            <View style={isMobile ? { width: '100%', zIndex: 10 } : { flex: 2, marginRight: 24, zIndex: 10 }}>
-              <InventoryTable refreshTrigger={refreshTrigger + tick} searchQuery={searchQuery} projectId={selectedProjectId} />
+            <View style={isMobile ? { width: '100%', zIndex: 10 } : { flex: 2, minWidth: 0, marginRight: 24, zIndex: 10 }}>
+              <InventoryTable allowedProjectIds={allowedProjectIds} refreshTrigger={refreshTrigger + tick} searchQuery={searchQuery} projectId={selectedProjectId} />
             </View>
 
             {/* Side Panel (Alerts & Deliveries) */}
-            <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1 }}>
-              <LowStockAlerts refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
-              <PendingDeliveries refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
-              <PendingOrders refreshTrigger={refreshTrigger} projectId={selectedProjectId} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
-              <RecentDeliveries refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
+            <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, minWidth: 0 }}>
+              <LowStockAlerts allowedProjectIds={allowedProjectIds} refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
+              <PendingDeliveries allowedProjectIds={allowedProjectIds} refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
+              <PendingOrders allowedProjectIds={allowedProjectIds} refreshTrigger={refreshTrigger} projectId={selectedProjectId} onRefreshNeeded={() => setRefreshTrigger(p=>p+1)} />
+              <RecentDeliveries allowedProjectIds={allowedProjectIds} refreshTrigger={refreshTrigger} projectId={selectedProjectId} />
             </View>
           </View>
         </ScrollView>

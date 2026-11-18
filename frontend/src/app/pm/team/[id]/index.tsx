@@ -6,13 +6,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { notify } from '@/utils/notify';
+import { roleLabel } from '@/utils/roles';
 
 export default function PMTeamMemberViewPage() {
   const { id } = useLocalSearchParams();
   const memberId = Array.isArray(id) ? id[0] : (id || '');
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [loading, setLoading] = useState(true);
   const [member, setMember] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
@@ -53,15 +54,15 @@ export default function PMTeamMemberViewPage() {
         if (isMounted) setLoading(false);
       }
     };
-    
-    if (id) fetchDetails();
+
+    if (memberId) fetchDetails();
     return () => { isMounted = false; };
-  }, [id, user]);
+  }, [memberId, user]);
 
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title={member?.full_name || 'Team Member'} showAction={false} />
-      
+
       {loading ? (
         <View className="flex-1 items-center justify-center p-8">
           <ActivityIndicator size="large" color="#F97316" />
@@ -87,7 +88,7 @@ export default function PMTeamMemberViewPage() {
                   {member.full_name || 'Unnamed Member'}
                 </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold uppercase text-xs tracking-wider">
-                  {(member.role || 'team member').replace('_', ' ')}
+                  {roleLabel(member.role || 'Team Member')}
                 </Text>
               </View>
             </View>
@@ -97,7 +98,7 @@ export default function PMTeamMemberViewPage() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-400 mb-1">Email Address</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg text-gray-800">{member.email || 'Not provided'}</Text>
               </View>
-              
+
               <View>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-400 mb-1">Contact Number</Text>
                 <View className="flex-row items-center justify-between">
@@ -137,7 +138,7 @@ export default function PMTeamMemberViewPage() {
             </View>
           ) : (
             projects.map(project => (
-              <Pressable 
+              <Pressable
                 key={project.id}
                 onPress={() => router.push(`/pm/projects/${project.id}` as any)}
                 className="bg-white rounded-xl p-5 mb-3 border border-gray-100 shadow-sm flex-row justify-between items-center active:opacity-70"
@@ -150,7 +151,7 @@ export default function PMTeamMemberViewPage() {
               </Pressable>
             ))
           )}
-          
+
           <View className="h-10" />
         </ScrollView>
       )}

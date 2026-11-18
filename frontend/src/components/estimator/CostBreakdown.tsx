@@ -77,8 +77,7 @@ export const CostBreakdown = ({
   let parsedContribs: FeatureContrib[] | null = null;
   let parsedRange: string | null = null;
   let parsedQuantities: any = null;
-  let explanation = "Illustrative split — generate a new estimate to see model-specific contributions";
-  
+
   try {
     if (latestEstimate?.project_name) {
       const parsed = JSON.parse(latestEstimate.project_name);
@@ -92,15 +91,12 @@ export const CostBreakdown = ({
         parsedQuantities = parsed.physical_quantities;
       }
     }
-  } catch (e) {
+  } catch {
     // Not valid JSON, keep as null
   }
-  
+
   const contribs: FeatureContrib[] = featureContributions || parsedContribs || [];
 
-  if (contribs.length > 0) {
-    explanation = `${contribs[0]?.name} weighted highest due to project size and quality tier`;
-  }
 
   if (loading) {
     return (

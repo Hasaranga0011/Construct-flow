@@ -1,4 +1,5 @@
 module.exports = ({ config }) => {
+  require('./scripts/build-map-frame.cjs')();
   const isArm64Only = process.env.ANDROID_ARM64_ONLY === 'true';
 
   const androidBuildProps = {
@@ -28,6 +29,7 @@ module.exports = ({ config }) => {
     ...config,
     plugins: [
       ...basePlugins,
+      ...(basePlugins.some(plugin => (typeof plugin === 'string' ? plugin : plugin[0]) === 'expo-secure-store') ? [] : ['expo-secure-store']),
       ['expo-build-properties', { android: androidBuildProps }],
     ],
   };

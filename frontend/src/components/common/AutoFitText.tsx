@@ -1,13 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import {
-  LayoutChangeEvent,
-  Platform,
-  StyleProp,
-  Text,
-  TextStyle,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { LayoutChangeEvent, Platform, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
 import { compactDisplayValue } from '../../lib/amount';
 
 /**

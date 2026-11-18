@@ -10,7 +10,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Modal }
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { QRScanner } from '@/components/worker/QRScanner';
+
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
@@ -43,7 +43,7 @@ export default function SMAttendancePage() {
   const { user } = useAuth();
   const [loadError, setLoadError] = useState('');
   const { assignedProjectIds, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
-  
+
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export default function SMAttendancePage() {
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualWorkerId, setManualWorkerId] = useState<string | null>(null);
   const [manualSubmitting, setManualSubmitting] = useState(false);
-  
+
   const isMounted = useRef(true);
   const requestVersion = useRef(0);
 
@@ -178,7 +178,7 @@ export default function SMAttendancePage() {
     try {
       const todayStr = getTodayDateString();
       const existing = todayAttendance.find(a => a.worker_id === manualWorkerId);
-      
+
       const now = new Date();
       const timeStr = now.toISOString();
 
@@ -219,7 +219,7 @@ export default function SMAttendancePage() {
         if (error) throw error;
         toast('Checked in successfully');
       }
-      
+
       setShowManualModal(false);
       setManualWorkerId(null);
       await fetchAttendanceData(true);
@@ -301,7 +301,7 @@ export default function SMAttendancePage() {
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">{new Date().toDateString()}</Text>
                   </View>
 
-                  <View className="flex-row flex-wrap gap-3">
+                  <View className="flex-row flex-wrap gap-3" style={{ maxWidth: '100%', flexShrink: 1 }}>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }}
                       onPress={() => setShowManualModal(true)}
                       className="bg-white border border-gray-200 px-5 py-3 rounded-xl flex-row items-center shadow-sm"
@@ -375,10 +375,10 @@ export default function SMAttendancePage() {
                               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-300 text-sm">—</Text>
                             )}
                           </View>
-                          
+
                           <View className="w-[20%] items-end justify-center pl-4">
                             {!attRecord?.check_out_time ? (
-                              <Pressable 
+                              <Pressable
                                 onPress={() => { setManualWorkerId(worker.id); setShowManualModal(true); }}
                                 className={`px-3 py-2 rounded-lg border ${checkedIn ? 'bg-amber-50 border-amber-200' : 'bg-brand-light border-gray-200'}`}
                               >

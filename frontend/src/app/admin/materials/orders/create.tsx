@@ -1,17 +1,29 @@
+import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import { notify } from '@/utils/notify';
-import { positiveQuantity, validReportDate } from '@/utils/siteWorkflow';
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
+import { validatePurchaseOrder } from '@/utils/procurement';
+import { useOrderSubmission } from '@/hooks/useOrderSubmission';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { FormField, ErrorState } from '@/components/ui';
+import { DateField } from '@/components/common/DateField';
+import { formatMoney } from '@/utils/format';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { supabase } from '@/lib/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { sendSystemNotification } from '../../../../utils/notifications';
 import { ProjectAssignmentDropdown } from '../../../../components/common/ProjectAssignmentDropdown';
 
 export default function AdminMaterialsOrdersCreatePage() {
+  const submitOrder = useOrderSubmission();
+  const submitting = useRef(false);
   const router = useRouter();
+  const { user, role } = useAuth();
+  const params = useLocalSearchParams<{ project_id?: string; project?: string }>();
+  const requestedProject = String(params.project_id || params.project || '');
+  const [loadError, setLoadError] = useState('');
+  const [retryTick, setRetryTick] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -27,11 +39,14 @@ export default function AdminMaterialsOrdersCreatePage() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [boqItemId, setBoqItemId] = useState('');
+  useEffect(() => { setBoqItemId(''); }, [selectedProject?.id]);
   const [materialQuery, setMaterialQuery] = useState('');
   const [selectedUnit, setSelectedUnit] = useState<string>('Units');
 
   // Form Inputs
   const [quantity, setQuantity] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Dropdown states
@@ -51,68 +66,40 @@ export default function AdminMaterialsOrdersCreatePage() {
     let isMounted = true;
     const fetchData = async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const currentUserId = sessionData.session?.user.id;
-        const { data: currentProfile } = currentUserId
-          ? await supabase.from('profiles').select('role').eq('id', currentUserId).maybeSingle()
-          : { data: null };
-
-        // Fetch Suppliers
-        const { data: supData, error: supErr } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .eq('role', 'supplier')
-          .order('full_name');
-        if (supErr) throw supErr;
-
-        // Fetch Projects
-        let projectQuery = supabase
-          .from('projects')
-          .select('id, name')
-          .order('name');
-        if (currentProfile?.role === 'pm' && currentUserId) {
-          projectQuery = projectQuery.eq('pm_id', currentUserId);
+        setInitialLoading(true); setLoadError('');
+        let projectQuery = supabase.from('projects').select('id,name').order('name');
+        if (role === 'pm' && user?.id) projectQuery = projectQuery.eq('pm_id', user.id);
+        const [supplierResult, projectResult, catalogResult, assignmentResult] = await Promise.all([
+          supabase.from('profiles').select('id,full_name,email').eq('role','supplier').eq('is_approved',true).order('full_name'),
+          projectQuery,
+          (supabase as any).from('material_catalog').select('*').order('name'),
+          supabase.from('project_role_assignments').select('project_id,user_id').eq('role','supplier'),
+        ]);
+        if (supplierResult.error) throw supplierResult.error;
+        if (projectResult.error) throw projectResult.error;
+        if (assignmentResult.error) throw assignmentResult.error;
+        const supData = supplierResult.data;
+        const projData = projectResult.data;
+        const assignData = assignmentResult.data;
+        let catalogItems: any[] = catalogResult.data || [];
+        if (catalogResult.error || !catalogItems.length) {
+          let materialsQuery = supabase.from('materials').select('id,name,unit,category,unit_price,project_id').order('name');
+          if (requestedProject) materialsQuery = materialsQuery.eq('project_id',requestedProject);
+          const materialResult = await materialsQuery;
+          if (materialResult.error) throw materialResult.error;
+          catalogItems = materialResult.data || [];
         }
-        const { data: projData, error: projErr } = await projectQuery;
-        if (projErr) throw projErr;
-
-        // Fetch Catalog via API or distinct materials
-        let catalogItems: any[] = [];
-        try {
-          const { data: catData } = await (supabase as any).from('material_catalog').select('*').order('name');
-          if (catData && catData.length > 0) {
-            catalogItems = catData;
-          }
-        } catch {}
-
-        if (catalogItems.length === 0) {
-          // Fallback to distinct existing materials
-          const { data: matData } = await supabase.from('materials').select('id, name, unit, category').order('name');
-          const distinctMap = new Map();
-          (matData || []).forEach(m => {
-            const key = (m.name || '').trim();
-            if (key && !distinctMap.has(key)) {
-              distinctMap.set(key, { id: m.id, name: key, unit: m.unit || 'Units', category: m.category || 'General' });
-            }
-          });
-          catalogItems = Array.from(distinctMap.values());
-        }
-
-        // Fetch Assignments
-        const { data: assignData } = await supabase
-          .from('project_role_assignments')
-          .select('project_id, user_id')
-          .eq('role', 'supplier');
 
         if (isMounted) {
           setSuppliers(supData || []);
           setProjects(projData || []);
+          if (requestedProject) setSelectedProject((projData || []).find(project => project.id === requestedProject) || null);
           setCatalog(catalogItems);
           setAssignments(assignData || []);
         }
       } catch (err: any) {
         if (isMounted) {
-          notify('Error loading data', err.message);
+          setLoadError(err.message || 'Unable to load order choices.');
         }
       } finally {
         if (isMounted) setInitialLoading(false);
@@ -121,7 +108,11 @@ export default function AdminMaterialsOrdersCreatePage() {
 
     fetchData();
     return () => { isMounted = false; };
-  }, []);
+  }, [role, user?.id, requestedProject, retryTick]);
+
+  useEffect(() => {
+    setUnitPrice(selectedMaterial ? String(selectedMaterial.reference_price ?? selectedMaterial.unit_price ?? 0) : '');
+  }, [selectedMaterial]);
 
   // When selectedProject changes, load that project's stock rows
   useEffect(() => {
@@ -236,17 +227,15 @@ export default function AdminMaterialsOrdersCreatePage() {
   };
 
   const handleSubmit = async () => {
-    if (loading) return;
-    if (!selectedSupplier || !selectedProject || !selectedMaterial || !positiveQuantity(quantity) || !validReportDate(expectedDate)) {
-      notify('Validation Error', 'Select an assigned supplier, project, and catalog material, enter a positive quantity and a valid delivery date (YYYY-MM-DD).');
+    if (loading || submitting.current) return;
+    const validation = validatePurchaseOrder({ projectId: selectedProject?.id, supplierId: selectedSupplier?.id, material: selectedMaterial?.id, quantity, unitPrice, expectedDate, unit: selectedUnit });
+    if (validation) {
+      notify('Check order details', validation);
       return;
     }
-
+    submitting.current = true;
     setLoading(true);
     try {
-      // Generate a random PO Number
-      const poNumber = `PO-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-
       const q = Number(quantity);
 
       // Construct items string
@@ -255,13 +244,13 @@ export default function AdminMaterialsOrdersCreatePage() {
         : `${q} ${selectedUnit} of Material`;
 
       const orderData: any = {
+        boq_item_id: boqItemId || undefined,
         project_id: selectedProject.id,
         supplier_id: selectedSupplier.id,
         supplier_name: selectedSupplier.full_name,
         quantity_ordered: q,
-        unit_price: 0,
-        total_price: 0,
-        po_number: poNumber,
+        unit_price: Number(unitPrice),
+        total_price: q * Number(unitPrice),
         items: itemsString,
         expected_date: expectedDate,
         status: 'Pending Delivery'
@@ -271,30 +260,22 @@ export default function AdminMaterialsOrdersCreatePage() {
         orderData.material_id = selectedMaterial.id;
       }
 
-      const { error } = await supabase.from('purchase_orders').insert([orderData]);
-      if (error) throw error;
+      await submitOrder({ ...orderData, unit: selectedUnit });
 
-      // Dispatch notification
-      await sendSystemNotification(
-        'Purchase Order Created',
-        `PO #${orderData.po_number} was created for ${selectedMaterial ? selectedMaterial.name : 'materials'}.`,
-        'Supplier',
-        orderData.supplier_id
-      );
-
-      if (Platform.OS === 'web') window.alert('Order created successfully!');
-      else Alert.alert('Success', 'Order created successfully!');
+      notify('Saved', 'Purchase order created and sent to the assigned supplier.');
 
       router.back();
 
     } catch (err: any) {
       const msg = err.message || 'Failed to create order.';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      notify('Unable to create order', msg);
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
+
+  if (loadError) return <View className="flex-1 bg-brand-light"><TopNav title="New purchase order" showBackButton showAction={false} /><ErrorState message={loadError} onRetry={() => setRetryTick(tick => tick + 1)} /></View>;
 
   if (initialLoading) {
     return (
@@ -406,6 +387,14 @@ export default function AdminMaterialsOrdersCreatePage() {
               );
             })()}
 
+            <BoqItemSelect projectId={selectedProject?.id} value={boqItemId} materialOnly onChange={(id, row) => {
+              setBoqItemId(id);
+              if (row) {
+                const match = catalog.find(item => item.name.trim().toLowerCase() === row.description.trim().toLowerCase() && String(item.unit).toLowerCase() === String(row.unit).toLowerCase());
+                setSelectedMaterial(match ? { ...match, reference_price: row.rate, unit_price: row.rate } : { id: row.description, name: row.description, unit: row.unit, reference_price: row.rate });
+                setMaterialQuery(row.description); setSelectedUnit(row.unit || 'Units'); setQuantity(String(Math.max(0, Number(row.quantity) - Number(row.ordered_quantity || 0)))); setUnitPrice(String(row.rate || 0));
+              }
+            }} />
             {/* Material Dropdown */}
             <View className="flex-row justify-between items-center mb-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase">Material (Catalog)</Text>
@@ -425,6 +414,7 @@ export default function AdminMaterialsOrdersCreatePage() {
                     setMaterialQuery(text);
                     setShowMaterialDrop(true);
                     setSelectedMaterial(null);
+                    setBoqItemId('');
                   }}
                   onFocus={() => {
                      setShowMaterialDrop(true);
@@ -496,6 +486,7 @@ export default function AdminMaterialsOrdersCreatePage() {
                                 key={mat.id || mat.name}
                                 onPress={() => {
                                   setSelectedMaterial(mat);
+                                  setBoqItemId('');
                                   setMaterialQuery(mat.name);
                                   setSelectedUnit(mat.unit || 'Units');
                                   setShowMaterialDrop(false);
@@ -567,13 +558,10 @@ export default function AdminMaterialsOrdersCreatePage() {
               </View>
             </View>
 
+            <FormField label="Unit price in LKR" value={unitPrice} onChangeText={setUnitPrice} keyboardType="decimal-pad" placeholder="0.00" />
+            <Text className="text-sm font-semibold text-brand-text mb-4">Order total: {formatMoney((Number(quantity) || 0) * (Number(unitPrice) || 0))}</Text>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-500 uppercase mb-1">Expected Delivery Date</Text>
-            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-              className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 mb-6 bg-gray-50 z-10"
-              placeholder="YYYY-MM-DD"
-              value={expectedDate}
-              onChangeText={setExpectedDate}
-            />
+            <View className="mb-6"><DateField label="Expected delivery date" value={expectedDate} onChange={setExpectedDate} /></View>
 
             {/* Submit */}
             <Pressable style={{ minHeight: 44, minWidth: 44 }}

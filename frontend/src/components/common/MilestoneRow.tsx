@@ -1,22 +1,29 @@
 import React from 'react';
 import { View, Text, Pressable, Image, Linking } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { StatusBadge } from './StatusBadge';
 import { useResponsive } from '../../hooks/useResponsive';
 
-export const MilestoneRow = ({ 
-  ms, 
-  isLast, 
-  onMarkComplete, 
+export const MilestoneRow = ({
+  ms,
+  isLast,
+  onMarkComplete,
   showAction = true,
+  disabled = false,
   children
-}: { 
-  ms: any; 
-  isLast: boolean; 
-  onMarkComplete?: (id: string) => void; 
-  showAction?: boolean; 
+}: {
+  ms: any;
+  isLast: boolean;
+  onMarkComplete?: (id: string) => void;
+  showAction?: boolean;
+  disabled?: boolean;
   children?: React.ReactNode;
 }) => {
   const { isMobile } = useResponsive();
+  const rawProgress = ms.completion_percentage ?? (ms.status === 'Completed' ? 100 : ms.status === 'Pending' ? 0 : null);
+  const progress = rawProgress == null || !Number.isFinite(Number(rawProgress)) ? null : Math.max(0,Math.min(100,Number(rawProgress)));
+  const dateValue = ms.due_date || ms.planned_date;
+  const targetDate = dateValue && !Number.isNaN(new Date(dateValue).getTime()) ? String(dateValue).slice(0,10) : 'Not scheduled';
 
   return (
     <View className="flex-row w-full relative">
@@ -36,14 +43,10 @@ export const MilestoneRow = ({
           <View className="flex-1 min-w-0 pr-0 md:pr-4">
             {isMobile && (
               <View className="self-start mb-2">
-                <View className={`px-2.5 py-1 rounded-md ${ms.status === 'Completed' ? 'bg-[#DCFCE7]' : 'bg-orange-50'}`}>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase tracking-wider ${ms.status === 'Completed' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {ms.status}
-                  </Text>
-                </View>
+                <StatusBadge status={ms.status} />
               </View>
             )}
-            
+
             <Text style={{ flexShrink: 1, minWidth: 0, fontSize: 18, lineHeight: 24, fontWeight: '700' }} maxFontSizeMultiplier={1.3} className="text-gray-800 mb-1.5">
               {ms.title}
             </Text>
@@ -53,11 +56,7 @@ export const MilestoneRow = ({
           </View>
 
           {!isMobile && (
-            <View className={`px-3 py-1.5 rounded-lg ml-2 shrink-0 ${ms.status === 'Completed' ? 'bg-[#DCFCE7]' : 'bg-orange-50'}`}>
-               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-bold uppercase tracking-wider ${ms.status === 'Completed' ? 'text-green-600' : 'text-orange-600'}`}>
-                 {ms.status}
-               </Text>
-            </View>
+            <StatusBadge status={ms.status} />
           )}
         </View>
 
@@ -65,13 +64,16 @@ export const MilestoneRow = ({
            <View className="flex-row items-center min-w-0 flex-shrink">
              <Ionicons name="calendar-outline" size={16} color="#6B7280" className="mr-2 shrink-0" />
              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-600 truncate">
-               Target Date: {new Date(ms.due_date).toDateString()}
+               Target date: {targetDate}
              </Text>
            </View>
 
            {ms.status !== 'Completed' && showAction && onMarkComplete && (
              <Pressable style={{ minHeight: 44, minWidth: 44 }}
                onPress={() => onMarkComplete(ms.id)}
+               accessibilityRole="button"
+               accessibilityState={{ disabled, busy: disabled }}
+               disabled={disabled}
                className="bg-[#DCFCE7] border border-[#BBF7D0] min-h-[44px] justify-center items-center px-4 rounded-lg shadow-sm active:bg-[#BBF7D0] w-full md:w-auto"
              >
                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[#15803D] text-sm font-bold">
@@ -81,17 +83,21 @@ export const MilestoneRow = ({
            )}
         </View>
 
+        <View className="mt-4">
+          <Text className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">{progress == null ? 'Progress not recorded' : `${progress}% complete`}</Text>
+          {progress != null && <View accessibilityRole="progressbar" accessibilityValue={{min:0,max:100,now:progress}} className="h-2 rounded-full bg-slate-100 overflow-hidden"><View className="h-2 rounded-full bg-orange-700" style={{width:`${progress}%`}} /></View>}
+        </View>
         {children}
 
         {/* Media Display */}
         {ms.milestone_media && ms.milestone_media.length > 0 && (
           <View className="flex-row flex-wrap mt-4">
              {ms.milestone_media.map((media: any) => (
-                <Pressable 
-                  style={{ minHeight: 44, minWidth: 44 }} 
-                  key={media.id} 
-                  accessibilityLabel="Open milestone photo" 
-                  onPress={() => media.url ? Linking.openURL(media.url) : null} 
+                <Pressable
+                  style={{ minHeight: 44, minWidth: 44 }}
+                  key={media.id}
+                  accessibilityLabel="Open milestone photo"
+                  onPress={() => media.url ? Linking.openURL(media.url) : null}
                   className="mr-3 mb-3"
                 >
                   {media.url ? (

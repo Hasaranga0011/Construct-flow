@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
-from core.security import get_current_user
+from core.security import get_current_user, require_admin
 from data_pipeline.model_engine import (
     predict_cost_hybrid,
     compute_rule_based_delay_risk,
@@ -46,6 +46,38 @@ from services.historical_data_service import (
 
 router = APIRouter(prefix="/ai", tags=["AI Models"])
 
+
+class HistoricalVerification(BaseModel):
+    evidence_note: str = Field(min_length=10, max_length=2000)
+
+
+@router.post("/historical-projects/{record_id}/verify")
+def verify_historical_project(record_id: str, payload: HistoricalVerification, current_user: dict = Depends(require_admin)):
+    from services.historical_data_service import _get_local_conn
+    from core.config import settings
+    from core.database import get_service_client
+    from contextlib import closing
+    note = payload.evidence_note.strip()
+    if len(note)<10:
+        raise HTTPException(422,"Source evidence must contain at least 10 non-whitespace characters")
+    client = get_service_client() if settings.SUPABASE_SERVICE_ROLE_KEY else None
+    with closing(_get_local_conn()) as conn:
+        row = (client.table("historical_projects").select("*").eq("id",record_id).maybe_single().execute().data
+               if client else conn.execute("SELECT * FROM historical_projects WHERE id=?",(record_id,)).fetchone())
+        if not row:
+            raise HTTPException(404,"Historical project not found")
+        if row["source"]=="sample" or (row["imported_by"] and row["imported_by"] in {current_user["id"],current_user.get("email")}):
+            raise HTTPException(403,"A different administrator must verify source evidence; samples cannot be verified")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if client:
+            client.table("historical_projects").update({"verified":True,"evidence_note":note,"verified_by":current_user["id"],"verified_at":timestamp}).eq("id",record_id).execute()
+        with conn:
+            conn.execute("UPDATE historical_projects SET verified=1,evidence_note=?,verified_by=?,verified_at=? WHERE id=?",
+                         (note,current_user["id"],timestamp,record_id))
+    _INSIGHTS_CACHE.clear()
+    return {"verified":True,"id":record_id}
+
+
 _INSIGHTS_CACHE: Dict[str, Tuple[float, Any]] = {}
 _INSIGHTS_CACHE_TTL = 120  # seconds
 
@@ -53,7 +85,7 @@ _INSIGHTS_CACHE_TTL = 120  # seconds
 # Model registry — loaded once at startup
 # ---------------------------------------------------------------------------
 
-_MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+_MODELS_DIR = Path(os.environ.get("CONSTRUCTFLOW_MODEL_DIR", str(Path(__file__).resolve().parents[2] / "models")))
 _COST_PKL   = _MODELS_DIR / "cost_predictor.pkl"
 _DELAY_PKL  = _MODELS_DIR / "delay_classifier.pkl"
 _COST_META  = _MODELS_DIR / "cost_predictor_meta.json"
@@ -61,7 +93,7 @@ _DELAY_META = _MODELS_DIR / "delay_classifier_meta.json"
 
 _COST_FEATURES = [
     "square_footage", "location", "project_type", "quality_tier",
-    "num_floors", "site_condition", "structure_type", 
+    "num_floors", "site_condition", "structure_type",
     "finishing_flooring", "finishing_sanitary", "finishing_electrical",
     "target_timeline"
 ]
@@ -199,12 +231,12 @@ def _prediction_interval(model, X) -> float:
     0-100 'uncertainty' score; lower is more confident.
     """
     import pandas as pd
-    
+
     regressor = model.named_steps['regressor'] if hasattr(model, 'named_steps') else model
     preprocessor = model.named_steps['preprocessor'] if hasattr(model, 'named_steps') else None
-    
+
     X_transformed = preprocessor.transform(X) if preprocessor else X
-    
+
     tree_preds = np.array([tree.predict(X_transformed)[0] for tree in regressor.estimators_])
     mean = tree_preds.mean()
     if mean == 0:
@@ -223,13 +255,13 @@ def _per_input_importance(model, X_row, original_df) -> List[Dict]:
     """
     regressor = model.named_steps['regressor'] if hasattr(model, 'named_steps') else model
     importances = regressor.feature_importances_
-    
+
     # Feature ordering is num_features then cat_features based on ColumnTransformer
     feature_names = ["square_footage", "num_floors", "location", "project_type", "quality_tier", "site_condition", "structure_type", "finishing_flooring", "finishing_sanitary", "finishing_electrical", "target_timeline"]
-    
+
     preprocessor = model.named_steps['preprocessor'] if hasattr(model, 'named_steps') else None
     X_transformed = preprocessor.transform(X_row) if preprocessor else X_row
-    
+
     values = X_transformed[0]
     norms = np.abs(values) / (np.abs(values).sum() + 1e-9)
     raw = importances * norms
@@ -323,7 +355,7 @@ def predict_cost(
     raw_loc = (req.district or req.location or "").strip()
     if not raw_loc:
         raise HTTPException(status_code=422, detail="District is required for project estimation.")
-    
+
     canonical_district = _DISTRICTS_LOWER.get(raw_loc.lower())
     if not canonical_district:
         raise HTTPException(
@@ -444,9 +476,11 @@ def get_insights(
       - model_info: metadata from the last training run
     When role == 'pm', results are filtered to that PM's assigned projects.
     """
-    _require_cost_model()
-    _require_delay_model()
 
+    if current_user["role"] not in {"super_admin", "admin", "pm"}:
+        raise HTTPException(403, "Project management access required")
+    if current_user["role"] == "pm" and pm_id and pm_id != current_user["id"]:
+        raise HTTPException(403, "You may only request your own project insights")
     db = client_for_token(current_user["token"])
     role = current_user["role"]
     caller_id = current_user["id"]
@@ -497,7 +531,7 @@ def get_insights(
         1 for p in projects
         if float(p.get("spent_cost") or 0) <= float(p.get("total_budget") or 0)
     )
-    
+
     # Real Evaluation Metrics & Historical Projects
     real_projects_list = get_all_real_projects()
     real_count = len(real_projects_list)
@@ -675,7 +709,7 @@ def get_insights(
         sqft = float(hp.get("floor_area_sqft") or 0)
         est = float(hp.get("estimate_total_lkr") or 0) if hp.get("estimate_total_lkr") else None
         act = float(hp.get("actual_total_lkr") or 0) if hp.get("actual_total_lkr") else None
-        
+
         est_sqft = round(est / sqft, 2) if est and sqft > 0 else None
         act_sqft = round(act / sqft, 2) if act and sqft > 0 else None
 
@@ -684,7 +718,7 @@ def get_insights(
             var_pct = round(((act - est) / est) * 100.0, 1)
 
         source_val = hp.get("source") or "real"
-        verified_val = bool(hp.get("verified", 1))
+        verified_val = bool(hp.get("verified")) and bool(hp.get("verified_by"))
 
         row_item = {
             "id": hp.get("id"),
@@ -769,7 +803,7 @@ def retrain_models(current_user: dict = Depends(get_current_user)):
     Retrains the Cost Predictor on real completed projects.
     Excludes synthetic rows from accuracy evaluation.
     """
-    if current_user["role"] not in ("admin", "super_admin", "pm"):
+    if current_user["role"] not in ("admin", "super_admin"):
         raise HTTPException(403, "Only administrators and project managers can trigger model retraining.")
 
     meta = train_and_evaluate_cost_model()
@@ -804,7 +838,7 @@ def import_historical_projects_endpoint(
       - End date after start date
       - Deduplicates by (project_name, start_date)
     """
-    if current_user["role"] not in ("admin", "super_admin", "pm"):
+    if current_user["role"] not in ("admin", "super_admin"):
         raise HTTPException(403, "Only administrators and project managers can import historical project data.")
 
     evidence = str(payload.evidence_note or "").strip()
@@ -815,7 +849,7 @@ def import_historical_projects_endpoint(
         )
 
     try:
-        user_identity = current_user.get("email") or current_user.get("id") or "Admin"
+        user_identity = current_user.get("id") or "Admin"
         res = import_historical_projects_from_csv(
             csv_content=payload.csv_content,
             evidence_note=evidence,
@@ -842,7 +876,7 @@ async def import_historical_projects_file_endpoint(
     Admin file upload import (CSV, XLSX, XLS) for past projects' actual costs from QS / contractor BOQs.
     Requires evidence_note (QS firm, contractor, BOQ file reference).
     """
-    if current_user["role"] not in ("admin", "super_admin", "pm"):
+    if current_user["role"] not in ("admin", "super_admin"):
         raise HTTPException(403, "Only administrators and project managers can import historical project data.")
 
     evidence = str(evidence_note or "").strip()
@@ -857,7 +891,7 @@ async def import_historical_projects_file_endpoint(
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        user_identity = current_user.get("email") or current_user.get("id") or "Admin"
+        user_identity = current_user.get("id") or "Admin"
         res = import_historical_projects_from_file(
             file_bytes=file_bytes,
             filename=file.filename or "import.csv",
@@ -879,7 +913,7 @@ def get_historical_projects_endpoint(
     current_user: dict = Depends(get_current_user),
 ):
     """Returns all real historical projects and their variance."""
-    return get_all_real_projects()
+    return get_all_historical_projects_for_display()
 
 
 @router.get("/historical-template")

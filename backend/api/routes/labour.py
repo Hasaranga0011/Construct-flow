@@ -6,7 +6,7 @@ from core.database import client_for_token
 from core.security import require_manager_or_admin, get_current_user
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from core.worker_payroll import calculate_payroll, _is_present
+from core.worker_payroll import calculate_payroll, summarize_salary_slips, _is_present
 
 router = APIRouter(
     prefix="/labour",
@@ -24,38 +24,58 @@ def managed_project_ids(client, current_user: dict) -> Optional[List[str]]:
         return [row["project_id"] for row in (response.data or [])]
     raise HTTPException(status_code=403, detail="Not enough privileges")
 
+def attendance_site_scope(client, allowed_projects, project_id=None):
+    if project_id and allowed_projects is not None and project_id not in allowed_projects:
+        raise HTTPException(403, 'Access denied: not your project')
+    project_ids = [project_id] if project_id else allowed_projects
+    if project_ids == []:
+        return {}
+    query = client.table('sites').select('id,project_id')
+    if project_ids is not None:
+        query = query.in_('project_id',project_ids)
+    return {row['id']:row['project_id'] for row in query.execute().data or []}
+
+
+def attendance_people(client, records):
+    ids = list({row['worker_id'] for row in records if row.get('worker_id')})
+    if not ids:
+        return {}
+    workers = client.table('workers').select('id,user_id').in_('id',ids).execute().data or []
+    identities = {row['id']:row.get('user_id') or row['id'] for row in workers}
+    profile_ids = list({identities.get(worker_id,worker_id) for worker_id in ids})
+    profiles = client.table('profiles').select('id,full_name,daily_rate,worker_type').in_('id',profile_ids).execute().data or []
+    by_id = {row['id']:row for row in profiles}
+    return {worker_id:{**by_id.get(identities.get(worker_id,worker_id),{}),'id':identities.get(worker_id,worker_id)} for worker_id in ids}
+
+
 @router.get("/", response_model=List[LabourResponse])
 def get_labour(project_id: Optional[str] = Query(None, description="Filter by project ID"), current_user: dict = Depends(get_current_user)):
     try:
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
-        query = client.table("attendance").select(
-            "id, date, check_in_time, check_out_time, hours_worked, site_id, worker_id, workers(profiles(full_name))"
-        )
-        if project_id:
-            if allowed_projects is not None and project_id not in allowed_projects:
-                raise HTTPException(status_code=403, detail="Access denied: not your project")
-            query = query.eq("site_id", project_id)
-        elif allowed_projects is not None:
-            if not allowed_projects:
-                return []
-            query = query.in_("site_id", allowed_projects)
-            
-        response = query.execute()
-        
+        site_to_project = attendance_site_scope(client,allowed_projects,project_id)
+        if not site_to_project:
+            return []
+        records = client.table('attendance').select('*').in_('site_id',list(site_to_project)).execute().data or []
+        people = attendance_people(client,records)
+
         # Map back to LabourResponse format for backwards compatibility
         mapped = []
-        for row in (response.data or []):
-            prof = row.get("workers", {}).get("profiles", {}) if row.get("workers") else {}
+        for row in records:
+            prof = people.get(row['worker_id'],{})
             mapped.append({
                 "id": row["id"],
-                "project_id": row["site_id"],
-                "worker_name": prof.get("full_name", "Unknown Worker"),
+                "project_id": site_to_project[row['site_id']],
+                "site_id":row['site_id'],
+                "worker_id":row['worker_id'],
+                "role":prof.get('worker_type') or 'worker',
+                "created_at":row['created_at'],
+                "worker_name": prof.get("full_name") or "Unknown Worker",
                 "date": row["date"],
                 "status": row.get("status") or "Present",
                 "check_in_time": row.get("check_in_time"),
                 "check_out_time": row.get("check_out_time"),
-                "hours_worked": row.get("hours_worked")
+                "hours_worked": row.get("hours_worked") or 0
             })
         return mapped
     except HTTPException:
@@ -68,43 +88,41 @@ def get_payroll(current_user: dict = Depends(require_manager_or_admin)):
     try:
         client = client_for_token(current_user["token"])
         allowed_projects = managed_project_ids(client, current_user)
-        sites_res = client.table("sites").select("id, project_id").execute().data or []
-        site_to_project = {s["id"]: s["project_id"] for s in sites_res if s.get("id")}
-
-        query = client.table("attendance").select(
-            "hours_worked, check_in_time, check_out_time, date, site_id, worker_id, workers(profiles(full_name, daily_rate))"
-        )
-        
-        if allowed_projects is not None and not allowed_projects:
+        site_to_project = attendance_site_scope(client,allowed_projects)
+        if not site_to_project:
             return []
-            
-        response = query.execute()
-        
+        records = client.table('attendance').select('*').in_('site_id',list(site_to_project)).execute().data or []
+        people = attendance_people(client,records)
+
         # Aggregate logic
         payroll_data = {}
-        for row in (response.data or []):
+        for row in records:
             raw_site = row.get("site_id")
             proj_id = site_to_project.get(raw_site, raw_site)
             if allowed_projects is not None and proj_id not in allowed_projects:
                 continue
-            
-            prof = row.get("workers", {}).get("profiles", {}) if row.get("workers") else {}
-            worker_name = prof.get("full_name", "Unknown Worker")
-            daily_rate = prof.get("daily_rate", 3500)
-            
-            hours = row.get("hours_worked") or 0
-            key = f"{proj_id}_{worker_name}"
+
+            prof = people.get(row['worker_id'],{})
+            worker_name = prof.get("full_name") or "Unknown Worker"
+            daily_rate = prof.get("daily_rate")
+
+            key = (proj_id,prof['id'])
             if key not in payroll_data:
                 payroll_data[key] = {
                     "project_id": proj_id,
+                    "worker_id": prof['id'],
                     "worker_name": worker_name,
                     "total_hours": 0,
                     "days_present": 0,
-                    "daily_rate": daily_rate
+                    "daily_rate": daily_rate,
+                    "records":[],
                 }
-            payroll_data[key]["total_hours"] += hours
-            payroll_data[key]["days_present"] += 1
-            
+            payroll_data[key]['records'].append(row)
+
+        for summary in payroll_data.values():
+            totals = calculate_payroll(summary.pop('records'),0)
+            summary.update(total_hours=totals['total_hours'],days_present=totals['total_days'],overtime_hours=totals['overtime_hours'])
+
         return list(payroll_data.values())
     except HTTPException:
         raise
@@ -120,50 +138,69 @@ def create_labour(labour: LabourCreate, current_user: dict = Depends(get_current
         allowed_projects = managed_project_ids(client, current_user)
         if allowed_projects is not None and labour.project_id not in allowed_projects:
             raise HTTPException(status_code=403, detail="Access denied: not your project")
-        
-        # Look up worker_id by name (since legacy API used worker_name)
-        prof_res = client.table("profiles").select("id").eq("full_name", labour.worker_name).execute()
-        if not prof_res.data:
-            raise HTTPException(status_code=404, detail="Worker profile not found")
-        user_id = prof_res.data[0]["id"]
-        
-        worker_res = client.table("workers").select("id").eq("user_id", user_id).execute()
-        if not worker_res.data:
-            raise HTTPException(status_code=404, detail="Worker record not found")
-        worker_id = worker_res.data[0]["id"]
 
-        att_data = {
-            "site_id": labour.project_id,
-            "worker_id": worker_id,
-            "date": labour.date,
-            "status": labour.status,
-            "hours_worked": labour.hours_worked
-        }
-        if labour.status == 'Present':
-             att_data['check_in_time'] = datetime.now(timezone.utc).isoformat()
-        
-        response = client.table("attendance").insert(att_data).execute()
-        
+        # Identity, assignment and physical-site checks precede every write.
+        profiles = client.table('profiles').select('id,full_name,role,is_approved,worker_type').eq('id', labour.worker_id).execute().data or []
+        if not profiles or profiles[0].get('role') != 'worker' or profiles[0].get('is_approved') is not True:
+            raise HTTPException(403, 'Select an approved worker identity')
+        profile = profiles[0]
+        workers = client.table('workers').select('id,user_id,site_id').eq('user_id', profile['id']).execute().data or []
+        if not workers:
+            raise HTTPException(409, 'The selected worker has no attendance record configured')
+        worker = workers[0]
+        site_scope = attendance_site_scope(client, allowed_projects, labour.project_id)
+        if not site_scope:
+            raise HTTPException(409, 'This project has no linked attendance site')
+        assigned = client.table('site_workers').select('worker_id').eq('project_id', labour.project_id).execute().data or []
+        if not any(row['worker_id'] in {worker['id'], profile['id']} for row in assigned):
+            raise HTTPException(403, 'This worker is not assigned to the selected project')
+        site_id = worker.get('site_id') or sorted(site_scope)[0]
+        if site_id not in site_scope:
+            raise HTTPException(403, 'This worker is assigned to a different physical site')
+
+        now = datetime.now(timezone.utc)
+        work_date = labour.work_date
+        check_in = labour.check_in_time if labour.status == 'Present' else None
+        hours = labour.hours_worked if labour.status == 'Present' else 0
+        if check_in:
+            if check_in.tzinfo is None:
+                raise HTTPException(422, 'Check-in time must include its timezone')
+            actual_date = check_in.astimezone(ZoneInfo('Asia/Colombo')).date()
+            if 'work_date' in labour.model_fields_set and actual_date != work_date:
+                raise HTTPException(422, 'Check-in time and attendance date must match')
+            work_date = actual_date
+        elif labour.status == 'Present':
+            if hours or work_date != now.astimezone(ZoneInfo('Asia/Colombo')).date():
+                raise HTTPException(422, 'A check-in time is required for completed work hours')
+            check_in = now
+        if work_date > now.astimezone(ZoneInfo('Asia/Colombo')).date():
+            raise HTTPException(422, 'Future attendance cannot be recorded')
+        from datetime import timedelta
+        check_out = check_in + timedelta(hours=hours) if check_in and hours else None
+        if check_in and check_in > now or check_out and check_out > now:
+            raise HTTPException(422, 'Record completed work hours only, or use zero hours for an open check-in')
+        payload = {'site_id': site_id, 'worker_id': worker['id'], 'date': work_date.isoformat(),
+                   'status': labour.status, 'hours_worked': hours, 'overtime_hours': max(hours - 8, 0),
+                   'check_in_time': check_in.isoformat() if check_in else None,
+                   'check_out_time': check_out.isoformat() if check_out else None}
+        response = client.table('attendance').insert(payload).execute()
         if not response.data:
-            raise HTTPException(status_code=400, detail="Failed to add labour record")
-            
+            raise HTTPException(400, 'Failed to add attendance record')
         inserted = response.data[0]
-        return {
-            "id": inserted["id"],
-            "project_id": inserted["site_id"],
-            "worker_name": labour.worker_name,
-            "date": inserted["date"],
-            "status": inserted["status"],
-            "check_in_time": inserted.get("check_in_time"),
-            "check_out_time": inserted.get("check_out_time"),
-            "hours_worked": inserted.get("hours_worked")
-        }
+        return {**inserted, 'project_id': labour.project_id, 'site_id': site_id,
+                'worker_name': profile.get('full_name') or 'Worker',
+                'role': profile.get('worker_type') or 'worker'}
     except HTTPException:
         raise
     except Exception as e:
+        if getattr(e, 'code', None) == '23505':
+            raise HTTPException(409, 'Attendance already exists for this worker, site and date') from e
+        if getattr(e, 'code', None) == '42501':
+            raise HTTPException(403, 'Attendance is not permitted for this assignment') from e
         raise HTTPException(status_code=500, detail=str(e))
 
-from pydantic import BaseModel
+
+from pydantic import BaseModel, Field
 
 class ScanRequest(BaseModel):
     qr_code: str
@@ -207,7 +244,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
 
         if not profile_res.data:
             raise HTTPException(status_code=404, detail="Invalid QR Code: Worker not found")
-            
+
         worker = profile_res.data[0] if isinstance(profile_res.data, list) else profile_res.data
         worker_profile_id = worker["id"]
 
@@ -217,7 +254,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
                 raise HTTPException(status_code=409, detail="Worker profile is not linked to a worker record")
             worker_row = worker_res.data[0] if isinstance(worker_res.data, list) else worker_res.data
         worker_id = worker_row["id"]
-        
+
         # 2. Resolve target project and linked attendance site
         raw_target_id = payload.site_id
         project_id = raw_target_id
@@ -265,21 +302,23 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
                 "date": today,
                 "check_in_time": now_iso
             }).execute()
-            
+
             return {"action": "check_in", "worker_name": worker["full_name"], "time": now_iso}
-            
+
         else:
             # Existing record
             record = att_res.data[0]
             if record.get("check_out_time"):
                 raise HTTPException(status_code=400, detail="Worker has already checked out today")
-                
+
             # Check-out: calculate real hours and minutes
             check_in_dt = datetime.fromisoformat(record["check_in_time"].replace('Z', '+00:00'))
             now_dt = datetime.now(timezone.utc)
             if check_in_dt.tzinfo is None:
                 check_in_dt = check_in_dt.replace(tzinfo=timezone.utc)
-            
+            if (now_dt - check_in_dt).total_seconds() < 30:
+                raise HTTPException(status_code=409, detail="Duplicate scan ignored. Wait before checking out.")
+
             diff_seconds = max(0.0, (now_dt - check_in_dt).total_seconds())
             total_minutes = max(0, round(diff_seconds / 60.0))
             hours = total_minutes // 60
@@ -288,13 +327,15 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
             diff_hours = round(total_minutes / 60.0, 2)
             overtime_minutes = max(0, total_minutes - 480)
             overtime_hours = round(overtime_minutes / 60.0, 2)
-            
+
             upd_res = supabase.table("attendance").update({
                 "check_out_time": now_iso,
                 "hours_worked": diff_hours,
                 "overtime_hours": overtime_hours
-            }).eq("id", record["id"]).execute()
-            
+            }).eq("id", record["id"]).is_("check_out_time", "null").execute()
+
+            if not upd_res.data:
+                raise HTTPException(status_code=409, detail="Attendance changed; refresh before scanning again")
             return {
                 "action": "check_out",
                 "worker_name": worker["full_name"],
@@ -303,7 +344,7 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
                 "overtime_hours": overtime_hours,
                 "formatted_hours": formatted_duration
             }
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -313,6 +354,36 @@ class SalaryGenerateRequest(BaseModel):
     start_date: str
     end_date: str
     site_id: str
+
+
+class SalaryPayment(BaseModel):
+    amount: float = Field(ge=0, allow_inf_nan=False)
+
+
+@router.patch('/salary/{slip_id}/paid')
+def record_salary_payment(slip_id: str, payload: SalaryPayment, current_user: dict = Depends(require_manager_or_admin)):
+    client = client_for_token(current_user['token'])
+    rows = client.table('salary_slips').select('*').eq('id', slip_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, 'Salary slip not found')
+    slip = rows[0]
+    project_id = slip.get('project_id')
+    if not project_id:
+        raise HTTPException(409, 'Reconcile this legacy salary slip with its project first')
+    from core.access import require_project_member
+    require_project_member(client, project_id, current_user)
+    total = slip.get('total_amount') if slip.get('total_amount') is not None else slip.get('total_pay')
+    from decimal import Decimal
+    if total is None or Decimal(str(total)) != Decimal(str(payload.amount)):
+        raise HTTPException(422, 'Confirm the exact salary slip amount')
+    if slip.get('status') == 'Paid':
+        return slip
+    if slip.get('status') not in {'Draft', 'Approved', 'Pending', 'Generated'}:
+        raise HTTPException(409, 'This salary slip cannot be paid')
+    result = client.table('salary_slips').update({'status':'Paid'}).eq('id',slip_id).eq('project_id',project_id).eq('status',slip['status']).execute().data or []
+    if not result:
+        raise HTTPException(409, 'Salary slip changed; refresh before recording payment')
+    return result[0]
 
 @router.post("/salary/generate")
 def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends(require_manager_or_admin)):
@@ -331,6 +402,9 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
         if allowed is not None and project_id not in allowed:
             raise HTTPException(status_code=403, detail="This project is not assigned to you")
 
+        project_rows = supabase.table("projects").select("*").eq("id", project_id).execute().data or []
+        is_test_project = bool(project_rows and project_rows[0].get("is_test"))
+
         # Resolve all site IDs that belong to this project
         project_sites = supabase.table("sites").select("id").eq("project_id", project_id).execute().data or []
         candidate_site_ids = list(set([s["id"] for s in project_sites] + [payload.site_id, project_id]))
@@ -338,6 +412,8 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
         # Attendance query: use site_id, not project_id
         records = supabase.table("attendance").select("*").in_("site_id", candidate_site_ids).gte("date", payload.start_date).lte("date", payload.end_date).execute().data or []
         present_records = [r for r in records if _is_present(r)]
+        if any(not r.get("reviewed_at") for r in present_records):
+            raise HTTPException(status_code=409, detail="Review and approve attendance before generating salary slips")
         if not present_records:
             return {"generated": 0, "slips": []}
 
@@ -358,29 +434,61 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
         if not target_uids:
             return {"generated": 0, "slips": []}
 
-        profiles = supabase.table("profiles").select("id,daily_rate,full_name,email,notification_preferences").in_("id", target_uids).execute().data or []
+        profiles = supabase.table("profiles").select("id,daily_rate,worker_type,full_name,email").in_("id", target_uids).execute().data or []
         profile_by_user = {p["id"]: p for p in profiles}
+        boq_plan = dict(project_rows[0].get("boq_data") or {}) if project_rows else {}
+        if boq_plan:
+            boq_plan["labour_overrides"] = supabase.table("project_boq_worker_rates").select("worker_id,daily_rate").eq("project_id",project_id).execute().data or []
+        existing_slips = supabase.table('salary_slips').select('id,worker_id,period_start,period_end,status').eq('project_id',project_id).in_('worker_id',target_uids).lte('period_start',payload.end_date).gte('period_end',payload.start_date).execute().data or []
+        conflicts = [row for row in existing_slips if row['period_start'] != payload.start_date or row['period_end'] != payload.end_date]
+        if conflicts:
+            raise HTTPException(409, detail={
+                'code':'payroll_overlap',
+                'message':'Salary slips already cover part of this pay period. No new slips were created. Review the existing slips and choose a non-overlapping period.',
+                'conflicts':[{**row,'worker_name':profile_by_user.get(row['worker_id'],{}).get('full_name') or 'Worker'} for row in conflicts],
+            })
+        existing_workers = {row['worker_id'] for row in existing_slips}
+        # Worker preference settings are stored in worker_details, not profiles.
+        try:
+            from core.database import get_service_client
+            from core.config import settings
+            if settings.SUPABASE_SERVICE_ROLE_KEY:
+                preference_rows = get_service_client().table("worker_details").select("user_id,notification_preferences").in_("user_id", target_uids).execute().data or []
+                for preference in preference_rows:
+                    if preference["user_id"] in profile_by_user:
+                        profile_by_user[preference["user_id"]]["notification_preferences"] = preference.get("notification_preferences") or {}
+        except Exception:
+            # An unavailable preference store must not result in an unsolicited email.
+            for profile in profile_by_user.values():
+                profile["notification_preferences"] = {"email": False, "in_app": True}
+
 
         slips_to_insert = []
         for uid, worker_records in user_records_map.items():
-            existing = supabase.table("salary_slips").select("id").eq("worker_id", uid).eq("period_start", payload.start_date).eq("period_end", payload.end_date).execute().data
-            if existing:
+            if uid in existing_workers:
                 continue
 
             prof = profile_by_user.get(uid, {})
-            daily_rate = prof.get("daily_rate") if prof.get("daily_rate") is not None else 3500
-            pay = calculate_payroll(worker_records, daily_rate)
+            from core.project_boq import resolve_boq_pay_terms
+            daily_rate, overtime_rate, rate_source = resolve_boq_pay_terms(boq_plan, prof)
+            pay = calculate_payroll(worker_records, daily_rate, overtime_rate)
             slips_to_insert.append({
                 "worker_id": uid,
                 "project_id": project_id,
-                "month": payload.start_date[:7] if len(payload.start_date) >= 7 else payload.start_date,
+                "month": start.replace(day=1).isoformat(),
                 "period_start": payload.start_date,
                 "period_end": payload.end_date,
                 **{key: pay[key] for key in ("total_days", "total_hours", "overtime_hours", "basic_pay", "overtime_pay", "total_pay")},
                 "total_amount": pay["total_pay"],
                 "daily_rate": pay["daily_rate"],
-                "status": "Generated"
+                "status": "Draft"
             })
+            if boq_plan:
+                trade = str(prof.get('worker_type') or '').strip().casefold()
+                rate_lines = [row for row in boq_plan.get('labour_rates', []) if str(row.get('trade') or row.get('role') or '').strip().casefold() == trade]
+                slips_to_insert[-1].update({'rate_source': rate_source, 'boq_revision': project_rows[0].get('boq_revision')})
+                if len(rate_lines) == 1 and rate_lines[0].get('id'):
+                    slips_to_insert[-1]['boq_item_id'] = rate_lines[0]['id']
         user_ids = [s["worker_id"] for s in slips_to_insert]
         if slips_to_insert:
             supabase.table("salary_slips").insert(slips_to_insert).execute()
@@ -390,6 +498,8 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                 notifications_to_insert = []
                 for uid in user_ids:
                     notifications_to_insert.append({
+                        "user_id": current_user["id"],
+                        "project_id": project_id,
                         "target_user_id": uid,
                         "target_role": "worker",
                         "title": "Salary Slip Ready",
@@ -399,7 +509,7 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                         "is_read": False,
                     })
                     profile = profile_by_user.get(uid)
-                    if profile and profile.get("email") and (profile.get("notification_preferences") or {}).get("email", True):
+                    if not is_test_project and profile and profile.get("email") and (profile.get("notification_preferences") or {}).get("email", True):
                         try:
                             from services.email_service import send_email
                             from html import escape
@@ -422,11 +532,17 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                 import logging
                 logging.exception("Payroll notification step failed (slips were still inserted)")
 
-        return {"generated": len(slips_to_insert), "slips": slips_to_insert}
+        return {"generated": len(slips_to_insert), "already_generated":len(existing_workers), "slips": slips_to_insert}
     except HTTPException:
         raise
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        if str(getattr(e,'code','')) == '23505':
+            raise HTTPException(409, detail={'code':'payroll_changed','message':'Payroll for this period was generated by another request. Refresh the existing salary slips before trying again.'}) from e
+        import logging
+        logging.exception('Salary generation failed')
+        raise HTTPException(503, 'Salary slips could not be generated. Please retry or contact your administrator.') from e
 
 
 @router.get("/worker/payroll")
@@ -443,14 +559,26 @@ def worker_payroll(month: str = Query(..., pattern=r"^\d{4}-\d{2}$"), current_us
     uid = current_user["id"]
     workers_res = client.table("workers").select("id").eq("user_id", uid).execute().data or []
     worker_ids = list({uid, *[w["id"] for w in workers_res if w.get("id")]})
-    records = client.table("attendance").select("*").in_("worker_id", worker_ids).gte("date", start).lte("date", end).execute().data or []
-    profile = client.table("profiles").select("daily_rate").eq("id", uid).single().execute().data
-    slips = client.table("salary_slips").select("*").eq("worker_id", uid).eq("period_start", start).eq("period_end", end).order("created_at", desc=True).execute().data or []
+    slips = client.table("salary_slips").select("*").in_("worker_id",worker_ids).lte("period_start",end).gte("period_end",start).order("period_start").execute().data or []
     if slips:
-        slip = slips[0]
-        return {**slip, "total_pay": slip.get("total_amount") if slip.get("total_amount") is not None else slip.get("total_pay"), "final": True, "slip_number": slip.get("slip_number")}
+        return summarize_salary_slips(slips,start,end)
+    records = client.table("attendance").select("*").in_("worker_id", worker_ids).gte("date", start).lte("date", end).execute().data or []
+    profile = client.table("profiles").select("id,daily_rate,worker_type").eq("id", uid).single().execute().data or {}
     try:
-        return {**calculate_payroll(records, profile.get("daily_rate")), "final": False}
+        from core.project_boq import estimate_project_payroll
+        plans_by_site = {}
+        site_ids = list({row['site_id'] for row in records if row.get('site_id')})
+        if site_ids:
+            sites = client.table('sites').select('id,project_id').in_('id',site_ids).execute().data or []
+            project_ids = list({row['project_id'] for row in sites if row.get('project_id')})
+            projects = client.table('projects').select('id,boq_data').in_('id',project_ids).execute().data or [] if project_ids else []
+            boq_by_project = {row['id']: dict(row.get('boq_data') or {}) for row in projects}
+            boq_ids = [key for key, value in boq_by_project.items() if value]
+            overrides = client.table('project_boq_worker_rates').select('project_id,worker_id,daily_rate').in_('project_id',boq_ids).eq('worker_id',uid).execute().data or [] if boq_ids else []
+            for row in overrides:
+                boq_by_project[row['project_id']].setdefault('labour_overrides',[]).append(row)
+            plans_by_site = {row['id']: {'project_id':row['project_id'],'boq_data':boq_by_project.get(row['project_id'])} for row in sites if row.get('project_id')}
+        return {**estimate_project_payroll(records, profile, plans_by_site), "final": False}
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 

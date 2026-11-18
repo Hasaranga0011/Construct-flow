@@ -1,11 +1,11 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { supabase } from '@/lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { notify } from '@/utils/notify';
 import { noAutofill } from '@/lib/formAutofill';
@@ -154,7 +154,7 @@ export default function AdminUsersCreatePage() {
         let errorData = {};
         try {
           errorData = await response.json();
-        } catch (e) {
+        } catch {
           const text = await response.text();
           console.error('Failed to parse error JSON, text was:', text);
         }
@@ -361,7 +361,7 @@ export default function AdminUsersCreatePage() {
         >
           <ModalViewport>
             <View className="bg-white max-h-full w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-              
+
               {/* Header */}
               <View className="p-5 border-b border-gray-100 bg-orange-50/60 flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
@@ -391,7 +391,7 @@ export default function AdminUsersCreatePage() {
               </View>
 
               <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20 }} style={{ flexShrink: 1 }}>
-                
+
                 {/* Rate limit status alert */}
                 <View className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 mb-4 flex-row items-start gap-2.5">
                   <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginTop: 2 }} />

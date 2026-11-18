@@ -163,7 +163,7 @@ export default function ClientProjectMapPage() {
       <View className="flex-1 p-4 md:p-6">
         {/* Header Row */}
         <View className="flex-row justify-between items-center mb-4 flex-wrap gap-2">
-          <View>
+          <View style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">
               Interactive Project Map
             </Text>

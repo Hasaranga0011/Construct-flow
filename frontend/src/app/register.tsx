@@ -1,16 +1,16 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Platform, View, Text, TextInput, Pressable, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { Platform, View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-
-WebBrowser.maybeCompleteAuthSession();
 import { getApiUrl } from '../lib/apiUrl';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { noAutofill } from '../lib/formAutofill';
 import { normalizeRole } from '../utils/auth';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type RoleCategory = 'all' | 'team' | 'partner';
 
@@ -87,10 +87,10 @@ export default function UnifiedRegisterScreen() {
   useEffect(() => {
     if (params.portal === 'team' || params.portal === 'internal') {
       setActiveTab('team');
-      if (!role || role === 'client' || role === 'supplier') setRole('pm');
+      setRole(current => !current || current === 'client' || current === 'supplier' ? 'pm' : current);
     } else if (params.portal === 'partner' || params.portal === 'external') {
       setActiveTab('partner');
-      if (!role || role === 'pm' || role === 'site_manager' || role === 'worker') setRole('client');
+      setRole(current => !current || current === 'pm' || current === 'site_manager' || current === 'worker' ? 'client' : current);
     }
 
     if (params.role) {
@@ -164,8 +164,8 @@ export default function UnifiedRegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters long.');
+    if (password.length < 12) {
+      setErrorMsg('Password must be at least 12 characters long.');
       return;
     }
 
@@ -214,36 +214,8 @@ export default function UnifiedRegisterScreen() {
       return;
     }
 
-    // 2. Direct Supabase sign up fallback if backend service was unreachable
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim(),
-            role: role,
-            contact_number: contactNumber.trim() || undefined,
-          }
-        }
-      });
-
-      if (error) {
-        console.error('Supabase SignUp Error:', error);
-        setErrorMsg(error.message || 'Registration failed. Please try again.');
-        setLoading(false);
-      } else {
-        if (data.session) {
-          await supabase.auth.signOut();
-        }
-        resetForm();
-        const targetLogin = portalType === 'partner' ? '/partner-login?registered=1' : '/team-login?registered=1';
-        router.replace(targetLogin as any);
-      }
-    } catch (fallbackErr: any) {
-      setErrorMsg(fallbackErr.message || 'An unexpected error occurred during registration.');
-      setLoading(false);
-    }
+    setErrorMsg('Registration service is unavailable. Please try again later.');
+    setLoading(false);
   };
 
   const handleGoogleAuth = async () => {
@@ -251,7 +223,7 @@ export default function UnifiedRegisterScreen() {
       setLoading(true);
       setErrorMsg('');
 
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       await AsyncStorage.setItem('pending_google_role', role);
 
       const redirectTo = Linking.createURL('auth/callback');

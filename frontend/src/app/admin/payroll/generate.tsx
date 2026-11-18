@@ -1,3 +1,6 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { PayrollGenerationNotice, payrollFailure } from '@/components/labour/PayrollGenerationNotice';
+import { AttendancePeriodReview } from '@/components/labour/AttendancePeriodReview';
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
@@ -5,16 +8,20 @@ import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
 
 export default function AdminPayrollGeneratePage() {
+  const params = useLocalSearchParams<{project?:string}>();
+  const router = useRouter();
+  const [failure, setFailure] = useState<ReturnType<typeof payrollFailure> | null>(null);
   const [loading, setLoading] = useState(false);
   const [sites, setSites] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     start_date: new Date(new Date().setDate(1)).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
-    site_id: ''
+    site_id: String(params.project || '')
   });
 
   const [result, setResult] = useState<any>(null);
+  useEffect(() => { setFailure(null); setResult(null); }, [formData.site_id, formData.start_date, formData.end_date]);
 
   useEffect(() => {
     const fetchSites = async () => {
@@ -25,6 +32,7 @@ export default function AdminPayrollGeneratePage() {
   }, []);
 
   const handleGenerate = async () => {
+    if (loading) return;
     if (!formData.site_id || !formData.start_date || !formData.end_date) {
       Alert.alert('Error', 'Please fill out all fields');
       return;
@@ -32,6 +40,7 @@ export default function AdminPayrollGeneratePage() {
 
     setLoading(true);
     setResult(null);
+    setFailure(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
 
@@ -46,13 +55,13 @@ export default function AdminPayrollGeneratePage() {
 
       const resData = await response.json();
       if (!response.ok) {
-        throw new Error(resData.detail || 'Failed to generate payroll');
+        setFailure(payrollFailure(resData.detail));
+        return;
       }
 
       setResult(resData);
-      Alert.alert('Success', `Generated ${resData.generated} salary slips successfully!`);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      setFailure(payrollFailure(err.message));
     } finally {
       setLoading(false);
     }
@@ -99,7 +108,11 @@ export default function AdminPayrollGeneratePage() {
             </View>
           </View>
 
+          <AttendancePeriodReview projectId={formData.site_id} start={formData.start_date} end={formData.end_date} />
+          {failure && <PayrollGenerationNotice {...failure} onView={row => router.push((row ? `/admin/payroll/${row.worker_id}` : '/admin/payroll') as any)} />}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Generate Salary Slips"
             onPress={handleGenerate}
             disabled={loading}
             style={[{ backgroundColor: loading ? '#FDBA74' : '#F97316', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 24, minHeight: 56 }, { minHeight: 44, minWidth: 44 }]}
@@ -110,8 +123,8 @@ export default function AdminPayrollGeneratePage() {
 
           {result && (
              <View className="bg-green-50 border border-green-200 p-4 rounded-xl items-center">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-700 font-bold text-lg">Completed!</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-600">{result.generated} slips generated and saved to the database.</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-700 font-bold text-lg">{result.generated > 0 ? 'Completed!' : result.already_generated > 0 ? 'Already generated' : 'No payable attendance'}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-green-600">{result.generated} new slips saved.{result.already_generated > 0 ? ` ${result.already_generated} existing slips were kept.` : ''}</Text>
              </View>
           )}
         </View>

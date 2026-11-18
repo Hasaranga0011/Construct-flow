@@ -17,7 +17,7 @@ export const MaterialsStockChart = () => {
         .select('current_stock, minimum_threshold');
 
       if (error) throw error;
-      
+
       let healthy = 0;
       let lowStock = 0;
       let outOfStock = 0;
@@ -66,7 +66,7 @@ export const MaterialsStockChart = () => {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <ActivityIndicator color="#F97316" size="large" />
       </View>
     );
@@ -74,7 +74,7 @@ export const MaterialsStockChart = () => {
 
   if (data.length === 0) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <Ionicons name="pie-chart-outline" size={48} color="#D1D5DB" />
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">No material data available.</Text>
       </View>
@@ -82,9 +82,9 @@ export const MaterialsStockChart = () => {
   }
 
   return (
-    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Materials Stock Health</Text>
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mb-2">Global inventory status across all items</Text>
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px]">
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">Materials Stock Health</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs mb-2">Global inventory status across all items</Text>
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}
@@ -105,7 +105,7 @@ export const MaterialsStockChart = () => {
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
             </Pie>
-            <Tooltip 
+            <Tooltip
               formatter={(val) => [`${val} Items`, 'Count']}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />

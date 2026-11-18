@@ -4,7 +4,8 @@ from typing import Optional
 import os
 import httpx
 from dotenv import load_dotenv
-from core.security import get_current_user
+from core.security import get_current_user, require_admin
+from core.database import client_for_token
 from core.notification_helper import create_notification
 from core.config import settings
 load_dotenv()
@@ -40,9 +41,9 @@ class SystemNotificationPayload(BaseModel):
     project_id: Optional[str] = None
 
 @router.post("/system")
-async def send_system_notification(payload: SystemNotificationPayload, current_user: dict = Depends(get_current_user)):
+async def send_system_notification(payload: SystemNotificationPayload, current_user: dict = Depends(require_admin)):
     """Send an in-app system notification, verifying caller JWT."""
-    create_notification(
+    saved = create_notification(
         type=payload.type,
         user_id=current_user["id"],
         title=payload.title,
@@ -54,6 +55,8 @@ async def send_system_notification(payload: SystemNotificationPayload, current_u
         is_read=False,
         sent_via="in_app"
     )
+    if not saved:
+        raise HTTPException(503, "Notification was not saved")
     return {"success": True}
 
 class MarkReadPayload(BaseModel):
@@ -62,40 +65,26 @@ class MarkReadPayload(BaseModel):
 
 @router.patch("/mark-read")
 async def mark_notifications_read(payload: MarkReadPayload, current_user: dict = Depends(get_current_user)):
-    """Bypass strict RLS to mark notifications as read for the current user."""
     try:
-        admin_client = get_admin_supabase()
-        updated_count = 0
+        result = client_for_token(current_user["token"]).rpc("mark_own_notifications_read", {"p_ids": payload.ids, "p_all": bool(payload.all)}).execute()
+        return {"success": True, "updated": result.data}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Could not save notification receipts") from exc
 
-        if payload.all:
-            user_id = current_user.get("id")
-            role = current_user.get("role", "")
-            
-            # 1. Update notifications targeted specifically at this user
-            if user_id:
-                admin_client.table("notifications").update({"is_read": True}).eq("target_user_id", user_id).eq("is_read", False).execute()
-            
-            # 2. Update role-targeted notifications
-            if role:
-                admin_client.table("notifications").update({"is_read": True}).eq("target_role", role).eq("is_read", False).execute()
-                for r in [role.capitalize(), role.title(), role.lower(), role.upper()]:
-                    if r != role:
-                        admin_client.table("notifications").update({"is_read": True}).eq("target_role", r).eq("is_read", False).execute()
+@router.get("/")
+def list_notifications(current_user: dict = Depends(get_current_user)):
+    try:
+        return client_for_token(current_user["token"]).rpc("get_own_notifications").execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Could not load notifications") from exc
 
-            # 3. Update broadcast 'All' notifications
-            admin_client.table("notifications").update({"is_read": True}).eq("target_role", "All").eq("is_read", False).execute()
+@router.get("/email/health")
+def email_health(current_user: dict = Depends(require_admin)):
+    return {"configured": bool(settings.RESEND_API_KEY or os.getenv("BREVO_API_KEY") or settings.SMTP_HOST)}
 
-        if payload.ids:
-            admin_client.table("notifications").update({"is_read": True}).in_("id", payload.ids).execute()
-            updated_count += len(payload.ids)
-
-        return {"success": True, "updated": updated_count}
-    except Exception as e:
-        logging.error(f"Failed to mark notifications as read: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 class EmailPayload(BaseModel):
-    to: str
+    to: EmailStr
     subject: str
     html_body: str
     reply_to: Optional[str] = None
@@ -112,14 +101,16 @@ async def send_email(to: str, subject: str, html_body: str) -> dict:
         return {"status": "logged", "error": str(e)}
 
 
-@router.post("/email/send")
+@router.post("/email/send", dependencies=[Depends(require_admin)])
 async def send_custom_email(payload: EmailPayload):
     """Send a custom email via Resend."""
     result = await send_email(payload.to, payload.subject, payload.html_body)
+    if result.get("status") != "success":
+        raise HTTPException(status_code=502, detail="Email delivery failed")
     return {"success": True, "result": result}
 
 
-@router.post("/email/material-approved")
+@router.post("/email/material-approved", dependencies=[Depends(require_admin)])
 async def notify_material_approved(
     supplier_email: str,
     item_name: str,
@@ -149,10 +140,12 @@ async def notify_material_approved(
     </div>
     """
     result = await send_email(supplier_email, f"New Order: {quantity} {unit} of {item_name}", html)
+    if result.get("status") != "success":
+        raise HTTPException(status_code=502, detail="Email delivery failed")
     return {"success": True, "result": result}
 
 
-@router.post("/email/material-rejected")
+@router.post("/email/material-rejected", dependencies=[Depends(require_admin)])
 async def notify_material_rejected(
     requester_email: str,
     item_name: str,
@@ -178,4 +171,6 @@ async def notify_material_rejected(
     </div>
     """
     result = await send_email(requester_email, f"Request Rejected: {item_name}", html)
+    if result.get("status") != "success":
+        raise HTTPException(status_code=502, detail="Email delivery failed")
     return {"success": True, "result": result}

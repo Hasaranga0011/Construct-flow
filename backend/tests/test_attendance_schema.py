@@ -9,6 +9,7 @@ class Query:
     def select(self, columns):
         if self.name == 'attendance': assert 'status' not in columns
         return self
+    def is_(self, key, value): return self
     def eq(self, key, value): self.filters[key] = value; return self
     def single(self): return self
     def order(self, key): return self

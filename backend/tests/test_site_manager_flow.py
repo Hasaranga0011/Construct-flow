@@ -55,10 +55,11 @@ class FakeClient:
 def test_milestone_percentage_and_notes_reach_database(monkeypatch):
     client = FakeClient()
     monkeypatch.setattr(projects, "authorized_project_client", lambda *a, **kw: client)
+    calls = []
+    client.rpc = lambda name, args: (calls.append((name, args)) or SimpleNamespace(execute=lambda: SimpleNamespace(data={"id": "m1"})))
     projects.update_milestone("p1", "m1", projects.MilestoneUpdate(status="In Progress", completion_percentage=42, description="Inspection complete"), {"id": "manager", "role": "site_manager"})
-    assert client.updates[0] == ("milestones", {"status": "In Progress", "completion_percentage": 42, "description": "Inspection complete"})
-    assert ("project_id", "p1") in client.filters
-    assert ("id", "m1") in client.filters
+    assert calls == [("update_project_milestone", {"p_project_id": "p1", "p_milestone_id": "m1", "p_data": {"status": "In Progress", "completion_percentage": 42, "description": "Inspection complete"}})]
+    assert client.updates == []
 
 
 def test_foreign_site_cannot_be_attached_to_report(monkeypatch):
@@ -122,12 +123,20 @@ def test_upload_saves_to_storage_and_returns_url(monkeypatch):
             self.storage = SimpleNamespace(from_=lambda bucket: FakeBucket())
 
     monkeypatch.setattr(media, "_get_storage_client", lambda: FakeClient())
-    upload = UploadFile(BytesIO(b"test-image"), filename="photo.png", headers=Headers({"content-type": "image/png"}))
-    res = asyncio.run(media.upload_site_photo(file=upload, project_id="p1", caption="Inspection", site_id=None, current_user={"id": "manager"}))
-    assert "p1" in captured["path"]
-    assert captured["file"] == b"test-image"
-    assert captured["file_options"]["content-type"] == "image/png"
-    assert res["project_id"] == "p1"
+    from PIL import Image
+    image_bytes = BytesIO()
+    Image.new("RGB", (2,2)).save(image_bytes,format="PNG")
+    image_bytes.seek(0)
+    project_id = "00000000-0000-0000-0000-000000000001"
+    monkeypatch.setattr(media,"client_for_token",lambda token:object())
+    monkeypatch.setattr(media,"require_project_member",lambda *args:None)
+    upload = UploadFile(image_bytes, filename="photo.html", headers=Headers({"content-type":"image/png"}))
+    res = asyncio.run(media.upload_site_photo(file=upload, project_id=project_id, caption="Inspection", site_id=None, current_user={"id":"manager","role":"site_manager","token":"jwt"}))
+    assert project_id in captured["path"]
+    assert captured["path"].endswith(".jpg")
+    assert captured["file"].startswith(bytes([255,216]))
+    assert captured["file_options"]["content-type"] == "image/jpeg"
+    assert res["project_id"] == project_id
     assert res["caption"] == "Inspection"
     assert res["storage_provider"] == "supabase"
     assert "https://example.supabase.co" in res["url"]

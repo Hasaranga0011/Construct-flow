@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
 import { Icon } from '../ui/Icon';
 
@@ -18,14 +18,14 @@ const DeliveryRow = ({ order, onOpenOrder }: { order: any, onOpenOrder: (id: str
 
       <View className="flex-1">
         <View className="flex-row items-center mb-0.5">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mr-2">{order.items || order.po_number}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-bold text-sm mr-2">{order.items || order.po_number}</Text>
           {isLate && (
              <View className="bg-red-100 px-2 py-0.5 rounded">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 text-[10px] font-bold uppercase">Overdue</Text>
              </View>
           )}
         </View>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-[10px] mb-1">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-[10px] mb-1">
           Due: {order.expected_date || 'TBD'} | Qty: {order.quantity_ordered}
         </Text>
         <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3}
@@ -35,7 +35,7 @@ const DeliveryRow = ({ order, onOpenOrder }: { order: any, onOpenOrder: (id: str
               else Alert.alert('Project Location', projectLocation);
             }
           }}
-          className={`text-gray-500 text-xs ${projectLocation ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
+          className={`text-slate-500 dark:text-slate-400 text-xs ${projectLocation ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
 
         >
           {projectName}
@@ -65,11 +65,11 @@ export const SupplierPendingDeliveries = ({
   const loading = sourceLoading;
 
   return (
-    <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
       <View className="mb-4 flex-row items-center justify-between">
         <View>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800">Pending Deliveries</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">Confirmed orders awaiting dispatch</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-slate-800 dark:text-slate-100">Pending Deliveries</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs mt-1">Confirmed orders awaiting dispatch</Text>
         </View>
         <View className="w-8 h-8 rounded-full bg-orange-50 items-center justify-center">
           <Icon name="boxes" size={14} color="#F97316" />

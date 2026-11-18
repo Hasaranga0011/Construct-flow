@@ -45,7 +45,7 @@ const DeliveryRow = ({ order }: { order: any }) => {
   );
 };
 
-export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '', allowedProjectIds }: { refreshTrigger?: number, projectId?: string, allowedProjectIds?: string[] }) => {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const [orders, setOrders] = useState<any[]>([]);
@@ -64,8 +64,12 @@ export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refr
 
         let pmProjectIds: string[] = [];
         if (isPM && user?.id) {
-          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
-          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (allowedProjectIds) pmProjectIds = allowedProjectIds;
+          else {
+            const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+            if (projectError) throw projectError;
+            pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          }
           if (pmProjectIds.length === 0) {
             if (isMounted) {
               setOrders([]);
@@ -106,7 +110,7 @@ export const PendingDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refr
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId, isPM, user?.id]);
+  }, [refreshTrigger, projectId, isPM, user?.id, allowedProjectIds]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">

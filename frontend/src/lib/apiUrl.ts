@@ -88,7 +88,7 @@ export function resolveApiUrl(configured: string | undefined, platform: string, 
 
     const isHostLoopback = !developmentHost || LOOPBACK_HOSTS.has(developmentHost.toLowerCase().trim());
 
-    if (!isHostLoopback && !developmentHost.endsWith('.exp.direct')) {
+    if (isPrivateOrLoopbackHost(url.hostname) && !isHostLoopback && !developmentHost.endsWith('.exp.direct')) {
       // Use the actual IP of the machine running the Expo bundler and backend API
       url.hostname = developmentHost;
     } else if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase().trim())) {

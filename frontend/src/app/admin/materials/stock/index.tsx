@@ -3,13 +3,13 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { firstRelation } from '@/utils/relations';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { format } from 'date-fns';
-import { Modal } from 'react-native';
+
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
 import { useAuth } from '@/context/AuthContext';

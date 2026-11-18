@@ -13,9 +13,16 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
     ANTHROPIC_API_KEY: str = ""
+    ENVIRONMENT: str = "production"
     ENABLE_SCHEDULER: bool = False
+    ALLOW_LOCAL_UPLOADS: bool = False
     CORS_ORIGINS: str = "http://localhost:8081,http://localhost:8082,http://localhost:19006,http://localhost:3000"
     FRONTEND_URL: str = "http://localhost:8082"
+    # A browser-restricted key for Google Maps JavaScript + Places (New).
+    # This key is intentionally delivered only in the isolated Google map document.
+    GOOGLE_MAPS_BROWSER_KEY: str = ""
+    GOOGLE_MAP_ID: str = ""
+    GEOAPIFY_API_KEY: str = ""
     # Optional SMTP settings for direct email delivery
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

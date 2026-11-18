@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { Icon } from '../ui/Icon';
-import { api } from '../../services/api';
 
 const AlertRow = ({ title, project, location, date }: { title: string, project: string, location?: string, date: string }) => {
   return (
@@ -20,7 +19,7 @@ const AlertRow = ({ title, project, location, date }: { title: string, project: 
               });
             }
           }}
-          className={`text-gray-500 text-xs ${location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
+          className={`text-slate-500 dark:text-slate-400 text-xs ${location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
 
         >
           {project}
@@ -35,13 +34,8 @@ export const SupplierAlertsPanel = ({ orders, loading = false }: { orders: any[]
   // Same definition as the "Late Deliveries" stat card (see isLateOrder in useSupplierOrders).
   const alerts = orders.slice(0, 5);
 
-  useEffect(() => {
-    // Ask the backend to generate overdue notifications once per mount; display data is live via props.
-    api.purchaseOrders.checkLate().catch(() => {});
-  }, []);
-
   return (
-    <View className="bg-white rounded-lg p-6 shadow-sm border border-red-100">
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-red-100 dark:border-red-950">
       <View className="mb-4 flex-row items-center justify-between">
         <View>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Late Deliveries</Text>

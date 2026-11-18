@@ -1,6 +1,6 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
@@ -10,6 +10,7 @@ import { PhoneInput } from '@/components/common/PhoneInput';
 import { AmountInput } from '@/components/common/AmountInput';
 
 import { RoleAvatar } from '@/components/common/RoleAvatar';
+import { roleLabel } from '@/utils/roles';
 
 const ROLES = [
   { label: 'Admin', value: 'super_admin' },
@@ -26,7 +27,7 @@ export default function AdminUsersEditPage() {
   const { id } = useLocalSearchParams();
   const userId = Array.isArray(id) ? id[0] : (id || '');
   const router = useRouter();
-  
+
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -63,7 +64,7 @@ export default function AdminUsersEditPage() {
           .single();
 
         if (error) throw error;
-        
+
         if (data && isMounted) {
           setFullName(data.full_name || '');
           setEmail(data.email || '');
@@ -82,9 +83,9 @@ export default function AdminUsersEditPage() {
         if (isMounted) setInitialLoading(false);
       }
     };
-    
+
     if (!userId) return;
-    if (id) fetchUser();
+    fetchUser();
     return () => { isMounted = false; };
   }, [userId]);
 
@@ -122,12 +123,12 @@ export default function AdminUsersEditPage() {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Failed to delete user');
       }
-      
+
       notify('Success', 'User has been removed successfully.');
       router.back();
     } catch (err: any) {
@@ -207,7 +208,7 @@ export default function AdminUsersEditPage() {
               <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-500 mt-0.5">{email || 'No email'}</Text>
               <View className="mt-2 flex-row items-center gap-2">
                 <View className="px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200 self-start">
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-brand-orange uppercase">{selectedRole.replace('_', ' ')}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-bold text-brand-orange uppercase">{roleLabel(selectedRole)}</Text>
                 </View>
                 <View className={`px-2.5 py-0.5 rounded-full self-start ${isApproved ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[11px] font-bold uppercase ${isApproved ? 'text-emerald-700' : 'text-amber-700'}`}>
@@ -378,7 +379,7 @@ export default function AdminUsersEditPage() {
               : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500 font-bold text-base">Delete User</Text>
             }
           </Pressable>
-        
+
         </View>
       </ScrollView>
     </View>

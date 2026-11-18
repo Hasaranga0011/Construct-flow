@@ -3,6 +3,26 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 
+def summarize_salary_slips(slips, start, end):
+    """Recorded pay periods overlapping a month; never invent cross-month proration."""
+    unique = {row['id']:row for row in slips}
+    rows = list(unique.values())
+    def total(field, fallback=None):
+        return float(sum((Decimal(str(row.get(field) if row.get(field) is not None else row.get(fallback) or 0)) for row in rows),Decimal(0)).quantize(Decimal('0.01'),rounding=ROUND_HALF_UP))
+    rates = {row.get('daily_rate') for row in rows if row.get('daily_rate') is not None}
+    return {
+        'summary_kind':'recorded_slips','final':True,'slip_count':len(rows),'slips':rows,
+        'period_start':start,'period_end':end,
+        'slip_number':rows[0].get('slip_number') if len(rows)==1 else None,
+        'total_days':total('total_days'),'total_hours':total('total_hours'),
+        'overtime_hours':total('overtime_hours'),'basic_pay':total('basic_pay'),
+        'overtime_pay':total('overtime_pay'),'deductions':total('deductions'),
+        'total_pay':total('total_amount','total_pay'),
+        'daily_rate':next(iter(rates)) if len(rates)==1 else None,
+        'includes_cross_month_periods':any(row['period_start']<start or row['period_end']>end for row in rows),
+    }
+
+
 def _is_present(record: dict) -> bool:
     status = record.get("status")
     if status is not None:
@@ -37,17 +57,25 @@ def _record_hours_and_overtime(record: dict) -> tuple[Decimal, Decimal]:
     return hw, ot
 
 
-def calculate_payroll(records, daily_rate):
+def calculate_payroll(records, daily_rate, overtime_rate=None):
     present = [r for r in (records or []) if _is_present(r)]
     days = len({r["date"] for r in present if r.get("date")})
-    pairs = [_record_hours_and_overtime(r) for r in present]
+    grouped = {}
+    for record in present:
+        key = record.get("date") or record.get("id")
+        hours, overtime = _record_hours_and_overtime(record)
+        if hours < 0 or overtime < 0:
+            raise ValueError("Attendance hours cannot be negative")
+        previous = grouped.get(key, (Decimal(0), Decimal(0)))
+        grouped[key] = (max(hours, previous[0]), max(overtime, previous[1]))
+    pairs = list(grouped.values())
     hours = sum((p[0] for p in pairs), Decimal(0))
     overtime = sum((p[1] for p in pairs), Decimal(0))
     if daily_rate is None and days:
         raise ValueError("Your daily rate has not been set. Please contact your Project Manager.")
     rate = Decimal(str(daily_rate or 0))
     base = rate * days
-    extra = overtime * rate / Decimal(8) * Decimal("1.5")
+    extra = overtime * (Decimal(str(overtime_rate)) if overtime_rate is not None else rate / Decimal(8) * Decimal("1.5"))
     amount = lambda n: float(n.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     hours_num = lambda n: float(n.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
     return {

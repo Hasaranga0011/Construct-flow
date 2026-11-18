@@ -27,7 +27,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       setColorScheme(dark ? 'dark' : 'light');
       applyTheme(dark);
     });
-  }, []);
+  }, [setColorScheme]);
 
   const applyTheme = (dark: boolean) => {
     if (Platform.OS === 'web') {

@@ -16,7 +16,7 @@ class ProfileClient:
     def select(self, *args): return self
     def eq(self, *args): return self
     def single(self): return self
-    def execute(self): return SimpleNamespace(data={"role": self.role})
+    def execute(self): return SimpleNamespace(data={"role": self.role, "is_approved": True})
 
 @pytest.mark.parametrize("stored, expected", [("Admin", "super_admin"), ("super_admin", "super_admin"), ("Project Manager", "pm"), ("worker", "worker")])
 def test_roles_use_caller_authenticated_profile(monkeypatch, stored, expected):

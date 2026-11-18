@@ -1,12 +1,4 @@
-import {
-  isValidSriLankanPhone,
-  normalizeToE164,
-  formatSriLankanPhoneLocal,
-  formatPhoneAsYouType,
-  toTelLink,
-  toWhatsAppLink,
-  LK_PHONE_ERROR_MESSAGE,
-} from '../phone';
+import { isValidSriLankanPhone, normalizeToE164, formatSriLankanPhoneLocal, formatPhoneAsYouType, toTelLink, toWhatsAppLink } from '../phone';
 
 describe('Sri Lankan phone number utilities', () => {
   describe('normalizeToE164 and isValidSriLankanPhone', () => {

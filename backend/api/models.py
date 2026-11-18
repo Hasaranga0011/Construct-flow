@@ -1,7 +1,10 @@
 from core.notification_helper import create_notifications
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Union, List, Dict, Any
 from datetime import date, datetime
+from datetime import date as CalendarDate
+from zoneinfo import ZoneInfo
+from typing import Literal
 import uuid
 
 # --- Projects ---
@@ -17,14 +20,23 @@ class ProjectBase(BaseModel):
     end_date: date
     client_id: Optional[str] = None
     pm_id: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
     address: Optional[str] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = Field(default_factory=list)
     is_test: bool = False
 
 class ProjectCreate(ProjectBase):
+    @model_validator(mode="after")
+    def valid_project(self):
+        if not self.name.strip() or not self.location.strip() or self.end_date < self.start_date:
+            raise ValueError("Project name, location and a chronological date range are required")
+        if self.boq_data:
+            from core.project_boq import normalize_boq
+            self.boq_data = normalize_boq(self.boq_data)
+        return self
+
     site_managers: Optional[list[str]] = None
     workers: Optional[list[str]] = None
     suppliers: Optional[list[str]] = None
@@ -41,12 +53,12 @@ class ProjectUpdate(BaseModel):
     total_budget: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     budget: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     spent_cost: Optional[float] = None
-    start_date: Optional[Union[date, str]] = None
-    end_date: Optional[Union[date, str]] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     client_id: Optional[str] = None
     pm_id: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
     address: Optional[str] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
@@ -140,11 +152,18 @@ class LabourBase(BaseModel):
     hours_worked: float = 0.0
 
 class LabourCreate(LabourBase):
-    pass
+    worker_id: str = Field(min_length=1)
+    work_date: CalendarDate = Field(default_factory=lambda: datetime.now(ZoneInfo('Asia/Colombo')).date(), alias='date')
+    check_in_time: Optional[datetime] = None
+    status: Literal['Present', 'Absent', 'On Leave']
+    hours_worked: float = Field(default=0, ge=0, le=24, allow_inf_nan=False)
 
 class LabourResponse(LabourBase):
     id: str
+    site_id: Optional[str] = None
+    worker_id: Optional[str] = None
     check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
     date: date
     created_at: datetime
 
@@ -171,13 +190,13 @@ class ClientResponse(ClientBase):
 
 class EstimationBase(BaseModel):
     project_name: str
-    estimated_cost: float
+    estimated_cost: float = Field(gt=0, allow_inf_nan=False)
     status: str
     confidence_score: Optional[int] = Field(None, ge=0, le=100)
     district: Optional[str] = None
     town: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
     project_id: Optional[str] = None
 
 class EstimationCreate(EstimationBase):
@@ -213,11 +232,13 @@ class ExpenseBase(BaseModel):
     project_id: str
     title: str
     description: Optional[str] = None
-    amount: float = Field(..., ge=0)
+    amount: float = Field(..., ge=0, allow_inf_nan=False)
     expense_date: Optional[date] = None
     category: Optional[str] = None
     material_id: Optional[str] = None
-    quantity_used: Optional[float] = Field(None, ge=0)
+    quantity_used: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    purchase_order_id: Optional[str] = None
+    boq_item_id: Optional[uuid.UUID] = None
 
 class ExpenseCreate(ExpenseBase):
     pass

@@ -1,15 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Modal,
-  FlatList,
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, Pressable, Modal, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 

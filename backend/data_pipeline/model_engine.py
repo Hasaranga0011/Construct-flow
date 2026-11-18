@@ -17,6 +17,9 @@ Implements:
 from __future__ import annotations
 
 import datetime
+import hashlib
+import io
+import tempfile
 import json
 import logging
 import math
@@ -64,7 +67,7 @@ FEATURE_DISPLAY_NAMES = {
     "floor_area_sqft": "Floor Area (Sq Ft)",
 }
 
-MODELS_DIR = Path(__file__).resolve().parents[1] / "models"
+MODELS_DIR = Path(os.environ.get("CONSTRUCTFLOW_MODEL_DIR", str(Path(__file__).resolve().parents[1] / "models")))
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 COST_MODEL_PKL = MODELS_DIR / "cost_predictor.pkl"
@@ -338,12 +341,22 @@ def train_historical_model(df: pd.DataFrame) -> Tuple[Pipeline, Dict[str, Any], 
     return pipe, {}, importances
 
 
+def _evaluation_baseline(row):
+    return compute_hybrid_bottom_up(
+        floor_area_sqft=float(row["floor_area_sqft"]), floors=int(row.get("floors", 1)),
+        district=row["district"], project_type=row["project_type"], quality_tier=row["quality_tier"],
+        site_condition=row.get("site_condition", "Flat"), cost_year=int(row.get("cost_year", 2024)),
+    )["bottom_up_total_lkr"]
+
+
 def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
     """
     STRICT EVALUATION ON HELD-OUT REAL PROJECTS ONLY.
     (Leave-one-out or k-fold by project, NEVER on rows used for fitting)
     """
     real_df = real_df.copy()
+    if real_df.empty:
+        real_df = pd.DataFrame(columns=ALL_FEATURES + ["actual_total_lkr", "log_cost_per_sqft"])
     if "log_cost_per_sqft" not in real_df.columns:
         real_df["log_cost_per_sqft"] = np.log(
             np.maximum(real_df["actual_total_lkr"] / np.maximum(real_df["floor_area_sqft"], 1.0), 100.0)
@@ -396,7 +409,8 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
                     test_row["project_type"].values[0],
                     test_row["quality_tier"].values[0]
                 )
-                y_baseline_preds[i] = b_sqft * real_floor_areas[i]
+                y_baseline_preds[i] = _evaluation_baseline(test_row.iloc[0])
+                y_heldout_preds[i] = 0.7 * y_heldout_preds[i] + 0.3 * y_baseline_preds[i]
 
             real_mape = round(calculate_mape(y_real_actual_cost, y_heldout_preds), 2)
             baseline_mape = round(calculate_mape(y_real_actual_cost, y_baseline_preds), 2)
@@ -426,7 +440,8 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
                     b_sqft = compute_baseline_cost_per_sqft(
                         row_t["district"], row_t["project_type"], row_t["quality_tier"]
                     )
-                    y_baseline_preds[t_i] = b_sqft * real_floor_areas[t_i]
+                    y_baseline_preds[t_i] = _evaluation_baseline(row_t)
+                    y_heldout_preds[t_i] = 0.7 * y_heldout_preds[t_i] + 0.3 * y_baseline_preds[t_i]
 
             real_mape = round(calculate_mape(y_real_actual_cost, y_heldout_preds), 2)
             baseline_mape = round(calculate_mape(y_real_actual_cost, y_baseline_preds), 2)
@@ -441,7 +456,7 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
         ci_upper = round((real_mape or 0.0) + margin_95, 1)
 
         is_indicative = (real_count < 100)
-        confidence_interval_note = "Indicative (n < 100)" if is_indicative else "Statistically robust (n ≥ 100)"
+        confidence_interval_note = "Indicative (n < 100)" if is_indicative else "Cross-validation estimate; coverage is not guaranteed"
         confidence_interval_display = f"±{margin_95}% (95% CI: [{ci_lower}%, {ci_upper}%], {confidence_interval_note})"
 
     elif real_count == 1:
@@ -468,6 +483,7 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
         "confidence_interval_note": confidence_interval_note,
         "confidence_interval_display": confidence_interval_display,
         "ci_95": f"[{ci_lower}%, {ci_upper}%]",
+        "prediction_interval_pct": float(np.quantile(np.abs(y_real_actual_cost - y_heldout_preds) / np.maximum(y_heldout_preds, 1), 0.90, method="higher")) if real_count >= 30 else None,
         "margin_95": margin_95,
         "ci_lower": ci_lower,
         "ci_upper": ci_upper,
@@ -553,6 +569,7 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
         "synthetic_rows_included": has_bootstrap,
         "validation_mape": real_mape,
         "validation_mae": real_mae,
+        "prediction_interval_pct": eval_res.get("prediction_interval_pct"),
         "baseline_mape": baseline_mape,
         "evaluation_method": evaluation_method,
         "validation_status": validation_status,
@@ -565,9 +582,25 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
         "cost_driver_note": "The model predicts log cost per sq ft, so floor area has a small direct importance by design.",
     }
 
-    # Save artifact
-    joblib.dump(production_model, COST_MODEL_PKL, compress=3)
-    COST_META_JSON.write_text(json.dumps(meta, indent=2))
+    # Atomic artifacts plus a shared digest reject mixed generations during retraining.
+    artifact = io.BytesIO()
+    joblib.dump(production_model, artifact, compress=3)
+    payload = artifact.getvalue()
+    meta["artifact_sha256"] = hashlib.sha256(payload).hexdigest()
+    def publish(path, content):
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+                temporary = stream.name
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary and os.path.exists(temporary):
+                os.unlink(temporary)
+    publish(COST_MODEL_PKL, payload)
+    publish(COST_META_JSON, json.dumps(meta, indent=2).encode("utf-8"))
     logger.info("Cost model and metadata saved successfully: %s", meta)
 
     return meta
@@ -606,6 +639,8 @@ def predict_cost_hybrid(
         cost_year=target_year,
     )
 
+    current_real_count = get_real_projects_count()
+    used_ml = False
     # 2. ML Log-Scale Prediction
     ml_predicted_cost = bottom_up["bottom_up_total_lkr"]
     meta = {}
@@ -615,9 +650,13 @@ def predict_cost_hybrid(
         except Exception:
             pass
 
-    if COST_MODEL_PKL.exists():
+    ml_enabled = (current_real_count >= 30 and meta.get("real_projects_count", 0) >= 30 and meta.get("validation_mape") is not None and meta.get("baseline_mape") is not None and meta["validation_mape"] <= meta["baseline_mape"])
+    if ml_enabled and COST_MODEL_PKL.exists():
         try:
-            model = joblib.load(COST_MODEL_PKL)
+            payload = COST_MODEL_PKL.read_bytes()
+            if not meta.get("artifact_sha256") or hashlib.sha256(payload).hexdigest() != meta["artifact_sha256"]:
+                raise ValueError("Cost model metadata does not match its published artifact; retrain the model")
+            model = joblib.load(io.BytesIO(payload))
             input_df = pd.DataFrame([{
                 "district": canonical_district,
                 "project_type": canonical_type,
@@ -632,6 +671,7 @@ def predict_cost_hybrid(
             pred_log_sqft = float(model.predict(input_df[ALL_FEATURES])[0])
             pred_cost_sqft = math.exp(pred_log_sqft)
             ml_predicted_cost = pred_cost_sqft * floor_area_sqft
+            used_ml = True
         except Exception as e:
             logger.warning("ML prediction failed, using bottom-up: %s", e)
 
@@ -639,8 +679,8 @@ def predict_cost_hybrid(
     final_estimate = round(0.70 * ml_predicted_cost + 0.30 * bottom_up["bottom_up_total_lkr"], 2)
     correction_factor = round(final_estimate / (bottom_up["bottom_up_total_lkr"] or 1), 3)
 
-    # 3. Honest Uncertainty Range (+/- 15% to 20%)
-    uncertainty_pct = 0.15 if quality_tier == "Standard" else 0.20
+    # 3. Empirical residual range, or an uncalibrated planning range.
+    uncertainty_pct = max(0.15, float(meta.get("prediction_interval_pct") or 0.35)) if used_ml else 0.35
     range_min = round(final_estimate * (1.0 - uncertainty_pct), -3)
     range_max = round(final_estimate * (1.0 + uncertainty_pct), -3)
 
@@ -654,16 +694,15 @@ def predict_cost_hybrid(
         "cost_breakdown": bottom_up["breakdown"],
         "quantities_summary": bottom_up["quantities"],
         "district": canonical_district,
-        "real_projects_count": meta.get("real_projects_count", 0),
+        "real_projects_count": current_real_count,
+        "model_source": "hybrid_real_calibrated" if used_ml else "rate_based_baseline",
         "validation_mape": meta.get("validation_mape"),
         "baseline_mape": meta.get("baseline_mape"),
         "evaluation_method": meta.get("evaluation_method", "Leave-one-out"),
         "validation_status": meta.get("validation_status", "Estimating with hybrid quantity model"),
         "confidence_interval_display": meta.get("confidence_interval_display", ""),
-        "disclaimer": (
-            "This is a probabilistic model estimate with a standard ±15–20% early-stage variance. "
-            "Final contract pricing requires a verified site Bill of Quantities (BOQ)."
-        ),
+        "disclaimer": "Indicative early-stage estimate. With fewer than 30 verified projects the rate baseline is used with an uncalibrated 35% planning range. Final pricing requires a verified BOQ.",
+
     }
 
 

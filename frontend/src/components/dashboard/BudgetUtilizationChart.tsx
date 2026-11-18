@@ -18,7 +18,7 @@ export const BudgetUtilizationChart = () => {
         .eq('status', 'active');
 
       if (error) throw error;
-      
+
       // Filter out test projects and ensure valid name and id
       const activeProjects = (projData || []).filter(
         (p): p is { id: string; name: string; location: string | null; total_budget: number | null; spent_cost: number | null } =>
@@ -41,18 +41,18 @@ export const BudgetUtilizationChart = () => {
           return { ...p, budget: Number(p.total_budget) || 0, spent };
         })
       );
-      
+
       const formatted = financialsList.map(p => {
         const spent = p.spent || 0;
-        
+
         // Division by zero guard
         const isBudgetZero = p.budget <= 0;
         const percent = isBudgetZero ? 0 : Math.round((spent / p.budget) * 100);
-        
+
         let fill = '#10B981'; // brand-success
         if (percent >= 100) fill = '#EF4444'; // brand-danger
         else if (percent >= 70) fill = '#F59E0B'; // brand-warning
-        
+
         // Format names to avoid duplicates
         let label = p.name;
         if (nameCounts[p.name] > 1 && p.location) {
@@ -63,7 +63,7 @@ export const BudgetUtilizationChart = () => {
         const formatCurrency = (val: number) => `Rs. ${(val/1_000_000).toFixed(1)}M`;
         const spentText = formatCurrency(spent);
         const budgetText = isBudgetZero ? 'No budget set' : formatCurrency(p.budget);
-        
+
         return {
           id: p.id,
           label,
@@ -101,7 +101,7 @@ export const BudgetUtilizationChart = () => {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <ActivityIndicator color="#F97316" size="large" />
       </View>
     );
@@ -109,7 +109,7 @@ export const BudgetUtilizationChart = () => {
 
   // Check if ALL projects have 0% utilization
   const allZero = data.length > 0 && data.every(d => d.value === 0);
-  const emptyMessage = allZero 
+  const emptyMessage = allZero
     ? "No spending recorded yet. Utilization will appear here once expenses, received orders or payroll are logged."
     : "No active projects found.";
 

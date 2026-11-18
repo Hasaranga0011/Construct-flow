@@ -37,13 +37,13 @@ export function formatAmount(
     return `${prefix}${formatCompact(num)}`;
   }
 
-  const hasDecimals = options.decimals !== undefined;
+
   const decimals = options.decimals ?? (Number.isInteger(num) ? 0 : 2);
 
   // Group integer part with THOUSANDS_SEPARATOR
   const parts = num.toFixed(decimals).split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
-  
+
   if (decimals > 0 && parts[1] !== undefined) {
     return `${prefix}${integerPart}${DECIMAL_SEPARATOR}${parts[1]}`;
   }
@@ -170,7 +170,7 @@ export function formatAmountLive(
 
   // Remove invalid characters (keep digits, one dot, leading minus)
   let val = rawInput.replace(/[^0-9.-]/g, '');
-  
+
   // Handle leading minus
   const isNegative = val.startsWith('-');
   val = val.replace(/-/g, '');

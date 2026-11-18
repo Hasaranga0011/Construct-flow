@@ -1,4 +1,4 @@
-import { firstRelation } from '@/utils/relations';
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, TextInput, Modal, Linking } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
@@ -50,7 +50,7 @@ export default function ClientProjectSiteReports() {
         `)
         .eq('project_id', projectId)
         .order('date', { ascending: false });
-        
+
       const parsedReports = reportsData || [];
       const smIds = [...new Set(parsedReports.map(r => r.site_manager_id).filter((id): id is string => Boolean(id)))];
       if (smIds.length > 0) {
@@ -58,7 +58,7 @@ export default function ClientProjectSiteReports() {
           .from('profiles')
           .select('id, full_name, avatar_url')
           .in('id', smIds);
-        
+
         if (smProfiles) {
           const smMap = smProfiles.reduce((acc: any, p) => {
             if (p.id) acc[p.id] = { full_name: p.full_name, avatar_url: p.avatar_url };

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
 import { Icon } from '../ui/Icon';
 import { supabase } from '../../lib/supabase';
-import { api } from '../../services/api';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
 const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) => void }) => {
@@ -26,15 +26,16 @@ const OrderRow = ({ order, onDeliver }: { order: any, onDeliver: (id: string) =>
         onPress={() => onDeliver(order.id)}
         className="bg-brand-success px-3 py-1.5 rounded-md"
       >
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">Confirm Received</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold">Review delivery</Text>
       </Pressable>
     </View>
   );
 };
 
-export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNeeded }: { refreshTrigger?: number, projectId?: string, onRefreshNeeded: () => void }) => {
+export const PendingOrders = ({ refreshTrigger = 0, projectId = '', allowedProjectIds, onRefreshNeeded }: { refreshTrigger?: number, projectId?: string, allowedProjectIds?: string[], onRefreshNeeded: () => void }) => {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
+  const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,8 +52,12 @@ export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNee
 
         let pmProjectIds: string[] = [];
         if (isPM && user?.id) {
-          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
-          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (allowedProjectIds) pmProjectIds = allowedProjectIds;
+          else {
+            const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+            if (projectError) throw projectError;
+            pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          }
           if (pmProjectIds.length === 0) {
             if (isMounted) {
               setOrders([]);
@@ -93,18 +98,10 @@ export const PendingOrders = ({ refreshTrigger = 0, projectId = '', onRefreshNee
     loadOrders();
 
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId, isPM, user?.id]);
+  }, [refreshTrigger, projectId, isPM, user?.id, allowedProjectIds]);
 
-  const handleDeliver = async (id: string) => {
-    try {
-      setLoading(true);
-      await api.purchaseOrders.receive(id); // Fixed Bug 16: Admin confirms receipt
-      onRefreshNeeded();
-    } catch (e: any) {
-      console.error("Confirm Received failed:", e);
-      Alert.alert('Error', e.message || e.detail || 'Failed to confirm received');
-      setLoading(false);
-    }
+  const handleDeliver = (id: string) => {
+    router.push(`/${isPM ? 'pm' : 'admin'}/materials/orders/${id}` as any);
   };
 
   return (

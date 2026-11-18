@@ -1,6 +1,6 @@
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { api } from '../../lib/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
@@ -138,18 +138,18 @@ const ClientDetailsModal = ({ client, visible, onClose, onUpdate, readOnly = fal
   const handleDelete = async () => {
     setLoading(true);
     try {
-      const { data, error, count } = await supabase.from('projects').select('id', { count: 'exact' }).eq('client_id', client.id);
+      const { error, count } = await supabase.from('projects').select('id', { count: 'exact' }).eq('client_id', client.id);
       setLoading(false);
       if (error) throw error;
-      
+
       if (count && count > 0) {
         notify('Error', `Cannot delete client. This client is assigned to ${count} project${count > 1 ? 's' : ''}. Please reassign or unlink the projects first.`);
         return;
       }
-      
+
       const confirmed = await confirmAction('Delete Client', `Delete client ${client.full_name}? This cannot be undone.`);
       if (!confirmed) return;
-      
+
       setLoading(true);
       await api.delete(`/clients/${client.id}`);
       notify('Success', 'Client deleted successfully.');

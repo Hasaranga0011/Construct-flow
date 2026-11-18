@@ -1,3 +1,4 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
@@ -5,13 +6,11 @@ import { supabase } from '../../lib/supabase';
 import { EditProjectModal } from './EditProjectModal';
 import { useDebounce } from '../../hooks/useDebounce';
 
-import { useResponsive } from '../../hooks/useResponsive';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTableLayout } from '@/hooks/useTableLayout';
 import { ProjectImage } from '../common/ProjectImage';
 
-const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) => void }) => {
+const ProjectRow = ({ project, onManage, isMobile }: { project: any, onManage: (p: any) => void; isMobile:boolean }) => {
   const { name, location, completion_percentage: progress, status } = project;
-  const { isMobile } = useResponsive();
 
   if (isMobile) {
     return (
@@ -23,25 +22,23 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
               className="w-12 h-12 rounded-lg mr-3 shadow-sm shrink-0"
             />
             <View className="flex-1 min-w-0">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm flex-wrap">{name}</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs flex-wrap">{location}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-bold text-sm flex-wrap">{name}</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs flex-wrap">{location}</Text>
             </View>
           </View>
-          <View className={`mt-1 ${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-green-50' : 'bg-gray-100'} px-2 py-1 rounded self-start`}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-green-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>{status}</Text>
-          </View>
+          <StatusBadge status={status} />
         </View>
         <View className="w-full mb-3">
           <View className="flex-row justify-between mb-1">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">Progress</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-bold">{progress}%</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs">Progress</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-xs font-bold">{progress}%</Text>
           </View>
           <View className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
             <View className="h-full bg-brand-orange rounded-full" style={{ width: `${progress}%` }} />
           </View>
         </View>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onManage(project)} className="w-full py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors items-center justify-center">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-bold uppercase tracking-wider">Manage</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-xs font-bold uppercase tracking-wider">Manage</Text>
         </Pressable>
       </View>
     );
@@ -54,32 +51,30 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
         project={project}
         className="w-12 h-12 rounded-lg mr-4 shadow-sm shrink-0"
       />
-      
+
       {/* Details */}
       <View className="flex-1 justify-center pr-2">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm">{name}</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{location}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-semibold text-sm">{name}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs">{location}</Text>
       </View>
-      
+
       {/* Status Badge */}
-      <View className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'bg-[#DCFCE7]' : 'bg-gray-100'} px-2 py-1 rounded mr-6`}>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${['active', 'Active', 'In Progress', 'in progress'].includes(status) ? 'text-brand-success' : 'text-gray-500'} text-xs font-semibold`}>{status}</Text>
-      </View>
-      
+      <View className="mr-4 shrink-0"><StatusBadge status={status} /></View>
+
       {/* Progress */}
       <View className="w-24 flex-row items-center mr-4">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm w-10">{progress}%</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-bold text-sm w-10">{progress}%</Text>
         <View className="flex-1 h-2 bg-gray-100 rounded-full ml-2">
-          <View 
-            className="h-full bg-brand-orange rounded-full" 
-            style={{ width: `${progress}%` }} 
+          <View
+            className="h-full bg-brand-orange rounded-full"
+            style={{ width: `${progress}%` }}
           />
         </View>
       </View>
 
       {/* Manage Button */}
       <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => onManage(project)} className="px-3 py-1.5 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-xs font-semibold">Manage</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-xs font-semibold">Manage</Text>
       </Pressable>
     </View>
   );
@@ -87,7 +82,7 @@ const ProjectRow = ({ project, onManage }: { project: any, onManage: (p: any) =>
 
 export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: { refreshTrigger?: number, searchQuery?: string, pmId?: string }) => {
   const router = useRouter();
-  const { isMobile } = useResponsive();
+  const { isCompact:isMobile, onLayout } = useTableLayout(780);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -97,7 +92,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadProjects = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -111,16 +106,16 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
           .select('id, name, location, status, image_url, images, start_date, end_date, total_budget, spent_cost, completion_percentage, pm_id, client_id, created_at')
           .in('status', ['active', 'Active', 'In Progress', 'in progress'])
           .order('created_at', { ascending: false });
-          
+
         if (pmId) {
           query = query.eq('pm_id', pmId);
         }
 
         const { data: projectsData, error } = await query;
         if (error) throw error;
-        
+
         let finalProjects = projectsData || [];
-        
+
         // Fetch milestones to calculate progress
         if (finalProjects.length > 0) {
            const projectIds = finalProjects.map(p => p.id);
@@ -128,7 +123,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
              .from('milestones')
              .select('project_id, completion_percentage')
              .in('project_id', projectIds);
-             
+
            if (milestonesData) {
              const milsByProj: Record<string, number[]> = {};
              milestonesData.forEach(m => {
@@ -144,7 +139,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
              });
            }
         }
-        
+
         if (isMounted) setProjects(finalProjects);
       } catch (error) {
         console.warn('Failed to load projects:', error);
@@ -152,9 +147,9 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadProjects();
-    
+
     return () => { isMounted = false; };
   }, [refreshTrigger, localRefresh, pmId]);
 
@@ -170,9 +165,9 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
   };
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
+    <View onLayout={onLayout} className={`bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
       <View className="flex-row justify-between items-center mb-4">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Active Projects</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100">Active Projects</Text>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(pmId ? '/pm/projects' : '/admin/projects')}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-sm font-semibold">View all →</Text>
         </Pressable>
@@ -189,7 +184,7 @@ export const ActiveProjectsTable = ({ refreshTrigger = 0, searchQuery = '', pmId
           </View>
         ) : (
           filteredProjects.map(p => (
-            <ProjectRow 
+            <ProjectRow isMobile={isMobile}
               key={p.id}
               project={p}
               onManage={handleManage}

@@ -1,5 +1,6 @@
+import { ProjectWorkspaceNav } from '@/components/projects/ProjectWorkspaceNav';
 import { firstRelation } from '@/utils/relations';
-import { notify, confirmAction } from '@/utils/notify';
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +11,7 @@ import { useResponsive } from '../../../../hooks/useResponsive';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { ProjectImage } from '@/components/common/ProjectImage';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
+import { roleLabel } from '@/utils/roles';
 
 export default function PMProjectDetailsPage() {
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
@@ -113,17 +115,6 @@ export default function PMProjectDetailsPage() {
     };
   }, [id]);
 
-  const handleDeleteProject = async () => {
-    if (!project || loading || !await confirmAction('Delete Project', 'Permanently delete this project? This cannot be undone.')) return;
-    setLoading(true);
-    try {
-      const result = await supabase.from('projects').delete().eq('id', project.id).eq('pm_id', project.pm_id).select('id').single();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error('No project was deleted.');
-      notify('Deleted', 'Project deleted successfully.'); router.replace('/pm/projects');
-    } catch (e: any) { notify('Unable to delete project', e.message); }
-    finally { setLoading(false); }
-  };
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -131,6 +122,7 @@ export default function PMProjectDetailsPage() {
 
       {!!loadError && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 p-4">{loadError}</Text>}
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4">
+        <ProjectWorkspaceNav projectId={id} />
         {loading ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#F97316" />
@@ -262,7 +254,7 @@ export default function PMProjectDetailsPage() {
                         />
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-800 text-sm font-medium" numberOfLines={1}>{a.profiles?.full_name || 'Unknown User'}</Text>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize" numberOfLines={1}>{a.role?.replace('_', ' ')}</Text>
+                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 capitalize" numberOfLines={1}>{roleLabel(a.role)}</Text>
                         </View>
                       </View>
                     ))}
@@ -310,17 +302,7 @@ export default function PMProjectDetailsPage() {
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                  </TouchableOpacity>
 
-                 <TouchableOpacity style={{ minHeight: 44, minWidth: 44 }}
-                    onPress={handleDeleteProject}
-                    className="flex-row items-center p-3 bg-red-50 rounded-xl border border-red-200 mt-2"
-                 >
-                    <Ionicons name="trash" size={20} color="#EF4444" className="mr-3" />
-                    <View className="flex-1">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-red-700">Delete Project</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-red-500">Permanently remove this project</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#EF4444" />
-                 </TouchableOpacity>
+                 <Text className="text-gray-500 p-3">Contact an administrator to archive or delete this project.</Text>
               </View>
             </View>
 

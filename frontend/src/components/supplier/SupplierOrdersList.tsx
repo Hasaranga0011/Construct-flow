@@ -7,13 +7,7 @@ import { TopNav } from '../common/TopNav';
 import { SearchInput } from '../common/SearchInput';
 import { useResponsive } from '../../hooks/useResponsive';
 import { formatMoney } from '../../utils/format';
-import {
-  useSupplierOrders,
-  matchesSupplierSearch,
-  buildOrderSuggestions,
-  SUPPLIER_STATUS_TABS,
-  PO_STATUS,
-} from '../../hooks/useSupplierOrders';
+import { useSupplierOrders, matchesSupplierSearch, buildOrderSuggestions, SUPPLIER_STATUS_TABS, PO_STATUS } from '../../hooks/useSupplierOrders';
 
 const getStatusColor = (status: string) => {
   switch (status) {

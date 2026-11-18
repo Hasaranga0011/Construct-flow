@@ -2,7 +2,7 @@ import AuthPageLayout from '../components/auth/AuthPageLayout';
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/apiUrl';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function ForgotPasswordScreen() {
@@ -25,15 +25,27 @@ export default function ForgotPasswordScreen() {
     const redirectTo = typeof window !== 'undefined'
       ? `${window.location.origin}/reset-password`
       : undefined;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-
-    if (error) {
-      setErrorMsg(error.message);
-    } else {
-      setSuccessMsg('A password reset link has been sent to your email.');
+    try {
+      // Recovery must work without a session; the authenticated API wrapper
+      // intentionally rejects signed-out callers.
+      const response = await fetch(getApiUrl() + '/auth/password-recovery', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), redirect_to: redirectTo }), signal: controller.signal,
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(typeof result.detail === 'string' ? result.detail : response.status === 422 ? 'Enter a valid email address.' : 'Password reset is unavailable. Please try again.');
+      }
+      setSuccessMsg('If an account exists, a password reset link will be sent.');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to request a password reset. Please try again.');
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

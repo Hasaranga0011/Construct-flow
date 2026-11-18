@@ -51,7 +51,7 @@ export default function ClientProjectPage() {
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav title="Client Project" showAction={false} />
+      <TopNav title="My Projects" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <View className="flex-row justify-between items-center mb-6 flex-wrap gap-2">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Assigned Projects</Text>
@@ -98,10 +98,11 @@ export default function ClientProjectPage() {
                 <View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase">Spent</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold mt-1">{formatCurrency(Number(project.spent_cost || 0))}</Text></View>
                 <View><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs uppercase">Target end</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold mt-1">{formatDate(project.end_date)}</Text></View>
               </View>
+              <View className="mt-4"><Link href={`/client/project/${project.id}/boq` as any} asChild><Pressable accessibilityRole="link" style={{ minHeight: 44 }} className="justify-center rounded-lg border border-orange-200 px-4"><Text className="font-semibold text-brand-orange">View project BOQ</Text></Pressable></Link></View>
               <View className="flex-row gap-2 mt-5">
                 <Link href={`/client/project/milestones?projectId=${project.id}`} asChild><Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-1 bg-brand-orange py-3 rounded-lg items-center"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-xs">Milestones</Text></Pressable></Link>
                 <Link href={`/client/project/${project.id}/reports`} asChild><Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-1 bg-blue-50 border border-blue-200 py-3 rounded-lg items-center"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-blue-700 font-bold text-xs">Site Reports</Text></Pressable></Link>
-                <Link href={`/client/messages/${project.id}`} asChild><Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-1 border border-gray-300 py-3 rounded-lg items-center"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-xs">Message PM</Text></Pressable></Link>
+                <Link href={`/client/messages/${project.id}`} asChild><Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-1 border border-gray-300 py-3 rounded-lg items-center"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-xs">Message Project Manager</Text></Pressable></Link>
               </View>
             </View>
           );

@@ -2,6 +2,8 @@ export const ROLE_LABELS = {
   super_admin: 'Super Admin',
   admin: 'Admin',
   pm: 'Project Manager',
+  project_manager: 'Project Manager',
+  manager: 'Project Manager',
   site_manager: 'Site Manager',
   client: 'Client',
   supplier: 'Supplier',
@@ -10,6 +12,6 @@ export const ROLE_LABELS = {
 
 export const roleLabel = (r?: string) => {
   if (!r) return '';
-  const normalized = r.toLowerCase().replace(/ /g, '_') as keyof typeof ROLE_LABELS;
+  const normalized = r.trim().toLowerCase().replace(/\s+/g, '_') as keyof typeof ROLE_LABELS;
   return ROLE_LABELS[normalized] ?? r;
 };

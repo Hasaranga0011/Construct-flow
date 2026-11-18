@@ -1,6 +1,6 @@
+import React, { useCallback, useState, useEffect } from 'react';
 import { getApiUrl } from '../../../lib/apiUrl';
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -9,8 +9,8 @@ import { AutoFitText } from '@/components/common/AutoFitText';
 import { useApi } from '@/hooks/useApi';
 
 import { LocationPicker } from '@/components/estimator/LocationPicker';
-import { SRI_LANKA_DISTRICTS, District } from '@/constants/districts';
-import { Linking } from 'react-native';
+import { SRI_LANKA_DISTRICTS } from '@/constants/districts';
+
 
 const TYPES = ['Residential', 'Commercial', 'Industrial'];
 const QUALITIES = ['Standard', 'Premium', 'Luxury'];
@@ -66,11 +66,11 @@ export default function AdminAiEstimatorPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const { request: apiRequest, loading: apiLoading, error: apiError } = useApi();
+  const { request: apiRequest } = useApi();
   const [history, setHistory] = useState<any[]>([]);
   const [insights, setInsights] = useState<any>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const { data } = await supabase
       .from('estimations')
       .select('*')
@@ -85,9 +85,9 @@ export default function AdminAiEstimatorPage() {
       });
       setInsights(insightsData);
     } catch { /* Backend may not be running */ }
-  };
+  }, [apiRequest]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const handleEstimate = async () => {
     if (!squareFootage || isNaN(Number(squareFootage)) || Number(squareFootage) <= 0) {
@@ -366,7 +366,7 @@ export default function AdminAiEstimatorPage() {
                   Estimated Project Cost
                 </Text>
                 <AutoFitText value={formatCurrency(result.estimated_cost)} maxFontSize={isMobile ? 28 : 36} minFontSize={18} style={{ color: '#fff', fontWeight: 'bold' }} captionStyle={{ color: 'rgba(255,255,255,0.8)' }} containerStyle={{ marginBottom: 4 }} />
-                
+
                 {result.estimated_range_display ? (
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 12 }}>
                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
@@ -482,7 +482,7 @@ export default function AdminAiEstimatorPage() {
                       try {
                         const parsed = JSON.parse(item.project_name);
                         return parsed.district || parsed.inputs?.district || parsed.inputs?.location;
-                      } catch (e) {
+                      } catch {
                         for (const d of SRI_LANKA_DISTRICTS) {
                           if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) return d;
                         }
@@ -531,7 +531,7 @@ export default function AdminAiEstimatorPage() {
                       try {
                         const p = JSON.parse(item.project_name);
                         itemDist = p.district || p.inputs?.district || p.inputs?.location;
-                      } catch (e) {
+                      } catch {
                         for (const d of SRI_LANKA_DISTRICTS) {
                           if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) {
                             itemDist = d;
@@ -546,7 +546,6 @@ export default function AdminAiEstimatorPage() {
                     let parsedTitle = item.project_name;
                     let parsedDistrict = item.district || 'National';
                     let parsedArea: any = null;
-                    let parsedType = 'Project';
 
                     try {
                       const p = JSON.parse(item.project_name);
@@ -555,8 +554,7 @@ export default function AdminAiEstimatorPage() {
                       else if (p.inputs?.district) parsedDistrict = p.inputs.district;
                       else if (p.inputs?.location) parsedDistrict = p.inputs.location;
                       if (p.inputs?.sq_ft) parsedArea = p.inputs.sq_ft;
-                      if (p.inputs?.type) parsedType = p.inputs.type;
-                    } catch (e) {
+                    } catch {
                       for (const d of SRI_LANKA_DISTRICTS) {
                         if ((item.project_name || '').toLowerCase().includes(d.toLowerCase())) {
                           parsedDistrict = d;

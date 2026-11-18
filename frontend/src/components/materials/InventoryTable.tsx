@@ -1,27 +1,29 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useResponsive } from '../../hooks/useResponsive';
+import { useTableLayout } from '@/hooks/useTableLayout';
 import { useAuth } from '@/context/AuthContext';
 
-const InventoryRow = ({ 
-  material, 
-  project, 
-  quantity, 
+const InventoryRow = ({
+  material,
+  project,
+  quantity,
   unit,
-  stockLevel, 
-  status, 
-  time 
-}: { 
-  material: string, 
-  project: string, 
-  quantity: string, 
+  stockLevel,
+  status,
+  time,
+  isMobile,
+}: {
+  material: string,
+  project: string,
+  quantity: string,
   unit: string,
-  stockLevel: number, 
-  status: string, 
-  time: string 
+  stockLevel: number,
+  status: string,
+  time: string
+  isMobile:boolean;
 }) => {
-  const { isMobile } = useResponsive();
 
   const getBarColor = () => {
     if (stockLevel < 30) return 'bg-brand-danger'; // red
@@ -29,19 +31,9 @@ const InventoryRow = ({
     return 'bg-brand-dark'; // black
   };
 
-  const getStatusColor = () => {
-    if (status === 'Out of Stock') return 'bg-[#FEE2E2] text-brand-danger';
-    if (status === 'Low Stock') return 'bg-orange-100 text-brand-warning';
-    return 'bg-gray-100 text-gray-600';
-  };
 
   if (isMobile) {
-    const getMobileStatusStyle = () => {
-      if (status === 'Out of Stock') return { bg: '#FEE2E2', text: '#991B1B' };
-      if (status === 'Low Stock') return { bg: '#FEF3C7', text: '#92400E' };
-      return { bg: '#D1FAE5', text: '#065F46' };
-    };
-    const mobileStatus = getMobileStatusStyle();
+
     return (
       <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -57,17 +49,11 @@ const InventoryRow = ({
           <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 13, color: '#6B7280', flex: 1 }]}>
             Project: {project}
           </Text>
-          <View style={{ backgroundColor: mobileStatus.bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-            <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: mobileStatus.text, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }]}>
-              {status}
-            </Text>
-          </View>
+          <StatusBadge status={status} />
         </View>
       </View>
     );
   }
-
-  const statusStyle = getStatusColor();
 
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
@@ -89,9 +75,9 @@ const InventoryRow = ({
       {/* Stock Level Bar */}
       <View className="w-1/6 pr-4">
         <View className="w-full h-1.5 bg-gray-100 rounded-full">
-          <View 
-            className={`h-full rounded-full ${getBarColor()}`} 
-            style={{ width: `${Math.max(0, Math.min(100, stockLevel))}%` }} 
+          <View
+            className={`h-full rounded-full ${getBarColor()}`}
+            style={{ width: `${Math.max(0, Math.min(100, stockLevel))}%` }}
           />
         </View>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">{Math.round(stockLevel)}%</Text>
@@ -99,9 +85,7 @@ const InventoryRow = ({
 
       {/* Status */}
       <View className="w-1/6">
-        <View className={`px-2 py-1 rounded self-start ${statusStyle.split(' ')[0]}`}>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${statusStyle.split(' ')[1]}`}>{status}</Text>
-        </View>
+        <StatusBadge status={status} />
       </View>
 
       {/* Time */}
@@ -112,8 +96,8 @@ const InventoryRow = ({
   );
 };
 
-export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId = '' }: { refreshTrigger?: number, searchQuery?: string, projectId?: string }) => {
-  const { isMobile } = useResponsive();
+export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId = '', allowedProjectIds }: { refreshTrigger?: number, searchQuery?: string, projectId?: string, allowedProjectIds?: string[] }) => {
+  const { isCompact:isMobile, onLayout } = useTableLayout(900);
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const [materials, setMaterials] = useState<any[]>([]);
@@ -121,7 +105,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadMaterials = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -132,8 +116,12 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
 
         let pmProjectIds: string[] = [];
         if (isPM && user?.id) {
-          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
-          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (allowedProjectIds) pmProjectIds = allowedProjectIds;
+          else {
+            const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+            if (projectError) throw projectError;
+            pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          }
           if (pmProjectIds.length === 0) {
             if (isMounted) {
               setMaterials([]);
@@ -164,7 +152,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
         const { data, error } = await query;
 
         if (error) throw error;
-        
+
         if (isMounted) setMaterials(data || []);
       } catch (error) {
         console.warn('Failed to load materials:', error);
@@ -172,16 +160,16 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadMaterials();
-    
+
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId, isPM, user?.id]);
+  }, [refreshTrigger, projectId, isPM, user?.id, allowedProjectIds]);
 
   const filteredMaterials = materials.filter(m => String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[400px]'}`}>
+    <View onLayout={onLayout} className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[400px]'}`}>
       <View className="mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Material Inventory</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">Stock levels across all active projects</Text>
@@ -211,26 +199,26 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
         ) : (
           filteredMaterials.map((m: any) => {
             const projectName = m.projects?.name || 'Unknown';
-            
+
             const globalStock = m.current_stock || 0;
             const threshold = m.minimum_threshold || 1;
-            
+
             const pct = Math.min(100, (globalStock / threshold) * 100);
-            
+
             let badgeStatus = 'In Stock';
             if (globalStock === 0) badgeStatus = 'Out of Stock';
             else if (globalStock < threshold) badgeStatus = 'Low Stock';
-            
+
             return (
-              <InventoryRow 
+              <InventoryRow isMobile={isMobile}
                 key={m.id}
-                material={m.name} 
-                project={projectName} 
+                material={m.name}
+                project={projectName}
                 quantity={`${globalStock}`}
                 unit={m.unit || ''}
-                stockLevel={pct} 
-                status={badgeStatus} 
-                time={m.last_updated ? new Date(m.last_updated).toLocaleDateString() : 'N/A'} 
+                stockLevel={pct}
+                status={badgeStatus}
+                time={m.last_updated ? new Date(m.last_updated).toLocaleDateString() : 'N/A'}
               />
             );
           })

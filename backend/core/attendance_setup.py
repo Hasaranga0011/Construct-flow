@@ -7,7 +7,8 @@ from core.config import settings
 def setup_client():
     if not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise RuntimeError("Attendance setup requires the server database credential")
-    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    from core.database import get_service_client
+    return get_service_client()
 
 
 def ensure_project_attendance(client, project_id):

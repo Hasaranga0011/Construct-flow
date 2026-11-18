@@ -8,14 +8,18 @@ This repository contains both the cross-platform application and its FastAPI ser
 - `backend/`: FastAPI REST API, Supabase data access, scheduled checks, document generation, integrations, and ML endpoints.
 - `frontend/supabase/` and `backend/*.sql`: Supabase/PostgreSQL schema and migration scripts. These files are still being consolidated; read the database section before applying SQL.
 
+## Security and workflow update (2026-11-16)
+
+Read [SECURITY_WORKFLOW_REMEDIATION.md](SECURITY_WORKFLOW_REMEDIATION.md) before releasing the current code. It documents the operating order, implemented fixes, eight database migrations, verification commands, and remaining credential/configuration/device checks. The owner activated the connected Supabase workflow bundle; current UI and live test-project results are in [UI_FLOW_VERIFICATION.md](UI_FLOW_VERIFICATION.md).
+
 ## Current Status
 
 The main role-based workflows are implemented and connected to Supabase:
 
 - **Authentication & Role Security**: Secure login, password recovery, role-based URL namespacing (`/admin`, `/pm`, `/site-manager`, `/supplier`, `/client`, `/worker`), and protected layout session guards.
 - **Cinematic Landing Page**: Features a scroll-scrubbing 3D-orbit construction video background (`homepage_scroll.mp4`) with smooth forward/reverse lerping on web and native video playback on mobile. Redesigned with a centralized, high-impact hero headline (responsively scaled from 42px on mobile to 78px on wide screens), centered dual portal CTAs ("Team Portal" and "Partner Portal"), horizontal metrics bar, and an integrated public inquiry form connected to `/api/public-inquiry` with automated admin notifications.
-- **Universal Multi-Platform API Resolution**: Centralized `getApiUrl()` (`lib/apiUrl.ts`) automatically resolves backend endpoints across web browsers (window hostname) and physical mobile devices on Expo Go (dynamically resolving computer LAN IP via Metro bundler metadata, eliminating loopback connection failures).
-- **Notification System**: Full cross-platform alert center with Supabase Realtime subscriptions, role-targeted broadcast alerts, and a hardened "Mark all as read" API (`PATCH /api/notifications/mark-read`) utilizing backend service-role client permissions with client-side direct Supabase update fallbacks.
+- **Universal Multi-Platform API Resolution**: Centralized `getApiUrl()` (`lib/apiUrl.ts`) preserves explicitly configured HTTPS backend endpoints and resolves development loopback addresses through the device/Metro host where appropriate.
+- **Notification System**: Full cross-platform alert center with Supabase Realtime subscriptions, role-targeted broadcast alerts, and a hardened "Mark all as read" API (`PATCH /api/notifications/mark-read`) using caller-scoped transactional RPCs and per-user read receipts. Shared notification rows are not changed by recipients.
 - **Admin Suite**: Global oversight for projects, users, assignments, milestones, expenses, materials, purchase orders, suppliers, labour, and payroll.
 - **Project Manager Portal**: Assigned-project scoping, material approvals, labour summaries, salary-slip generation, client/project team views, supplier summaries, and AI cost estimation.
 - **Site Manager Operations**: Site selection, worker assignment, QR attendance scanning, site-scoped materials, stock tracking, site reports, photos, and incident issue reporting.
@@ -24,7 +28,7 @@ The main role-based workflows are implemented and connected to Supabase:
 - **Client Transparency**: Project progress, milestone tracking with media, invoices, document repository, cost estimates, and real-time messaging with project managers.
 - **Responsive Portal Shell**: Desktop sidebars gracefully switch to an animated slide-over drawer below 1024px; dashboard cards, charts, and tables stack seamlessly across phone, tablet, and desktop viewports.
 - **NativeWind Stability**: UI components adhere to strict React Native styling conventions, avoiding dynamic CSS variable classes (`ring-*`) on interactive state toggles to prevent CSS interop React Fiber serialization crashes.
-- **Background Automation & ML**: FastAPI background scheduler (APScheduler) monitors overdue purchase orders and low stock levels daily/hourly with `job_runs` database logging, alongside scikit-learn `RandomForest` cost and delay prediction models.
+- **Background Automation & ML**: FastAPI background scheduler (APScheduler) monitors overdue purchase orders and low stock levels daily/hourly with `job_runs` database logging, alongside an evidence-gated scikit-learn cost model and explicitly rule-based delay risk. Low-data cost estimates use a labelled rate baseline.
 
 Some generated screens remain intentionally phased. The core role dashboards and scoped operational screens are active and connected. Report export pages, live GPS delivery tracking, and auxiliary client components are targeted for subsequent production hardening.
 
@@ -42,7 +46,7 @@ Some generated screens remain intentionally phased. The core role dashboards and
 
 ### Backend
 
-- Python 3.10+ recommended
+- Python 3.12+ required by the pinned NumPy runtime; verified here on Python 3.14
 - FastAPI with Uvicorn
 - Pydantic and pydantic-settings
 - Supabase Python client
@@ -187,8 +191,9 @@ ConstructFlow utilizes Supabase PostgreSQL with Row Level Security (RLS) policie
    - `phase5_migration.sql`: Site manager sites, site workers, suppliers, issues, and salary slips.
    - `02_add_expenses.sql`: Project expenses and financial cost tracking.
    - `schema_fixes.sql`: Role normalization, foreign key constraints, and RLS adjustments.
-3. Ensure the storage bucket `project-images` is created under **Supabase Storage** with public read access or appropriate authenticated policies.
-4. Enable **Realtime** on `notifications`, `client_messages`, and `purchase_orders` tables under **Database > Publications > supabase_realtime**.
+3. After the foundational schemas, apply the current workflow/security migrations in `backend/reviews/APPLY_UI_WORKFLOW.sql` (regenerate with `python backend/scripts/build_workflow_bundle.py`). For an existing installation with the earlier workflow and role-boundary migrations already applied, the BOQ upgrade is `backend/migrations/20261117_boq_connected_workflow.sql`. This adds audited BOQ revisions and project-scoped references; deploy it before using the new BOQ workspace. Existing BOQ projects are initialized by reviewing and saving their first revision, without guessing links for historical transactions.
+4. Ensure the storage bucket `project-images` is created under **Supabase Storage** with public read access or appropriate authenticated policies.
+5. Enable **Realtime** on `notifications`, `client_messages`, and `purchase_orders` tables under **Database > Publications > supabase_realtime**.
 
 ---
 

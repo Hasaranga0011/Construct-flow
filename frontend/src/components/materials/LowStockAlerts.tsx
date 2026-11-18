@@ -9,11 +9,11 @@ import { useAuth } from '@/context/AuthContext';
 const AlertRow = ({ material, project, remaining }: { material: string, project: string, remaining: string }) => {
   return (
     <View className="flex-row items-center justify-between py-3 border-b border-gray-50">
-      <View>
+      <View className="flex-1 min-w-0 mr-3">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{material}</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
       </View>
-      <View className="items-end">
+      <View className="items-end shrink-0">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">{remaining}</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px]">In stock</Text>
       </View>
@@ -21,7 +21,7 @@ const AlertRow = ({ material, project, remaining }: { material: string, project:
   );
 };
 
-export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '', allowedProjectIds }: { refreshTrigger?: number, projectId?: string, allowedProjectIds?: string[] }) => {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const [alerts, setAlerts] = useState<any[]>([]);
@@ -37,8 +37,12 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
 
       let pmProjectIds: string[] = [];
       if (isPM && user?.id) {
-        const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
-        pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+        if (allowedProjectIds) pmProjectIds = allowedProjectIds;
+          else {
+            const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+            if (projectError) throw projectError;
+            pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          }
         if (pmProjectIds.length === 0) {
           setAlerts([]);
           setLoading(false);
@@ -64,7 +68,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
       const { data, error } = await query;
 
       if (error) throw error;
-      
+
       let lowStock: any[] = [];
       if (data) {
         lowStock = data.filter((m: any) => {
@@ -82,7 +86,7 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
     } finally {
       setLoading(false);
     }
-  }, [projectId, isPM, user?.id]);
+  }, [projectId, isPM, user?.id, allowedProjectIds]);
 
   useEffect(() => { loadAlerts(); }, [loadAlerts, refreshTrigger, projectId]);
 
@@ -112,11 +116,11 @@ export const LowStockAlerts = ({ refreshTrigger = 0, projectId = '' }: { refresh
             const remaining = `${m.current_stock || 0} ${m.unit || ''}`;
 
             return (
-              <AlertRow 
-                key={m.id} 
-                material={m.name} 
-                project={projectName} 
-                remaining={remaining} 
+              <AlertRow
+                key={m.id}
+                material={m.name}
+                project={projectName}
+                remaining={remaining}
               />
             );
           })

@@ -156,7 +156,7 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <ActivityIndicator color="#F97316" size="large" />
       </View>
     );
@@ -164,7 +164,7 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
 
   if (projects.length === 0) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">No active projects data available.</Text>
       </View>
@@ -172,18 +172,18 @@ export const CostTimelineChart = ({ pmId }: { pmId?: string } = {}) => {
   }
 
   return (
-    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 w-full min-h-[400px]">
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 w-full min-h-[400px]">
       <View className="flex-row justify-between items-start mb-4">
         <View className="flex-1">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Project Cost vs Timeline</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">Values in Millions (LKR)</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">Project Cost vs Timeline</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs">Values in Millions (LKR)</Text>
         </View>
         <Pressable style={{ minHeight: 44, minWidth: 44 }}
           className={`flex-row items-center border ${showForecast ? 'border-brand-orange bg-orange-50' : 'border-gray-300 bg-white'} px-3 py-1.5 rounded-full ml-4`}
           onPress={() => setShowForecast(!showForecast)}
         >
           <View className={`w-3 h-3 rounded-full mr-1.5 ${showForecast ? 'bg-brand-orange' : 'bg-gray-300'}`} />
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${showForecast ? 'text-brand-orange' : 'text-gray-500'} text-xs font-semibold`}>Budget Plan</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`${showForecast ? 'text-brand-orange' : 'text-slate-500 dark:text-slate-400'} text-xs font-semibold`}>Budget Plan</Text>
         </Pressable>
       </View>
 

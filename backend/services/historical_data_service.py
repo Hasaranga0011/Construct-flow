@@ -25,10 +25,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.database import get_service_client
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-MODELS_DIR = Path(__file__).resolve().parents[1] / "models"
+MODELS_DIR = Path(os.environ.get("CONSTRUCTFLOW_MODEL_DIR", str(Path(__file__).resolve().parents[1] / "models")))
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 LOCAL_DB_PATH = MODELS_DIR / "real_construction_data.db"
 
@@ -119,7 +120,9 @@ def init_local_db():
         ("imported_by", "TEXT"),
         ("import_batch_id", "TEXT"),
         ("evidence_note", "TEXT"),
-        ("verified", "INTEGER DEFAULT 1")
+        ("verified", "INTEGER DEFAULT 0"),
+        ("verified_by", "TEXT"),
+        ("verified_at", "TEXT")
     ]:
         try:
             cur.execute(f"ALTER TABLE historical_projects ADD COLUMN {col} {ctype}")
@@ -258,7 +261,7 @@ def import_historical_projects_from_csv(
             "imported_by": imported_by,
             "import_batch_id": batch_id,
             "evidence_note": clean_evidence,
-            "verified": 1,
+            "verified": 0,
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
 
@@ -297,20 +300,23 @@ def import_historical_projects_from_csv(
         except sqlite3.IntegrityError:
             skipped_duplicates += 1
 
-    conn.commit()
 
     # Also sync to Supabase if table exists
-    sb = get_service_client()
+    sb = get_service_client() if settings.SUPABASE_SERVICE_ROLE_KEY else None
     if sb and rows_to_save:
         try:
-            sb.table("historical_projects").upsert(rows_to_save, on_conflict="project_name,start_date").execute()
+            sb.table("historical_projects").upsert(rows_to_save, on_conflict="project_name,start_date", ignore_duplicates=True).execute()
             logger.info("Synchronized %d historical projects to Supabase", len(rows_to_save))
         except Exception as e:
-            logger.warning("Could not sync to Supabase historical_projects table: %s", e)
+            conn.rollback()
+            conn.close()
+            raise ValueError("Historical database unavailable; import was not committed") from e
+
+    conn.commit()
 
     cur.execute("""
         SELECT COUNT(*) FROM historical_projects 
-        WHERE source IN ('real', 'imported_boq', 'real_completed') AND (verified = 1 OR verified IS 1)
+        WHERE source IN ('real', 'imported_boq', 'real_completed') AND (verified = 1 OR verified IS 1) AND verified_by IS NOT NULL
     """)
     total_real = cur.fetchone()[0]
     conn.close()
@@ -388,7 +394,7 @@ def import_price_indices_from_csv(csv_content: str) -> Dict[str, Any]:
 
     conn.commit()
 
-    sb = get_service_client()
+    sb = get_service_client() if settings.SUPABASE_SERVICE_ROLE_KEY else None
     if sb and rows_to_save:
         try:
             sb.table("price_indices").upsert(rows_to_save, on_conflict="material_group,month").execute()
@@ -430,7 +436,7 @@ def record_material_price(
     conn.commit()
     conn.close()
 
-    sb = get_service_client()
+    sb = get_service_client() if settings.SUPABASE_SERVICE_ROLE_KEY else None
     if sb:
         try:
             sb.table("material_prices").insert({
@@ -487,12 +493,20 @@ def get_all_real_projects() -> List[Dict[str, Any]]:
     Returns only verified real historical projects (source in 'real', 'imported_boq', 'real_completed' and verified = 1).
     Excludes synthetic, sample/demo, or unverified records.
     """
+    if settings.SUPABASE_SERVICE_ROLE_KEY:
+        client = get_service_client()
+        result = []
+        while True:
+            page = client.table("historical_projects").select("*").in_("source", ["real","imported_boq","real_completed"]).eq("verified",True).not_.is_("verified_by","null").order("id").range(len(result),len(result)+499).execute().data or []
+            result.extend(page)
+            if len(page)<500:
+                return result
     conn = _get_local_conn()
     cur = conn.cursor()
     cur.execute("""
         SELECT * FROM historical_projects 
         WHERE source IN ('real', 'imported_boq', 'real_completed')
-          AND (verified = 1 OR verified IS 1)
+          AND (verified = 1 OR verified IS 1) AND verified_by IS NOT NULL
         ORDER BY start_date DESC, created_at DESC
     """)
     rows = [dict(row) for row in cur.fetchall()]
@@ -501,17 +515,11 @@ def get_all_real_projects() -> List[Dict[str, Any]]:
 
 
 def get_real_projects_count() -> int:
-    """Returns count of verified real projects used for training, accuracy, and benchmarks."""
-    conn = _get_local_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT COUNT(*) FROM historical_projects 
-        WHERE source IN ('real', 'imported_boq', 'real_completed')
-          AND (verified = 1 OR verified IS 1)
-    """)
-    count = cur.fetchone()[0]
-    conn.close()
-    return int(count)
+    """Count independently verified records without loading the full remote dataset."""
+    if settings.SUPABASE_SERVICE_ROLE_KEY:
+        result = get_service_client().table("historical_projects").select("id", count="exact", head=True).in_("source",["real","imported_boq","real_completed"]).eq("verified",True).not_.is_("verified_by","null").execute()
+        return int(result.count or 0)
+    return len(get_all_real_projects())
 
 
 def get_all_historical_projects_for_display(limit: int = 200) -> List[Dict[str, Any]]:
@@ -519,12 +527,14 @@ def get_all_historical_projects_for_display(limit: int = 200) -> List[Dict[str, 
     Returns all historical records for administrative inspection.
     Includes verified real projects as well as sample/demo records (which are labeled).
     """
+    if settings.SUPABASE_SERVICE_ROLE_KEY:
+        return get_service_client().table("historical_projects").select("*").order("created_at",desc=True).limit(limit).execute().data or []
     conn = _get_local_conn()
     cur = conn.cursor()
     cur.execute("""
         SELECT * FROM historical_projects 
         ORDER BY 
-          CASE WHEN source IN ('real', 'imported_boq', 'real_completed') AND (verified = 1 OR verified IS 1) THEN 0 ELSE 1 END,
+          CASE WHEN source IN ('real', 'imported_boq', 'real_completed') AND (verified = 1 OR verified IS 1) AND verified_by IS NOT NULL THEN 0 ELSE 1 END,
           start_date DESC, 
           created_at DESC
         LIMIT ?
@@ -580,11 +590,15 @@ def import_historical_projects_from_file(
     """
     import pandas as pd
 
+    from core.spreadsheet_limits import validate_spreadsheet
+    validate_spreadsheet(file_bytes, filename)
     lower_name = filename.lower()
     if lower_name.endswith(".xlsx") or lower_name.endswith(".xls"):
         try:
             # Read first sheet
-            df = pd.read_excel(io.BytesIO(file_bytes))
+            df = pd.read_excel(io.BytesIO(file_bytes), nrows=20001)
+            if len(df)>20000:
+                raise ValueError("Historical import exceeds 20000 rows")
             # Normalize column names: strip whitespace
             df.columns = [str(c).strip() for c in df.columns]
             # Convert NaN to empty string

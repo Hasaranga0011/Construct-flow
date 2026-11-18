@@ -9,25 +9,24 @@ export async function managedProjects() {
   return result.data || [];
 }
 
-export async function managedPayroll() {
-  const projects = await managedProjects();
+export async function managedPayroll(knownProjects?: Awaited<ReturnType<typeof managedProjects>>) {
+  const projects = knownProjects ?? await managedProjects();
   if (!projects.length) return [];
-  
+
   const projectIds = projects.map(p => p.id).filter((id): id is string => Boolean(id));
-  const assigned = await assignedWorkers(projectIds);
-  const workerIds = [...new Set(assigned.map(a => a.profiles?.id).filter((id): id is string => Boolean(id)))];
-  if (!workerIds.length) return [];
-  
-  const result = await supabase.from('salary_slips').select('*').in('worker_id', workerIds).order('created_at', { ascending: false });
+  const [assigned, result] = await Promise.all([
+    assignedWorkers(projectIds),
+    supabase.from('salary_slips').select('*').in('project_id', projectIds).order('created_at', { ascending: false }),
+  ]);
   if (result.error) throw result.error;
   const slips = result.data || [];
-  
+
   return slips.map(slip => {
     const assign = assigned.find(a => a.profiles?.id === slip.worker_id);
-    return { 
-      ...slip, 
-      worker: assign?.profiles, 
-      project: projects.find(p => p.id === assign?.project_id) 
+    return {
+      ...slip,
+      worker: assign?.profiles,
+      project: projects.find(p => p.id === slip.project_id)
     };
   });
 }

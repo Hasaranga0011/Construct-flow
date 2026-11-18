@@ -11,8 +11,8 @@ interface ChartItem {
 
 export function WorkerAttendanceChart({ chartData }: { chartData: ChartItem[] }) {
   return (
-    <View className="flex-1 mt-4">
-      <ResponsiveContainer width="100%" height="100%">
+    <View className="mt-4 w-full min-w-0" style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height={260}>
         <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />

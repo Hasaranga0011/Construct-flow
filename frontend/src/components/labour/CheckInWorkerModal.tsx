@@ -2,9 +2,9 @@ import { DateField } from '../common/DateField';
 import { getApiUrl } from '../../lib/apiUrl';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { api } from '../../lib/api';
+
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { toast } from '../../lib/toast';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
@@ -20,11 +20,13 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
   const [projectId, setProjectId] = useState<string | null>(null);
   const [status, setStatus] = useState<'Present' | 'On Leave' | 'Absent'>('Present');
   const [checkInTime, setCheckInTime] = useState('');
-  const [hoursWorked, setHoursWorked] = useState('8');
+  const [hoursWorked, setHoursWorked] = useState('0');
   const [overtime, setOvertime] = useState('0');
 
   const [workers, setWorkers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [assignedWorkerIds, setAssignedWorkerIds] = useState<string[] | null>(null);
+  const availableWorkers = projectId && assignedWorkerIds ? workers.filter(worker => assignedWorkerIds.includes(worker.id)) : [];
 
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -39,8 +41,8 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
       setFetchingData(true);
       try {
         const [projectsReq, workersReq] = await Promise.all([
-          supabase.from('projects').select('id, name').eq('status', 'Active'),
-          supabase.from('profiles').select('id, full_name').eq('role', 'worker')
+          supabase.from('projects').select('id, name').in('status', ['Active', 'active', 'In Progress', 'in_progress']),
+          supabase.from('profiles').select('id, full_name').eq('role', 'worker').eq('is_approved', true)
         ]);
 
         if (projectsReq.error) throw projectsReq.error;
@@ -66,6 +68,26 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
     return () => { isMounted = false; };
   }, [visible]);
 
+  useEffect(() => {
+    let active = true;
+    setWorkerId(null);
+    setAssignedWorkerIds(null);
+    if (!visible || !projectId) return;
+    void (async () => {
+      try {
+        const assignments = await supabase.from('site_workers').select('worker_id').eq('project_id', projectId);
+        if (assignments.error) throw assignments.error;
+        const identifiers = (assignments.data || []).map(row => row.worker_id).filter(Boolean);
+        const records = identifiers.length ? await supabase.from('workers').select('id,user_id').in('id', identifiers) : { data: [], error: null };
+        if (records.error) throw records.error;
+        if (active) setAssignedWorkerIds([...new Set([...identifiers, ...(records.data || []).map(row => row.user_id).filter(Boolean)])] as string[]);
+      } catch (error) {
+        if (active) { setAssignedWorkerIds([]); setErrorMsg(error instanceof Error ? error.message : 'Could not load assigned workers.'); }
+      }
+    })();
+    return () => { active = false; };
+  }, [visible, projectId]);
+
   const handleCreate = async () => {
     if (!workerId || !projectId || !status) {
       setErrorMsg('Please select a worker, project, and status.');
@@ -73,6 +95,11 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
     }
     if (status === 'Present' && !checkInTime) {
       setErrorMsg('Check in time is required when Present.');
+      return;
+    }
+    const regular = Number(hoursWorked), extra = Number(overtime);
+    if (status === 'Present' && (!hoursWorked.trim() || !overtime.trim() || !Number.isFinite(regular) || !Number.isFinite(extra) || regular < 0 || regular > 8 || extra < 0 || regular + extra > 24 || (extra > 0 && regular !== 8))) {
+      setErrorMsg('Enter 0–8 regular hours and valid overtime after eight regular hours, up to 24 hours total.');
       return;
     }
 
@@ -83,7 +110,7 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
       const selectedWorker = workers.find(w => w.id === workerId);
       const workerName = selectedWorker ? selectedWorker.full_name : 'Unknown Worker';
 
-      const now = new Date();
+
       // Format checkInTime to a full timestamp if they are present
       let checkInTimestamp = null;
       if (status === 'Present' && checkInTime) {
@@ -106,7 +133,9 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
         },
         body: JSON.stringify({
           project_id: projectId,
+          worker_id: workerId,
           worker_name: workerName,
+          check_in_time: checkInTimestamp,
           role: 'Labourer',
           hours_worked: totalHours,
           status: status
@@ -122,7 +151,7 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
       setWorkerId(null);
       setProjectId(null);
       setStatus('Present');
-      setHoursWorked('8');
+      setHoursWorked('0');
       setOvertime('0');
 
       toast.success('Attendance recorded!');
@@ -162,14 +191,14 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
               <>
                 <View className="mb-4">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Select Worker</Text>
-                  {workers.length > 0 ? (
+                  {availableWorkers.length > 0 ? (
                     <FilterChipGrid
-                      options={workers.map(w => ({ id: w.id, label: w.full_name }))}
+                      options={availableWorkers.map(w => ({ id: w.id, label: w.full_name }))}
                       selectedValue={workerId || ''}
                       onSelect={setWorkerId}
                     />
                   ) : (
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">No active workers found.</Text>
+                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm italic">{!projectId ? 'Choose a project below to load its assigned workers.' : assignedWorkerIds === null ? 'Loading assigned workers...' : 'No approved workers are assigned to this project.'}</Text>
                   )}
                 </View>
 
@@ -205,6 +234,7 @@ export const CheckInWorkerModal = ({ visible, onClose, onSuccess }: CheckInWorke
 
                 {status === 'Present' && (
                   <>
+                    <Text className="text-sm text-gray-500 mb-3">Use 0 hours for an open check-in. Enter completed hours only; overtime applies after eight regular hours.</Text>
                     <View className="mb-4">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Check In Time</Text>
                       <DateField label="Check in time" mode="time" value={checkInTime} onChange={setCheckInTime} />

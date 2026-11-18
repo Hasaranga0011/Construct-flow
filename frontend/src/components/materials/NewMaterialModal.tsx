@@ -1,9 +1,11 @@
 import { DateField } from '../common/DateField';
 import { ModalViewport } from '../common/ModalViewport';
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { api } from '../../services/api';
+import { useOrderSubmission } from '@/hooks/useOrderSubmission';
+import { validatePurchaseOrder } from '@/utils/procurement';
+import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { toast } from '../../lib/toast';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +17,9 @@ type NewMaterialModalProps = {
 };
 
 export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialModalProps) => {
+  const submitOrder = useOrderSubmission();
+  const submitting = useRef(false);
+  const [boqItemId, setBoqItemId] = useState('');
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const [supplierName, setSupplierName] = useState('');
@@ -22,6 +27,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
   const [materialId, setMaterialId] = useState<string | null>(null);
   const [materialName, setMaterialName] = useState('');
   const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(() => { setBoqItemId(''); }, [projectId]);
   const [quantity, setQuantity] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [unit, setUnit] = useState('Bags');
@@ -104,16 +110,19 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
 
 
   const handleCreate = async () => {
-    if (!supplierName || (!materialId && !materialName) || !projectId || !quantity || !expectedDate) {
-      setErrorMsg('Please fill in all fields.');
+    if (submitting.current) return;
+    const validation = validatePurchaseOrder({ projectId, supplierId, material: materialId || materialName, quantity, unitPrice: '0', expectedDate, unit });
+    if (validation) {
+      setErrorMsg(validation);
       return;
     }
-
+    submitting.current = true;
     setLoading(true);
     setErrorMsg('');
 
     try {
-      await api.purchaseOrders.create({
+      await submitOrder({
+        boq_item_id: boqItemId || undefined,
         supplier_id: supplierId,
         supplier_name: supplierName,
         material_id: materialId || materialName, // fallback to typed name
@@ -139,6 +148,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
     } catch (e: any) {
       setErrorMsg(e.message || 'Failed to create purchase order');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -157,6 +167,7 @@ export const NewMaterialModal = ({ visible, onClose, onSuccess }: NewMaterialMod
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }} style={{ flexShrink: 1 }}>
+            <BoqItemSelect projectId={projectId || undefined} value={boqItemId} onChange={setBoqItemId} materialOnly />
             {errorMsg ? (
               <View className="bg-red-50 p-3 rounded-lg border border-red-200 mb-6">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 text-sm text-center">{errorMsg}</Text>

@@ -12,6 +12,9 @@ class Query:
     def select(self, columns):
         self.columns = columns
         return self
+    def in_(self, column, values):
+        self.rows = [row for row in self.rows if row.get(column) in values]
+        return self
     def order(self, column):
         assert column == 'id'
         return self
@@ -44,7 +47,7 @@ def test_management_report_uses_request_client_and_minimal_people_fields(monkeyp
         assert actual is request
         return client
     monkeypatch.setattr(reports, 'get_auth_client', auth_client)
-    result = reports.get_management_report(request)
+    result = reports.get_management_report(request, current_user={"role":"super_admin","id":"admin"})
     assert len(result['projects']) == 2
     assert result['payroll'] == []
     assert datetime.fromisoformat(result['generated_at']).tzinfo is not None

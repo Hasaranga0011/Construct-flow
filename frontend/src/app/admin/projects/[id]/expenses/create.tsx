@@ -1,4 +1,5 @@
 import { getApiUrl } from '../../../../../lib/apiUrl';
+import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +27,7 @@ export default function AdminCreateExpensePage() {
     expense_date: new Date().toISOString().split('T')[0]
   });
   const [loading, setLoading] = useState(false);
+  const [boqItemId, setBoqItemId] = useState('');
 
   useEffect(() => {
     const pid = Array.isArray(projectId) ? projectId[0] : projectId;
@@ -50,7 +52,7 @@ export default function AdminCreateExpensePage() {
     const qtyNum = parseFloat(quantityUsed);
     const price = Number(mat.unit_price || 0);
     if (!isNaN(qtyNum) && qtyNum > 0 && price > 0) {
-      setForm(prev => ({ ...prev, amount: String(Math.round(qtyNum * price * 100) / 100) }));
+      setForm(prev => ({ ...prev, amount: '0' }));
     }
   };
 
@@ -59,7 +61,7 @@ export default function AdminCreateExpensePage() {
     const qtyNum = parseFloat(val);
     const price = Number(selectedMaterial?.unit_price || 0);
     if (!isNaN(qtyNum) && qtyNum > 0 && price > 0) {
-      setForm(prev => ({ ...prev, amount: String(Math.round(qtyNum * price * 100) / 100) }));
+      setForm(prev => ({ ...prev, amount: '0' }));
     }
   };
 
@@ -79,6 +81,7 @@ export default function AdminCreateExpensePage() {
       const { data: sessionData } = await supabase.auth.getSession();
 
       const payload: any = {
+        boq_item_id: boqItemId || undefined,
         project_id: Array.isArray(projectId) ? projectId[0] : projectId,
         title: form.title,
         description: form.description || null,
@@ -127,6 +130,7 @@ export default function AdminCreateExpensePage() {
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
         <View className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 shadow-sm mb-10 border border-gray-100 dark:border-gray-800 max-w-2xl w-full mx-auto">
 
+          <BoqItemSelect projectId={String(projectId || '')} value={boqItemId} onChange={id => setBoqItemId(id)} />
           {/* Expense Category Selector */}
           <View className="mb-5">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">
@@ -218,6 +222,7 @@ export default function AdminCreateExpensePage() {
 
           <View className="mb-4">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Amount (Rs.) *</Text>
+            {category === 'Material' && !!selectedMaterialId && Number(quantityUsed) > 0 && <Text className="text-sm text-slate-500 mb-3">Stock usage is recorded at Rs. 0 additional expense: received goods are already included in project cost. Record transport or other additional charges separately.</Text>}
             <View className="flex-row items-center bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
               <Ionicons name="cash-outline" size={20} color="#EF4444" className="mr-3" />
               <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
@@ -226,6 +231,7 @@ export default function AdminCreateExpensePage() {
                 placeholderTextColor="#9CA3AF"
                 keyboardType="numeric"
                 value={form.amount}
+                editable={!(category === 'Material' && !!selectedMaterialId && Number(quantityUsed) > 0)}
                 onChangeText={(t) => setForm({...form, amount: t})}
               />
             </View>

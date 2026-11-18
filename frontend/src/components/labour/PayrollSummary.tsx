@@ -32,7 +32,7 @@ export const PayrollSummary = ({ refreshTrigger = 0, pmId }: { refreshTrigger?: 
           return;
         }
 
-        const today = new Date().toISOString().split('T')[0];
+
 
         // Fetch attendance from backend API
         const response = await fetch(`${getApiUrl()}/labour/payroll`, {

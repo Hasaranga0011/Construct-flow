@@ -1,5 +1,5 @@
+import React, { useCallback, useEffect, useState } from 'react';
 import { getApiUrl } from '../../../../../lib/apiUrl';
-import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../../lib/supabase';
@@ -17,13 +17,13 @@ export default function AdminExpensesIndexPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [project, setProject] = useState<any>(null);
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     if (!projectId) return;
     try {
       setLoading(true);
 
       // Fetch project
-      if (!project) {
+      {
         const { data: pData } = await supabase.from('projects').select('name, total_budget, spent_cost').eq('id', projectId).single();
         if (pData) setProject(pData);
       }
@@ -43,11 +43,11 @@ export default function AdminExpensesIndexPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) fetchExpenses();
-  }, [projectId]);
+  }, [projectId, fetchExpenses]);
 
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 

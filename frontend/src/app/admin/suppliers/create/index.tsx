@@ -63,10 +63,11 @@ export default function AdminSupplierCreatePage() {
       // Update the contact_number on the created profile (invite API doesn't take phone currently)
       const resJson = await response.json();
       if (resJson.user_id) {
-        await supabase.from('profiles').update({ contact_number: phone.trim() }).eq('id', resJson.user_id);
+        const { error: contactError } = await supabase.from('profiles').update({ contact_number: phone.trim() }).eq('id', resJson.user_id);
+        if (contactError) throw new Error('Supplier created, but contact details could not be saved. Update the existing supplier profile before retrying.');
       }
 
-      const message = 'Supplier created and invited successfully.';
+      const message = 'Supplier account created. Administrator approval is required before sign-in. ' + (resJson.email_delivery?.sent_to_inbox ? 'Invitation email sent.' : 'Invitation email delivery is pending.');
       resetForm();
       if (Platform.OS === 'web') window.alert(message); else Alert.alert('Success', message);
       router.replace('/admin/suppliers');

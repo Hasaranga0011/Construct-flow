@@ -1,15 +1,6 @@
+import { api } from "@/services/api";
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  useWindowDimensions,
-  Linking,
-  ScrollView,
-  Alert,
-  Platform,
-} from "react-native";
+import { View, Text, Pressable, Modal, useWindowDimensions, Linking, ScrollView, Alert, Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,38 +9,13 @@ import QRCode from "react-native-qrcode-svg";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import {
-  ScreenContainer,
-  Card,
-  Button,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-} from "@/components/ui";
+import { Card, Button, EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { StatCard } from "@/components/common/StatCard";
 import { AutoFitText } from "@/components/common/AutoFitText";
 import { TopNav } from "@/components/common/TopNav";
-import {
-  Attendance,
-  rows,
-  profileForWorker,
-  cachedWorker,
-  workerRequest,
-  money,
-  dateLabel,
-  timeLabel,
-  todayKey,
-  monthRange,
-} from "@/services/workerData";
-import {
-  formatHoursMinutes,
-  formatOvertimeHoursMinutes,
-  formatMinutes,
-  getAttendanceStatus,
-  sumWorkedMinutes,
-  sumOvertimeMinutes,
-} from "@/utils/format";
+import { Attendance, rows, profileForWorker, cachedWorker, workerRequest, money, dateLabel, timeLabel, todayKey, monthRange } from "@/services/workerData";
+import { formatHoursMinutes, formatOvertimeHoursMinutes, formatMinutes, getAttendanceStatus, sumWorkedMinutes, sumOvertimeMinutes } from "@/utils/format";
 import { deliverReport } from "@/components/reports/reportDelivery";
 
 type Resource = ReturnType<typeof useAsyncData<any>>;
@@ -73,19 +39,7 @@ function UpdateItem({
     setBusy(true);
     setError("");
     try {
-      const changed = await rows(
-        supabase
-          .from("notifications")
-          .update({ is_read: true })
-          .eq("id", notification.id)
-          .eq("target_user_id", user.id)
-          .select("id"),
-        controller.signal,
-      );
-      if (!changed?.length)
-        throw new Error(
-          "This update could not be marked as read. Please try again.",
-        );
+      await api.patch("/notifications/mark-read", { ids: [notification.id] });
       onRead();
     } catch (e: any) {
       setError(
@@ -187,15 +141,7 @@ function useWorkerResource(kind: string, month: string, enabled = true) {
             signal,
           );
         case "updates":
-          return rows(
-            supabase
-              .from("notifications")
-              .select("*")
-              .eq("target_user_id", id)
-              .order("created_at", { ascending: false })
-              .limit(50),
-            signal,
-          );
+          return api.getFresh("/notifications/");
         case "recent":
           return rows(
             supabase
@@ -632,15 +578,15 @@ function PaySummary({ pay }: { pay: any }) {
     <View className="gap-3">
       <StatusBadge
         status={
-          pay.final ? `Final · ${pay.slip_number || "Payslip"}` : "Estimated"
+          pay.summary_kind === 'recorded_slips' ? `Recorded · ${pay.slip_count} payslip${pay.slip_count === 1 ? '' : 's'}` : pay.final ? `Final · ${pay.slip_number || "Payslip"}` : "Estimated"
         }
       />
-      <BodyText>
+      {pay.summary_kind === 'recorded_slips' ? <BodyText>Basic pay across {pay.slip_count} recorded payslip{pay.slip_count === 1 ? '' : 's'}: {money(pay.basic_pay)}</BodyText> : <BodyText>
         {pay.total_days} days x {money(pay.daily_rate)} daily rate ={" "}
         {money(pay.basic_pay)}
-      </BodyText>
+      </BodyText>}
       <BodyText>
-        {formatHoursMinutes(pay.overtime_hours ?? 0)} overtime x hourly rate x 1.5 ={" "}
+        {formatHoursMinutes(pay.overtime_hours ?? 0)} {pay.summary_kind === 'recorded_slips' ? 'recorded overtime:' : 'overtime x hourly rate x 1.5 ='}{" "}
         {money(pay.overtime_pay)}
       </BodyText>
       <BodyText>Deductions: {money(pay.deductions ?? 0)}</BodyText>
@@ -648,6 +594,7 @@ function PaySummary({ pay }: { pay: any }) {
         {money(pay.total_pay)}
       </Text>
       {!pay.total_days && <BodyText>No days recorded yet this period</BodyText>}
+      {pay.summary_kind === 'recorded_slips' && <BodyText>{pay.includes_cross_month_periods ? 'Totals include full pay periods overlapping this month, including days outside this month.' : 'Totals show recorded payslips for this month. Work not yet included in a payslip is excluded.'}</BodyText>}
     </View>
   );
 }
@@ -911,7 +858,7 @@ export default function WorkerPortal({
               formatMinutes(sumOvertimeMinutes(attendance.data || [])),
             ],
             [
-              p.final ? "Final Earnings (LKR)" : "Estimated Earnings (LKR)",
+              p.summary_kind === 'recorded_slips' ? "Recorded Payslips (LKR)" : p.final ? "Final Earnings (LKR)" : "Estimated Earnings (LKR)",
               Number(p.total_pay ?? 0).toLocaleString("en-LK"),
             ],
           ].map(([label, value]) => (
@@ -977,7 +924,7 @@ export default function WorkerPortal({
         }
         showAction={false}
       />
-      <ScrollView 
+      <ScrollView
         className="flex-1 px-4 md:px-8 py-6"
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}

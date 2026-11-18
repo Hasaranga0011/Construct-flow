@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="origin">
+<style nonce="__NONCE__">html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f8fafc}#search{position:relative;z-index:5;padding:8px;background:#fff;border-bottom:1px solid #e2e8f0;box-sizing:border-box;min-height:56px}#search gmp-place-autocomplete{width:100%;color-scheme:light}#map{height:calc(100% - 66px);min-height:160px}#status{position:absolute;bottom:30px;left:12px;right:12px;z-index:6;background:#fff7ed;color:#9a3412;padding:10px;border-radius:8px;font-size:12px}#status[hidden]{display:none}</style></head>
+<body data-map-id="__GOOGLE_MAP_ID__"><div id="search" aria-label="Search site location"></div><div id="map"></div><div id="status" role="status">Loading Google Maps…</div>
+<script nonce="__NONCE__">
+(function(){
+  var config=null,map=null,pin=null,sdkReady=false,Marker=null,projects=[],geocoder=null,selection=0;
+  function notify(value){var message=JSON.stringify(value);if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(message);else if(window.parent!==window)window.parent.postMessage(message,'*');}
+  function status(text){var node=document.getElementById('status');node.textContent=text;node.hidden=!text;}
+  function valid(lat,lng){return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;}
+  window.gm_authFailure=function(){status('Google Maps authorization failed. Ask the administrator to check the map key and enabled APIs.');notify({type:'mapUnavailable'});};
+  window.addEventListener('error',function(event){if(event.target&&event.target.tagName==='SCRIPT')window.gm_authFailure();},true);
+  window.setPin=function(lat,lng,move){if(!map||!valid(lat,lng))return;var position={lat:lat,lng:lng};if(!pin){pin=new Marker({map:map,position:position,gmpDraggable:config.interactive===true,title:'Project site'});pin.addListener('dragend',function(event){selectPin(event.latLng.lat(),event.latLng.lng());});}else pin.position=position;if(move)map.panTo(position);};
+  window.flyToLocation=function(lat,lng,zoom){if(!map||!valid(lat,lng))return;map.panTo({lat:lat,lng:lng});if(typeof zoom==='number')map.setZoom(zoom);};
+  window.previewLocation=window.flyToLocation;
+  window.toggleLayer=function(){if(!map)return;var type=map.getMapTypeId()==='satellite'?'roadmap':'satellite';map.setMapTypeId(type);notify({type:'layerChanged',layer:type==='satellite'?'sat':'street'});};
+  window.setMarkers=function(rows){
+    if(!map)return;
+    projects.forEach(function(marker){marker.map=null;});projects=[];
+    var points=[];
+    (rows||[]).forEach(function(row){
+      if(!valid(row.lat,row.lng))return;
+      var marker=new Marker({map:map,position:{lat:row.lat,lng:row.lng},title:String(row.title||'Project')});
+      marker.addListener('click',function(){
+        if(google.maps.InfoWindow){
+          var content=document.createElement('div');
+          [row.title||'Project',row.location,row.status,typeof row.completion==='number'?row.completion+'% complete':''].filter(Boolean).forEach(function(text){var line=document.createElement('div');line.textContent=String(text);content.appendChild(line);});
+          new google.maps.InfoWindow({content:content}).open({map:map,anchor:marker});
+        }
+        notify({type:'markerClick',id:row.id});
+      });
+      projects.push(marker);points.push(row);
+    });
+    if(points.length===1)window.flyToLocation(points[0].lat,points[0].lng,14);
+    else if(points.length>1)map.fitBounds({north:Math.max.apply(null,points.map(function(p){return p.lat;})),south:Math.min.apply(null,points.map(function(p){return p.lat;})),east:Math.max.apply(null,points.map(function(p){return p.lng;})),west:Math.min.apply(null,points.map(function(p){return p.lng;}))},40);
+  };
+  async function selectPin(lat,lng){
+    if(!config||!config.interactive||!valid(lat,lng))return;
+    var current=++selection;window.setPin(lat,lng,false);
+    var address='Lat: '+lat.toFixed(5)+', Lng: '+lng.toFixed(5);
+    try{var response=await geocoder.geocode({location:{lat:lat,lng:lng}});if(current!==selection)return;if(response.results&&response.results[0])address=response.results[0].formatted_address;}catch(error){}
+    if(current===selection)notify({type:'locationSelect',lat:lat,lng:lng,address:address});
+  }
+  async function build(){
+    if(!sdkReady||!config||map)return;
+    try{
+      var libraries=await Promise.all([google.maps.importLibrary('maps'),google.maps.importLibrary('marker'),google.maps.importLibrary('places'),google.maps.importLibrary('geocoding')]);
+      Marker=libraries[1].AdvancedMarkerElement;
+      map=new libraries[0].Map(document.getElementById('map'),{center:config.center||{lat:7.8731,lng:80.7718},zoom:config.zoom||7,mapId:document.body.dataset.mapId,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,gestureHandling:'greedy'});
+      geocoder=new libraries[3].Geocoder();
+      if(config.interactive){
+        var autocomplete=new libraries[2].PlaceAutocompleteElement({includedRegionCodes:['lk']});
+        autocomplete.setAttribute('aria-label','Search Google Maps places');
+        autocomplete.setAttribute('placeholder','Search a business, place or address');
+        document.getElementById('search').appendChild(autocomplete);
+        autocomplete.addEventListener('focusin',function(){notify({type:'placeSearchFocus',focused:true});});
+        autocomplete.addEventListener('focusout',function(){notify({type:'placeSearchFocus',focused:false});});
+        autocomplete.addEventListener('gmp-select',async function(event){
+          var current=++selection;status('Finding the selected place…');
+          try{
+            var place=event.placePrediction.toPlace();
+            await place.fetchFields({fields:['location','formattedAddress','displayName']});
+            if(current!==selection)return;
+            if(!place.location)throw new Error('Missing coordinates');
+            var lat=place.location.lat(),lng=place.location.lng();
+            if(!valid(lat,lng))throw new Error('Invalid coordinates');
+            var address=[place.displayName,place.formattedAddress].filter(Boolean).join(', ');
+            window.setPin(lat,lng,true);map.setZoom(17);status('');
+            notify({type:'locationSelect',lat:lat,lng:lng,address:address});
+          }catch(error){if(current===selection)status('This place could not be loaded. Choose it again or pin the site on the map.');}
+        });
+        autocomplete.addEventListener('gmp-error',function(){status('Google place search is unavailable. Check Places API access or pin the site on the map.');});
+        map.addListener('click',function(event){selectPin(event.latLng.lat(),event.latLng.lng());});
+      }else{document.getElementById('search').style.display='none';document.getElementById('map').style.height='100%';}
+      if(config.markerPos)window.setPin(config.markerPos.lat,config.markerPos.lng,false);
+      window.setMarkers(config.markers);status('');notify({type:'mapLoaded'});
+    }catch(error){status('Google Maps could not load. Check the connection and map configuration.');notify({type:'mapUnavailable'});}
+  }
+  window.configureMap=function(value){if(!config){config=value||{};build();}};
+  window.initGoogleMap=function(){sdkReady=true;notify({type:'mapFrameReady'});build();};
+  window.addEventListener('message',function(event){
+    if(event.source!==window.parent)return;
+    try{var value=typeof event.data==='string'?JSON.parse(event.data):event.data;if(!value)return;
+      if(value.type==='initialize')window.configureMap(value.config);
+      else if(value.type==='setMarker')window.setPin(value.lat,value.lng,true);
+      else if(value.type==='previewLocation')window.flyToLocation(value.lat,value.lng,value.zoom);
+      else if(value.type==='flyTo')window.flyToLocation(value.lat,value.lng,value.zoom);
+      else if(value.type==='toggleLayer')window.toggleLayer();
+      else if(value.type==='setMarkers')window.setMarkers(value.markers);
+    }catch(error){}
+  });
+})();
+</script><script nonce="__NONCE__" async src="__GOOGLE_SCRIPT_URL__"></script>
+</body></html>

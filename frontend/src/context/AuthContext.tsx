@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { normalizeRole } from '../utils/auth';
@@ -43,6 +44,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isApproved, setIsApproved] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
   const [portalError, setPortalError] = useState<string | null>(null);
+  const activeUserId = useRef<string | null>(null);
   const clearPortalError = () => setPortalError(null);
 
   const fetchProfileDetails = async (userId: string) => {
@@ -52,11 +54,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('role, is_approved, avatar_url, full_name')
         .eq('id', userId)
         .single();
-      if (profile) {
-        if (profile.avatar_url) setAvatarUrl(profile.avatar_url);
-        if (profile.full_name) setFullName(profile.full_name);
-        if (profile.role) setRole(normalizeRole(profile.role));
-        if (profile.is_approved !== undefined && profile.is_approved !== null) setIsApproved(Boolean(profile.is_approved));
+      if (profile && activeUserId.current === userId) {
+        setAvatarUrl(profile.avatar_url || null);
+        setFullName(profile.full_name || null);
+        setRole(normalizeRole(profile.role));
+        setIsApproved(profile.is_approved === true);
       }
     } catch (e) {
       console.warn('Error fetching profile details:', e);
@@ -79,6 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const requestId = ++roleRequest;
 
       if (!mounted) return;
+      activeUserId.current = nextSession?.user?.id || null;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
@@ -96,18 +99,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const isSameUser = prevUserId === nextSession.user.id;
       // Only show loading screen if the user has actually changed.
-      // This prevents the app from unmounting and losing local form state 
+      // This prevents the app from unmounting and losing local form state
       // when Supabase triggers a session refresh on window refocus.
       if (!isSameUser) {
         setIsLoading(true);
       }
       prevUserId = nextSession.user.id;
 
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      const [pendingRole, hasLoginPortal] = await Promise.all([
-        AsyncStorage.getItem('pending_google_role').catch(() => null),
-        AsyncStorage.getItem('login_portal').catch(() => null),
-      ]);
+      const pendingRole = await AsyncStorage.getItem('pending_google_role').catch(() => null);
 
       if (pendingRole) {
         try {
@@ -127,42 +126,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      // Fast path: on token refresh/window refocus for the same user without a pending portal check,
-      // skip redundant profile fetch so UI never stalls.
-      if (isSameUser && !pendingRole && !hasLoginPortal) {
-        if (mounted && requestId === roleRequest) setIsLoading(false);
-        return;
-      }
-
       try {
-        const appMetaRole = (nextSession.user as any).app_metadata?.role;
-        const userMetaRole = nextSession.user.user_metadata?.role;
-        const metaRole = appMetaRole || userMetaRole;
-        let resolvedRole = metaRole ? normalizeRole(metaRole) : null;
-        let resolvedIsApproved = true;
-        let resolvedAvatarUrl = (nextSession.user.user_metadata as any)?.avatar_url || null;
-        let resolvedFullName = (nextSession.user.user_metadata as any)?.full_name || null;
-
-        // Fast startup: if we already have a role from metadata and no portal gate or Google role sync is pending,
-        // unblock the UI immediately and refresh the profile in the background.
-        if (resolvedRole && !pendingRole && !hasLoginPortal) {
-          if (mounted && requestId === roleRequest) {
-            setRole(resolvedRole);
-            setIsApproved(resolvedIsApproved);
-            setAvatarUrl(resolvedAvatarUrl);
-            setFullName(resolvedFullName);
-            setIsLoading(false);
-          }
-          void fetchProfileDetails(nextSession.user.id);
-          return;
-        }
+        let resolvedRole: string | null = null;
+        let resolvedIsApproved = false;
+        let resolvedAvatarUrl: string | null = null;
+        let resolvedFullName: string | null = null;
 
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role, is_approved, avatar_url, full_name')
           .eq('id', nextSession.user.id)
           .single();
-        if (!profileError && profile) {
+        if (profileError || !profile) throw new Error("An authorized profile is required");
+        if (profile) {
           if (profile.role) resolvedRole = normalizeRole(profile.role);
           if (profile.is_approved !== undefined && profile.is_approved !== null) resolvedIsApproved = Boolean(profile.is_approved);
           if (profile.avatar_url) resolvedAvatarUrl = profile.avatar_url;
@@ -195,7 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Error fetching role:', error);
         if (mounted && requestId === roleRequest) {
             setRole(null);
-            setIsApproved(true);
+            setIsApproved(false);
         }
       } finally {
         if (mounted && requestId === roleRequest) setIsLoading(false);
@@ -217,6 +193,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
+      activeUserId.current = null;
       subscription.unsubscribe();
     };
   }, []);

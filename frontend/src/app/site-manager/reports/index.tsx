@@ -1,8 +1,6 @@
 import { dataError } from '@/services/siteData';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, ScrollView, ActivityIndicator, Pressable, Image, Linking, TextInput, Modal,
-} from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, Linking, TextInput, Modal } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
@@ -168,7 +166,7 @@ export default function SiteManagerReportsPage() {
 
           <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
             <View className="flex-row flex-wrap gap-3 justify-between items-center mb-5">
-              <View>
+              <View style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-gray-800">Daily Reports</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mt-0.5">
                   Daily progress logs, workforce headcount, materials & blockers

@@ -3,7 +3,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
-from core.security import get_current_user
+from core.security import get_current_user, normalize_role
+from core.access import require_project_member, project_member
 from datetime import datetime, timezone
 
 router = APIRouter(
@@ -26,8 +27,11 @@ from core.database import client_for_token, get_service_client
 def send_message(payload: MessageCreate, current_user: dict = Depends(get_current_user)):
     if payload.sender_id != current_user["id"]:
         raise HTTPException(status_code=403, detail="Cannot send a message as another user")
-    
+
     service_client = get_service_client()
+    require_project_member(service_client, payload.project_id, current_user)
+    if not payload.content.strip() or len(payload.content) > 10000:
+        raise HTTPException(status_code=422, detail="Message must contain 1 to 10000 characters")
     try:
         # Verify sender and receiver are both participants of this project.
         proj = service_client.table("projects").select("id, pm_id, client_id").eq("id", payload.project_id).execute()
@@ -41,7 +45,9 @@ def send_message(payload: MessageCreate, current_user: dict = Depends(get_curren
             receiver_profile = service_client.table("profiles").select("id, role").eq("id", payload.receiver_id).execute()
             if not receiver_profile.data:
                 raise HTTPException(status_code=404, detail="Receiver not found")
-            receiver_role_val = receiver_role_val or receiver_profile.data[0].get("role")
+            receiver_role_val = normalize_role(receiver_profile.data[0].get("role"))
+            if not project_member(service_client, payload.project_id, payload.receiver_id, receiver_role_val):
+                raise HTTPException(status_code=403, detail="Receiver is not a project participant")
         else:
             receiver_role_val = receiver_role_val or "All"
 
@@ -49,7 +55,7 @@ def send_message(payload: MessageCreate, current_user: dict = Depends(get_curren
             "project_id": payload.project_id,
             "sender_id": payload.sender_id,
             "receiver_id": payload.receiver_id,
-            "sender_role": payload.sender_role or current_user.get("role"),
+            "sender_role": current_user["role"],
             "receiver_role": receiver_role_val,
             "message_text": payload.content,
             "content": payload.content,
@@ -73,19 +79,23 @@ def get_messages(
     current_user: dict = Depends(get_current_user),
 ):
     supabase = client_for_token(current_user["token"])
+    require_project_member(supabase, project_id, current_user)
     try:
         # Base query: only rows where the current user is sender or receiver.
         query = supabase.table("client_messages") \
-            .select("*, sender:profiles!sender_id(full_name, role)") \
+            .select("*") \
             .eq("project_id", project_id) \
             .or_(f"sender_id.eq.{current_user['id']},receiver_id.eq.{current_user['id']},receiver_id.is.null") \
             .order("created_at", desc=False)
 
+        allowed_roles = {"super_admin","admin","pm","client","site_manager","supplier","worker","All"}
+        if any(value and value not in allowed_roles for value in (sender_role,receiver_role)):
+            raise HTTPException(422,"Invalid message channel")
         # Optional channel filter: client requests only their thread with a specific role.
         if sender_role and receiver_role:
             # Match both directions of the channel.
             query = supabase.table("client_messages") \
-                .select("*, sender:profiles!sender_id(full_name, role)") \
+                .select("*") \
                 .eq("project_id", project_id) \
                 .or_(
                     f"and(sender_role.eq.{sender_role},receiver_role.eq.{receiver_role}),"
@@ -95,7 +105,11 @@ def get_messages(
                 .order("created_at", desc=False)
 
         res = query.execute()
-        return res.data
+        rows = res.data or []
+        sender_ids = list({row['sender_id'] for row in rows if row.get('sender_id')})
+        profiles = supabase.table('profiles').select('id,full_name,role').in_('id',sender_ids).execute().data or [] if sender_ids else []
+        senders = {profile['id']: {'full_name':profile.get('full_name'), 'role':profile.get('role')} for profile in profiles}
+        return [{**row, 'sender':senders.get(row.get('sender_id'))} for row in rows]
     except HTTPException:
         raise
     except Exception as e:
@@ -108,7 +122,7 @@ def mark_message_read(message_id: str, current_user: dict = Depends(get_current_
     supabase = client_for_token(current_user["token"])
     try:
         res = supabase.table("client_messages") \
-            .update({"read_at": datetime.now(timezone.utc).isoformat()}) \
+            .update({"read_at": datetime.now(timezone.utc).isoformat(), "is_read": True}) \
             .eq("id", message_id) \
             .eq("receiver_id", current_user["id"]) \
             .execute()
@@ -122,6 +136,7 @@ def mark_message_read(message_id: str, current_user: dict = Depends(get_current_
 @router.get("/{project_id}/contacts")
 def get_project_contacts(project_id: str, current_user: dict = Depends(get_current_user)):
     service_client = get_service_client()
+    require_project_member(service_client, project_id, current_user)
     contacts = {}
 
     # 1. Fetch project PM and Client

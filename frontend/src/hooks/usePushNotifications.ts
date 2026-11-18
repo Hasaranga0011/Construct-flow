@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 
 const supportsRemotePush = Platform.OS !== 'web' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 // Avoid loading token auto-registration side effects in Expo Go and web.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Do not initialize native push in Expo Go or web.
 const Notifications: typeof import('expo-notifications') | null = supportsRemotePush ? require('expo-notifications') : null;
 
 if (Notifications) Notifications.setNotificationHandler({
@@ -88,17 +89,17 @@ async function registerForPushNotificationsAsync() {
   if (Device.isDevice) {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    
+
     if (finalStatus !== 'granted') {
       console.log('Failed to get push token for push notification!');
       return null;
     }
-    
+
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     if (!projectId) {
       console.log('No projectId found in app.json. Skipping push token generation.');

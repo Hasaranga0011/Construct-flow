@@ -2,9 +2,10 @@
 Authentication and Self-Registration endpoints.
 """
 import logging
+from html import escape
 from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from supabase import create_client
 
 from core.config import settings
@@ -25,10 +26,49 @@ logger = logging.getLogger("constructflow.auth")
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
+class PasswordRecoveryRequest(BaseModel):
+    email: EmailStr
+    redirect_to: Optional[str] = None
+
+
+@router.post('/password-recovery', status_code=202)
+def request_password_recovery(payload: PasswordRecoveryRequest):
+    """Use the configured app email transport, with no account enumeration."""
+    from core.database import get_service_client
+    from services.email_service import send_email
+    frontend = settings.FRONTEND_URL.rstrip('/')
+    allowed = {frontend + '/reset-password'}
+    allowed.update(origin.strip().rstrip('/') + '/reset-password' for origin in settings.CORS_ORIGINS.split(',') if origin.strip())
+    allowed.add('constructflow://reset-password')
+    redirect = payload.redirect_to or frontend + '/reset-password'
+    if redirect not in allowed:
+        raise HTTPException(422, 'This password recovery redirect is not allowed')
+    message = {'message': 'If an account exists, a password reset link will be sent.'}
+    try:
+        result = get_service_client().auth.admin.generate_link({
+            'type': 'recovery', 'email': str(payload.email), 'options': {'redirect_to': redirect}
+        })
+        properties = getattr(result, 'properties', None)
+        link = getattr(properties, 'action_link', None)
+        if not link and isinstance(result, dict):
+            link = result.get('action_link') or (result.get('properties') or {}).get('action_link')
+        if not link:
+            raise ValueError('Recovery link not returned')
+        send_email(str(payload.email), 'ConstructAi — Reset your password',
+                   '<h2>Reset your ConstructAi password</h2><p>You requested a password reset.</p>'
+                   '<p><a href="' + escape(link, quote=True) + '">Set a new password</a></p>'
+                   '<p>If you did not request this, you can ignore this email. Your password has not been changed.</p>')
+    except Exception:
+        # Never log the provider response: it can contain the one-time action link.
+        # Unknown accounts and dispatch failures share the public response.
+        logger.warning('Password recovery could not be dispatched; inspect email provider health')
+    return message
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
-    full_name: str
+    password: str = Field(min_length=12, max_length=128)
+    full_name: str = Field(min_length=2, max_length=120)
     role: str
     portal: Optional[str] = None  # "internal" or "partner"
     contact_number: Optional[str] = None
@@ -112,7 +152,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         auth_res = admin_db.auth.admin.create_user({
             "email": normalized_email,
             "password": payload.password,
-            "email_confirm": True,
+            "email_confirm": False,
             "app_metadata": {"role": canonical_role},
             "user_metadata": user_meta,
         })
@@ -127,7 +167,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         raise HTTPException(status_code=400, detail=f"Registration failed: {err_str}")
 
     # Prepare profile
-    is_approved = canonical_role != ROLE_SUPPLIER
+    is_approved = canonical_role == "client"
     profile_data = {
         "id": user_id,
         "email": normalized_email,
@@ -143,13 +183,22 @@ def register_user(payload: RegisterRequest) -> Dict:
 
     try:
         admin_db.table("profiles").upsert(profile_data).execute()
-    except Exception as e:
-        if "is_approved" in str(e):
-            # Fallback omitting is_approved if column is not yet present
-            profile_data_safe = {k: v for k, v in profile_data.items() if k != "is_approved"}
-            admin_db.table("profiles").upsert(profile_data_safe).execute()
-        else:
-            raise HTTPException(status_code=500, detail=f"Could not initialize profile: {e}")
+    except Exception as exc:
+        admin_db.auth.admin.delete_user(user_id)
+        raise HTTPException(status_code=503, detail="Registration could not initialize the account") from exc
+
+    # A real verification email is required; never auto-confirm public accounts.
+    try:
+        from services.email_service import send_email
+        from html import escape
+        link = admin_db.auth.admin.generate_link({"type": "magiclink", "email": normalized_email,
+            "options": {"redirect_to": settings.FRONTEND_URL.rstrip("/") + ("/partner-login" if canonical_role in {"client", "supplier"} else "/team-login")}})
+        action_url = link.properties.action_link
+        send_email(normalized_email, "Verify your ConstructFlow email",
+                   '<p>Verify your email to finish registration.</p><a href="' + escape(action_url, quote=True) + '">Verify email</a>')
+    except Exception as exc:
+        admin_db.auth.admin.delete_user(user_id)
+        raise HTTPException(status_code=503, detail="Verification email could not be delivered. Please try again later.") from exc
 
     # 1. Dispatch registration welcome email (without password)
     email_delivery = None
@@ -185,7 +234,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         "role": canonical_role,
         "is_approved": is_approved,
         "email_delivery": email_delivery,
-        "message": "Registration successful" if is_approved else "Registration received. Supplier accounts require admin approval before accessing the dashboard.",
+        "message": "Check your email to verify your account. Staff and supplier accounts also require administrator approval.",
     }
 
 

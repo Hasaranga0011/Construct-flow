@@ -10,11 +10,11 @@ interface ScreenContainerProps {
 }
 
 export const ScreenContainer = ({ children, scroll = true, className = '', style }: ScreenContainerProps) => {
-  const { isDark } = useTheme();
+  useTheme();
 
   const content = scroll ? (
-    <ScrollView 
-      keyboardShouldPersistTaps="handled" 
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
       className="flex-1 px-4 md:px-8 py-6"
       contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
@@ -27,8 +27,8 @@ export const ScreenContainer = ({ children, scroll = true, className = '', style
 
   return (
     <SafeAreaView className="flex-1 bg-brand-light dark:bg-[#0F172A]">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className={`flex-1 ${className}`}
         style={style}
       >

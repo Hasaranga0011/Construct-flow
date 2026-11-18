@@ -4,6 +4,7 @@ export interface EditableMilestone {
   due_date: string;
   duration_days: number;
   allocated_budget?: number;
+  boq_stage?: string;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,6 +73,7 @@ export function seedMilestonesFromBoq(
   const validStart = isValidYMD(startDateStr) ? startDateStr!.trim() : getTodayYMD();
   const rawList: EditableMilestone[] = (boqMilestones || []).map((m: any) => ({
     title: String(m.title || '').trim(),
+    boq_stage: String(m.boq_stage || m.title || '').trim(),
     description: String(m.description || '').trim(),
     duration_days: Number(m.duration_days) > 0 ? Math.round(Number(m.duration_days)) : 21,
     due_date: '',

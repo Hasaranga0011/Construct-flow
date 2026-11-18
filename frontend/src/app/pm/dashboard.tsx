@@ -1,6 +1,11 @@
+import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
+import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
+import { useRouter } from 'expo-router';
+// Modified for Expo Go mobile compatibility
 // Modified for Expo Go mobile compatibility
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
+import { View, Text } from 'react-native';
+import { LoadingState, ErrorState } from '@/components/ui';
 import { TopNav } from '@/components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { StatCard } from '../../components/common/StatCard';
@@ -13,9 +18,11 @@ import { supabase } from '../../lib/supabase';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
 import { useRealtimeStats } from '../../hooks/useRealtimeStats';
 import { useResponsive } from '../../hooks/useResponsive';
+import { todayKey } from '@/services/workerData';
 
 export default function DashboardScreen() {
   const { isMobile } = useResponsive();
+  const router = useRouter();
   const [stats, setStats] = useState({
     activeProjects: 0,
     workersOnSite: 0,
@@ -24,7 +31,7 @@ export default function DashboardScreen() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  
+
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,7 +42,7 @@ export default function DashboardScreen() {
       setError('');
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) return;
-      
+
       const userId = sessionData.session.user.id;
       setCurrentUserId(userId);
 
@@ -59,9 +66,12 @@ export default function DashboardScreen() {
       }
 
       if (assignedProjectIds.length > 0) {
+        const sites = await supabase.from('sites').select('id').in('project_id', assignedProjectIds);
+        if (sites.error) throw sites.error;
+        const siteIds = (sites.data || []).map(site => site.id);
         const [materialsReq, attReq] = await Promise.all([
           supabase.from('materials').select('current_stock, minimum_threshold').in('project_id', assignedProjectIds),
-          supabase.from('attendance').select('id', { count: 'exact', head: true }).in('site_id', assignedProjectIds).eq('date', new Date().toISOString().slice(0, 10)).not('check_in_time', 'is', null).is('check_out_time', null)
+          siteIds.length ? supabase.from('attendance').select('id', { count: 'exact', head: true }).in('site_id', siteIds).eq('date', todayKey()).not('check_in_time', 'is', null).is('check_out_time', null) : Promise.resolve({count:0,error:null})
         ]);
         if (materialsReq.error) throw materialsReq.error;
         lowStockAlerts = (materialsReq.data || []).filter(m => m.current_stock != null && m.minimum_threshold != null && Number(m.current_stock) < Number(m.minimum_threshold)).length;
@@ -117,27 +127,27 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Dashboard" 
-        actionLabel="+ New Project" 
-        onActionPress={() => setModalVisible(true)} 
+    <View className="flex-1 bg-brand-light dark:bg-slate-950">
+      <TopNav
+        title="Project Manager Dashboard"
+        actionLabel="+ New Project"
+        onActionPress={() => setModalVisible(true)}
       />
-      
-      {!!error && <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} className="text-red-600 p-4" onPress={loadStats}>{error} Tap to retry.</Text>}
+
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#F97316" />
+          <LoadingState message="Loading your project overview…" />
         </View>
-      ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={true}>
+      ) : error ? <ErrorState message={error} onRetry={() => { setLoading(true); void loadStats(); }} /> : (
+        <DashboardContent>
+          <DashboardHero eyebrow="Project management" title="Project overview" description="Progress, budgets and outstanding work across your assigned projects." icon="business-outline" />
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">PM Dashboard</Text>
-            
-            <SearchInput 
-              placeholder="Search projects..." 
-              value={searchQuery} 
-              onChangeText={setSearchQuery} 
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-slate-900 dark:text-white">Portfolio overview</Text>
+
+            <SearchInput
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
               className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'projects',
@@ -156,76 +166,83 @@ export default function DashboardScreen() {
           {/* Top Stat Cards Row */}
           <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
             <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Active Projects" 
-                value={stats.activeProjects.toString()} 
-                indicatorText="Live tracking" 
-                indicatorType="success" 
+              <StatCard onPress={() => router.push('/pm/projects')} 
+                label="Active Projects"
+                value={stats.activeProjects.toString()}
+                indicatorText="Live tracking"
+                indicatorType="success"
                 colorScheme="blue"
                 fullWidth
               />
             </AnimatedCard>
             <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Workers On Site" 
-                value={stats.workersOnSite.toString()} 
-                indicatorText="Currently checked in" 
+              <StatCard onPress={() => router.push('/pm/labour')} 
+                label="Workers On Site"
+                value={stats.workersOnSite.toString()}
+                indicatorText="Currently checked in"
                 colorScheme="emerald"
                 fullWidth
               />
             </AnimatedCard>
             <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Low Stock Alerts" 
-                value={stats.lowStockAlerts.toString()} 
-                indicatorText="Requires ordering" 
-                indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"} 
+              <StatCard onPress={() => router.push('/pm/materials')} 
+                label="Low Stock Alerts"
+                value={stats.lowStockAlerts.toString()}
+                indicatorText="Requires ordering"
+                indicatorType={stats.lowStockAlerts > 0 ? "danger" : "success"}
                 colorScheme="amber"
                 fullWidth
               />
             </AnimatedCard>
             <AnimatedCard delay={400} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Total Budget" 
-                value={formatCurrency(stats.totalBudget)} 
-                indicatorText="Approved estimates" 
+              <StatCard onPress={() => router.push('/pm/projects')} 
+                label="Total Budget"
+                value={formatCurrency(stats.totalBudget)}
+                indicatorText="Approved estimates"
                 colorScheme="purple"
                 fullWidth
               />
             </AnimatedCard>
           </View>
 
+          <DashboardActions actions={[
+            { label: 'Project workspace', description: 'Progress, people and project details', icon: 'business-outline', onPress: () => router.push('/pm/projects') },
+            { label: 'Materials & orders', description: 'Stock levels and purchasing', icon: 'cube-outline', onPress: () => router.push('/pm/materials') },
+            { label: 'Attendance & payroll', description: 'Review your team’s working records', icon: 'people-outline', onPress: () => router.push('/pm/payroll') },
+          ]} />
+          <DashboardSectionHeading title="Performance & planning" description="Budget visibility and the signals that need your attention." icon="analytics-outline" />
           {/* Center Row: Chart & Delay Risk */}
           <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, marginBottom: 24 }}>
             {/* Main Content Area (Chart) */}
-            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
-              <CostTimelineChart pmId={currentUserId} />
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2, minWidth: 0 }}>
+              <DashboardDetailLink href="/pm/projects" label="project cost history"><CostTimelineChart pmId={currentUserId} /></DashboardDetailLink>
             </View>
-            
+
             {/* Side Panel (Delay Risk) */}
-            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
-              <DelayRiskPanel pmId={currentUserId} />
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1, minWidth: 0 }}>
+              <DashboardDetailLink href="/pm/projects" label="project risk" interactive><DelayRiskPanel pmId={currentUserId} /></DashboardDetailLink>
             </View>
           </View>
 
+          <DashboardSectionHeading title="Your project workspace" description="Current projects and recent updates from your team." icon="layers-outline" />
           {/* Bottom Row: Active Projects & Recent Alerts */}
           <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 24, paddingBottom: 24 }}>
-            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2 }}>
-              <ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} pmId={currentUserId} />
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 2, minWidth: 0 }}>
+              <DashboardDetailLink href="/pm/projects" label="project register" interactive><ActiveProjectsTable refreshTrigger={refreshTrigger} searchQuery={searchQuery} pmId={currentUserId} /></DashboardDetailLink>
             </View>
-            
-            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1 }}>
-              <RecentAlertsPanel pmId={currentUserId} />
+
+            <View style={{ width: isMobile ? '100%' : undefined, flex: isMobile ? undefined : 1, minWidth: 0 }}>
+              <DashboardDetailLink href="/pm/notifications" label="notifications" interactive><RecentAlertsPanel pmId={currentUserId} /></DashboardDetailLink>
             </View>
           </View>
-          
-        </ScrollView>
+
+        </DashboardContent>
       )}
 
-      <NewProjectModal 
-        visible={isModalVisible} 
-        onClose={() => setModalVisible(false)} 
-        onSuccess={handleProjectCreated} 
+      <NewProjectModal
+        visible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        onSuccess={handleProjectCreated}
       />
     </View>
   );

@@ -15,8 +15,8 @@ const AlertItem = ({ title, subtext, iconColor }: { title: string, subtext: stri
 
       {/* Content */}
       <View className="flex-1">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{title}</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{subtext}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-bold text-sm mb-0.5">{title}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs">{subtext}</Text>
       </View>
     </View>
   );
@@ -25,7 +25,7 @@ const AlertItem = ({ title, subtext, iconColor }: { title: string, subtext: stri
 export const RecentAlertsPanel = ({ pmId, basePath }: { pmId?: string; basePath?: string }) => {
   const router = useRouter();
   const { isMobile } = useResponsive();
-  
+
   // Directly use the shared real-time notification hook to ensure it always matches the bell icon perfectly.
   const { notifications, unreadCount, loading } = useNotifications();
 
@@ -55,9 +55,9 @@ export const RecentAlertsPanel = ({ pmId, basePath }: { pmId?: string; basePath?
   };
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
+    <View className={`bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 ${isMobile ? '' : 'flex-1 min-h-[300px]'}`}>
       <View className="flex-row justify-between items-center mb-6">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Recent Alerts</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100">Recent Alerts</Text>
         {unreadCount > 0 && (
           <View className="bg-brand-orange px-2 py-1 rounded-full">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-[10px] font-bold">{unreadCount} new</Text>

@@ -1,9 +1,12 @@
+import { Pressable , View, ActivityIndicator, Text } from 'react-native';
+import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
+import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
 import { projectSites, dataError } from '@/services/siteData';
 // Modified for Expo Go mobile compatibility
+// Modified for Expo Go mobile compatibility
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
+
 import { useRouter } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
@@ -13,6 +16,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useAssignedSites } from '../../hooks/useAssignedSites';
 import { useAuth } from '../../context/AuthContext';
 import { NoAssignedSites } from '../../components/common/NoAssignedSites';
+import { todayKey } from '@/services/workerData';
 
 export default function SiteManagerDashboard() {
   const router = useRouter();
@@ -48,7 +52,7 @@ export default function SiteManagerDashboard() {
       let activeIssues = 0;
 
       if (projectIds.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = todayKey();
         const [attReq, materialsReq, issuesReq] = await Promise.all([
           supabase
             .from('attendance')
@@ -103,10 +107,10 @@ export default function SiteManagerDashboard() {
   useRealtimeStats(loadStats, true);
 
   return (
-    <View className="flex-1 bg-brand-light">
+    <View className="flex-1 bg-brand-light dark:bg-slate-950">
       <TopNav title="Site Manager Dashboard" actionLabel="Refresh" onActionPress={() => { loadStats(); } } />
       {loadError || assignmentError ? <View className="bg-red-50 p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{loadError || assignmentError}</Text><Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} accessibilityRole="button" onPress={refreshAssignments} className="text-brand-orange font-bold mt-2">Reload site assignments</Text></View> : null}
-      
+
       {loading || sitesLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#F97316" />
@@ -114,143 +118,81 @@ export default function SiteManagerDashboard() {
       ) : assignedProjectIds.length === 0 ? (
         <NoAssignedSites />
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-          
+        <DashboardContent>
+          <DashboardHero eyebrow="Site operations" title="Site overview" description="Attendance, material availability and daily reports for your sites." icon="construct-outline" />
+
+
           <View className={isMobile ? "flex-row flex-wrap -mx-2 mb-6" : "flex-row gap-4 mb-6"}>
             <AnimatedCard delay={100} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Assigned Sites" 
-                value={stats.assignedSites.toString()} 
-                indicatorText="Currently managing" 
+              <StatCard onPress={() => router.push('/site-manager/sites')} 
+                label="Assigned Sites"
+                value={stats.assignedSites.toString()}
+                indicatorText="Currently managing"
+                fullWidth
                 colorScheme="blue"
               />
             </AnimatedCard>
-            
+
             <AnimatedCard delay={200} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Workers Present" 
-                value={stats.workersPresent.toString()} 
-                indicatorText="Checked in today" 
+              <StatCard onPress={() => router.push('/site-manager/attendance')} 
+                label="Workers Present"
+                value={stats.workersPresent.toString()}
+                indicatorText="Checked in today"
                 indicatorType="success"
+                fullWidth
                 colorScheme="emerald"
               />
             </AnimatedCard>
-            
+
             <AnimatedCard delay={300} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Low Stock Alerts" 
-                value={stats.pendingMaterials.toString()} 
-                indicatorText="Items below threshold" 
+              <StatCard onPress={() => router.push('/site-manager/materials')} 
+                label="Low Stock Alerts"
+                value={stats.pendingMaterials.toString()}
+                indicatorText="Items below threshold"
                 indicatorType={stats.pendingMaterials > 0 ? "danger" : "success"}
+                fullWidth
                 colorScheme="amber"
               />
             </AnimatedCard>
-            
+
             <AnimatedCard delay={400} style={isMobile ? { width: '50%', paddingHorizontal: 8, marginBottom: 16 } : { flex: 1 }}>
-              <StatCard 
-                label="Active Issues" 
-                value={stats.activeIssues.toString()} 
-                indicatorText="Requires attention"
+              <StatCard onPress={() => router.push('/site-manager/issues')} 
+                label="Active Issues"
+                value={stats.activeIssues.toString()}
+                indicatorText={stats.activeIssues > 0 ? "Requires attention" : "No open issues"}
                 indicatorType={stats.activeIssues > 0 ? "danger" : "success"}
+                fullWidth
                 colorScheme="rose"
               />
             </AnimatedCard>
           </View>
 
-          {/* Quick Actions Grid */}
-          <View className="mb-6">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-3">Quick Actions</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              <Pressable
-                onPress={() => router.push('/site-manager/attendance')}
-                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
-                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
-              >
-                <View className="w-10 h-10 rounded-lg bg-orange-50 items-center justify-center">
-                  <Ionicons name="qr-code-outline" size={22} color="#F97316" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Attendance</Text>
-                  <Text numberOfLines={1} className="text-xs text-gray-500">Scan & Check-in</Text>
-                </View>
-              </Pressable>
+          <DashboardActions actions={[
+            { label:'Attendance', description:'Scan and manage check-ins', icon:'qr-code-outline', onPress:()=>router.push('/site-manager/attendance') },
+            { label:'Materials', description:'Monitor stock and requests', icon:'cube-outline', onPress:()=>router.push('/site-manager/materials') },
+            { label:'Daily reports', description:'Record the work completed', icon:'document-text-outline', onPress:()=>router.push('/site-manager/reports') },
+            { label:'Site issues', description:'Report and resolve concerns', icon:'alert-circle-outline', onPress:()=>router.push('/site-manager/issues') },
+            { label:'Milestones', description:'Update project progress', icon:'flag-outline', onPress:()=>router.push('/site-manager/milestones') },
+          ]} />
 
-              <Pressable
-                onPress={() => router.push('/site-manager/materials')}
-                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
-                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
-              >
-                <View className="w-10 h-10 rounded-lg bg-amber-50 items-center justify-center">
-                  <Ionicons name="cube-outline" size={22} color="#D97706" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Materials</Text>
-                  <Text numberOfLines={1} className="text-xs text-gray-500">Stock & Orders</Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                onPress={() => router.push('/site-manager/issues')}
-                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
-                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
-              >
-                <View className="w-10 h-10 rounded-lg bg-rose-50 items-center justify-center">
-                  <Ionicons name="alert-circle-outline" size={22} color="#E11D48" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Site Issues</Text>
-                  <Text numberOfLines={1} className="text-xs text-gray-500">Report & Track</Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                onPress={() => router.push('/site-manager/milestones')}
-                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
-                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
-              >
-                <View className="w-10 h-10 rounded-lg bg-blue-50 items-center justify-center">
-                  <Ionicons name="flag-outline" size={22} color="#2563EB" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Milestones</Text>
-                  <Text numberOfLines={1} className="text-xs text-gray-500">Update Progress</Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                onPress={() => router.push('/site-manager/reports')}
-                style={{ flex: isMobile ? 1 : undefined, minWidth: isMobile ? '45%' : 160, minHeight: 44 }}
-                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex-row items-center gap-3 active:bg-gray-50"
-              >
-                <View className="w-10 h-10 rounded-lg bg-emerald-50 items-center justify-center">
-                  <Ionicons name="document-text-outline" size={22} color="#059669" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text numberOfLines={1} className="font-bold text-sm text-brand-text">Daily Reports</Text>
-                  <Text numberOfLines={1} className="text-xs text-gray-500">Log Site Work</Text>
-                </View>
-              </Pressable>
-            </View>
-          </View>
-
-          <View className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">Live Site Signals</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-2">
+          <DashboardDetailLink href="/site-manager/sites" label="site overview" interactive><View className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6">
+            <DashboardSectionHeading title="Site pulse" description="The latest signals from your assigned sites." icon="pulse-outline" />
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-slate-400 text-sm mt-2">
               Attendance, stock, and issue counts update from your assigned site data in real time.
             </Text>
             <View className="flex-row flex-wrap mt-5 gap-4">
-              <View className="flex-1 min-w-[45%] bg-gray-50 rounded-lg p-4">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs uppercase font-semibold">Workers present</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mt-1">{stats.workersPresent}</Text>
-              </View>
-              <View className="flex-1 min-w-[45%] bg-gray-50 rounded-lg p-4">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs uppercase font-semibold">Open issues</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mt-1">{stats.activeIssues}</Text>
-              </View>
+              <Pressable accessibilityRole="link" accessibilityLabel="Open workers present details" onPress={() => router.push('/site-manager/attendance')}  className="flex-1 min-w-[45%] bg-gray-50 dark:bg-slate-800 rounded-lg p-4">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-slate-400 text-xs uppercase font-semibold">Workers present</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text dark:text-slate-100 mt-1">{stats.workersPresent}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="link" accessibilityLabel="Open open site issues details" onPress={() => router.push('/site-manager/issues')}  className="flex-1 min-w-[45%] bg-gray-50 dark:bg-slate-800 rounded-lg p-4">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-slate-400 text-xs uppercase font-semibold">Open issues</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text dark:text-slate-100 mt-1">{stats.activeIssues}</Text>
+              </Pressable>
             </View>
-          </View>
+          </View></DashboardDetailLink>
 
-        </ScrollView>
+        </DashboardContent>
       )}
     </View>
   );

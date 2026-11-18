@@ -1,6 +1,7 @@
+import { ProjectWorkspaceNav } from '@/components/projects/ProjectWorkspaceNav';
 import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -346,6 +347,7 @@ export default function AdminProjectDetailsPage() {
       <TopNav title={project ? project.name : "Project Details"} showAction={false} />
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6">
+        <ProjectWorkspaceNav projectId={projectId!} />
         {loading ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#F97316" />
@@ -588,7 +590,7 @@ export default function AdminProjectDetailsPage() {
             {/* BOQ Materials & Labour Rates Section */}
             <View className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <View className="flex-row flex-wrap items-center justify-between gap-3 mb-5 border-b border-gray-100 pb-3">
-                <View>
+                <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800">
                     BOQ Materials & Labour Rates
                   </Text>
@@ -601,6 +603,7 @@ export default function AdminProjectDetailsPage() {
                   <TouchableOpacity
                     style={{ minHeight: 38 }}
                     onPress={async () => {
+                      if (project.boq_data) { router.push(`/admin/projects/${project.id}/boq` as any); return; }
                       const uploadFile = async (fileObj: any, name: string) => {
                         setApplyingBoq(true);
                         try {

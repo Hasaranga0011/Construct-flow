@@ -8,7 +8,7 @@ import { getDashboardForRole } from '@/utils/auth';
 
 export default function PendingApprovalPage() {
   const router = useRouter();
-  const { user, role, isApproved, signOut } = useAuth();
+  const { user, role, isApproved, signOut, refreshProfile } = useAuth();
   const [checking, setChecking] = useState(false);
 
   const handleCheckStatus = async () => {
@@ -24,6 +24,7 @@ export default function PendingApprovalPage() {
       if (!error && data) {
         const profileData = data as any;
         if (profileData.role && profileData.role !== 'pending' && profileData.is_approved !== false) {
+          await refreshProfile();
           const target = getDashboardForRole(profileData.role);
           if (target) {
             router.replace(target as any);

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
@@ -31,17 +31,17 @@ export default function PMLabourScreen() {
       if (attendance.error) throw attendance.error;
       const records = (attendance.data || []).map(a => {
         const workerInfo = workersList.find(w => w.workerRecordId === a.worker_id);
-        return { 
-          ...a, 
-          person: workerInfo?.profiles || null, 
-          project: projects.find(p => p.id === a.site_id) 
+        return {
+          ...a,
+          person: workerInfo?.profiles || null,
+          project: projects.find(p => p.id === a.site_id)
         };
       });
       setRows(records);
-      setStats({ 
-        workers: workersList.length, 
-        present: records.filter(a => a.check_in_time && !a.check_out_time).length, 
-        sites: projects.length, 
+      setStats({
+        workers: workersList.length,
+        present: records.filter(a => a.check_in_time && !a.check_out_time).length,
+        sites: projects.length,
         overtime: sumOvertimeMinutes(records)
       });
     } catch (e: any) { setError(e.message || 'Unable to load attendance.'); }
@@ -55,12 +55,12 @@ export default function PMLabourScreen() {
     <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Today&apos;s Attendance</Text>
       <View style={{ flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
-        <SearchInput 
-          placeholder="Search worker or project..." 
-          value={search} 
-          onChangeText={setSearch} 
-          items={rows} 
-          entityLabel="labour" 
+        <SearchInput
+          placeholder="Search worker or project..."
+          value={search}
+          onChangeText={setSearch}
+          items={rows}
+          entityLabel="labour"
           className={isMobile ? "w-full" : "w-80"}
           getLocalResults={(query) => rows.filter(a => `${a.person?.full_name || ''} ${a.project?.name || ''}`.toLowerCase().includes(query.toLowerCase())).map(a => ({ id: a.id, title: a.person?.full_name || 'Worker', subtitle: a.project?.name || '' }))}
         />

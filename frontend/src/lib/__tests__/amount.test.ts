@@ -1,4 +1,4 @@
-import { formatAmount, formatCurrency, parseAmount, formatAmountLive, formatCompact, formatCompactCurrency, compactDisplayValue } from '../amount';
+import { formatAmount, formatCurrency, parseAmount, formatAmountLive, formatCompactCurrency, compactDisplayValue } from '../amount';
 
 describe('amount utilities', () => {
   describe('parseAmount', () => {

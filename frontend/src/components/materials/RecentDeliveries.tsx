@@ -11,20 +11,20 @@ const DeliveryRow = ({ title, project, time }: { title: string, project: string,
       <View className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center mr-3">
         <Icon name="truck" size={16} color="#F97316" />
       </View>
-      
+
       {/* Content */}
       <View className="flex-1">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold text-sm mb-0.5">{title}</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{project}</Text>
       </View>
-      
+
       {/* Time */}
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs">{time}</Text>
     </View>
   );
 };
 
-export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refreshTrigger?: number, projectId?: string }) => {
+export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '', allowedProjectIds }: { refreshTrigger?: number, projectId?: string, allowedProjectIds?: string[] }) => {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -32,7 +32,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadDeliveries = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -43,8 +43,12 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
 
         let pmProjectIds: string[] = [];
         if (isPM && user?.id) {
-          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
-          pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          if (allowedProjectIds) pmProjectIds = allowedProjectIds;
+          else {
+            const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+            if (projectError) throw projectError;
+            pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
+          }
           if (pmProjectIds.length === 0) {
             if (isMounted) {
               setDeliveries([]);
@@ -57,7 +61,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
         let query = supabase
           .from('purchase_orders')
           .select(`
-            id, items, status, 
+            id, items, status,
             actual_delivery, created_at, updated_at, project_id,
             projects!inner(name)
           `)
@@ -74,7 +78,7 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
           .limit(5);
 
         if (error) throw error;
-        
+
         if (isMounted) setDeliveries(data || []);
       } catch (error) {
         console.warn('Failed to load recent deliveries:', error);
@@ -82,11 +86,11 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadDeliveries();
-    
+
     return () => { isMounted = false; };
-  }, [refreshTrigger, projectId, isPM, user?.id]);
+  }, [refreshTrigger, projectId, isPM, user?.id, allowedProjectIds]);
 
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
@@ -104,13 +108,13 @@ export const RecentDeliveries = ({ refreshTrigger = 0, projectId = '' }: { refre
             const projectName = d.projects?.name || 'Unknown';
             const items = d.items;
             const itemsStr = typeof items === 'string' ? items : 'Materials';
-              
+
             return (
-              <DeliveryRow 
+              <DeliveryRow
                 key={d.id}
-                title={`${itemsStr} received`} 
-                project={projectName} 
-                time={d.updated_at ? new Date(d.updated_at).toLocaleDateString() : (d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.created_at).toLocaleDateString())} 
+                title={`${itemsStr} received`}
+                project={projectName}
+                time={d.updated_at ? new Date(d.updated_at).toLocaleDateString() : (d.actual_delivery ? new Date(d.actual_delivery).toLocaleDateString() : new Date(d.created_at).toLocaleDateString())}
               />
             );
           })

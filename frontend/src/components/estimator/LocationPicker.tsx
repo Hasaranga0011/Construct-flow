@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Modal,
-  FlatList,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, FlatList, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { SRI_LANKA_DISTRICTS, District, filterDistricts, normalizeDistrict } from '@/constants/districts';
+import { SRI_LANKA_DISTRICTS, District, filterDistricts } from '@/constants/districts';
 import { supabase } from '../../lib/supabase';
 
 interface LocationPickerProps {

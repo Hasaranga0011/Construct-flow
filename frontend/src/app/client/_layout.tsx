@@ -12,9 +12,11 @@ const CLIENT_NAV_ITEMS: NavItem[] = [
   { label: 'Project Map',   href: '/project/map',  IconFamily: Ionicons,      iconName: 'map-outline' },
   { label: 'Media & Gallery',href: '/media',       IconFamily: Ionicons,      iconName: 'images' },
   { label: 'Messages',      href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubble' },
+  { label: 'Payments & variations', href: '/financials', IconFamily: Ionicons, iconName: 'wallet-outline' },
+  { label: 'Raise an issue', href: '/issues', IconFamily: Ionicons, iconName: 'alert-circle-outline' },
   { label: 'Invoices',      href: '/invoices',     IconFamily: Icon,  iconName: 'file-invoice-dollar' },
   { label: 'Documents',     href: '/documents',    IconFamily: Icon,  iconName: 'file-alt' },
-  { label: 'Notifications', href: '/notifications',badge: 1, IconFamily: Ionicons, iconName: 'notifications' },
+  { label: 'Notifications', href: '/notifications', IconFamily: Ionicons, iconName: 'notifications' },
   { label: 'Profile',       href: '/profile',      IconFamily: Ionicons,      iconName: 'person-circle-outline' },
   { label: 'Settings',      href: '/settings',     IconFamily: Ionicons,      iconName: 'settings-sharp' },
 ];

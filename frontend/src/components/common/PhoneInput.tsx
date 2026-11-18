@@ -1,20 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Platform,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
-import {
-  formatPhoneAsYouType,
-  formatSriLankanPhoneLocal,
-  normalizeToE164,
-  isValidSriLankanPhone,
-  LK_PHONE_ERROR_MESSAGE,
-} from '@/lib/phone';
+import React, { useCallback, useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, Platform, ViewStyle, TextStyle } from 'react-native';
+import { formatPhoneAsYouType, formatSriLankanPhoneLocal, normalizeToE164, isValidSriLankanPhone, LK_PHONE_ERROR_MESSAGE } from '@/lib/phone';
 
 export interface PhoneInputProps {
   label?: string;
@@ -48,10 +34,10 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   testID,
 }) => {
   // Initialize with local format if value provided (e.g. +9477... -> 077 123 4567)
-  const getInitialDisplay = () => {
+  const getInitialDisplay = useCallback(() => {
     if (!value) return '';
     return formatSriLankanPhoneLocal(value);
-  };
+  }, [value]);
 
   const [displayText, setDisplayText] = useState<string>(getInitialDisplay());
   const [internalError, setInternalError] = useState<string | null>(null);
@@ -63,7 +49,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     if (!isFocused) {
       setDisplayText(getInitialDisplay());
     }
-  }, [value, isFocused]);
+  }, [getInitialDisplay, isFocused]);
 
   const handleChangeText = (text: string) => {
     // Progressive auto-formatting as user types
@@ -153,6 +139,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
         <TextInput
           testID={testID}
+          accessibilityLabel={label || 'Phone number'}
           style={[styles.input, inputStyle]}
           value={displayText}
           onChangeText={handleChangeText}
@@ -228,6 +215,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     minHeight: 48,
     paddingHorizontal: 12,
     fontSize: 16,

@@ -1,27 +1,22 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
-import { api, getFreshAccessToken } from '../../../services/api';
+import { getFreshAccessToken } from '../../../services/api';
 import { ProjectAssignmentDropdown } from '../../../components/common/ProjectAssignmentDropdown';
 import { InteractiveMap, InteractiveMapRef, MapLocation } from '@/components/common/InteractiveMap';
+import { SiteLocationSearch, SitePinDetails } from '@/components/common/SiteLocationSearch';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { PROJECT_IMAGE_PRESETS } from '../../../utils/projectImages';
-import { ProjectImage } from '../../../components/common/ProjectImage';
+
+
 import { ProjectImageUploader } from '../../../components/common/ProjectImageUploader';
 import * as DocumentPicker from 'expo-document-picker';
 import { formatMoney } from '../../../utils/format';
 import { downloadBoqTemplateXlsx } from '../../../utils/boqDownload';
-import {
-  EditableMilestone,
-  recalculateScheduleFromStart,
-  seedMilestonesFromBoq,
-  isValidYMD,
-  addDaysToYMD,
-  getTodayYMD,
-} from '../../../utils/boqSchedule';
+import { BoqEditor } from '@/components/projects/BoqEditor';
+import { EditableMilestone, recalculateScheduleFromStart, seedMilestonesFromBoq, isValidYMD, addDaysToYMD, getTodayYMD } from '../../../utils/boqSchedule';
 
 export default function AdminProjectsCreatePage() {
   const router = useRouter();
@@ -70,6 +65,7 @@ export default function AdminProjectsCreatePage() {
         const { data: allProfiles } = await supabase
           .from('profiles')
           .select('id, full_name, email, role, avatar_url')
+          .eq('is_approved', true)
           .order('full_name');
 
         if (isMounted && allProfiles) {
@@ -92,12 +88,16 @@ export default function AdminProjectsCreatePage() {
 
   const mapRef = React.useRef<InteractiveMapRef>(null);
 
-  const handleLocationSelect = async ({ lat, lng }: MapLocation) => {
+  const handleLocationSelect = async ({ lat, lng, address }: MapLocation) => {
     setFormData(prev => ({
       ...prev,
       latitude: String(lat),
       longitude: String(lng),
     }));
+    if (address) {
+      setFormData(prev => ({ ...prev, address, location: prev.location || address.split(',')[0] }));
+      return;
+    }
 
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -107,32 +107,17 @@ export default function AdminProjectsCreatePage() {
       if (res.ok) {
         const data = await res.json();
         if (data?.display_name) {
-          setFormData(prev => ({
+          setFormData(prev => prev.latitude === String(lat) && prev.longitude === String(lng) ? ({
             ...prev,
             address: data.display_name,
             location: prev.location || data.display_name.split(',')[0],
-          }));
+          }) : prev);
           return;
         }
       }
     } catch {}
 
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-        headers: { 'User-Agent': 'ConstructFlow/1.0' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.display_name) {
-          setFormData(prev => ({
-            ...prev,
-            address: data.display_name,
-            location: prev.location || data.display_name.split(',')[0],
-          }));
-          return;
-        }
-      }
-    } catch {}
+    setFormData(prev => prev.latitude === String(lat) && prev.longitude === String(lng) ? ({ ...prev, address: `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}` }) : prev);
   };
 
   const handleParseBoq = async (fileObj?: any, csvText?: string, filename: string = 'boq.csv') => {
@@ -523,6 +508,7 @@ export default function AdminProjectsCreatePage() {
           <View className="mb-4">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-1">Interactive Site Map</Text>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-2">Tap to pin exact site location or use GPS button.</Text>
+            <SiteLocationSearch onPreview={(location, zoom) => mapRef.current?.previewLocation(location.lat, location.lng, zoom)} onSelect={(location, zoom) => { void handleLocationSelect(location); mapRef.current?.flyTo(location.lat, location.lng, zoom); }} />
             <InteractiveMap
               ref={mapRef}
               markerPos={
@@ -539,6 +525,7 @@ export default function AdminProjectsCreatePage() {
             />
           </View>
 
+          <SitePinDetails location={formData.latitude && formData.longitude ? { lat: Number(formData.latitude), lng: Number(formData.longitude) } : null} />
           <View className="flex-row space-x-4 mb-4">
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Start Date (YYYY-MM-DD) *</Text>
@@ -569,11 +556,11 @@ export default function AdminProjectsCreatePage() {
           {/* BOQ & Budget Baseline Section */}
           <View className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
             <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center">
+              <View className="flex-row items-center flex-1 min-w-0">
                 <View className="w-9 h-9 rounded-lg bg-orange-100 items-center justify-center mr-3">
                   <Ionicons name="calculator-outline" size={20} color="#EA580C" />
                 </View>
-                <View>
+                <View className="flex-1 min-w-0">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
                     Bill of Quantities (BOQ) & Budget
                   </Text>
@@ -613,7 +600,7 @@ export default function AdminProjectsCreatePage() {
                   Upload Project BOQ Document
                 </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 text-center mt-0.5 mb-3">
-                  Supports Excel (.xlsx, .xls) and CSV with items, quantities, and rates
+                  Supports Excel (.xlsx) and CSV with items, quantities, and rates
                 </Text>
 
                 {parsingBoq ? (
@@ -673,6 +660,10 @@ export default function AdminProjectsCreatePage() {
               </View>
             )}
 
+            {boqData && <BoqEditor value={boqData} onChange={next => {
+              if (Number(next.total_budget) !== Number(boqData.total_budget)) setTotalBudget(previous => String(Number(previous || boqData.total_budget || 0) + Number(next.total_budget) - Number(boqData.total_budget)));
+              setBoqData(next);
+            }} />}
             {/* If BOQ successfully loaded & parsed */}
             {boqData && (
               <View className="bg-white border border-green-200 rounded-xl p-4 shadow-sm">
@@ -868,7 +859,7 @@ export default function AdminProjectsCreatePage() {
           {/* Editable Project Milestones & Schedule */}
           <View className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
             <View className="flex-row flex-wrap gap-3 justify-between items-center mb-3">
-              <View>
+              <View className="w-full md:flex-1 min-w-0">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
                   Project Milestones & Schedule
                 </Text>

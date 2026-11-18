@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import {
-  View, Text, ScrollView, Pressable, TextInput,
-  ActivityIndicator, Animated, Platform, Image
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, Platform, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -81,7 +78,7 @@ export default function ProfileScreen() {
           .from('project_role_assignments')
           .select('project_id, projects(id, name, location)')
           .eq('user_id', user.id);
-          
+
         if (roleData && isMounted) {
            const projectsMap = new Map();
            roleData.forEach((r: any) => {

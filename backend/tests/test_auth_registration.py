@@ -82,6 +82,10 @@ def test_successful_registration_sends_welcome_email(monkeypatch):
             return SimpleNamespace(data=[])
 
     class MockAuthAdmin:
+        def generate_link(self, payload):
+            return SimpleNamespace(properties=SimpleNamespace(action_link="https://auth.example/verify"))
+        def delete_user(self, uid):
+            pass
         def create_user(self, payload):
             return SimpleNamespace(user=SimpleNamespace(id="reg-user-uuid-999"))
 
@@ -93,6 +97,7 @@ def test_successful_registration_sends_welcome_email(monkeypatch):
     monkeypatch.setattr(auth.settings, "SUPABASE_SERVICE_ROLE_KEY", "mock-role-key")
     monkeypatch.setattr(auth, "create_client", lambda url, key: MockAdminDb())
 
+    monkeypatch.setattr("services.email_service.send_email", lambda *args: "resend_sent")
     sent_emails = []
     def mock_send_email(to_email, name, role, website_url=None):
         sent_emails.append({
@@ -122,7 +127,7 @@ def test_successful_registration_sends_welcome_email(monkeypatch):
     assert res_data["id"] == "reg-user-uuid-999"
     assert res_data["email"] == "kamal.silva@gmail.com"
     assert res_data["role"] == "pm"
-    assert res_data["is_approved"] is True
+    assert res_data["is_approved"] is False
     assert res_data["email_delivery"]["sent_to_inbox"] is True
 
     # Crucial security assertion: verify send_registration_welcome_email was invoked

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ViewStyle, StyleProp, Animated } from 'react-native';
+import { ViewStyle, StyleProp, Animated, View, AccessibilityInfo } from 'react-native';
 
 interface AnimatedCardProps {
   children: React.ReactNode;
@@ -10,18 +10,22 @@ interface AnimatedCardProps {
   duration?: number;
 }
 
-export const AnimatedCard: React.FC<AnimatedCardProps> = ({ 
-  children, 
-  delay = 0, 
-  style, 
+export const AnimatedCard: React.FC<AnimatedCardProps> = ({
+  children,
+  delay = 0,
+  style,
   className,
   direction = 'up',
-  duration = 500
+  duration = 220
 }) => {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translate = useRef(new Animated.Value(50)).current;
+  const translate = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(reduced => {
+      if (active && reduced) { clearTimeout(timer); opacity.stopAnimation(); translate.stopAnimation(); opacity.setValue(1); translate.setValue(0); }
+    });
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(opacity, {
@@ -29,16 +33,15 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
           duration,
           useNativeDriver: true,
         }),
-        Animated.spring(translate, {
+        Animated.timing(translate, {
           toValue: 0,
-          friction: 8,
-          tension: 40,
+          duration,
           useNativeDriver: true,
         })
       ]).start();
-    }, delay);
+    }, Math.min(delay, 80));
 
-    return () => clearTimeout(timer);
+    return () => { active = false; clearTimeout(timer); };
   }, [delay, duration, opacity, translate]);
 
   let transform: any[] = [];
@@ -58,8 +61,8 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   }
 
   return (
-    <Animated.View style={[{ opacity, transform }, style]} className={className}>
-      {children}
+    <Animated.View style={[{ opacity, transform, minWidth: 0 }, style]}>
+      <View className={className} style={{ flexGrow: 1, minWidth: 0 }}>{children}</View>
     </Animated.View>
   );
 };

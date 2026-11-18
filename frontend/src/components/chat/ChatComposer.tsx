@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-  Platform,
-  NativeSyntheticEvent,
-  TextInputKeyPressEventData,
-} from 'react-native';
+import { View, TextInput, Pressable, ActivityIndicator, Platform, NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

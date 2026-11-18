@@ -23,6 +23,41 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
   const [cameraError, setCameraError] = useState('');
   const [scanError, setScanError] = useState('');
 
+  const handleManualSubmit = async () => {
+    if (!manualCode.trim() || processing.current) return;
+    setSubmittingManual(true);
+    processing.current = true;
+    setScanError('');
+    try {
+      await onScan(manualCode.trim());
+      setManualCode('');
+      setShowManual(false);
+    } catch (e: any) {
+      setScanError(e?.message || 'Unable to process this worker code.');
+    } finally {
+      setSubmittingManual(false);
+      processing.current = false;
+    }
+  };
+
+  // Manual entry must work even when permission is denied or the camera failed.
+  // Unmounting CameraView here also releases the camera while entering a code.
+  if (showManual) {
+    return <View className="flex-1 bg-black">
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: Math.max(24, insets.top), paddingBottom: Math.max(24, insets.bottom) }}>
+        <Text className="text-white text-xl font-bold mb-3">Enter Worker Code</Text>
+        <Text className="text-gray-300 mb-5">Enter the worker UUID or code. Camera access is not required.</Text>
+        <TextInput accessibilityLabel="Worker code" value={manualCode} onChangeText={setManualCode} editable={!submittingManual} autoCapitalize="none" autoCorrect={false} placeholder="e.g. worker UUID or code" placeholderTextColor="#9CA3AF" style={{ minHeight: 48 }} className="bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white mb-4" onSubmitEditing={handleManualSubmit} />
+        {!!scanError && <Text accessibilityRole="alert" className="text-red-300 mb-4">{scanError}</Text>}
+        <Pressable accessibilityRole="button" onPress={handleManualSubmit} disabled={submittingManual || !manualCode.trim()} style={{ minHeight: 48 }} className="bg-brand-orange px-4 py-3 rounded-xl items-center justify-center mb-3">
+          <Text className="text-white font-bold">{submittingManual ? 'Submitting...' : 'Submit worker code'}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => setShowManual(false)} disabled={submittingManual} style={{ minHeight: 44 }} className="items-center justify-center mb-2"><Text className="text-gray-300">Back to camera</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={onClose} disabled={submittingManual} style={{ minHeight: 44 }} className="items-center justify-center"><Text className="text-gray-300">Close scanner</Text></Pressable>
+      </ScrollView>
+    </View>;
+  }
+
   if (!permission) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
@@ -96,23 +131,6 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
     } catch (e: any) {
       setScanError(e?.message || 'Unable to process this QR code.');
     } finally {
-      processing.current = false;
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    if (!manualCode.trim() || processing.current) return;
-    setSubmittingManual(true);
-    processing.current = true;
-    setScanError('');
-    try {
-      await onScan(manualCode.trim());
-      setManualCode('');
-      setShowManual(false);
-    } catch (e: any) {
-      setScanError(e?.message || 'Unable to process this worker code.');
-    } finally {
-      setSubmittingManual(false);
       processing.current = false;
     }
   };
@@ -201,7 +219,7 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
             )}
 
             {/* Manual Entry Fallback Button */}
-            {!showManual ? (
+            {(
               <Pressable
                 style={{ minHeight: 44, minWidth: 44 }}
                 onPress={() => setShowManual(true)}
@@ -212,34 +230,6 @@ export const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
                   Or enter worker code manually
                 </Text>
               </Pressable>
-            ) : (
-              <View className="mt-4 mx-6 p-4 bg-black/85 border border-white/20 rounded-2xl w-full max-w-sm">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white text-xs font-bold mb-2">
-                  Enter Worker Code or UUID:
-                </Text>
-                <View className="flex-row gap-2">
-                  <TextInput
-                    value={manualCode}
-                    onChangeText={setManualCode}
-                    placeholder="e.g. worker UUID or code"
-                    placeholderTextColor="#9CA3AF"
-                    className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm"
-                    onSubmitEditing={handleManualSubmit}
-                  />
-                  <Pressable
-                    onPress={handleManualSubmit}
-                    disabled={submittingManual || !manualCode.trim()}
-                    className="bg-brand-orange px-4 py-2 rounded-xl items-center justify-center"
-                  >
-                    <Text className="text-white font-bold text-sm">
-                      {submittingManual ? '...' : 'Go'}
-                    </Text>
-                  </Pressable>
-                </View>
-                <Pressable onPress={() => setShowManual(false)} className="mt-2 self-center p-1">
-                  <Text className="text-gray-400 text-xs">Hide manual entry</Text>
-                </Pressable>
-              </View>
             )}
           </View>
         </ScrollView>

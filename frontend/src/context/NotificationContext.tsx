@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { buildNotificationFilter, isNotificationForUser } from '../utils/notifications';
-import { getApiUrl } from '../lib/apiUrl';
+import { api } from '../services/api';
 
 export interface AppNotification {
   id: string;
@@ -14,7 +13,6 @@ export interface AppNotification {
   is_read: boolean;
   created_at: string;
 }
-
 interface NotificationContextType {
   notifications: AppNotification[];
   unreadCount: number;
@@ -22,191 +20,72 @@ interface NotificationContextType {
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
 }
-
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, session } = useAuth();
+  const { user, role, isApproved } = useAuth();
+  const userId = user?.id;
+  const activeUser = useRef(userId);
+  activeUser.current = userId;
+  const version = useRef(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
-  // Polling fallback in case realtime is not enabled on DB
-  const loadNotifications = async () => {
-    if (!user) return;
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    if (!userId || !isApproved) return;
+    const request = ++version.current;
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(buildNotificationFilter(user.id, role))
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (!error && data) {
-        setNotifications(data as any as AppNotification[]);
-      }
-    } catch (e) {
-      console.error('Failed to load notifications', e);
+      const rows = await api.getFresh('/notifications/') as AppNotification[];
+      if (activeUser.current === userId && version.current === request) setNotifications(rows);
+    } catch (error) {
+      console.warn('Unable to load notifications', error);
+    } finally {
+      if (activeUser.current === userId && version.current === request) setLoading(false);
     }
-  };
+  }, [userId, isApproved]);
 
   useEffect(() => {
-    let isMounted = true;
+    const generation = version;
     setNotifications([]);
-    setLoading(!!user);
-
-    if (user) {
-      loadNotifications().then(() => {
-        if (isMounted) setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
-
-    if (!user) return;
-
-    // Realtime subscription
-    const channel = supabase
-      .channel(`public:notifications:global`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
-        (payload) => {
-          if (!isMounted) return;
-          const newNotif = payload.new as AppNotification;
-          if (user && isNotificationForUser(newNotif, user.id, role)) {
-            setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications' },
-        (payload) => {
-          if (!isMounted) return;
-          const updatedNotif = payload.new as AppNotification;
-          setNotifications((prev) =>
-            prev.flatMap((n) => n.id !== updatedNotif.id ? [n]
-              : user && isNotificationForUser(updatedNotif, user.id, role) ? [updatedNotif] : [])
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'notifications' },
-        (payload) => {
-          if (!isMounted) return;
-          setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
-        }
-      )
+    setLoading(!!userId && isApproved);
+    if (!userId || !isApproved) return;
+    void load();
+    // Read flags belong to receipts, so shared events only trigger an authoritative refresh.
+    const channel = supabase.channel(`notifications:${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { void load(); })
       .subscribe();
-
-    // Fallback polling for missing realtime config on DB
-    const interval = setInterval(() => {
-      loadNotifications();
-    }, 45000); // 45s fallback poll, realtime handles instant events
-
+    const interval = setInterval(() => { void load(); }, 45000);
     return () => {
-      isMounted = false;
+      generation.current++;
       clearInterval(interval);
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [user, role]);
+  }, [load, userId, role, isApproved]);
 
-  const markAsRead = async (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+  const saveRead = async (ids: string[]) => {
+    if (!userId || !ids.length) return;
+    version.current++;
+    const previous = new Map(notifications.map(row => [row.id, row.is_read]));
+    setNotifications(rows => rows.map(row => ids.includes(row.id) ? { ...row, is_read: true } : row));
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token || session?.access_token;
-
-      let apiSuccess = false;
-      if (token) {
-        try {
-          const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ ids: [id] })
-          });
-          if (response.ok) {
-            apiSuccess = true;
-          }
-        } catch (err) {
-          console.warn('API mark-read failed, trying direct supabase fallback', err);
-        }
+      await api.patch('/notifications/mark-read', { ids });
+    } catch (error) {
+      if (activeUser.current === userId) {
+        setNotifications(rows => rows.map(row => ids.includes(row.id) ? { ...row, is_read: previous.get(row.id) ?? false } : row));
+        Alert.alert('Unable to save read status', error instanceof Error ? error.message : 'Please try again.');
       }
-
-      if (!apiSuccess) {
-        const { error } = await supabase.from('notifications').update({ is_read: true } as any).eq('id', id);
-        if (error) {
-          console.warn('Direct supabase mark-read error', error);
-          setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
-        }
-      }
-    } catch (e) {
-      console.error('Error marking as read', e);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+    } finally {
+      if (activeUser.current === userId) await load();
     }
   };
-
-  const markAllAsRead = async () => {
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-    if (unreadIds.length === 0) return;
-
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token || session?.access_token;
-
-      let apiSuccess = false;
-      if (token) {
-        try {
-          const response = await fetch(`${getApiUrl()}/notifications/mark-read`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ ids: unreadIds, all: true })
-          });
-          if (response.ok) {
-            apiSuccess = true;
-          }
-        } catch (err) {
-          console.warn('API mark-read all failed, trying direct supabase fallback', err);
-        }
-      }
-
-      if (!apiSuccess) {
-        const { error } = await supabase.from('notifications').update({ is_read: true } as any).in('id', unreadIds);
-        if (error) {
-          console.warn('Direct supabase mark-read all error', error);
-          setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
-          return;
-        }
-      }
-
-      Alert.alert('Success', 'All notifications marked as read.');
-    } catch (e) {
-      console.error('Error marking all as read', e);
-      setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, is_read: false } : n));
-    }
-  };
-
-  return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, loading, markAsRead, markAllAsRead }}>
-      {children}
-    </NotificationContext.Provider>
-  );
+  return <NotificationContext.Provider value={{
+    notifications, loading, unreadCount: notifications.filter(row => !row.is_read).length,
+    markAsRead: id => saveRead([id]),
+    markAllAsRead: () => saveRead(notifications.filter(row => !row.is_read).map(row => row.id)),
+  }}>{children}</NotificationContext.Provider>;
 };
 
-export const useNotifications = () => {
+export function useNotifications() {
   const context = useContext(NotificationContext);
-  if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
-  }
+  if (!context) throw new Error('useNotifications requires NotificationProvider');
   return context;
-};
+}

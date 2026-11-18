@@ -1,3 +1,4 @@
+import { GoodsReceiptForm } from '@/components/materials/GoodsReceiptForm';
 import { notify, confirmAction } from '@/utils/notify';
 import { positiveQuantity, validReportDate } from '@/utils/siteWorkflow';
 import { firstRelation } from '@/utils/relations';
@@ -303,7 +304,7 @@ export default function AdminMaterialsOrdersIdPage() {
             {/* Items Ordered Section */}
             <View className="bg-gray-50 rounded-xl p-6 border border-gray-100">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">Items Ordered</Text>
-              <OrderItemRow 
+              <OrderItemRow
                 itemName={order.items}
                 quantity={order.quantity_ordered}
                 unitPrice={order.unit_price}
@@ -358,17 +359,11 @@ export default function AdminMaterialsOrdersIdPage() {
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-600 font-bold text-center">Cancel Order</Text>
                   </Pressable>
                 )}
-                
+
                 {order.status === 'Delivered' && (
-                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                    disabled={actionLoading}
-                    onPress={() => handleUpdateStatus('Received')}
-                    className={`bg-brand-success px-6 py-3 rounded-lg items-center justify-center ${isMobile ? 'w-full' : ''}`}
-                  >
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-center">Confirm Receipt</Text>
-                  </Pressable>
+                  <GoodsReceiptForm order={order} onReceived={fetchOrder} />
                 )}
-                
+
                 {order.status === 'Suggested' && (
                   <>
                     <Pressable style={{ minHeight: 44, minWidth: 44 }}

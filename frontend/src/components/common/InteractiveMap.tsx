@@ -1,23 +1,23 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Alert, StyleSheet, Linking } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
-import {
-  MapLocation,
-  MapProjectMarker,
-  generateLeafletHtml,
-} from './mapHtml';
+import { getApiUrl } from '@/lib/apiUrl';
+import { useMapConfiguration } from '@/hooks/useMapProvider';
+import { MapLocation, MapProjectMarker, generateLeafletHtml } from './mapHtml';
 
 export type { MapLocation, MapProjectMarker };
 
 export interface InteractiveMapRef {
+  previewLocation: (lat: number, lng: number, zoom?: number) => void;
   flyTo: (lat: number, lng: number, zoom?: number) => void;
   setMarker: (lat: number, lng: number) => void;
   toggleLayer: () => void;
 }
 
 export interface InteractiveMapProps {
+  provider?: 'google' | 'openstreetmap';
   markerPos?: MapLocation | null;
   onLocationSelect?: (loc: MapLocation) => void;
   onMarkerClick?: (markerId: string) => void;
@@ -37,6 +37,7 @@ const DEFAULT_CENTER: MapLocation = { lat: 7.8731, lng: 80.7718 };
 export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(
   (
     {
+      provider: requestedProvider,
       markerPos,
       onLocationSelect,
       onMarkerClick,
@@ -52,8 +53,16 @@ export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>
     },
     ref
   ) => {
+    const configuration = useMapConfiguration();
+    const provider = requestedProvider || configuration.provider;
+    const geoapify = provider !== 'google' && configuration.search_provider === 'geoapify';
     const webViewRef = useRef<WebView>(null);
+    const ready = useRef(false);
+    const pendingNavigation = useRef<{ lat: number; lng: number; zoom: number; preview: boolean } | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
+    const [searchFocused, setSearchFocused] = useState(false);
+    const [mapError, setMapError] = useState('');
+    useEffect(() => { ready.current = false; setIsMapReady(false); setSearchFocused(false); setMapError(''); }, [provider]);
     const [layerType, setLayerType] = useState<'street' | 'sat'>('street');
     const [isLocating, setIsLocating] = useState(false);
 
@@ -72,11 +81,20 @@ export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>
     );
 
     useImperativeHandle(ref, () => ({
+      previewLocation: (lat: number, lng: number, zoomLevel = 13) => {
+        if (!ready.current) { pendingNavigation.current = { lat, lng, zoom: zoomLevel, preview: true }; return; }
+        pendingNavigation.current = null;
+        webViewRef.current?.injectJavaScript(`window.previewLocation && window.previewLocation(${lat}, ${lng}, ${zoomLevel}); true;`);
+      },
       flyTo: (lat: number, lng: number, zoomLevel = 15) => {
+        if (!ready.current) { pendingNavigation.current = { lat, lng, zoom: zoomLevel, preview: false }; return; }
+        pendingNavigation.current = null;
         const js = `if (window.flyToLocation) { window.flyToLocation(${lat}, ${lng}, ${zoomLevel}); } true;`;
         webViewRef.current?.injectJavaScript(js);
       },
       setMarker: (lat: number, lng: number) => {
+        if (!ready.current) { pendingNavigation.current = { lat, lng, zoom: 15, preview: false }; return; }
+        pendingNavigation.current = null;
         const js = `if (window.setPin) { window.setPin(${lat}, ${lng}, true); } true;`;
         webViewRef.current?.injectJavaScript(js);
       },
@@ -102,13 +120,33 @@ export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>
       }
     }, [isMapReady, markers]);
 
+    useEffect(() => {
+      const command = pendingNavigation.current;
+      if (isMapReady && command) {
+        const method = command.preview ? 'previewLocation' : 'flyToLocation';
+        webViewRef.current?.injectJavaScript(`window.${method} && window.${method}(${command.lat}, ${command.lng}, ${command.zoom}); true;`);
+        pendingNavigation.current = null;
+      }
+    }, [isMapReady]);
+
     const handleMessage = (event: WebViewMessageEvent) => {
       try {
         const data = JSON.parse(event.nativeEvent.data);
-        if (data.type === 'mapLoaded') {
+        if (data.type === 'mapFrameReady' && provider === 'google') {
+          const config = JSON.stringify({ center: defaultCenter, zoom, markerPos, markers, interactive }).replace(/</g, '\\u003c');
+          webViewRef.current?.injectJavaScript(`window.configureMap && window.configureMap(${config}); true;`);
+        } else if (data.type === 'placeSearchFocus') {
+          setSearchFocused(data.focused === true);
+        } else if (data.type === 'mapUnavailable') {
+          ready.current = false;
+          setIsMapReady(false);
+          setMapError('Map unavailable. Check the connection and map configuration.');
+        } else if (data.type === 'mapLoaded') {
+          ready.current = true;
+          setMapError('');
           setIsMapReady(true);
         } else if (data.type === 'locationSelect' && onLocationSelect) {
-          onLocationSelect({ lat: data.lat, lng: data.lng });
+          onLocationSelect({ lat: data.lat, lng: data.lng, ...(typeof data.address === 'string' ? { address: data.address } : {}) });
         } else if (data.type === 'markerClick' && onMarkerClick) {
           onMarkerClick(data.id);
         } else if (data.type === 'layerChanged') {
@@ -173,15 +211,19 @@ export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>
       <View
         style={[
           styles.container,
-          { height: typeof height === 'number' ? height : 260 },
+          { height: provider === 'google' && interactive ? Math.max(400, typeof height === 'number' ? height : 400) : typeof height === 'number' ? height : 260 },
           style,
         ]}
       >
         <WebView
+          key={provider}
           ref={webViewRef}
           originWhitelist={['*']}
-          source={{ html }}
+          source={provider === 'google' ? { uri: `${getApiUrl()}/maps/frame?provider=google` } : { html }}
+          applicationNameForUserAgent="ConstructFlow/1.0"
           onMessage={handleMessage}
+          onError={() => { ready.current = false; setIsMapReady(false); setMapError('Map unavailable. Check the connection and reload the map.'); }}
+          onHttpError={() => { ready.current = false; setIsMapReady(false); setMapError('Map unavailable. Check the connection and reload the map.'); }}
           style={styles.webView}
           nestedScrollEnabled={true}
           scrollEnabled={false}
@@ -191,16 +233,19 @@ export const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>
           showsVerticalScrollIndicator={false}
         />
 
+        {geoapify && <View style={{ height: 24, justifyContent: 'center', paddingHorizontal: 8, backgroundColor: '#fff' }}><Pressable accessibilityRole="link" accessibilityLabel="Powered by Geoapify" onPress={() => { void Linking.openURL('https://www.geoapify.com/').catch(() => {}); }}><Text style={{ fontSize: 10, color: '#475569' }}>Powered by Geoapify</Text></Pressable></View>}
+
         {!isMapReady && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="small" color="#F97316" />
-            <Text style={styles.loadingText}>Loading interactive map...</Text>
+            {!mapError && <ActivityIndicator size="small" color="#F97316" />}
+            <Text style={styles.loadingText}>{mapError || 'Loading interactive map...'}</Text>
+            {!!mapError && <Pressable accessibilityRole="button" accessibilityLabel="Reload map" onPress={() => { ready.current = false; setIsMapReady(false); setMapError(''); webViewRef.current?.reload(); }} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa' }}><Text style={{ color: '#c2410c', fontWeight: '600' }}>Reload map</Text></Pressable>}
           </View>
         )}
 
         {/* Floating Controls Overlay */}
-        {showControls && isMapReady && (
-          <View style={styles.floatingControls}>
+        {showControls && isMapReady && !searchFocused && (
+          <View style={[styles.floatingControls, provider === 'google' && interactive ? { top: 80 } : null]}>
             {showLayerToggle && (
               <Pressable
                 accessibilityLabel="Toggle satellite view"

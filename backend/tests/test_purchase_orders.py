@@ -3,6 +3,102 @@ import pytest
 from fastapi import HTTPException
 from api.routes import purchase_orders as orders
 
+
+@pytest.fixture
+def retry_order_client(monkeypatch):
+    class RetryClient:
+        def __init__(self):
+            self.saved = None
+            self.inserts = 0
+            self.notifications = []
+            self.race = False
+        def table(self, name):
+            self.name = name
+            self.operation = 'read'
+            return self
+        def select(self, *args): return self
+        def eq(self, *args): return self
+        def insert(self, payload):
+            self.payload = payload
+            self.operation = 'insert'
+            return self
+        def execute(self):
+            if self.name == 'profiles': return SimpleNamespace(data=[{'role': 'supplier', 'is_approved': True}])
+            if self.name == 'purchase_orders':
+                if self.operation == 'insert':
+                    self.inserts += 1
+                    self.saved = dict(self.payload)
+                    if self.race:
+                        failure = Exception('Concurrent insert already committed')
+                        failure.code = '23505'
+                        raise failure
+                return SimpleNamespace(data=[self.saved] if self.saved else [])
+            return SimpleNamespace(data=[])
+    client = RetryClient()
+    monkeypatch.setattr(orders, 'client_for_token', lambda token: client)
+    monkeypatch.setattr('core.access.project_member', lambda *args: True)
+    monkeypatch.setattr(orders, 'create_notifications', lambda value: client.notifications.append(value))
+    return client
+
+
+def retry_order(**changes):
+    return orders.PurchaseOrderCreate(**{
+        'request_id': '10000000-0000-4000-8000-000000000001',
+        'project_id': 'project-one', 'supplier_id': 'supplier-one', 'supplier_name': 'Supplier',
+        'material_id': '20000000-0000-4000-8000-000000000002',
+        'quantity_ordered': 3, 'unit_price': 12.5, 'expected_date': '2030-01-01', 'unit': 'bags', **changes,
+    })
+
+
+def test_uncertain_response_retry_returns_original_order_once(retry_order_client):
+    client = retry_order_client
+    user = {'id': 'admin-one', 'role': 'super_admin', 'token': 'jwt'}
+    first = orders.create_purchase_order(retry_order(), user)
+    client.saved['status'] = 'Delivered'
+    client.saved['boq_item_id'] = 'inferred-boq-reference'
+    # BOQ triggers can replace a catalog ID with its linked stock ID.
+    client.saved['material_id'] = 'stock-row'
+    replay = orders.create_purchase_order(retry_order(), user)
+    assert replay['id'] == first['id']
+    assert replay['status'] == 'Delivered'
+    assert client.inserts == 1
+    assert len(client.notifications) == 1
+
+
+def test_concurrent_order_retry_recovers_unique_key_winner(retry_order_client):
+    retry_order_client.race = True
+    result = orders.create_purchase_order(retry_order(), {'id': 'admin-one', 'role': 'super_admin', 'token': 'jwt'})
+    assert result['quantity_ordered'] == 3
+    assert retry_order_client.inserts == 1
+    assert not retry_order_client.notifications
+
+
+@pytest.mark.parametrize('changes', [{'quantity_ordered': 4}, {'unit_price': 0}, {'unit': 'tonnes'}, {'supplier_id': 'other'}, {'material_id': '30000000-0000-4000-8000-000000000003'}])
+def test_reusing_order_key_for_different_details_is_rejected(retry_order_client, changes):
+    user = {'id': 'admin-one', 'role': 'super_admin', 'token': 'jwt'}
+    orders.create_purchase_order(retry_order(), user)
+    with pytest.raises(HTTPException) as error:
+        orders.create_purchase_order(retry_order(**changes), user)
+    assert error.value.status_code == 409
+    assert retry_order_client.inserts == 1
+
+
+def test_order_request_key_is_scoped_to_actor_and_project(retry_order_client):
+    client = retry_order_client
+    first = orders.create_purchase_order(retry_order(), {'id': 'admin-one', 'role': 'super_admin', 'token': 'jwt'})['id']
+    client.saved = None
+    second = orders.create_purchase_order(retry_order(), {'id': 'admin-two', 'role': 'super_admin', 'token': 'jwt'})['id']
+    client.saved = None
+    third = orders.create_purchase_order(retry_order(project_id='project-two'), {'id': 'admin-one', 'role': 'super_admin', 'token': 'jwt'})['id']
+    assert len({first, second, third}) == 3
+
+
+@pytest.mark.parametrize('changes', [{'quantity_ordered': 1e308, 'unit_price': 1e308}, {'supplier_name': ' '}, {'unit': ' '}])
+def test_invalid_order_totals_and_blank_labels_fail_before_database(changes):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        retry_order(**changes)
+
 class Client:
     def __init__(self, order): self.order = order; self.calls = []
     def table(self, name): return self
@@ -60,187 +156,18 @@ def test_database_transition_errors_preserve_http_status(monkeypatch, code, stat
     assert error.value.status_code == status
 
 
-def test_deliver_po_handles_notification_enum_22P02_gracefully(monkeypatch):
-    class EnumFailure(Exception):
-        code = "22P02"
-    failure = EnumFailure('invalid input value for enum notification_type: "info"')
-    
-    initial_order = {
-        "id": "po-1",
-        "po_number": "PO-101",
-        "project_id": "proj-1",
-        "supplier_id": "supplier-1",
-        "status": "Confirmed",
-        "supplier_notes": "[]"
-    }
-    
-    updated_state = dict(initial_order)
-    notifications_sent = []
-    
-    class FakeServiceTable:
-        def __init__(self, table_name):
-            self.table_name = table_name
-            self._filters = {}
-            self._update_data = None
-            
-        def select(self, *args):
-            return self
-            
-        def eq(self, field, value):
-            self._filters[field] = value
-            return self
-            
-        def update(self, data):
-            self._update_data = data
-            return self
-            
-        def execute(self):
-            if self._update_data:
-                updated_state.update(self._update_data)
-                return SimpleNamespace(data=[dict(updated_state)])
-            return SimpleNamespace(data=[dict(updated_state)])
-            
-    class FakeServiceClient:
-        def table(self, name):
-            return FakeServiceTable(name)
-            
-    client = Client(initial_order)
-    def failing_rpc(*args, **kwargs):
+@pytest.mark.parametrize("operation,role,code", [("deliver","supplier","22P02"),("receive","super_admin","22P02"),("deliver","supplier","23502"),("receive","super_admin","42501")])
+def test_transition_failure_never_falls_back_to_privileged_writes(monkeypatch, operation, role, code):
+    class Failure(Exception):
+        pass
+    failure = Failure("Database rejected the transaction")
+    failure.code = code
+    client = Client({"supplier_id":"supplier-1","status":"Confirmed"})
+    def fail(*args):
         raise failure
-    client.rpc = failing_rpc
-    
-    monkeypatch.setattr(orders, "client_for_token", lambda token: client)
-    monkeypatch.setattr(orders, "get_service_client", lambda: FakeServiceClient())
-    monkeypatch.setattr(orders, "create_notifications", lambda notifs: notifications_sent.extend(notifs))
-    
-    result = orders.deliver_po("po-1", {"role": "supplier", "id": "supplier-1", "token": "token"})
-    assert result["status"] == "Delivered"
-    assert updated_state["status"] == "Delivered"
-    assert "delivered_at" in updated_state
-    assert len(notifications_sent) == 2
-    assert all(n["type"] == "general" for n in notifications_sent)
-
-
-def test_receive_po_handles_notification_enum_22P02_gracefully(monkeypatch):
-    class EnumFailure(Exception):
-        code = "22P02"
-    failure = EnumFailure('invalid input value for enum notification_type: "success"')
-    
-    initial_order = {
-        "id": "po-1",
-        "po_number": "PO-101",
-        "project_id": "proj-1",
-        "material_id": "mat-1",
-        "quantity_ordered": 25.0,
-        "supplier_id": "supplier-1",
-        "status": "Delivered",
-        "supplier_notes": "[]"
-    }
-    
-    updated_state = dict(initial_order)
-    material_stock = {"id": "mat-1", "project_id": "proj-1", "current_stock": 10.0}
-    notifications_sent = []
-    
-    class FakeServiceTable:
-        def __init__(self, table_name):
-            self.table_name = table_name
-            self._filters = {}
-            self._update_data = None
-            
-        def select(self, *args):
-            return self
-            
-        def eq(self, field, value):
-            self._filters[field] = value
-            return self
-            
-        def update(self, data):
-            self._update_data = data
-            return self
-            
-        def execute(self):
-            if self.table_name == "materials":
-                if self._update_data:
-                    material_stock.update(self._update_data)
-                return SimpleNamespace(data=[dict(material_stock)])
-            if self._update_data:
-                updated_state.update(self._update_data)
-                return SimpleNamespace(data=[dict(updated_state)])
-            return SimpleNamespace(data=[dict(updated_state)])
-            
-    class FakeServiceClient:
-        def table(self, name):
-            return FakeServiceTable(name)
-            
-    client = Client(initial_order)
-    def failing_rpc(*args, **kwargs):
-        raise failure
-    client.rpc = failing_rpc
-    
-    monkeypatch.setattr(orders, "client_for_token", lambda token: client)
-    monkeypatch.setattr(orders, "get_service_client", lambda: FakeServiceClient())
-    monkeypatch.setattr(orders, "create_notifications", lambda notifs: notifications_sent.extend(notifs))
-    
-    result = orders.receive_po("po-1", {"role": "super_admin", "id": "admin-1", "token": "token"})
-    assert result["status"] == "Received"
-    assert updated_state["status"] == "Received"
-    assert material_stock["current_stock"] == 35.0
-    assert len(notifications_sent) == 2
-    assert all(n["type"] == "general" for n in notifications_sent)
-
-
-def test_deliver_po_handles_notification_user_id_not_null_23502_gracefully(monkeypatch):
-    class ConstraintFailure(Exception):
-        code = "23502"
-    failure = ConstraintFailure('null value in column "user_id" of relation "notifications" violates not-null constraint')
-
-    initial_order = {
-        "id": "po-1",
-        "po_number": "PO-101",
-        "project_id": "proj-1",
-        "supplier_id": "supplier-1",
-        "status": "Confirmed",
-        "supplier_notes": "[]"
-    }
-
-    updated_state = dict(initial_order)
-    notifications_sent = []
-
-    class FakeServiceTable:
-        def __init__(self, table_name):
-            self.table_name = table_name
-
-        def select(self, *args):
-            return self
-
-        def eq(self, field, value):
-            return self
-
-        def update(self, data):
-            updated_state.update(data)
-            return self
-
-        def execute(self):
-            return SimpleNamespace(data=[dict(updated_state)])
-
-    class FakeServiceClient:
-        def table(self, name):
-            return FakeServiceTable(name)
-
-    client = Client(initial_order)
-    def failing_rpc(*args, **kwargs):
-        raise failure
-    client.rpc = failing_rpc
-
-    monkeypatch.setattr(orders, "client_for_token", lambda token: client)
-    monkeypatch.setattr(orders, "get_service_client", lambda: FakeServiceClient())
-    monkeypatch.setattr(orders, "create_notifications", lambda notifs: notifications_sent.extend(notifs))
-
-    result = orders.deliver_po("po-1", {"role": "supplier", "id": "supplier-1", "token": "token"})
-    assert result["status"] == "Delivered"
-    assert updated_state["status"] == "Delivered"
-    assert "delivered_at" in updated_state
-    assert len(notifications_sent) == 2
-    assert all(n["type"] == "general" for n in notifications_sent)
-
-
+    client.rpc = fail
+    monkeypatch.setattr(orders,"client_for_token",lambda token:client)
+    monkeypatch.setattr(orders,"get_service_client",lambda:pytest.fail("Privileged fallback must never run"))
+    with pytest.raises(HTTPException) as error:
+        (orders.deliver_po if operation=="deliver" else orders.receive_po)("po-1",{"id":"supplier-1","role":role,"token":"jwt"})
+    assert error.value.status_code == (403 if code=="42501" else 500)

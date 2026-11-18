@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { normalizeFetchError } from '../../lib/apiUrl';
 import { ChatComposer } from './ChatComposer';
+import { roleLabel } from '@/utils/roles';
 
 type Message = {
   id: string;
@@ -26,7 +27,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [projectName, setProjectName] = useState('Client Conversation');
-  const [clientId, setClientId] = useState<string | null>(null);
+  const [, setClientId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -92,13 +93,15 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
 
   useEffect(() => {
     const fetchMissingProfiles = async () => {
-      const missingIds = [...new Set(messages.map(m => m.sender_id).filter(id => id && !profiles[id]))];
+      const missingIds = [...new Set(messages.map(m => m.sender_id).filter(Boolean))];
       if (missingIds.length > 0) {
         const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
         if (data) {
-          const newProfiles = { ...profiles };
-          data.forEach(p => { if (p.id) newProfiles[p.id] = p.full_name || 'Unknown'; });
-          setProfiles(newProfiles);
+          setProfiles(previous => {
+            const next = { ...previous };
+            data.forEach(p => { if (p.id) next[p.id] = p.full_name || 'Unknown'; });
+            return next;
+          });
         }
       }
     };
@@ -158,7 +161,7 @@ export default function StaffMessagesThread({ threadId }: { threadId: string }) 
           </View>
         ) : messages.map(message => {
           const isSender = message.sender_id === user?.id;
-          const senderName = isSender ? 'You' : (profiles[message.sender_id] || (message.sender_role ? message.sender_role.replace('_', ' ') : 'Client'));
+          const senderName = isSender ? 'You' : (profiles[message.sender_id] || (message.sender_role ? roleLabel(message.sender_role) : 'Client'));
           return (
             <View key={message.id} className={`mb-4 ${isSender ? 'self-end' : 'self-start'} max-w-[80%]`}>
               <View className={`p-3 rounded-2xl ${isSender ? 'bg-brand-orange rounded-tr-sm' : 'bg-white dark:bg-[#1E293B] rounded-tl-sm shadow-sm border border-gray-100 dark:border-gray-800'}`}>

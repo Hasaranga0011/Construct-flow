@@ -2,7 +2,7 @@ import { dataError } from '@/services/siteData';
 import { notify } from '@/utils/notify';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platform, Modal, Image, Linking } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platform, Modal, Image } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { api } from '../../../services/api';
 import { TopNav } from '@/components/common/TopNav';
@@ -111,20 +111,9 @@ export default function SMMilestonesPage() {
       await api.projects.updateMilestone(activeProjectId, selectedMilestone.id, {
         completion_percentage: value,
         description: notes.trim(),
+        media_urls: photoUrl ? [photoUrl] : [],
         status: value >= 100 ? 'Completed' : value > 0 ? 'In Progress' : 'Pending'
       });
-
-      // 2. Insert media/notes if provided
-      if (photoUrl) {
-        const { error: mediaError } = await supabase
-          .from('milestone_media')
-          .insert({
-            milestone_id: selectedMilestone.id,
-            uploaded_by: user?.id,
-            url: photoUrl
-          });
-        if (mediaError) throw new Error(`Progress saved, but photo could not be attached: ${mediaError.message}`);
-      }
 
       toast('Progress updated successfully');
       setSelectedMilestone(null);
@@ -141,13 +130,7 @@ export default function SMMilestonesPage() {
     else notify('Success', msg);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-700';
-      case 'In Progress': return 'bg-blue-100 text-blue-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
+
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -189,9 +172,9 @@ export default function SMMilestonesPage() {
             ) : (
               <View className={`bg-white rounded-3xl shadow-sm border border-gray-100 ${isMobile ? 'p-4 mt-4' : 'p-8 mt-4'}`}>
                 {milestones.map((ms, idx) => (
-                  <MilestoneRow 
-                    key={ms.id} 
-                    ms={ms} 
+                  <MilestoneRow
+                    key={ms.id}
+                    ms={ms}
                     isLast={idx === milestones.length - 1}
                     showAction={false}
                   >

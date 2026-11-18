@@ -40,3 +40,6 @@ cloudinary==1.45.0
 resend
 email-validator
 
+
+# Decode and re-encode uploaded image content before storage.
+pillow==13.0.0

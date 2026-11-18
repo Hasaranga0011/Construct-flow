@@ -1,10 +1,19 @@
 import time
+import httpx
 from supabase import create_client, Client
 from .config import settings
 from fastapi import HTTPException, Request
 from supabase import ClientOptions
 
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+def _http_client() -> httpx.Client:
+    # Concurrent HTTP/2 streams on Windows can poison the cached connection
+    # with WinError 10035. HTTP/1.1 still pools independent parallel requests.
+    return httpx.Client(http2=False, timeout=httpx.Timeout(120, connect=10),
+                        limits=httpx.Limits(max_connections=32, max_keepalive_connections=16))
+
+
+supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY,
+                                options=ClientOptions(httpx_client=_http_client()))
 _service_client: Client | None = None
 _TOKEN_CLIENT_CACHE: dict[str, tuple[Client, float]] = {}
 _TOKEN_CLIENT_TTL = 600  # 10 minutes
@@ -24,6 +33,7 @@ def client_for_token(token: str) -> Client:
             headers={"Authorization": f"Bearer {token}"},
             persist_session=False,
             auto_refresh_token=False,
+            httpx_client=_http_client(),
         ),
     )
     if len(_TOKEN_CLIENT_CACHE) >= _TOKEN_CLIENT_MAX:
@@ -36,11 +46,11 @@ def get_auth_client(request: Request) -> Client:
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     scheme, _, token = auth_header.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     return client_for_token(token.strip())
 
 def get_service_client() -> Client:
@@ -49,6 +59,6 @@ def get_service_client() -> Client:
         _service_client = create_client(
             settings.SUPABASE_URL,
             settings.SUPABASE_SERVICE_ROLE_KEY,
-            options=ClientOptions(persist_session=False, auto_refresh_token=False),
+            options=ClientOptions(persist_session=False, auto_refresh_token=False, httpx_client=_http_client()),
         )
     return _service_client

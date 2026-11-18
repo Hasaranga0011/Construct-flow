@@ -1,3 +1,6 @@
+import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/apiUrl';
+
 const ROLE_ALIASES: Record<string, string[]> = {
   admin: ['admin', 'super_admin', 'Super Admin', 'Admin'],
   pm: ['pm', 'project_manager', 'Project Manager', 'Manager'],
@@ -27,9 +30,6 @@ export const isNotificationForUser = (
     && (notification.target_role === 'All'
       || getNotificationRoleAliases(role).includes(notification.target_role || '')));
 
-import { supabase } from '../lib/supabase';
-import { getApiUrl } from '../lib/apiUrl';
-
 export const sendSystemNotification = async (
   title: string,
   message: string,
@@ -42,7 +42,7 @@ export const sendSystemNotification = async (
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
-    
+
     if (!token) {
       console.warn('Cannot send notification: no token');
       return;

@@ -1,9 +1,10 @@
+import { LoadingState, ErrorState } from '@/components/ui';
+import { VerificationQueue } from '@/components/common/VerificationQueue';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Alert, Platform, Modal } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platform, Modal } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
 import { api } from '../../services/api';
-import { supabase } from '../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import { notify, confirmAction } from '@/utils/notify';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -36,195 +37,6 @@ Colombo Residencies Tower B,Colombo,Kollupitiya,Residential,2400,2,Standard,RCC 
 Kandy Commercial Plaza,Kandy,Peradeniya,Commercial,4500,4,Premium,Steel Frame,Level,2024,89100000,91125000,2024,CIDA Certified BOQ
 Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,Level,2023,64800000,66600000,2023,QS Completion Certificate`;
 
-  const buildFallbackInsights = async () => {
-    try {
-      const { data: dbProjects } = await supabase
-        .from('projects')
-        .select('id, name, status, total_budget, spent_cost, start_date, end_date, completion_percentage, location');
-
-      const projectsList = dbProjects || [];
-      const total = projectsList.length;
-      const active = projectsList.filter((p: any) => p.status === 'Active' || p.status === 'In Progress').length;
-      const completed = projectsList.filter((p: any) => p.status === 'Completed').length;
-      const overBudget = projectsList.filter((p: any) => Number(p.spent_cost || 0) > Number(p.total_budget || 0) && Number(p.total_budget || 0) > 0).length;
-      const onBudgetPct = total > 0 ? Math.round(((total - overBudget) / total) * 100) : 100;
-
-      const mappedProjects = projectsList.map((p: any) => {
-        const budget = Number(p.total_budget) || 0;
-        const spent = Number(p.spent_cost) || 0;
-        const completion = Number(p.completion_percentage) || 0;
-        const isOver = budget > 0 && spent > budget;
-        let delayScore = 18;
-        let isBehind = false;
-        if (p.end_date && p.start_date) {
-          const start = new Date(p.start_date).getTime();
-          const end = new Date(p.end_date).getTime();
-          const now = Date.now();
-          if (end > start) {
-            const elapsedRatio = Math.max(0, Math.min(1, (now - start) / (end - start)));
-            const expectedCompletion = elapsedRatio * 100;
-            if (expectedCompletion - completion > 20) {
-              isBehind = true;
-              delayScore += 50;
-            } else if (expectedCompletion - completion > 10) {
-              delayScore += 25;
-            }
-          }
-        }
-        if (isOver) delayScore += 25;
-        delayScore = Math.min(95, Math.max(10, delayScore));
-
-        return {
-          project_id: p.id,
-          project_name: p.name || 'Untitled Project',
-          delay_risk: delayScore,
-          recommendation: delayScore > 65
-            ? 'Critical: Schedule is lagging. Expedite pending tasks and allocate resources.'
-            : delayScore > 35
-            ? 'Moderate: Monitor critical path milestones and material deliveries.'
-            : 'Healthy: Progress is within expected baseline schedule and budget tolerances.',
-          milestone_overdue_count: isBehind ? 1 : 0,
-          late_po_count: 0,
-          is_over_budget: isOver,
-          attendance_gap: 0,
-        };
-      });
-
-      // Query historical projects directly from Supabase instead of using hardcoded mock data
-      const { data: dbHist } = await (supabase as any)
-        .from('historical_projects')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const mappedHistorical = (dbHist || []).map((hp: any) => {
-        const sqft = Number(hp.floor_area_sqft) || 0;
-        const est = hp.estimate_total_lkr ? Number(hp.estimate_total_lkr) : null;
-        const act = hp.actual_total_lkr ? Number(hp.actual_total_lkr) : null;
-        const estSqft = est && sqft > 0 ? Math.round(est / sqft) : null;
-        const actSqft = act && sqft > 0 ? Math.round(act / sqft) : null;
-        const varPct = est && act ? Math.round(((act - est) / est) * 1000) / 10 : null;
-        return {
-          id: hp.id,
-          project_name: hp.project_name,
-          district: hp.district,
-          town: hp.town,
-          project_type: hp.project_type,
-          floor_area_sqft: sqft,
-          cost_year: hp.cost_year || 2024,
-          estimate_cost_per_sqft: estSqft,
-          actual_cost_per_sqft: actSqft,
-          estimate_total_lkr: est,
-          actual_total_lkr: act,
-          variance_pct: varPct,
-          source: hp.source || 'real',
-          verified: Boolean(hp.verified ?? true),
-          evidence_note: hp.evidence_note || '',
-        };
-      });
-
-      const validVariances = mappedHistorical
-        .filter((h: any) => h.variance_pct !== null && h.source !== 'sample')
-        .map((h: any) => h.variance_pct);
-      const summaryCount = validVariances.length;
-      const meanVar = summaryCount > 0 ? Math.round((validVariances.reduce((a: number, b: number) => a + b, 0) / summaryCount) * 10) / 10 : 0;
-      const meanAbsVar = summaryCount > 0 ? Math.round((validVariances.reduce((a: number, b: number) => a + Math.abs(b), 0) / summaryCount) * 10) / 10 : 0;
-
-      // Dynamic market trends from live and historical projects
-      const trendGroups: Record<string, { costs: number[]; location: string; project_type: string }> = {};
-      mappedHistorical.forEach((hp: any) => {
-        if (hp.floor_area_sqft > 0 && hp.actual_total_lkr) {
-          const key = `${hp.district}__${hp.project_type}`;
-          if (!trendGroups[key]) trendGroups[key] = { costs: [], location: hp.district, project_type: hp.project_type };
-          trendGroups[key].costs.push(hp.actual_total_lkr / hp.floor_area_sqft);
-        }
-      });
-      projectsList.forEach((p: any) => {
-        if (p.status === 'Completed' && p.square_footage && p.spent_cost) {
-          const loc = p.location || 'Colombo';
-          const ptype = p.project_type || 'Residential';
-          const key = `${loc}__${ptype}`;
-          if (!trendGroups[key]) trendGroups[key] = { costs: [], location: loc, project_type: ptype };
-          trendGroups[key].costs.push(Number(p.spent_cost) / Number(p.square_footage));
-        }
-      });
-
-      const dynamicMarketTrends: any[] = [];
-      const dynamicPendingTrends: any[] = [];
-      Object.values(trendGroups).forEach((grp) => {
-        const sz = grp.costs.length;
-        const avg = Math.round(grp.costs.reduce((a, b) => a + b, 0) / sz);
-        if (sz >= 3) {
-          dynamicMarketTrends.push({
-            location: grp.location,
-            project_type: grp.project_type,
-            avg_cost_per_sqft: avg,
-            sample_size: sz,
-          });
-        } else {
-          dynamicPendingTrends.push({
-            location: grp.location,
-            project_type: grp.project_type,
-            group_label: `${grp.location} / ${grp.project_type}`,
-            sample_size: sz,
-            needed: 3,
-            short: 3 - sz,
-            message: `${grp.location} / ${grp.project_type}: ${sz} of 3 needed`,
-          });
-        }
-      });
-
-      return {
-        is_standalone: true,
-        model_info: {
-          cost_model: {
-            trained_at: null,
-            algorithm: 'RandomForestRegressor (Hybrid AI + CIDA)',
-          },
-          delay_classifier: {
-            trained_at: null,
-            algorithm: 'Rule-Based Weighted Composite Engine',
-          }
-        },
-        real_projects_count: mappedHistorical.length,
-        verified_real_count: mappedHistorical.length,
-        baseline_mape: null,
-        validation_mape: null,
-        accuracy_score: 'Backend connection required',
-        accuracy_status: 'Connect to backend API to view trained model validation metrics',
-        cost_driver_is_indicative: true,
-        feature_importance: [
-          { key: 'project_type', name: 'Project Type', value: 49.2 },
-          { key: 'quality_tier', name: 'Quality Tier', value: 46.0 },
-          { key: 'floor_area_sqft', name: 'Floor Area (Sq Ft)', value: 1.6 },
-          { key: 'floors', name: 'Number of Floors', value: 0.9 },
-          { key: 'district', name: 'District / Location', value: 0.6 },
-          { key: 'cost_year', name: 'Cost Year', value: 0.7 },
-          { key: 'price_index', name: 'Price Index (CIDA)', value: 0.7 },
-          { key: 'site_condition', name: 'Site Condition', value: 0.3 },
-          { key: 'structure_type', name: 'Structure Type', value: 0.0 },
-        ],
-        projects: mappedProjects,
-        project_health: {
-          total,
-          active,
-          completed,
-          trending_over_budget: overBudget,
-          on_budget_percent: onBudgetPct,
-        },
-        market_trends: dynamicMarketTrends,
-        pending_market_trends: dynamicPendingTrends,
-        historical_projects: mappedHistorical,
-        historical_summary_metrics: {
-          count: summaryCount,
-          mean_variance_pct: meanVar,
-          mean_abs_variance_pct: meanAbsVar,
-        }
-      };
-    } catch {
-      return null;
-    }
-  };
-
   const fetchInsights = useCallback(async (isRefresh = false) => {
     if (isRefresh) setLoading(true);
     setErrorMsg('');
@@ -237,14 +49,9 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
         return;
       }
       throw new Error('Incomplete response');
-    } catch {
-      const fallback = await buildFallbackInsights();
-      if (fallback) {
-        setInsights(fallback);
-        setErrorMsg('');
-      } else {
-        setErrorMsg('Network error. Unable to connect to backend or Supabase.');
-      }
+    } catch (error) {
+      setInsights(null);
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to load model evidence. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -267,14 +74,9 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
         target_timeline: 'Normal'
       });
       setSimResult(res.estimated_cost);
-    } catch {
-      // Local calibrated calculation based on CIDA benchmarks
-      const sqft = Number(simSqft) || 2000;
-      const baseRate = 11500;
-      const qualityMultiplier = simQuality === 'Luxury' ? 1.85 : simQuality === 'Premium' ? 1.35 : 1.0;
-      const districtMultiplier = 1.28;
-      const calculated = Math.round(sqft * baseRate * qualityMultiplier * districtMultiplier);
-      setSimResult(calculated);
+    } catch (error) {
+      setSimResult(null);
+      setErrorMsg(error instanceof Error ? error.message : 'Estimator unavailable. No estimate was generated.');
     } finally {
       setSimulating(false);
     }
@@ -291,18 +93,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
       notify('Success', res.message || 'Model retraining completed successfully.');
       await fetchInsights(true);
     } catch (err: any) {
-      // If FastAPI microservice is unreachable, calibrate the local model from live Supabase data
-      try {
-        const fallback = await buildFallbackInsights();
-        if (fallback) {
-          setInsights(fallback);
-          notify('Model Calibrated', 'Calibrated local CIDA baseline model with live project metrics.');
-        } else {
-          notify('Notice', err?.message || 'FastAPI microservice offline. Operating on calibrated baseline model.');
-        }
-      } catch {
-        notify('Notice', err?.message || 'FastAPI microservice offline. Operating on calibrated baseline model.');
-      }
+      notify('Retraining failed', err?.message || 'No model was retrained. Please retry.');
     } finally {
       setRetraining(false);
     }
@@ -441,36 +232,14 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
     fetchInsights();
   }, [fetchInsights]);
 
-  if (loading) {
-    return (
-      <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-4 text-brand-text dark:text-white font-semibold">Loading ML Insights...</Text>
-      </View>
-    );
-  }
-
-  if (errorMsg) {
-    return (
-      <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center p-8">
-        <Ionicons name="alert-circle" size={48} color="#EF4444" />
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-4 text-brand-text dark:text-white font-bold text-lg text-center">Failed to load insights</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="mt-2 text-gray-500 dark:text-gray-400 text-center">{errorMsg}</Text>
-        <Pressable
-          className="mt-6 bg-brand-orange px-6 py-3 rounded-xl flex-row items-center"
-          onPress={() => fetchInsights(true)}
-        >
-          <Ionicons name="refresh-outline" size={18} color="#fff" />
-          <Text className="text-white font-bold ml-2">Retry Connection</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  if (loading) return <View className="flex-1 bg-brand-light dark:bg-slate-950"><TopNav title="AI Analytics & Insights" showAction={false}/><LoadingState message="Loading model evidence…"/></View>;
+  if (errorMsg) return <View className="flex-1 bg-brand-light dark:bg-slate-950"><TopNav title="AI Analytics & Insights" showAction={false}/><ErrorState message={errorMsg} onRetry={()=>void fetchInsights(true)}/></View>;
 
   return (
     <View className="flex-1 bg-brand-light dark:bg-[#0F172A]">
       <TopNav title="AI Analytics & Insights" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} className={isPhone ? "p-3 pb-24" : isMobile ? "p-4 pb-20" : "p-8"}>
+        <VerificationQueue kind="historical" />
         <View className={`mb-6 md:mb-8 flex-row ${isMobile ? 'flex-col gap-3.5' : 'justify-between items-start'}`}>
           <View className="flex-1 min-w-0">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl sm:text-2xl md:text-3xl font-black text-brand-text dark:text-white mb-1.5">
@@ -505,7 +274,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
             <View className="flex-row items-center flex-1 mr-3">
               <Ionicons name="shield-checkmark" size={18} color="#D97706" />
               <Text className="text-xs text-amber-900 dark:text-amber-200 ml-2 font-medium flex-1">
-                Calibrated Mode: Running on verified CIDA ML benchmark models with live Supabase project health.
+                Model service is unavailable. Accuracy and prediction evidence cannot be verified.
               </Text>
             </View>
             <Pressable
@@ -1136,15 +905,15 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
                   Upload BOQ File (.csv, .xlsx, .xls)
                 </Text>
-                
+
                 {selectedFile ? (
                   <View className="p-3.5 bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-xl flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1 pr-2">
                       <View className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/40 items-center justify-center mr-3">
-                        <Ionicons 
-                          name={selectedFile.name.toLowerCase().endsWith('.csv') ? "document-text" : "grid"} 
-                          size={22} 
-                          color="#F97316" 
+                        <Ionicons
+                          name={selectedFile.name.toLowerCase().endsWith('.csv') ? "document-text" : "grid"}
+                          size={22}
+                          color="#F97316"
                         />
                       </View>
                       <View className="flex-1">
@@ -1162,8 +931,8 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
                         </View>
                       </View>
                     </View>
-                    <Pressable 
-                      onPress={() => setSelectedFile(null)} 
+                    <Pressable
+                      onPress={() => setSelectedFile(null)}
                       className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
                     >
                       <Ionicons name="trash-outline" size={18} color="#EF4444" />

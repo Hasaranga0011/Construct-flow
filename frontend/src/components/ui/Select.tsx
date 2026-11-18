@@ -84,6 +84,8 @@ export const Select = ({
           onPress={measureAndOpen}
           disabled={disabled}
           accessibilityRole="button"
+          accessibilityLabel={selectedOption?.label || placeholder}
+          accessibilityState={{ expanded: open, disabled: !!disabled }}
           style={open ? { borderColor: '#F97316', borderWidth: 1.5 } : undefined}
           className={`flex-row items-center justify-between min-h-[48px] px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1E293B] ${disabled ? 'opacity-60' : ''}`}
         >
@@ -136,13 +138,14 @@ export const Select = ({
                   <TextInput
                     value={filterQuery}
                     onChangeText={setFilterQuery}
-                    placeholder="Search projects..."
+                    accessibilityLabel="Search options"
+                    placeholder="Search options…"
                     placeholderTextColor="#9CA3AF"
                     style={{ flex: 1, fontSize: 13, color: '#111827', height: '100%', outlineStyle: 'none' as any }}
                     autoFocus
                   />
                   {filterQuery ? (
-                    <Pressable onPress={() => setFilterQuery('')}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Clear options search" style={{minWidth:44,minHeight:44,alignItems:"center",justifyContent:"center"}} onPress={() => setFilterQuery('')}>
                       <Ionicons name="close-circle" size={14} color="#9CA3AF" />
                     </Pressable>
                   ) : null}
@@ -153,10 +156,10 @@ export const Select = ({
             <ScrollView keyboardShouldPersistTaps="handled" bounces={false} contentContainerStyle={{ paddingVertical: 4 }}>
               {filteredOptions.length === 0 ? (
                 <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, color: '#9CA3AF' }}>No projects found</Text>
+                  <Text style={{ fontSize: 13, color: '#9CA3AF' }}>No matching options</Text>
                 </View>
               ) : (
-                filteredOptions.map(opt => {
+                filteredOptions.slice(0, 100).map(opt => {
                   const isSelected = value === opt.value;
                   return (
                     <Pressable
@@ -195,6 +198,7 @@ export const Select = ({
                   );
                 })
               )}
+              {filteredOptions.length > 100 && <Text style={{ padding: 14, fontSize: 12, color: '#64748B' }}>Showing the first 100 matches. Refine your search to find another item.</Text>}
             </ScrollView>
           </View>
         </Pressable>

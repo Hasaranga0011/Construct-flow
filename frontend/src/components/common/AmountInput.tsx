@@ -1,22 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Platform,
-  ViewStyle,
-  TextStyle,
-  NativeSyntheticEvent,
-  TextInputSelectionChangeEventData,
-} from 'react-native';
-import {
-  formatAmountLive,
-  parseAmount,
-  formatCompactCurrency,
-  formatAmount,
-  CURRENCY_PREFIX,
-} from '@/lib/amount';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, StyleSheet, Platform, ViewStyle, TextStyle } from 'react-native';
+import { formatAmountLive, parseAmount, formatCompactCurrency, formatAmount } from '@/lib/amount';
 
 export interface AmountInputProps {
   label?: string;
@@ -62,12 +46,12 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   testID,
 }) => {
   // Format initial value
-  const getInitialDisplay = () => {
+  const getInitialDisplay = useCallback(() => {
     if (value === null || value === undefined || value === '') return '';
     return formatAmount(value, {
       decimals: allowDecimals ? (Number.isInteger(Number(value)) ? 0 : maxDecimals) : 0,
     });
-  };
+  }, [value, allowDecimals, maxDecimals]);
 
   const [displayText, setDisplayText] = useState<string>(getInitialDisplay());
   const [internalError, setInternalError] = useState<string | null>(null);
@@ -79,7 +63,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
     if (!isFocused) {
       setDisplayText(getInitialDisplay());
     }
-  }, [value, isFocused]);
+  }, [getInitialDisplay, isFocused]);
 
   const handleChangeText = (text: string) => {
     // Format live

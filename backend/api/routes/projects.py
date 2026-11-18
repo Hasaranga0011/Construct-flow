@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Request, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Request, Depends, UploadFile, File, Form, Query
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from ..models import ProjectCreate, ProjectUpdate, ProjectResponse
 from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token, get_auth_client
@@ -8,6 +8,25 @@ from core.security import get_current_user, require_admin, normalize_role
 from core.attendance_setup import ensure_project_attendance, setup_client
 import os
 import requests
+import logging
+from uuid import uuid4
+
+logger = logging.getLogger(__name__)
+PROJECT_VALIDATION_MESSAGES = {
+    'Invalid project fields', 'Invalid project status', 'Assignments must be arrays',
+    'PM assignment required', 'Invalid BOQ payload', 'Invalid milestone list',
+    'Milestone title required', 'New project milestones must start pending',
+    'Invalid BOQ material list', 'Invalid BOQ material', 'Invalid BOQ total',
+    'Invalid BOQ line', 'BOQ total must equal its line amounts',
+    'Choose an approved worker for project pay rates',
+    'Worker rate override requires an assigned worker',
+    'BOQ document requires a secure storage URL',
+    'A BOQ item cannot change its item type',
+}
+for assignment_role in ('pm', 'client'):
+    PROJECT_VALIDATION_MESSAGES.add(f'Invalid or unapproved assignment for {assignment_role}_id')
+for assignment_role in ('site_manager', 'worker', 'supplier', 'admin'):
+    PROJECT_VALIDATION_MESSAGES.add(f'Invalid or unapproved {assignment_role} assignment')
 
 router = APIRouter(
     prefix="/projects",
@@ -31,110 +50,24 @@ class BulkProjectRequest(BaseModel):
     ids: List[str]
 
 @router.post("/bulk-names")
-def get_bulk_project_names(req: BulkProjectRequest):
+def get_bulk_project_names(req: BulkProjectRequest, request: Request):
     try:
-        service_client = get_service_client()
+        service_client = get_auth_client(request)
         res = service_client.table("projects").select("id, name, location").in_("id", req.ids).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/debug_schema")
-def debug_schema(request: Request):
-    client = get_auth_client(request)
-    return client.rpc("run_query", {"query": "SELECT column_name, column_default, data_type FROM information_schema.columns WHERE table_name = 'site_manager_sites'"}).execute().data
-
 @router.get("/geocode")
-def geocode_location(q: str):
-    """
-    Geocode a place or address string into latitude, longitude, and display name.
-    Chains Google Maps (if enabled) -> Photon (Komoot/OSM) -> Nominatim.
-    """
-    if not q or not q.strip():
-        return []
-    query = q.strip()
+def geocode_location(q: str = Query(min_length=2, max_length=200)):
+    from core.location_search import search_locations
+    return search_locations(q)
 
-    # 1. Google Geocoding (if active and configured)
-    google_key = os.getenv("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", "")
-    if google_key:
-        try:
-            g_res = requests.get(
-                "https://maps.googleapis.com/maps/api/geocode/json",
-                params={"address": query, "key": google_key},
-                timeout=4
-            )
-            g_data = g_res.json()
-            if g_data.get("status") == "OK" and g_data.get("results"):
-                mapped = []
-                for item in g_data["results"]:
-                    geom = item.get("geometry", {}).get("location", {})
-                    mapped.append({
-                        "lat": geom.get("lat"),
-                        "lon": geom.get("lng"),
-                        "display_name": item.get("formatted_address")
-                    })
-                if mapped:
-                    return mapped
-        except Exception:
-            pass
 
-    # 2. Photon (free OpenStreetMap search with typo tolerance)
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ConstructFlow/1.0"}
-    try:
-        r = requests.get(
-            "https://photon.komoot.io/api/",
-            params={"q": query, "limit": 5},
-            headers=headers,
-            timeout=5
-        )
-        if r.status_code == 200:
-            features = r.json().get("features", [])
-            if features:
-                results = []
-                for f in features:
-                    props = f.get("properties", {})
-                    coords = f.get("geometry", {}).get("coordinates", [0, 0])
-                    name = props.get("name") or ""
-                    street = props.get("street") or ""
-                    district = props.get("district") or ""
-                    city = props.get("city") or ""
-                    state = props.get("state") or ""
-                    country = props.get("country") or "Sri Lanka"
-                    parts = [p for p in [name, street, district, city, state, country] if p]
-                    unique_parts = []
-                    for p in parts:
-                        if not unique_parts or unique_parts[-1].lower() != p.lower():
-                            unique_parts.append(p)
-                    results.append({
-                        "lat": coords[1],
-                        "lon": coords[0],
-                        "display_name": ", ".join(unique_parts) or name or "Selected Location"
-                    })
-                if results:
-                    return results
-    except Exception:
-        pass
-
-    # 3. Nominatim fallback
-    try:
-        osm_res = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": query, "format": "json", "limit": 5, "countrycodes": "lk"},
-            headers=headers,
-            timeout=5
-        )
-        if osm_res.status_code == 200:
-            osm_data = osm_res.json()
-            if isinstance(osm_data, list) and osm_data:
-                return [{
-                    "lat": float(item["lat"]),
-                    "lon": float(item["lon"]),
-                    "display_name": item.get("display_name", "")
-                } for item in osm_data]
-    except Exception:
-        pass
-
-    return []
+@router.get('/location-suggestions')
+def location_suggestions(q: str = Query(min_length=3, max_length=200)):
+    from core.location_search import suggest_locations
+    return suggest_locations(q)
 
 @router.get("/reverse-geocode")
 def reverse_geocode(lat: float, lng: float):
@@ -142,6 +75,9 @@ def reverse_geocode(lat: float, lng: float):
     Reverse geocode coordinates into a readable address string.
     Chains Google Maps -> Photon -> Nominatim.
     """
+    from core import geoapify_search
+    if geoapify_search.configured():
+        return geoapify_search.reverse(lat, lng)
     google_key = os.getenv("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", "")
     if google_key:
         try:
@@ -179,16 +115,10 @@ def reverse_geocode(lat: float, lng: float):
         pass
 
     try:
-        osm_res = requests.get(
-            "https://nominatim.openstreetmap.org/reverse",
-            params={"lat": lat, "lon": lng, "format": "json"},
-            headers=headers,
-            timeout=5
-        )
-        if osm_res.status_code == 200:
-            osm_data = osm_res.json()
-            if osm_data.get("display_name"):
-                return {"display_name": osm_data["display_name"]}
+        from core.location_search import nominatim_data
+        osm_data = nominatim_data({"lat": lat, "lon": lng, "format": "json"}, reverse=True)
+        if osm_data.get("display_name"):
+            return {"display_name": osm_data["display_name"]}
     except Exception:
         pass
 
@@ -197,6 +127,8 @@ def reverse_geocode(lat: float, lng: float):
 def send_client_assignment_email(email: str, project_name: str):
     from services.email_service import send_email
     subject = f"Welcome to {project_name} - ConstructFlow"
+    from html import escape
+    project_name = escape(project_name)
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #F97316; padding: 24px; border-radius: 12px 12px 0 0;">
@@ -221,47 +153,39 @@ def send_client_assignment_email(email: str, project_name: str):
 def save_project(client, data, project_id=None):
     # Defined in migrations/20260925_workflow_integrity.sql. A failed assignment
     # rolls back the project change as part of the same database transaction.
-    service_client = setup_client()
-    clean_data = {k: v for k, v in data.items() if k not in ("site_managers", "workers", "suppliers", "admins")}
     try:
-        result = client.rpc("save_project_with_assignments", {
-            "p_project_id": project_id, "p_data": data,
-        }).execute()
+        result = client.rpc("save_project_with_assignments", {"p_project_id": project_id, "p_data": data}).execute()
         if result and getattr(result, "data", None):
             return result.data
-    except Exception as e:
-        import logging
-        logging.warning(f"save_project_with_assignments RPC skipped or failed: {e}")
-
-    # Fallback or direct update via service client
-    if project_id:
-        try:
-            upd = service_client.table("projects").update(clean_data).eq("id", project_id).execute()
-        except Exception as e:
-            if "image_url" in clean_data or "images" in clean_data:
-                clean_data_fallback = {k: v for k, v in clean_data.items() if k not in ("image_url", "images")}
-                upd = service_client.table("projects").update(clean_data_fallback).eq("id", project_id).execute()
-            else:
-                raise e
-        if upd.data and len(upd.data) > 0:
-            return upd.data[0]
-        raise HTTPException(status_code=400, detail="Project update failed: database returned 0 modified rows. Please verify permissions.")
-    else:
-        try:
-            ins = service_client.table("projects").insert(clean_data).execute()
-        except Exception as e:
-            if "image_url" in clean_data or "images" in clean_data:
-                clean_data_fallback = {k: v for k, v in clean_data.items() if k not in ("image_url", "images")}
-                ins = service_client.table("projects").insert(clean_data_fallback).execute()
-            else:
-                raise e
-        if ins.data and len(ins.data) > 0:
-            return ins.data[0]
-        raise HTTPException(status_code=400, detail="Project creation failed: database returned empty result.")
+        raise HTTPException(status_code=503, detail="Project transaction returned no data")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        code = str(getattr(exc, "code", ""))
+        message = str(getattr(exc, 'message', ''))
+        reference = uuid4().hex[:12]
+        # Only known application validation text is safe to show or log.
+        logger.warning('Project transaction rejected: reference=%s code=%s validation=%s',
+                       reference, code if code.isalnum() else 'unknown',
+                       message if message in PROJECT_VALIDATION_MESSAGES else 'unclassified')
+        if code == 'P0001' and message in PROJECT_VALIDATION_MESSAGES:
+            raise HTTPException(status_code=422, detail=message) from exc
+        details = {
+            '42501': (403, 'You do not have permission to save this project or its assignments.'),
+            'P0002': (404, 'Project not found. Refresh your project list.'),
+            '23503': (422, 'A selected assignment or BOQ reference is no longer available. Refresh and select it again.'),
+            '23514': (422, 'A project, milestone or BOQ value is outside the allowed limits. Check the entered values.'),
+            '23505': (409, 'A duplicate assignment or project planning record was found. Check the selected team and BOQ rows.'),
+            '22P02': (422, 'A project, assignment or BOQ value has an invalid format.'),
+            '22007': (422, 'A project or milestone date is invalid. Use YYYY-MM-DD.'),
+            '22008': (422, 'A project or milestone date is outside the allowed range.'),
+        }
+        status_code, detail = details.get(code, (503, 'Project could not be saved. Contact the administrator with the error reference.'))
+        raise HTTPException(status_code=status_code, detail=f'{detail} Reference: {reference} ({code if code.isalnum() else "unknown"}).') from exc
 
 
 def notify_assigned_client(client, project):
-    if not project.get("client_id"):
+    if project.get("is_test") or not project.get("client_id"):
         return
     try:
         profile = client.table("profiles").select("email").eq("id", project["client_id"]).execute()
@@ -304,86 +228,6 @@ def get_boq_template(format: str = "csv", kind: str = "blank"):
     }
 
 
-def _persist_boq_to_project(
-    service_client,
-    project_id: str,
-    boq_data: Dict[str, Any],
-    start_date_str: Optional[str],
-    end_date_str: Optional[str],
-    create_milestones: bool = True,
-):
-    """Persist parsed BOQ data, baseline materials, and milestones onto a project."""
-    import logging
-    from datetime import timedelta
-
-    # 1. Best-effort save boq_data JSONB onto projects row
-    try:
-        service_client.table("projects").update({"boq_data": boq_data}).eq("id", project_id).execute()
-    except Exception as e:
-        logging.warning(f"Could not store boq_data column on project {project_id}: {e}")
-
-    # 2. Create milestones from BOQ if requested
-    if create_milestones and boq_data.get("milestones"):
-        try:
-            cur_date = None
-            if start_date_str:
-                try:
-                    cur_date = datetime.fromisoformat(str(start_date_str)[:10]).date()
-                except Exception:
-                    cur_date = None
-
-            milestones_to_insert = []
-            for m in boq_data["milestones"]:
-                if not m.get("title"):
-                    continue
-                dur = int(m.get("duration_days") or 0)
-                if cur_date and dur > 0:
-                    cur_date = cur_date + timedelta(days=dur)
-                    due_str = cur_date.isoformat()
-                else:
-                    due_str = str(end_date_str) if end_date_str else None
-                milestones_to_insert.append({
-                    "project_id": project_id,
-                    "title": m.get("title"),
-                    "description": m.get("description", ""),
-                    "due_date": due_str,
-                    "planned_date": due_str,
-                    "status": "Pending",
-                    "completion_percentage": 0,
-                })
-            if milestones_to_insert:
-                service_client.table("milestones").insert(milestones_to_insert).execute()
-        except Exception as e:
-            logging.warning(f"Failed to create BOQ milestones: {e}")
-
-    # 3. Create baseline materials from BOQ
-    if boq_data.get("materials"):
-        try:
-            existing_mats = service_client.table("materials").select("id, name").eq("project_id", project_id).execute()
-            existing_names = {str(x.get("name") or "").strip().lower() for x in (existing_mats.data or [])}
-            materials_to_insert = []
-            for mat in boq_data["materials"]:
-                mat_name = str(mat.get("name") or "").strip()
-                if not mat_name or mat_name.lower() in existing_names:
-                    continue
-                qty = float(mat.get("allocated_quantity", 0) or 0)
-                materials_to_insert.append({
-                    "project_id": project_id,
-                    "name": mat_name,
-                    "unit": mat.get("unit", "units"),
-                    "current_stock": 0,
-                    "minimum_threshold": max(10, round(qty * 0.1)),
-                    "quantity": str(round(qty, 1)),
-                    "unit_price": float(mat.get("unit_price", 0) or 0),
-                    "category": mat.get("category", "General"),
-                    "status": "Pending Order",
-                })
-            if materials_to_insert:
-                service_client.table("materials").insert(materials_to_insert).execute()
-        except Exception as e:
-            logging.warning(f"Failed to create BOQ baseline materials: {e}")
-
-
 @router.post("/parse-boq")
 async def parse_boq_endpoint(
     file: Optional[UploadFile] = File(None),
@@ -393,17 +237,20 @@ async def parse_boq_endpoint(
         from core.boq_parser import parse_boq_file, parse_boq_dataframe
         import pandas as pd
         import io
+        from core.project_boq import normalize_boq
 
         if file:
             content = await file.read()
             if not content:
                 raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-            return parse_boq_file(content, file.filename or "boq.csv")
+            return normalize_boq(parse_boq_file(content, file.filename or "boq.csv"))
         elif csv_data and csv_data.strip():
-            df = pd.read_csv(io.StringIO(csv_data), on_bad_lines="skip")
-            return parse_boq_dataframe(df)
+            df = pd.read_csv(io.StringIO(csv_data), on_bad_lines="error", nrows=20001, keep_default_na=False)
+            return normalize_boq(parse_boq_dataframe(df))
         else:
             raise HTTPException(status_code=400, detail="Please upload an Excel/CSV BOQ file or provide CSV text.")
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
@@ -412,105 +259,20 @@ async def parse_boq_endpoint(
 
 @router.post("", response_model=ProjectResponse, include_in_schema=False)
 @router.post("/", response_model=ProjectResponse)
-def create_project(project: ProjectCreate, request: Request):
+def create_project(project: ProjectCreate, request: Request, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in {"super_admin", "pm"}:
+        raise HTTPException(status_code=403, detail="Manager access required")
+    if current_user["role"] == "pm" and (project.pm_id != current_user["id"] or project.admins):
+        raise HTTPException(status_code=403, detail="PMs may create only their own projects")
     client = get_auth_client(request)
-    dump = project.model_dump(mode="json", exclude_none=True, exclude={"milestones", "boq_data", "boq_file_url"})
+    dump = project.model_dump(mode="json", exclude_none=True)
     # Auto populate total_budget from BOQ if not set manually
     if (dump.get("total_budget", 0) <= 0) and project.boq_data and project.boq_data.get("total_budget"):
         dump["total_budget"] = float(project.boq_data["total_budget"])
 
     saved = save_project(client, dump)
-    service_client = setup_client()
-    
-    # 1. Sync PM and Client assignments
-    try:
-        if saved.get("pm_id"):
-            service_client.table("pm_projects").delete().eq("project_id", saved["id"]).execute()
-            service_client.table("pm_projects").insert({"project_id": saved["id"], "pm_id": saved["pm_id"]}).execute()
-            service_client.table("project_role_assignments").delete().eq("project_id", saved["id"]).eq("role", "pm").execute()
-            service_client.table("project_role_assignments").insert({"project_id": saved["id"], "user_id": saved["pm_id"], "role": "pm"}).execute()
 
-        if saved.get("client_id"):
-            service_client.table("project_role_assignments").delete().eq("project_id", saved["id"]).eq("role", "client").execute()
-            service_client.table("project_role_assignments").insert({"project_id": saved["id"], "user_id": saved["client_id"], "role": "client"}).execute()
-    except Exception as e:
-        import logging
-        logging.warning(f"Could not sync pm/client assignments: {e}")
-
-    # 2. Sync site_manager_sites and site_workers
-    try:
-        if project.site_managers is not None:
-            client.table("site_manager_sites").delete().eq("project_id", saved["id"]).execute()
-            if project.site_managers:
-                import uuid
-                sm_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "site_manager_id": sm_id} for sm_id in project.site_managers]
-                client.table("site_manager_sites").insert(sm_inserts).execute()
-        
-        if project.workers is not None:
-            client.table("site_workers").delete().eq("project_id", saved["id"]).execute()
-            if project.workers:
-                import uuid
-                w_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "worker_id": w_id} for w_id in project.workers]
-                client.table("site_workers").insert(w_inserts).execute()
-
-        if getattr(project, "suppliers", None) is not None:
-            client.table("project_role_assignments").delete().eq("project_id", saved["id"]).eq("role", "supplier").execute()
-            if project.suppliers:
-                import uuid
-                supp_inserts = [{"id": str(uuid.uuid4()), "project_id": saved["id"], "user_id": s_id, "role": "supplier"} for s_id in project.suppliers]
-                client.table("project_role_assignments").insert(supp_inserts).execute()
-    except Exception as e:
-        import logging
-        logging.warning(f"Failed to sync site managers, workers or suppliers: {e}")
-
-    # 3. Create milestones from explicit input (when provided)
-    milestones_to_insert = []
-    if project.milestones:
-        for m in project.milestones:
-            if m.get("title"):
-                milestones_to_insert.append({
-                    "project_id": saved["id"],
-                    "title": m.get("title"),
-                    "description": m.get("description", ""),
-                    "due_date": str(m.get("due_date")) if m.get("due_date") else str(project.end_date),
-                    "planned_date": str(m.get("due_date")) if m.get("due_date") else str(project.end_date),
-                    "status": m.get("status", "Pending"),
-                    "completion_percentage": 0
-                })
-
-    if milestones_to_insert:
-        try:
-            service_client.table("milestones").insert(milestones_to_insert).execute()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to create project milestones: {e}")
-
-    # 4. Persist BOQ data, baseline materials, and BOQ milestones (if explicit milestones weren't supplied)
-    if project.boq_data:
-        _persist_boq_to_project(
-            service_client,
-            saved["id"],
-            project.boq_data,
-            str(project.start_date) if project.start_date else None,
-            str(project.end_date) if project.end_date else None,
-            create_milestones=not bool(milestones_to_insert),
-        )
-        saved["boq_data"] = project.boq_data
-
-    # 5. Save BOQ document reference in shared_documents
-    if project.boq_file_url:
-        try:
-            doc_record = {
-                "project_id": saved["id"],
-                "name": f"Bill of Quantities - {saved.get('name', 'Project')}",
-                "category": "BOQ",
-                "file_url": project.boq_file_url,
-                "status": "Active"
-            }
-            service_client.table("shared_documents").insert(doc_record).execute()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to attach BOQ document: {e}")
+    # Assignment synchronization is owned by the database transaction.
 
     # 4. Safe server-side notifications (never fails project creation)
     notifications_failed = False
@@ -518,7 +280,7 @@ def create_project(project: ProjectCreate, request: Request):
         notifications = []
         if saved.get("pm_id"):
             notifications.append({
-                "user_id": "11111111-1111-1111-1111-111111111111",
+                "user_id": None,
                 "project_id": saved["id"],
                 "target_user_id": saved["pm_id"],
                 "target_role": "pm",
@@ -529,7 +291,7 @@ def create_project(project: ProjectCreate, request: Request):
             })
         if saved.get("client_id"):
             notifications.append({
-                "user_id": "11111111-1111-1111-1111-111111111111",
+                "user_id": None,
                 "project_id": saved["id"],
                 "target_user_id": saved["client_id"],
                 "target_role": "client",
@@ -540,7 +302,7 @@ def create_project(project: ProjectCreate, request: Request):
             })
         # Admins
         notifications.append({
-            "user_id": "11111111-1111-1111-1111-111111111111",
+            "user_id": None,
             "project_id": saved["id"],
             "target_user_id": None,
             "target_role": "super_admin",
@@ -553,7 +315,7 @@ def create_project(project: ProjectCreate, request: Request):
         if getattr(project, "suppliers", None):
             for s_id in project.suppliers:
                 notifications.append({
-                    "user_id": "11111111-1111-1111-1111-111111111111",
+                    "user_id": None,
                     "project_id": saved["id"],
                     "target_user_id": s_id,
                     "target_role": "supplier",
@@ -562,14 +324,14 @@ def create_project(project: ProjectCreate, request: Request):
                     "type": "general",
                     "is_read": False,
                 })
-        create_notifications(notifications)
+        notifications_failed = create_notifications(notifications) != len(notifications)
     except Exception as e:
         import logging
         logging.warning(f"Notification dispatch failed: {e}")
         notifications_failed = True
 
     try:
-        ensure_project_attendance(service_client, saved["id"])
+        ensure_project_attendance(setup_client(), saved["id"])
         notify_assigned_client(client, saved)
     except Exception:
         pass
@@ -595,7 +357,7 @@ def record_project_audit_log(admin_user: dict, action: str, project_id: str, sum
 def get_project_dependencies(project_id: str) -> Dict[str, int]:
     service_client = setup_client()
     deps = {}
-    
+
     # 1. Direct project_id child tables
     table_cols = [
         ("milestones", "project_id"),
@@ -660,7 +422,7 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
     existing_res = service_client.table("projects").select("*").eq("id", project_id).execute()
     if not existing_res.data:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     old_project = existing_res.data[0]
     old_pm_id = old_project.get("pm_id")
     old_client_id = old_project.get("client_id")
@@ -701,7 +463,7 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
     end_d = raw_dict.get("end_date") or old_project.get("end_date")
     if start_d and end_d and str(end_d) < str(start_d):
         raise HTTPException(status_code=400, detail="End date precedes start date")
-    
+
     whitelist_fields = {
         "name", "location", "address", "status", "total_budget", "start_date",
         "end_date", "client_id", "pm_id", "description", "latitude", "longitude",
@@ -713,84 +475,14 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
     client = get_auth_client(request)
     saved = save_project(client, filtered_data, project_id)
 
-    # 5. Sync PM & Client assignment tables reliably via service_client
-    try:
-        if "pm_id" in filtered_data:
-            target_pm = filtered_data["pm_id"]
-            service_client.table("pm_projects").delete().eq("project_id", project_id).execute()
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "pm").execute()
-            if target_pm:
-                service_client.table("pm_projects").insert({"project_id": project_id, "pm_id": target_pm}).execute()
-                service_client.table("project_role_assignments").insert({"project_id": project_id, "user_id": target_pm, "role": "pm"}).execute()
-
-        if "client_id" in filtered_data:
-            target_client = filtered_data["client_id"]
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "client").execute()
-            if target_client:
-                service_client.table("project_role_assignments").insert({"project_id": project_id, "user_id": target_client, "role": "client"}).execute()
-    except Exception as e:
-        import logging
-        logging.warning(f"Failed to sync pm_projects/client assignments: {e}")
-
-    # 6. Sync site_manager_sites, site_workers, suppliers, and admins
-    try:
-        if project.site_managers is not None:
-            service_client.table("site_manager_sites").delete().eq("project_id", project_id).execute()
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "site_manager").execute()
-            if project.site_managers:
-                import uuid
-                sm_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "site_manager_id": sm_id} for sm_id in project.site_managers]
-                service_client.table("site_manager_sites").insert(sm_inserts).execute()
-                pra_inserts = [{"project_id": project_id, "user_id": sm_id, "role": "site_manager"} for sm_id in project.site_managers]
-                service_client.table("project_role_assignments").insert(pra_inserts).execute()
-
-        if project.workers is not None:
-            service_client.table("site_workers").delete().eq("project_id", project_id).execute()
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "worker").execute()
-            if project.workers:
-                import uuid
-                w_inserts = [{"id": str(uuid.uuid4()), "project_id": project_id, "worker_id": w_id} for w_id in project.workers]
-                service_client.table("site_workers").insert(w_inserts).execute()
-                pra_inserts = [{"project_id": project_id, "user_id": w_id, "role": "worker"} for w_id in project.workers]
-                service_client.table("project_role_assignments").insert(pra_inserts).execute()
-
-        if getattr(project, "suppliers", None) is not None:
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "supplier").execute()
-            if project.suppliers:
-                supp_inserts = [{"project_id": project_id, "user_id": s_id, "role": "supplier"} for s_id in project.suppliers]
-                service_client.table("project_role_assignments").insert(supp_inserts).execute()
-                
-                # Best-effort supplier notifications
-                try:
-                    notifs = [{
-                        "user_id": "11111111-1111-1111-1111-111111111111",
-                        "project_id": project_id,
-                        "target_user_id": s_id,
-                        "target_role": "supplier",
-                        "title": "New Project Assignment",
-                        "message": f"You have been assigned as a supplier for project: {saved.get('name', 'Unknown')}",
-                        "type": "general",
-                        "is_read": False,
-                    } for s_id in project.suppliers]
-                    create_notifications(notifs)
-                except Exception:
-                    pass
-
-        if getattr(project, "admins", None) is not None and user_role == "super_admin":
-            service_client.table("project_role_assignments").delete().eq("project_id", project_id).eq("role", "admin").execute()
-            if project.admins:
-                adm_inserts = [{"project_id": project_id, "user_id": a_id, "role": "admin"} for a_id in project.admins]
-                service_client.table("project_role_assignments").insert(adm_inserts).execute()
-    except Exception:
-        import logging
-        logging.exception("Failed to sync site_manager_sites, site_workers, suppliers or admins")
+    # Assignment synchronization is owned by the database transaction.
 
     # 7. Best-effort notifications for PM and Client change
     try:
         new_pm_id = saved.get("pm_id")
         if new_pm_id and str(new_pm_id) != str(old_pm_id):
             create_notifications([{
-                "user_id": "11111111-1111-1111-1111-111111111111",
+                "user_id": None,
                 "project_id": project_id,
                 "target_user_id": new_pm_id,
                 "target_role": "pm",
@@ -830,9 +522,9 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
             is_test_data = is_test_flag or is_test_by_name
 
             source_val = "sample" if is_test_data else "real"
-            verified_val = 0 if is_test_data else 1
+            verified_val = 0
             evidence = "Test project (excluded from training)" if is_test_data else f"ConstructFlow completed project: {p_name}"
-            
+
             conn = _get_local_conn()
             cur = conn.cursor()
             cur.execute("""
@@ -860,12 +552,12 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
 @router.delete("/{project_id}")
 def delete_project(project_id: str, archive_only: bool = False, current_user: dict = Depends(require_admin)):
     service_client = setup_client()
-    
+
     # 1. Verify project exists
     proj_res = service_client.table("projects").select("*").eq("id", project_id).execute()
     if not proj_res.data:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     project = proj_res.data[0]
     project_name = project.get("name") or "Unnamed Project"
 
@@ -878,7 +570,7 @@ def delete_project(project_id: str, archive_only: bool = False, current_user: di
 
     # 3. Dependency check for permanent deletion
     deps = get_project_dependencies(project_id)
-    
+
     # Financial and operational history check
     blocking_keys = {
         "purchase_orders": "purchase orders",
@@ -893,7 +585,7 @@ def delete_project(project_id: str, archive_only: bool = False, current_user: di
         "milestones": "milestones"
     }
 
-    blocking_items = []
+    blocking_items = ['BOQ baseline/revision history'] if project.get('boq_data') or project.get('boq_revision') else []
     for k, label in blocking_keys.items():
         if deps.get(k, 0) > 0:
             blocking_items.append(f"{deps[k]} {label}")
@@ -985,9 +677,9 @@ def prepare_attendance(project_id: str, current_user: dict = Depends(get_current
 
 
 class MilestoneCreate(BaseModel):
-    title: str
-    description: str
-    due_date: str
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=10000)
+    due_date: date
 
 @router.post("/{project_id}/milestones")
 def create_milestone(project_id: str, payload: MilestoneCreate, current_user: dict = Depends(get_current_user)):
@@ -997,8 +689,8 @@ def create_milestone(project_id: str, payload: MilestoneCreate, current_user: di
             "project_id": project_id,
             "title": payload.title,
             "description": payload.description,
-            "due_date": payload.due_date,
-            "planned_date": payload.due_date,  # Added to satisfy legacy table constraint
+            "due_date": payload.due_date.isoformat(),
+            "planned_date": payload.due_date.isoformat(),  # Added to satisfy legacy table constraint
             "status": "Pending"
         }).execute()
         return res.data[0]
@@ -1018,54 +710,21 @@ def update_milestone(project_id: str, milestone_id: str, payload: MilestoneUpdat
     supabase = authorized_project_client(project_id, current_user, write=True)
     try:
         # Update milestone status
-        updates = {"status": payload.status}
-        if payload.completion_percentage is not None:
-            updates["completion_percentage"] = payload.completion_percentage
-        elif payload.status == "Completed":
-            updates["completion_percentage"] = 100
-        if payload.description is not None:
-            updates["description"] = payload.description
-        res = supabase.table("milestones").update(updates).eq("id", milestone_id).eq("project_id", project_id).execute()
-
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Milestone not found")
-
-        # Insert any new media
-        if payload.media_urls:
-            media_inserts = [{"milestone_id": milestone_id, "url": url} for url in payload.media_urls]
-            supabase.table("milestone_media").insert(media_inserts).execute()
-
-        # Recalculate project completion percentage
-        all_ms = supabase.table("milestones").select("status").eq("project_id", project_id).execute()
-        if all_ms.data:
-            total = len(all_ms.data)
-            completed = sum(1 for ms in all_ms.data if ms.get("status") == "Completed")
-            percentage = int((completed / total) * 100)
-            supabase.table("projects").update({"completion_percentage": percentage}).eq("id", project_id).execute()
-
-        # Notify the client about the milestone update.
-        try:
-            proj = supabase.table("projects").select("client_id, name").eq("id", project_id).execute()
-            if proj.data and proj.data[0].get("client_id"):
-                create_notifications([{
-                    "user_id": current_user["id"],
-                    "project_id": project_id,
-                    "target_user_id": proj.data[0]["client_id"],
-                    "target_role": "client",
-                    "title": "Milestone Updated",
-                    "message": f"A milestone has been updated to '{payload.status}' on your project '{proj.data[0].get('name', '')}'.",
-                    "type": "general",
-                    "is_read": False,
-                }])
-        except Exception:
-            import logging
-            logging.exception("Milestone updated but client notification failed")
-
-        return res.data[0]
+        if payload.status not in {"Pending", "In Progress", "Completed"}:
+            raise HTTPException(status_code=422, detail="Invalid milestone status")
+        if payload.status == "Completed" and payload.completion_percentage not in (None, 100):
+            raise HTTPException(status_code=422, detail="Completed milestones must be 100 percent")
+        if payload.status == "Pending" and payload.completion_percentage not in (None, 0):
+            raise HTTPException(status_code=422, detail="Pending milestones must be zero percent")
+        from api.routes.workflow import transition
+        return transition(supabase, "update_project_milestone", {
+            "p_project_id": project_id, "p_milestone_id": milestone_id,
+            "p_data": payload.model_dump(mode="json", exclude_none=True),
+        })
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(503, "Milestone update was not saved") from exc
 
 @router.delete("/{project_id}/milestones/{milestone_id}")
 def delete_milestone(project_id: str, milestone_id: str, current_user: dict = Depends(get_current_user)):
@@ -1073,15 +732,7 @@ def delete_milestone(project_id: str, milestone_id: str, current_user: dict = De
     try:
         res = supabase.table("milestones").delete().eq("id", milestone_id).eq("project_id", project_id).execute()
 
-        # Recalculate project completion percentage
-        all_ms = supabase.table("milestones").select("status").eq("project_id", project_id).execute()
-        if all_ms.data:
-            total = len(all_ms.data)
-            completed = sum(1 for ms in all_ms.data if ms.get("status") == "Completed")
-            percentage = int((completed / total) * 100)
-            supabase.table("projects").update({"completion_percentage": percentage}).eq("id", project_id).execute()
-        else:
-            supabase.table("projects").update({"completion_percentage": 0}).eq("id", project_id).execute()
+        # The database trigger recalculates progress inside the deletion transaction.
 
         return {"success": True}
     except HTTPException:
@@ -1104,13 +755,10 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
     Actual = POs in Delivered / Received + salary slips paid out.
     Fires budget-overrun notifications at 90% and 100% thresholds.
     """
-    now = time.time()
-    if project_id in _FINANCIALS_CACHE:
-        cached_time, cached_val = _FINANCIALS_CACHE[project_id]
-        if now - cached_time < _FINANCIALS_CACHE_TTL:
-            return cached_val
-
     supabase = authorized_project_client(project_id, current_user, write=False)
+    if current_user["role"] == "client":
+        # Authorization has already passed. Only project-scoped aggregate totals are returned.
+        supabase = setup_client()
     try:
         # Fetch project budget
         proj = supabase.table("projects").select("total_budget, name, pm_id, client_id").eq("id", project_id).execute()
@@ -1120,36 +768,23 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
         pm_id = proj.data[0].get("pm_id")
         project_name = proj.data[0].get("name", "")
 
-        # Committed: POs not yet delivered
-        committed_res = supabase.table("purchase_orders") \
-            .select("total_price") \
-            .eq("project_id", project_id) \
-            .in_("status", ["Pending Delivery", "Confirmed"]) \
-            .execute()
-        committed_cost = sum(float(r.get("total_price") or 0) for r in (committed_res.data or []))
+        # Count accepted goods, and keep unreceived quantities committed.
+        order_rows = supabase.table("purchase_orders").select("status,total_price,quantity_ordered,quantity_received").eq("project_id", project_id).execute().data or []
+        actual_po, committed_cost = 0.0, 0.0
+        for order in order_rows:
+            value = float(order.get("total_price") or 0)
+            if order.get("status") == "Received":
+                actual_po += value
+            elif order.get("status") == "Delivered":
+                quantity = float(order.get("quantity_ordered") or 0)
+                fraction = min(1.0, max(0.0, float(order.get("quantity_received") or 0) / quantity)) if quantity > 0 else 0
+                actual_po += value * fraction
+                committed_cost += value * (1 - fraction)
+            elif order.get("status") in {"Pending Delivery", "Confirmed"}:
+                committed_cost += value
 
-        # Actual: delivered/received POs
-        actual_po_res = supabase.table("purchase_orders") \
-            .select("total_price") \
-            .eq("project_id", project_id) \
-            .in_("status", ["Delivered", "Received"]) \
-            .execute()
-        actual_po = sum(float(r.get("total_price") or 0) for r in (actual_po_res.data or []))
-
-        # Actual: salary slips (via workers on this project)
-        worker_res = supabase.table("site_workers").select("worker_id").eq("project_id", project_id).execute()
-        project_worker_ids = [r["worker_id"] for r in (worker_res.data or [])]
-        
-        actual_payroll = 0
-        if project_worker_ids:
-            salary_res = supabase.table("salary_slips") \
-                .select("total_amount") \
-                .in_("worker_id", project_worker_ids) \
-                .execute()
-            actual_payroll = sum(
-                float(r.get("total_amount") or 0)
-                for r in (salary_res.data or [])
-            )
+        salary_res = supabase.table("salary_slips").select("total_amount,total_pay").eq("project_id", project_id).eq("status", "Paid").execute()
+        actual_payroll = sum(float(r.get("total_amount") if r.get("total_amount") is not None else r.get("total_pay") or 0) for r in (salary_res.data or []))
 
         # Actual: project expenses
         expense_res = supabase.table("project_expenses") \
@@ -1172,51 +807,13 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
             "remaining_budget": remaining_budget,
         }
 
-        # Budget overrun notifications (90% and 100% thresholds)
-        if total_budget > 0:
-            utilisation = (committed_cost + actual_spend) / total_budget
-            if utilisation >= 1.0:
-                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 100, current_user["id"])
-            elif utilisation >= 0.9:
-                _fire_overrun_notification(supabase, project_id, project_name, pm_id, 90, current_user["id"])
+        # Budget alerts are deduplicated by the transactional ledger triggers.
 
-        _FINANCIALS_CACHE[project_id] = (now, result)
         return result
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-def _fire_overrun_notification(supabase, project_id: str, project_name: str, pm_id, threshold_pct: int, current_user_id: str):
-    """Insert a budget-overrun warning notification for PM and admin."""
-    import logging
-    try:
-        notifications = [
-            {
-                "user_id": current_user_id,
-                "project_id": project_id,
-                "target_role": "super_admin",
-                "title": f"Budget {threshold_pct}% Exceeded",
-                "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
-                "type": "general",
-                "is_read": False,
-            }
-        ]
-        if pm_id:
-            notifications.append({
-                "user_id": current_user_id,
-                "project_id": project_id,
-                "target_user_id": pm_id,
-                "target_role": "pm",
-                "title": f"Budget {threshold_pct}% Exceeded",
-                "message": f"Project '{project_name}' has used {threshold_pct}% or more of its budget.",
-                "type": "general",
-                "is_read": False,
-            })
-        create_notifications(notifications)
-    except Exception:
-        logging.exception("Failed to insert budget overrun notifications")
 
 
 @router.get("/{project_id}/expenses", response_model=List[ExpenseResponse])
@@ -1240,32 +837,20 @@ async def apply_boq_to_existing_project(
     if current_user["role"] not in {"super_admin", "pm"}:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     client = authorized_project_client(project_id, current_user, write=True)
-    service_client = setup_client()
-
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     from core.boq_parser import parse_boq_file
-    boq_data = parse_boq_file(content, file.filename or "boq.xlsx")
+    from core.project_boq import normalize_boq
+    try:
+        boq_data = normalize_boq(parse_boq_file(content, file.filename or "boq.xlsx"))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
-    proj_res = client.table("projects").select("id, start_date, end_date, total_budget").eq("id", project_id).single().execute()
-    proj = proj_res.data or {}
+    from api.routes.workflow import transition
+    return transition(client, "apply_project_boq", {"p_project_id": project_id, "p_boq": boq_data})
 
-    # Update total_budget from BOQ
-    if boq_data.get("total_budget", 0) > 0:
-        service_client.table("projects").update({"total_budget": float(boq_data["total_budget"])}).eq("id", project_id).execute()
-
-    _persist_boq_to_project(
-        service_client,
-        project_id,
-        boq_data,
-        proj.get("start_date"),
-        proj.get("end_date"),
-        create_milestones=True,
-    )
-    _FINANCIALS_CACHE.pop(project_id, None)
-    return {"ok": True, "boq_data": boq_data}
 
 
 @router.post("/{project_id}/expenses", response_model=ExpenseResponse)
@@ -1273,68 +858,12 @@ def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: d
     if current_user["role"] not in {"super_admin", "pm"}:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     supabase = authorized_project_client(project_id, current_user, write=True)
-    service_client = setup_client()
+    if expense.project_id != project_id:
+        raise HTTPException(status_code=400, detail="Expense project does not match URL")
     try:
-        if expense.project_id != project_id:
-            raise HTTPException(status_code=400, detail="Expense project does not match URL")
-        expense_data = expense.model_dump(exclude={"category", "material_id", "quantity_used"})
-        if expense_data.get('expense_date'):
-            expense_data['expense_date'] = expense_data['expense_date'].isoformat()
-        else:
-            del expense_data['expense_date']
-
-        # Try inserting with optional material metadata if columns exist, fallback safely
-        full_expense_data = {**expense_data}
-        if expense.category:
-            full_expense_data["category"] = expense.category
-        if expense.material_id:
-            full_expense_data["material_id"] = expense.material_id
-        if expense.quantity_used is not None:
-            full_expense_data["quantity_used"] = expense.quantity_used
-
-        try:
-            res = supabase.table("project_expenses").insert(full_expense_data).execute()
-        except Exception:
-            res = supabase.table("project_expenses").insert(expense_data).execute()
-
-        if not res.data:
-            raise HTTPException(status_code=400, detail="Failed to create expense")
-
-        # Deduct material stock when material_id + quantity_used are supplied
-        if expense.material_id and expense.quantity_used and expense.quantity_used > 0:
-            try:
-                mat_res = service_client.table("materials").select("id, name, current_stock, minimum_threshold, unit").eq("id", expense.material_id).maybe_single().execute()
-                if mat_res.data:
-                    mat = mat_res.data
-                    cur_stock = float(mat.get("current_stock") or 0)
-                    new_stock = max(0.0, round(cur_stock - float(expense.quantity_used), 2))
-                    min_thresh = float(mat.get("minimum_threshold") or 0)
-                    new_status = "Out of Stock" if new_stock <= 0 else ("Low Stock" if new_stock < min_thresh else "In Stock")
-                    service_client.table("materials").update({
-                        "current_stock": new_stock,
-                        "status": new_status,
-                    }).eq("id", expense.material_id).execute()
-
-                    if new_stock < min_thresh:
-                        create_notification(
-                            type="Alert",
-                            project_id=project_id,
-                            title=f"Low Stock Alert: {mat.get('name', 'Material')}",
-                            message=f"{mat.get('name', 'Material')} dropped to {new_stock} {mat.get('unit', '')} after expense deduction (threshold: {min_thresh}).",
-                        )
-            except Exception as mat_err:
-                import logging
-                logging.warning(f"Material stock deduction failed for {expense.material_id}: {mat_err}")
-
-        # Recalculate spent_cost
-        all_exp = supabase.table("project_expenses").select("amount").eq("project_id", project_id).execute()
-        total_spent = sum(float(e.get("amount", 0)) for e in all_exp.data) if all_exp.data else 0.0
-
-        supabase.table("projects").update({"spent_cost": total_spent}).eq("id", project_id).execute()
+        response = supabase.rpc("record_project_expense", {"p_project_id": project_id, "p_data": expense.model_dump(mode="json", exclude_none=True)}).execute()
         _FINANCIALS_CACHE.pop(project_id, None)
-
-        return res.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return response.data
+    except Exception as exc:
+        code = str(getattr(exc, "code", ""))
+        raise HTTPException(status_code={"42501":403,"P0001":409,"23514":422}.get(code,503), detail="Expense was not recorded. Check stock, references and database migration.") from exc

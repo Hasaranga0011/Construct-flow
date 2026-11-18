@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  TextInput,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PROJECT_IMAGE_PRESETS, ProjectImagePreset } from '../../utils/projectImages';
 import { pickAndUploadProjectPhotos } from '../../services/projectPhoto';
@@ -120,12 +111,12 @@ export const ProjectImageUploader: React.FC<ProjectImageUploaderProps> = ({
   return (
     <View className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-5">
       {/* Header with counter */}
-      <View className="flex-row items-center justify-between mb-3">
-        <View className="flex-row items-center gap-2">
+      <View className="flex-row flex-wrap items-center justify-between gap-3 mb-3">
+        <View className="flex-row items-center gap-2 flex-1 min-w-0">
           <View className="w-8 h-8 rounded-lg bg-orange-100 items-center justify-center">
             <Ionicons name="images-outline" size={18} color="#EA580C" />
           </View>
-          <View>
+          <View className="flex-1 min-w-0">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-900 font-bold text-sm">
               Project Photos & Cover
             </Text>
@@ -147,7 +138,7 @@ export const ProjectImageUploader: React.FC<ProjectImageUploaderProps> = ({
         <View className="relative w-full rounded-xl overflow-hidden mb-4 border border-slate-200" style={{ height: 160 }}>
           <Image source={{ uri: coverImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           <View className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-          
+
           <View className="absolute top-3 left-3 bg-brand-orange px-2.5 py-1 rounded-full flex-row items-center gap-1 shadow-sm">
             <Ionicons name="star" size={12} color="#FFFFFF" />
             <Text className="text-[10px] font-extrabold text-white uppercase tracking-wider">
@@ -192,7 +183,7 @@ export const ProjectImageUploader: React.FC<ProjectImageUploaderProps> = ({
           return (
             <View
               key={`${url}-${idx}`}
-              className={`relative rounded-xl overflow-hidden border-2 bg-slate-100 ${isCover ? 'border-brand-orange ring-2 ring-orange-400/30' : 'border-slate-200'}`}
+              className={`relative rounded-xl overflow-hidden border-2 bg-slate-100 ${isCover ? 'border-brand-orange' : 'border-slate-200'}`}
               style={{ width: 88, height: 72 }}
             >
               <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -257,7 +248,7 @@ export const ProjectImageUploader: React.FC<ProjectImageUploaderProps> = ({
 
       {/* Action Buttons Row */}
       <View className="flex-row flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
-        <View className="flex-row flex-wrap items-center gap-2">
+        <View className="flex-row flex-wrap items-center gap-2 flex-1 min-w-0">
           {images.length < maxImages && (
             <TouchableOpacity
               onPress={handlePickImages}

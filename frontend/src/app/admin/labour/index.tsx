@@ -24,7 +24,7 @@ export default function LabourForceScreen() {
     pendingPayroll: 0,
   });
   const [loading, setLoading] = useState(true);
-  
+
   const [isModalVisible, setModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,7 +54,7 @@ export default function LabourForceScreen() {
           supabase.from('workers').select('*'),
           supabase.from('site_workers').select('worker_id, project_id')
         ]);
-        
+
         let overtimeHrs = 0;
         if (labourReq.data) {
           labourReq.data.forEach((r: any) => {
@@ -76,8 +76,8 @@ export default function LabourForceScreen() {
           setStats({
             totalWorkers: workersReq.count || 0,
             checkedInToday: Math.max(attCheckinsReq.count || 0, checkinsReq.count || 0),
-            activeSites: (sitesReq.data || []).filter(p => ['active', 'in progress'].includes(String(p.status).toLowerCase())).length, 
-            pendingPayroll: Math.round(overtimeHrs), 
+            activeSites: (sitesReq.data || []).filter(p => ['active', 'in progress'].includes(String(p.status).toLowerCase())).length,
+            pendingPayroll: Math.round(overtimeHrs),
           });
         }
       } catch (error) {
@@ -98,19 +98,19 @@ export default function LabourForceScreen() {
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Labour Force" 
-        actionLabel="+ Add Worker" 
-        onActionPress={() => router.push('/admin/users/create')} 
+      <TopNav
+        title="Labour Force"
+        actionLabel="+ Add Worker"
+        onActionPress={() => router.push('/admin/users/create')}
       />
-      
+
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
-          
+
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <View>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Workers</Text>
@@ -119,13 +119,13 @@ export default function LabourForceScreen() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
               </View>
             </View>
-            
-            <SearchInput 
+
+            <SearchInput
               placeholder="Search workers..."
               entityLabel="workers"
-              items={workers} 
-              value={searchQuery} 
-              onChangeText={setSearchQuery} 
+              items={workers}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
               className={isMobile ? "w-full" : "w-80"}
               config={{
                 table: 'profiles',
@@ -142,26 +142,26 @@ export default function LabourForceScreen() {
 
           {/* Top Stat Cards Row */}
           <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
-            <StatCard 
-              label="Total Workers" 
-              value={stats.totalWorkers.toString()} 
-              indicatorText="" 
+            <StatCard
+              label="Total Workers"
+              value={stats.totalWorkers.toString()}
+              indicatorText=""
             />
-            <StatCard 
-              label="Checked In Today" 
-              value={stats.checkedInToday.toString()} 
-              indicatorText="" 
+            <StatCard
+              label="Checked In Today"
+              value={stats.checkedInToday.toString()}
+              indicatorText=""
             />
-            <StatCard 
-              label="Today's Overtime" 
-              value={formatHoursMinutes(stats.pendingPayroll)} 
-              indicatorText="Additional hours" 
-              indicatorType="warning" 
+            <StatCard
+              label="Today's Overtime"
+              value={formatHoursMinutes(stats.pendingPayroll)}
+              indicatorText="Additional hours"
+              indicatorType="warning"
             />
-            <StatCard 
-              label="Active Sites" 
-              value={stats.activeSites.toString()} 
-              indicatorText="" 
+            <StatCard
+              label="Active Sites"
+              value={stats.activeSites.toString()}
+              indicatorText=""
             />
           </View>
 
@@ -181,9 +181,14 @@ export default function LabourForceScreen() {
           <View style={isMobile ? { flexDirection: 'column', gap: 16 } : { flexDirection: 'row' }}>
             {/* Main Content Area (Attendance Table) */}
             <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
+              <View className="items-end mb-3">
+                <Pressable accessibilityRole="button" onPress={() => setModalVisible(true)} style={{ minHeight: 44 }} className="bg-brand-orange px-4 py-3 rounded-xl justify-center">
+                  <Text className="text-white font-semibold">Record attendance</Text>
+                </Pressable>
+              </View>
               <AttendanceTable refreshTrigger={liveTrigger} searchQuery={searchQuery} />
             </View>
-            
+
             {/* Side Panel (Payroll & Chart) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
               <PayrollSummary refreshTrigger={liveTrigger} />
@@ -195,10 +200,10 @@ export default function LabourForceScreen() {
         </ScrollView>
       )}
 
-      <CheckInWorkerModal 
-        visible={isModalVisible} 
-        onClose={() => setModalVisible(false)} 
-        onSuccess={handleWorkerCreated} 
+      <CheckInWorkerModal
+        visible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        onSuccess={handleWorkerCreated}
       />
     </View>
   );

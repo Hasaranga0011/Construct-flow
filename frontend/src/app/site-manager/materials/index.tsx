@@ -1,6 +1,7 @@
+import { GoodsReceiptForm } from '@/components/materials/GoodsReceiptForm';
+import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import { RecordCard } from '@/components/common/RecordCard';
 import { useResponsive } from '@/hooks/useResponsive';
-import { api } from '@/services/api';
 import { positiveQuantity } from '@/utils/siteWorkflow';
 import { firstRelation } from '@/utils/relations';
 import { notify } from '@/utils/notify';
@@ -14,7 +15,7 @@ import { ModalViewport } from '@/components/common/ModalViewport';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';
 
-const COMMON_MATERIALS: Array<{ name: string; unit: string }> = [
+const COMMON_MATERIALS: { name: string; unit: string }[] = [
   { name: 'Cement (50kg Bag)', unit: 'bags' },
   { name: 'River Sand', unit: 'cubes' },
   { name: 'Aggregate / Crushed Stone', unit: 'cubes' },
@@ -35,7 +36,6 @@ export default function SMMaterialsPage() {
   const { assignedProjectIds, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [receiving, setReceiving] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -47,6 +47,8 @@ export default function SMMaterialsPage() {
 
   // Form State
   const [itemName, setItemName] = useState('');
+  const [boqItemId, setBoqItemId] = useState('');
+  useEffect(() => { setBoqItemId(''); }, [activeProjectId]);
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('units');
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false);
@@ -55,7 +57,7 @@ export default function SMMaterialsPage() {
 
   const materialOptions = useMemo(() => {
     const seen = new Set<string>();
-    const options: Array<{ name: string; unit: string; stock?: number; inProject: boolean }> = [];
+    const options: { name: string; unit: string; stock?: number; inProject: boolean }[] = [];
     for (const m of projectStock) {
       const name = String(m.name || '').trim();
       if (!name || seen.has(name.toLowerCase())) continue;
@@ -158,6 +160,7 @@ export default function SMMaterialsPage() {
           project_id: activeProjectId,
           requested_by: user.id,
           item_name: itemName.trim(),
+          ...(boqItemId ? { boq_item_id: boqItemId } : {}),
           quantity: Number(quantity),
           unit: unit.trim(),
           status: 'Pending Approval'
@@ -176,18 +179,6 @@ export default function SMMaterialsPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleReceiveDelivery = async (poId: string) => {
-    if (receiving) return;
-    setReceiving(poId);
-    try {
-      await api.purchaseOrders.receive(poId);
-      notify('Success', 'Goods received and stock updated!');
-      await fetchMaterialsData();
-    } catch (e: any) {
-      notify('Error', e.message);
-    } finally { setReceiving(null); }
   };
 
   const getStatusColor = (status: string) => {
@@ -297,6 +288,7 @@ export default function SMMaterialsPage() {
           <ScrollView showsVerticalScrollIndicator={false} className="flex-1" keyboardShouldPersistTaps="handled">
             <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-gray-800 mb-6">New Material Request</Text>
+              <BoqItemSelect projectId={activeProjectId || undefined} value={boqItemId} materialOnly onChange={(id, row) => { setBoqItemId(id); if (row) { setItemName(row.description); setUnit(row.unit || 'units'); setIsCustomMaterial(false); setQuantity(String(Math.max(0, Number(row.quantity) - Number(row.ordered_quantity || 0)))); } }} />
 
               <View>
                 <View className="mb-4">
@@ -322,7 +314,7 @@ export default function SMMaterialsPage() {
                       maxFontSizeMultiplier={1.3}
                       style={{ minHeight: 44, minWidth: 44 }}
                       value={itemName}
-                      onChangeText={setItemName}
+                      onChangeText={text => { setItemName(text); setBoqItemId(''); }}
                       placeholder="Enter custom material name..."
                       className="border border-gray-200 rounded-xl p-4 bg-gray-50 mt-3"
                     />
@@ -356,7 +348,7 @@ export default function SMMaterialsPage() {
                   disabled={submitting}
                   className="bg-brand-orange py-4 rounded-xl mt-4 items-center"
                 >
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">{submitting ? 'Submitting...' : 'Submit Request to PM'}</Text>
+                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-base">{submitting ? 'Submitting...' : 'Submit Request to Project Manager'}</Text>
                 </Pressable>
               </View>
             </View>
@@ -392,13 +384,7 @@ export default function SMMaterialsPage() {
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-1">{del.material?.name || del.items || del.material_id} • {del.quantity_ordered} {del.material?.unit}</Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-1">Dispatched: {del.delivered_at ? new Date(del.delivered_at).toLocaleDateString() : 'Not recorded'}</Text>
                   </View>
-                  <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                    onPress={() => handleReceiveDelivery(del.id)}
-                    disabled={receiving !== null}
-                    className="bg-brand-success px-4 py-2 rounded-lg"
-                  >
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold">{receiving === del.id ? 'Receiving...' : 'Confirm Receipt'}</Text>
-                  </Pressable>
+                  <GoodsReceiptForm order={del} onReceived={() => fetchMaterialsData()} />
                 </View>
               ))
             )}
@@ -443,6 +429,7 @@ export default function SMMaterialsPage() {
                     onPress={() => {
                       setIsCustomMaterial(false);
                       setItemName(opt.name);
+                      setBoqItemId('');
                       setUnit(opt.unit || 'units');
                       setMaterialSearch('');
                       setMaterialDropdownOpen(false);

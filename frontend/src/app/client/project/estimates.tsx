@@ -1,4 +1,3 @@
-import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
@@ -106,6 +105,7 @@ export default function ClientProjectEstimatesPage() {
         estimated_cost: responseData.estimated_cost,
         confidence_score: responseData.confidence_score,
         status: 'Pending',
+        project_id: project.id,
       }).select('id, project_name, estimated_cost, confidence_score, status, created_at').single();
       if (saveError) throw saveError;
       setResult(saved as Estimation);

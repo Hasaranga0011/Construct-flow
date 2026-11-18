@@ -99,7 +99,7 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
         <View className="bg-white rounded-2xl w-full max-w-xl max-h-full shadow-xl overflow-hidden">
           {/* Header */}
           <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-100">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text">Edit Project</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xl font-bold text-brand-text dark:text-slate-100">Edit Project</Text>
             <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={onClose} className="p-2 -mr-2">
               <Ionicons name="close" size={24} color="#6B7280" />
             </Pressable>
@@ -160,9 +160,9 @@ export const EditProjectModal = ({ visible, onClose, project, onProjectUpdated }
             <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={onClose} className="px-5 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50" disabled={isSubmitting}>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 font-semibold">Cancel</Text>
             </Pressable>
-            
-            <Pressable 
-              onPress={handleSubmit} 
+
+            <Pressable
+              onPress={handleSubmit}
               disabled={isSubmitting}
               className="bg-brand-orange px-6 py-2.5 rounded-lg shadow-sm flex-row justify-center items-center opacity-100"
               style={[{ opacity: isSubmitting ? 0.7 : 1 }, { minHeight: 44, minWidth: 44 }]}

@@ -4,11 +4,11 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { dataError, assignedWorkers } from '@/services/siteData';
 import { notify, confirmAction } from '@/utils/notify';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { QRScanner } from '@/components/worker/QRScanner';
+
 import { NoAssignedSites } from '@/components/common/NoAssignedSites';
 import { useAssignedSites } from '@/hooks/useAssignedSites';
 import { useAuth } from '@/context/AuthContext';

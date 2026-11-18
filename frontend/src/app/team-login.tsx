@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Platform,  View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
+import { Platform, View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-
-WebBrowser.maybeCompleteAuthSession();
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getRememberedEmail, saveRememberedEmail, clearRememberedEmail } from '../lib/rememberedEmail';
@@ -13,6 +11,8 @@ import { loginEmailAutofill, loginPasswordAutofill } from '../lib/formAutofill';
 import { setLoginPortal, clearLoginPortal } from '../lib/loginPortal';
 import { useAuth } from '../context/AuthContext';
 import AccessDeniedModal from '../components/auth/AccessDeniedModal';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -99,21 +99,21 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setErrorMsg('');
-      
+
       // Save selected role to local storage so it survives the OAuth redirect
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       await AsyncStorage.setItem('pending_google_role', 'pm');
       await setLoginPortal('team');
 
       const redirectTo = Linking.createURL('auth/callback');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { 
-          redirectTo, 
-          skipBrowserRedirect: Platform.OS !== 'web' 
+        options: {
+          redirectTo,
+          skipBrowserRedirect: Platform.OS !== 'web'
         },
       });
-      
+
       if (error || !data?.url) throw error ?? new Error('No OAuth URL returned');
 
       if (Platform.OS !== 'web') {

@@ -1,11 +1,11 @@
 import os
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, APIRouter, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from core.config import settings
 from core.database import get_service_client
-from core.security import get_current_user
+from core.security import get_current_user, get_authenticated_identity
 from api.routes import projects, materials, labour, clients, estimations, notifications, ai, documents, purchase_orders, media, reports, messages, site_reports, admin, auth
 from apscheduler.schedulers.background import BackgroundScheduler
 from supabase import create_client
@@ -17,6 +17,8 @@ app = FastAPI(
     version="1.0.0"
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+from core.http_limits import RequestLimits
+app.add_middleware(RequestLimits)
 
 # Setup Background Scheduler
 scheduler = BackgroundScheduler()
@@ -97,7 +99,7 @@ async def limit_request_size(request: Request, call_next):
 # CORS
 # In development (ENVIRONMENT=development), allow all origins for convenience.
 # In production, restrict to known frontend URLs only.
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+ENVIRONMENT = settings.ENVIRONMENT
 
 if ENVIRONMENT == "development":
     allowed_origins = ["*"]
@@ -125,8 +127,16 @@ app.add_api_route("/api/ai/compare-boq", ai.compare_boq_with_ai, methods=["POST"
 # Routers
 secure_dependency = [Depends(get_current_user)]
 
+# Keep public routes out of the protected include, so the API contract and runtime agree.
+public_endpoints = {projects.get_boq_template, projects.parse_boq_endpoint, projects.geocode_location,
+                    projects.reverse_geocode, ai.compare_boq_with_ai}
+protected_projects = APIRouter()
+protected_projects.routes.extend(route for route in projects.router.routes if route.endpoint not in public_endpoints)
+protected_ai = APIRouter()
+protected_ai.routes.extend(route for route in ai.router.routes if route.endpoint not in public_endpoints)
+
 # Secured routers
-app.include_router(projects.router,        prefix="/api", dependencies=secure_dependency)
+app.include_router(protected_projects,     prefix="/api", dependencies=secure_dependency)
 app.include_router(materials.router,       prefix="/api", dependencies=secure_dependency)
 app.include_router(labour.router,          prefix="/api", dependencies=secure_dependency)
 app.include_router(clients.router,         prefix="/api", dependencies=secure_dependency)
@@ -137,9 +147,13 @@ app.include_router(reports.router,         prefix="/api", dependencies=secure_de
 app.include_router(messages.router,        prefix="/api", dependencies=secure_dependency)
 app.include_router(site_reports.router,    prefix="/api", dependencies=secure_dependency)
 app.include_router(admin.router,           prefix="/api", dependencies=secure_dependency)
+from api.routes import workflow, boq, maps
+app.include_router(workflow.router, prefix="/api", dependencies=secure_dependency)
+app.include_router(boq.router, prefix="/api", dependencies=secure_dependency)
+app.include_router(maps.router, prefix="/api")
 
 # Previously unsecured — now protected with auth dependency
-app.include_router(ai.router,        prefix="/api", dependencies=secure_dependency)
+app.include_router(protected_ai,     prefix="/api", dependencies=secure_dependency)
 app.include_router(documents.router, prefix="/api", dependencies=secure_dependency)
 app.include_router(media.router,     prefix="/api", dependencies=secure_dependency)
 
@@ -157,46 +171,37 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field, field_validator
 class PublicInquiry(BaseModel):
-    name: str
-    email: str
-    project_name: str
-    message: str
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    project_name: str = Field(default="", max_length=200)
+    message: str = Field(min_length=10, max_length=5000)
+
+    @field_validator("name", "message", mode="before")
+    @classmethod
+    def trim_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 @app.post("/api/public-inquiry")
 def handle_public_inquiry(inquiry: PublicInquiry):
-    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-    full_message = f"Name: {inquiry.name}\nEmail: {inquiry.email}\nProject: {inquiry.project_name or 'N/A'}\n\nMessage: {inquiry.message}"
-    
-    admins = client.table('profiles').select('id').in_('role', ['admin', 'super_admin', 'Super Admin', 'Admin']).execute()
-    
-    if admins.data:
-        notifications = []
-        for admin in admins.data:
-            notifications.append({
-                "user_id": admin['id'],
-                "type": "general",
-                "title": f"New Inquiry: {inquiry.name}",
-                "message": full_message,
-                "target_role": "admin",
-                "target_user_id": admin['id'],
-                "is_read": False,
-                "sent_via": "in_app"
-            })
-        if notifications:
-            client.table('notifications').insert(notifications).execute()
-    
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(503, "Inquiry service is not configured")
+    try:
+        get_service_client().rpc("submit_public_inquiry", {"p_data": inquiry.model_dump(mode="json")}).execute()
+    except Exception as exc:
+        logging.error("Inquiry transaction failed: %s", type(exc).__name__)
+        raise HTTPException(503, "Unable to save inquiry. Please try again.") from exc
     return {"success": True}
 
 class GoogleRoleUpdate(BaseModel):
     role: str
 
 @app.post("/api/auth/google-role")
-def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(get_current_user)):
+def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(get_authenticated_identity)):
     allowed_roles = ['pm', 'site_manager', 'worker', 'client', 'supplier']
     if payload.role not in allowed_roles:
-        return {"error": "Invalid role"}
+        raise HTTPException(status_code=422, detail="Invalid role")
         
     client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
     
@@ -205,7 +210,7 @@ def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(g
     # another portal — the portal gate rejects them instead.
     res = client.table('profiles').select('role').eq('id', current_user['id']).single().execute()
     if res.data and res.data.get('role') in [None, '', 'pending']:
-        client.table('profiles').update({'role': payload.role}).eq('id', current_user['id']).execute()
+        client.table('profiles').update({'role': payload.role, 'is_approved': payload.role == 'client'}).eq('id', current_user['id']).execute()
         client.auth.admin.update_user_by_id(current_user['id'], {"user_metadata": {'role': payload.role}})
         
     return {"success": True}

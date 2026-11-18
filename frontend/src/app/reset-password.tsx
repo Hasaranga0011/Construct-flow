@@ -4,33 +4,61 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'reac
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useAuth } from '../context/AuthContext';
 
 export default function ResetPasswordScreen() {
+  const { role } = useAuth();
+  const [invalidLink, setInvalidLink] = useState(() => {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const parameters = new URLSearchParams(window.location.hash.slice(1));
+    return parameters.has('error') || parameters.has('error_code');
+  });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState(invalidLink ? 'This reset link has expired or has already been used. Request a new link below.' : '');
   const [successMsg, setSuccessMsg] = useState('');
   const [sessionReady, setSessionReady] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(!invalidLink);
   const router = useRouter();
+  const loginRoute = role === 'client' || role === 'supplier' ? '/partner-login' : role === 'admin' ? '/admin-login' : '/team-login';
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.location) return;
+    const checkLink = () => {
+      const parameters = new URLSearchParams(window.location.hash.slice(1));
+      const invalid = parameters.has('error') || parameters.has('error_code');
+      setInvalidLink(invalid);
+      if (invalid) {
+        setSessionReady(false);
+        setCheckingSession(false);
+        setErrorMsg('This reset link has expired or has already been used. Request a new link below.');
+      }
+    };
+    window.addEventListener('hashchange', checkLink);
+    return () => window.removeEventListener('hashchange', checkLink);
+  }, []);
 
   // Supabase sends the user back with an access_token in the URL hash.
   // We listen for the PASSWORD_RECOVERY event which fires automatically.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' && !invalidLink) {
         setSessionReady(true);
+        setCheckingSession(false);
       }
     });
     let mounted = true;
     // Recovery can complete before this screen mounts.
     void supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setSessionReady(!!data.session);
+      if (mounted) { setSessionReady(!invalidLink && !!data.session); setCheckingSession(false); }
+    }).catch(() => {
+      if (mounted) { setSessionReady(false); setCheckingSession(false); setErrorMsg('Unable to verify this recovery session. Request a new link below.'); }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, []);
+  }, [invalidLink]);
 
   const handleReset = async () => {
     if (!sessionReady) {
@@ -60,7 +88,7 @@ export default function ResetPasswordScreen() {
     } else {
       await supabase.auth.signOut();
       setSuccessMsg('Password updated successfully! Redirecting to login…');
-      setTimeout(() => router.replace('/team-login'), 2500);
+      setTimeout(() => router.replace(loginRoute), 2500);
     }
     setLoading(false);
   };
@@ -92,10 +120,10 @@ export default function ResetPasswordScreen() {
             onPress={() => router.push('/')}
             style={[{ width: '100%', maxWidth: 280, marginBottom: 24 }, { minHeight: 44, minWidth: 44 }]}
           >
-            <Image 
-              source={require('../../assets/images/main-logo.png')} 
-              style={{ width: 80, height: 80, marginBottom: 16 }} 
-              resizeMode="contain" 
+            <Image
+              source={require('../../assets/images/main-logo.png')}
+              style={{ width: 80, height: 80, marginBottom: 16 }}
+              resizeMode="contain"
             />
           </Pressable>
 
@@ -107,11 +135,15 @@ export default function ResetPasswordScreen() {
           </View>
 
           {/* Not arrived via email link */}
-          {!sessionReady && !successMsg && (
+          {checkingSession && <View className="items-center p-5"><ActivityIndicator color="#F97316" /><Text className="text-slate-500 mt-3">Verifying your reset link...</Text></View>}
+          {!checkingSession && !sessionReady && !successMsg && (
             <View className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-700 text-sm text-center">
                 Please open this page from the reset link in your email.
               </Text>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/forgot-password')} style={{ minHeight: 44 }} className="items-center justify-center mt-2">
+                <Text className="text-brand-orange font-semibold">Request a new reset link</Text>
+              </Pressable>
             </View>
           )}
 
@@ -128,6 +160,7 @@ export default function ResetPasswordScreen() {
           ) : null}
 
           {/* New Password */}
+          {sessionReady && !successMsg && <>
           <View className="mb-5">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">New Password</Text>
             <View className="w-full flex-row items-center border border-gray-300 rounded-xl bg-gray-50 pr-2">
@@ -176,9 +209,10 @@ export default function ResetPasswordScreen() {
             )}
           </Pressable>
 
+          </>}
           <View className="flex-row flex-wrap justify-center">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Back to </Text>
-            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/team-login')}>
+            <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(loginRoute)}>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold hover:underline">Login</Text>
             </Pressable>
           </View>

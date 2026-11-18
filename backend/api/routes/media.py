@@ -3,6 +3,11 @@ import os
 import time
 import uuid
 import pathlib
+import io
+import warnings
+from PIL import Image
+from core.database import client_for_token
+from core.access import require_project_member
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from core.security import get_current_user
 from core.config import settings
@@ -54,34 +59,41 @@ async def upload_site_photo(
     Supports direct device uploads and live camera captures.
     """
 
-    # ── File type validation ────────────────────────────────────────────────
-    content_type = file.content_type or "image/jpeg"
-    if content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Unsupported file type '{content_type}'. "
-                "Only image/jpeg, image/png, and image/webp are allowed."
-            )
-        )
-
-    # ── Read file and enforce size limit ────────────────────────────────────
-    file_bytes = await file.read()
+    if project_id == "new_project":
+        if current_user["role"] not in {"super_admin", "pm"}:
+            raise HTTPException(status_code=403, detail="Project creation access required")
+        project_id = "draft_" + str(uuid.UUID(current_user["id"]))
+    else:
+        try:
+            project_id = str(uuid.UUID(project_id))
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=422, detail="A valid project ID is required")
+        if current_user["role"] not in {"super_admin", "pm", "site_manager"}:
+            raise HTTPException(status_code=403, detail="Project staff access required")
+        require_project_member(client_for_token(current_user["token"]), project_id, current_user)
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Only JPEG, PNG and WebP images are supported")
+    chunks, size = [], 0
+    while chunk := await file.read(65536):
+        size += len(chunk)
+        if size > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Image exceeds the 10 MB limit")
+        chunks.append(chunk)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(b"".join(chunks))) as image:
+                if image.width * image.height > 25000000:
+                    raise ValueError("Image dimensions exceed the limit")
+                image.load()
+                output = io.BytesIO()
+                image.convert("RGB").save(output, format="JPEG", quality=90)
+                file_bytes = output.getvalue()
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Invalid or excessively large image") from exc
     if len(file_bytes) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum allowed size is 10 MB (received {len(file_bytes) // (1024*1024)} MB)."
-        )
-
-    # Determine file extension
-    ext = "jpg"
-    if "png" in content_type:
-        ext = "png"
-    elif "webp" in content_type:
-        ext = "webp"
-    elif file.filename and "." in file.filename:
-        ext = file.filename.rsplit(".", 1)[-1].lower()
-
+        raise HTTPException(status_code=413, detail="Processed image exceeds the limit")
+    ext, content_type = "jpg", "image/jpeg"
     timestamp = int(time.time())
     unique_suffix = uuid.uuid4().hex[:8]
     storage_path = f"site_uploads/{project_id}/{timestamp}_{unique_suffix}.{ext}"
@@ -109,6 +121,8 @@ async def upload_site_photo(
             print(f"Supabase storage upload error: {sb_err}. Falling back to local storage.")
 
     # ── 2. Local Storage Fallback (100% Free, Offline-ready) ─────────────────
+    if not settings.ALLOW_LOCAL_UPLOADS or settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=503, detail="Secure image storage is unavailable; upload was not saved")
     upload_dir = pathlib.Path("uploads") / "site_uploads" / str(project_id)
     upload_dir.mkdir(parents=True, exist_ok=True)
     local_filename = f"{timestamp}_{unique_suffix}.{ext}"

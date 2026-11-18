@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import {
-  View, Text, ScrollView, Pressable,
-  ActivityIndicator, Switch, Animated, Image, Modal, TextInput
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Switch, Animated, Modal, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -84,8 +81,6 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
   }, [user]);
 
   const rc = roleConfig[role || 'admin'] || roleConfig.admin;
-  const initials = (profile?.full_name || user?.user_metadata?.full_name || user?.email || 'U')
-    .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
   const openPasswordModal = () => {
     setNewPassword('');

@@ -14,39 +14,43 @@ export const FormField = React.forwardRef<TextInput, FormFieldProps>(({
   helperText,
   containerClassName = '',
   className = '',
+  onFocus,
+  onBlur,
+  style,
   ...props
 }, ref) => {
   const [isFocused, setIsFocused] = React.useState(false);
 
   return (
     <View className={`mb-4 ${containerClassName}`}>
-      <Text 
-        maxFontSizeMultiplier={1.3} 
+      <Text
+        maxFontSizeMultiplier={1.3}
         className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5"
       >
         {label}
       </Text>
       <TextInput
+        {...props}
         ref={ref}
+        accessibilityLabel={props.accessibilityLabel || label}
         onFocus={(e) => {
           setIsFocused(true);
-          props.onFocus?.(e);
+          onFocus?.(e);
         }}
         onBlur={(e) => {
           setIsFocused(false);
-          props.onBlur?.(e);
+          onBlur?.(e);
         }}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor="#64748B"
         maxFontSizeMultiplier={1.3}
         className={`min-h-[48px] px-4 rounded-xl border text-base text-brand-text dark:text-white bg-gray-50 dark:bg-[#1E293B]
-          ${error ? 'border-red-500' : isFocused ? 'border-brand-orange' : 'border-gray-300 dark:border-gray-700'} 
-          ${Platform.OS === 'web' ? 'outline-none transition-colors' : ''} 
+          ${error ? 'border-red-500' : isFocused ? 'border-brand-orange' : 'border-gray-300 dark:border-gray-700'}
+          ${Platform.OS === 'web' ? 'outline-none transition-colors' : ''}
           ${className}`}
-        style={Platform.OS === 'android' ? { includeFontPadding: false, textAlignVertical: 'center' } : {}}
-        {...props}
+        style={[{ minWidth: 0 }, Platform.OS === 'android' ? { includeFontPadding: false, textAlignVertical: 'center' } : {}, style]}
       />
       {error ? (
-        <Text maxFontSizeMultiplier={1.3} className="text-xs text-red-500 mt-1.5 font-medium">{error}</Text>
+        <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} className="text-xs text-red-700 mt-1.5 font-medium">{error}</Text>
       ) : helperText ? (
         <Text maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{helperText}</Text>
       ) : null}

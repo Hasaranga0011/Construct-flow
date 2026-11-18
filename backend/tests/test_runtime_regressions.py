@@ -10,6 +10,7 @@ from main import app
 class Query:
     def __init__(self, client, table): self.client, self.name = client, table
     def select(self, *args): return self
+    def is_(self, key, value): return self
     def eq(self, *args): return self
     def gte(self, *args): return self
     def order(self, *args): return self

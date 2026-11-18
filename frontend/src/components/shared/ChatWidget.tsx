@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { api } from '@/services/api';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ChatComposer } from '../chat/ChatComposer';
+import { roleLabel } from '@/utils/roles';
 
 export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRole, targetUserId }: {
   projectId: string;
@@ -16,6 +18,37 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
+
+
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      let query = supabase
+        .from('client_messages')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Filter locally for this conversation channel
+      const filtered = (data || []).filter(m =>
+        (m.sender_role === currentUserRole && m.receiver_role === targetRole) ||
+        (m.sender_role === targetRole && m.receiver_role === currentUserRole) ||
+        (targetUserId && (m.sender_id === targetUserId || m.receiver_id === targetUserId)) ||
+        (m.sender_role === 'site_manager' && m.receiver_role === 'supplier') ||
+        (m.sender_role === 'supplier' && m.receiver_role === 'site_manager')
+      );
+
+      setMessages(filtered);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 300);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, currentUserRole, targetRole, targetUserId]);
 
   useEffect(() => {
     fetchMessages();
@@ -44,52 +77,20 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
     return () => {
       subscription.unsubscribe();
     };
-  }, [projectId]);
-
-  const fetchMessages = async () => {
-    try {
-      let query = supabase
-        .from('client_messages')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: true });
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Filter locally for this conversation channel
-      const filtered = (data || []).filter(m =>
-        (m.sender_role === currentUserRole && m.receiver_role === targetRole) ||
-        (m.sender_role === targetRole && m.receiver_role === currentUserRole) ||
-        (targetUserId && (m.sender_id === targetUserId || m.receiver_id === targetUserId)) ||
-        (m.sender_role === 'site_manager' && m.receiver_role === 'supplier') ||
-        (m.sender_role === 'supplier' && m.receiver_role === 'site_manager')
-      );
-
-      setMessages(filtered);
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 300);
-    } catch (err) {
-      console.error('Failed to fetch messages:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [projectId, currentUserId, currentUserRole, targetRole, targetUserId, fetchMessages]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
     try {
       const text = newMessage.trim();
-      const { error } = await supabase.from('client_messages').insert([{
+      await api.post('/messages/', {
         project_id: projectId,
         sender_id: currentUserId,
         sender_role: currentUserRole,
         receiver_role: targetRole,
         receiver_id: targetUserId || null,
-        message_text: text,
         content: text,
-        message: text,
-      }]);
-      if (error) throw error;
+      });
       setNewMessage('');
     } catch (err) {
       console.error('Failed to send message:', err);
@@ -102,7 +103,7 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
     <View className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex-col overflow-hidden min-h-[400px] max-h-[500px]">
       <View className="p-4 border-b border-gray-100 bg-gray-50 flex-row items-center">
         <Ionicons name="chatbubbles" size={20} color="#F97316" className="mr-2" />
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 ml-2">Chat with {targetRole ? targetRole.replace('_', ' ') : 'Team'}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800 ml-2">Chat with {targetRole ? roleLabel(targetRole) : 'Team'}</Text>
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled"

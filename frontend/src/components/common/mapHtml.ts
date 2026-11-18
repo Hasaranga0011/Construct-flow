@@ -1,6 +1,7 @@
 export interface MapLocation {
   lat: number;
   lng: number;
+  address?: string;
 }
 
 export interface MapProjectMarker {
@@ -20,6 +21,7 @@ export interface GenerateMapHtmlOptions {
   markerPos?: MapLocation | null;
   markers?: MapProjectMarker[];
   interactive?: boolean;
+  deferred?: boolean;
 }
 
 export function generateLeafletHtml({
@@ -28,10 +30,11 @@ export function generateLeafletHtml({
   markerPos = null,
   markers = [],
   interactive = true,
+  deferred = false,
 }: GenerateMapHtmlOptions = {}): string {
   const initialCenterJson = JSON.stringify(center);
   const initialMarkerPosJson = JSON.stringify(markerPos);
-  const initialMarkersJson = JSON.stringify(markers);
+  const initialMarkersJson = JSON.stringify(markers).replace(/</g, '\\u003c');
   const isInteractiveJson = JSON.stringify(interactive);
   const initialZoomJson = JSON.stringify(zoom);
 
@@ -39,6 +42,7 @@ export function generateLeafletHtml({
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="referrer" content="origin" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ConstructFlow Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -149,6 +153,7 @@ export function generateLeafletHtml({
 </head>
 <body>
   <div id="map"></div>
+  <div id="tile-error" role="status" style="display:none;position:absolute;z-index:1000;bottom:30px;left:10px;right:60px;padding:10px;border:1px solid #fed7aa;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;pointer-events:none">Map imagery is unavailable. You can still enter the site address or switch map view.</div>
   <div id="hint-tag" class="map-tag">
     <span class="map-tag-dot"></span>
     <span id="hint-text">${interactive ? 'Tap anywhere to pin site' : 'ConstructFlow Map'}</span>
@@ -156,6 +161,7 @@ export function generateLeafletHtml({
 
   <script>
     var map;
+    var isDeferred = ${JSON.stringify(deferred)};
     var currentMarker = null;
     var projectMarkers = [];
     var streetLayer, satLayer;
@@ -177,7 +183,7 @@ export function generateLeafletHtml({
     }
 
     function createPinIcon(color) {
-      color = color || '#F97316';
+      color = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#F97316';
       var svg = '<svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">' +
         '<path d="M16 0C7.16344 0 0 7.16344 0 16C0 26.5 16 42 16 42C16 42 32 26.5 32 16C32 7.16344 24.8366 0 16 0Z" fill="' + color + '"/>' +
         '<circle cx="16" cy="16" r="6" fill="#ffffff"/>' +
@@ -192,14 +198,36 @@ export function generateLeafletHtml({
     }
 
     function initMap() {
+      if (map) return;
+      if (typeof L === 'undefined') {
+        var fallback = document.getElementById('map');
+        fallback.setAttribute('role', 'status');
+        fallback.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#475569';
+        fallback.textContent = 'Map could not load. Check your connection and reopen this page. Project details remain available in List View.';
+        notifyParent({ type: 'mapUnavailable' });
+        return;
+      }
       streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
+        referrerPolicy: 'origin',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>'
       });
 
       satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: '&copy; Esri'
+      });
+      [streetLayer, satLayer].forEach(function(layer) {
+        var failed = false;
+        layer.on('loading', function() { failed = false; });
+        layer.on('tileerror', function(event) {
+          failed = true;
+          if (event.tile) event.tile.style.visibility = 'hidden';
+          document.getElementById('tile-error').style.display = 'block';
+        });
+        layer.on('load', function() {
+          if (!failed) document.getElementById('tile-error').style.display = 'none';
+        });
       });
 
       var centerCoords = initialMarkerPos && initialMarkerPos.lat && initialMarkerPos.lng
@@ -238,6 +266,7 @@ export function generateLeafletHtml({
     }
 
     window.setPin = function(lat, lng, shouldPan) {
+      if (!map) return;
       if (typeof lat !== 'number' || typeof lng !== 'number') return;
       if (currentMarker) {
         currentMarker.setLatLng([lat, lng]);
@@ -261,12 +290,18 @@ export function generateLeafletHtml({
       }
     };
 
+    window.previewLocation = function(lat, lng, zoomLevel) {
+      if (map) map.flyTo([lat, lng], zoomLevel || 13, { duration: 0.6 });
+    };
+
     window.flyToLocation = function(lat, lng, zoomLevel) {
+      if (!map) return;
       window.setPin(lat, lng, false);
       map.flyTo([lat, lng], zoomLevel || 15, { duration: 0.6 });
     };
 
     window.toggleLayer = function() {
+      if (!map) return;
       if (currentLayerType === 'street') {
         map.removeLayer(streetLayer);
         map.addLayer(satLayer);
@@ -279,7 +314,13 @@ export function generateLeafletHtml({
       notifyParent({ type: 'layerChanged', layer: currentLayerType });
     };
 
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
+        return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c];
+      });
+    }
     window.setMarkers = function(list) {
+      if (!map) return;
       if (!Array.isArray(list)) return;
       projectMarkers.forEach(function(m) { map.removeLayer(m); });
       projectMarkers = [];
@@ -291,12 +332,12 @@ export function generateLeafletHtml({
             icon: createPinIcon(item.color || '#F97316')
           });
 
-          var html = '<div style="font-weight:700;color:#0f172a;margin-bottom:3px;font-size:13px;">' + (item.title || 'Project') + '</div>';
+          var html = '<div style="font-weight:700;color:#0f172a;margin-bottom:3px;font-size:13px;">' + escapeHtml(item.title || 'Project') + '</div>';
           if (item.location) {
-            html += '<div style="color:#64748b;font-size:11px;margin-bottom:6px;">' + item.location + '</div>';
+            html += '<div style="color:#64748b;font-size:11px;margin-bottom:6px;">' + escapeHtml(item.location) + '</div>';
           }
           if (item.status) {
-            html += '<span style="display:inline-block;background:#ffedd5;color:#c2410c;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;text-transform:uppercase;">' + item.status + '</span>';
+            html += '<span style="display:inline-block;background:#ffedd5;color:#c2410c;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;text-transform:uppercase;">' + escapeHtml(item.status) + '</span>';
           }
           if (typeof item.completion === 'number') {
             html += '<div style="margin-top:6px;font-size:11px;font-weight:700;color:#f97316;">' + item.completion + '% Progress</div>';
@@ -324,10 +365,22 @@ export function generateLeafletHtml({
 
     // Listen for Web postMessage
     window.addEventListener('message', function(event) {
+      if (isDeferred && event.source !== window.parent) return;
       try {
         var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (!data || !data.type) return;
-        if (data.type === 'flyTo') {
+        if (data.type === 'initialize' && isDeferred && !map) {
+          var config = data.config || {};
+          initialCenter = config.center || initialCenter;
+          initialZoom = typeof config.zoom === 'number' ? config.zoom : initialZoom;
+          initialMarkerPos = config.markerPos || null;
+          initialMarkers = Array.isArray(config.markers) ? config.markers : [];
+          isInteractive = config.interactive === true;
+          document.getElementById('hint-text').textContent = isInteractive ? 'Tap anywhere to pin site' : 'ConstructFlow Map';
+          initMap();
+        } else if (data.type === 'previewLocation') {
+          window.previewLocation(data.lat, data.lng, data.zoom);
+        } else if (data.type === 'flyTo') {
           window.flyToLocation(data.lat, data.lng, data.zoom);
         } else if (data.type === 'setMarker') {
           window.setPin(data.lat, data.lng, true);
@@ -339,7 +392,10 @@ export function generateLeafletHtml({
       } catch (e) {}
     });
 
-    window.addEventListener('DOMContentLoaded', initMap);
+    window.addEventListener('DOMContentLoaded', function() {
+      if (isDeferred) notifyParent({ type: 'mapFrameReady' });
+      else initMap();
+    });
   </script>
 </body>
 </html>`;

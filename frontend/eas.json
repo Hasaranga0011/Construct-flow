@@ -11,14 +11,16 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "node": "22.22.0"
     },
     "production": {
       "environment": "production",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
-      }
+      },
+      "node": "22.22.0"
     }
   }
 }

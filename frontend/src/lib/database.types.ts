@@ -65,6 +65,7 @@ export interface Database {
       }
       salary_slips: {
         Row: {
+          project_id: string | null
           id: string | null
           worker_id: string | null
           period_start: string
@@ -531,6 +532,7 @@ export interface Database {
       }
       attendance: {
         Row: {
+          status: string | null
           id: string | null
           worker_id: string | null
           site_id: string | null
@@ -696,7 +698,7 @@ export interface Database {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: { review_variation: { Args: { p_id: string; p_approve: boolean }; Returns: Json } }
     Enums: { [_ in never]: never }
   }
 }

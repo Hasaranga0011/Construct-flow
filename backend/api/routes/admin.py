@@ -52,29 +52,13 @@ def _admin_supabase():
 def list_users(current_user: dict = Depends(get_current_user)) -> List[Dict]:
     _require_admin(current_user)
     db = _admin_supabase()
-    
+
     # 1. Fetch profiles
     res = db.table("profiles").select(
         "id, email, full_name, role, is_approved, created_at, company_name, contact_number, bio, avatar_url, worker_type"
     ).order("created_at", desc=True).execute()
     profiles = res.data or []
-    
-    # 2. Fetch auth users to get the raw_user_meta_data (which bypasses the trigger issue)
-    auth_users_res = db.auth.admin.list_users()
-    auth_users = auth_users_res.users if auth_users_res else []
-    
-    auth_meta_map = {u.id: u.user_metadata or {} for u in auth_users}
-    
-    # 3. Merge metadata into profiles
-    for p in profiles:
-        uid = p["id"]
-        meta = auth_meta_map.get(uid, {})
-        # Prioritize meta role/name over profiles (since trigger forces 'client')
-        if meta.get("role"):
-            p["role"] = meta.get("role")
-        if meta.get("full_name"):
-            p["full_name"] = meta.get("full_name")
-            
+
     return profiles
 
 
@@ -140,6 +124,18 @@ def create_user(
     new_uid = None
     invite_link = None
 
+    # Creation must never reset a pre-existing identity or silently change its role.
+    # A profile-only check misses orphaned Auth identities.
+    for page in range(1, 101):
+        directory = admin_db.auth.admin.list_users(page=page, per_page=1000)
+        identities = directory.users if hasattr(directory, 'users') else directory
+        if any(str(getattr(identity, 'email', '') or '').casefold() == str(payload.email).casefold() for identity in identities):
+            raise HTTPException(status_code=409, detail='This account already exists. Use its recovery or user-management actions instead.')
+        if len(identities) < 1000:
+            break
+    else:
+        raise HTTPException(status_code=503, detail='Could not verify account uniqueness')
+
     user_meta = {"full_name": payload.full_name, "role": canonical_role}
     if normalized_phone:
         user_meta["contact_number"] = normalized_phone
@@ -171,28 +167,7 @@ def create_user(
             err_msg = str(invite_err)
             # If user already registered, send password reset / access email via Supabase
             if "already" in err_msg.lower() or "registered" in err_msg.lower():
-                try:
-                    users_list = admin_db.auth.admin.list_users()
-                    matching = next((u for u in users_list if getattr(u, 'email', None) == payload.email), None)
-                    if matching:
-                        new_uid = matching.id
-                        admin_db.auth.admin.update_user_by_id(new_uid, {
-                            "password": password,
-                            "app_metadata": {"role": canonical_role},
-                            "user_metadata": user_meta
-                        })
-                    admin_db.auth.reset_password_for_email(
-                        payload.email,
-                        {"redirect_to": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:8082')}/reset-password"}
-                    )
-                    email_delivery = {
-                        "success": True,
-                        "sent_to_inbox": True,
-                        "provider": "supabase",
-                        "message": f"User access email delivered to {payload.email} via Supabase Auth"
-                    }
-                except Exception:
-                    pass
+                raise HTTPException(status_code=409, detail='This account already exists. Use its recovery or user-management actions instead.') from invite_err
 
             # If Supabase email mailer fails or rate limits, generate direct Supabase action link
             if not new_uid:
@@ -339,7 +314,7 @@ def audit_user_roles(current_user: dict = Depends(get_current_user)) -> Dict:
     for u in auth_users:
         uid = str(u.id)
         profile = profiles_by_id.get(uid)
-        
+
         # Meta role prioritized from app_metadata then user_metadata
         app_meta = getattr(u, "app_metadata", {}) or {}
         user_meta = getattr(u, "user_metadata", {}) or {}
@@ -468,14 +443,14 @@ def delete_user(
 ) -> Dict:
     _require_admin(current_user)
     admin_db = _admin_supabase()
-    
+
     try:
         # Delete from Supabase Auth (this cascades to profiles if foreign keys are set up correctly)
         # We use the admin api
         res = admin_db.auth.admin.delete_user(user_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to delete auth user: {e}")
-        
+
     return {"ok": True, "message": "User deleted successfully"}
 
 

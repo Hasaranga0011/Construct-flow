@@ -34,58 +34,35 @@ def _fetch_auth_user(token: str):
     except (httpx.HTTPError, OSError, TimeoutError):
         # Retry once with a fresh client if the shared keep-alive socket was reset
         return client_for_token(token).auth.get_user(token)
-    except Exception as exc:
-        if "session_id" in str(exc):
-            from types import SimpleNamespace
-            claims = _decode_jwt_claims(token)
-            sub = str(claims.get("sub") or "").strip()
-            exp = float(claims.get("exp") or 0)
-            if sub and exp > time.time():
-                # Verify token cryptographic signature & RLS via Supabase PostgREST
-                prof = client_for_token(token).table("profiles").select("id, email").eq("id", sub).single().execute()
-                if prof.data and prof.data.get("id") == sub:
-                    return SimpleNamespace(
-                        user=SimpleNamespace(
-                            id=sub,
-                            email=claims.get("email") or prof.data.get("email"),
-                        )
-                    )
-        raise
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     token = (credentials.credentials or "").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
-    now = time.time()
-    cached = _TOKEN_CACHE.get(token)
-    if cached and (now - cached["cached_at"]) < _TOKEN_CACHE_TTL:
-        return cached["user"]
-
     try:
         # Validate the token directly with Supabase
         user_response = _fetch_auth_user(token)
         if not user_response.user:
              raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-             
+
         try:
             # Authorization comes from the protected profile, never editable user metadata.
-            profile_response = client_for_token(token).table("profiles").select("role").eq("id", user_response.user.id).single().execute()
+            profile_response = client_for_token(token).table("profiles").select("role,is_approved").eq("id", user_response.user.id).single().execute()
             role = normalize_role(profile_response.data.get("role") if profile_response.data else None)
         except Exception as profile_err:
             raise HTTPException(status_code=403, detail="An authorized profile is required") from profile_err
         if role not in {"super_admin", "pm", "site_manager", "worker", "client", "supplier"}:
             raise HTTPException(status_code=403, detail="An authorized profile is required")
-        
+        if profile_response.data.get("is_approved") is not True:
+            raise HTTPException(status_code=403, detail="Your account is pending administrator approval")
+
         user_data = {
             "id": user_response.user.id,
             "email": user_response.user.email,
             "role": role,
             "token": token
         }
-        if len(_TOKEN_CACHE) > 500:
-            _TOKEN_CACHE.clear()
-        _TOKEN_CACHE[token] = {"user": user_data, "cached_at": now}
         return user_data
     except HTTPException:
         raise
@@ -97,8 +74,19 @@ def require_admin(current_user: dict = Depends(get_current_user)):
     if normalize_role(current_user["role"]) != "super_admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
-    
+
 def require_manager_or_admin(current_user: dict = Depends(get_current_user)):
     if normalize_role(current_user["role"]) not in ["super_admin", "pm"]:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     return current_user
+
+
+def get_authenticated_identity(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Validate identity for onboarding before a role has been approved."""
+    try:
+        response = _fetch_auth_user(credentials.credentials)
+        if not response.user:
+            raise ValueError("Missing user")
+        return {"id": response.user.id, "email": response.user.email}
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials") from exc

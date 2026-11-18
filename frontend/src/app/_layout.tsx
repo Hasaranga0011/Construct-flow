@@ -4,17 +4,16 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
-import { useEffect } from 'react';
-import { View, ActivityIndicator, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator, Text, Pressable, KeyboardAvoidingView, Platform, LogBox } from 'react-native';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { ToastProvider } from '../components/common/ToastProvider';
 import { NotificationProvider } from '../context/NotificationContext';
+import { PageMetadata } from '../components/common/PageMetadata';
 
 import { normalizeRole } from '../utils/auth';
 import { supabase } from '../lib/supabase';
-import { getApiUrl } from '../lib/apiUrl';
 import { cleanupLegacyRememberedKeys } from '../lib/rememberedEmail';
-import { LogBox } from 'react-native';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 
 // Ignore React Native logs for Reanimated strict mode
@@ -41,10 +40,12 @@ const AUTH_PAGES = ['register', 'team-login', 'team-register', 'partner-login', 
 const ROLE_PORTALS = ['admin', 'pm', 'site-manager', 'client', 'worker', 'supplier'];
 
 function InitialLayout() {
-  const { session, role, isLoading, signOut } = useAuth();
+  const { session, role, isLoading, isApproved, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
+  const [hasMounted, setHasMounted] = useState(Platform.OS !== 'web');
+  useEffect(() => { setHasMounted(true); }, []);
 
   usePushNotifications(session?.user?.id || null);
 
@@ -53,6 +54,10 @@ function InitialLayout() {
     if (isLoading) return;
 
     const firstSegment = (segments as string[])[0] ?? '';
+    if (session && !isApproved && firstSegment !== 'pending-approval' && firstSegment !== 'reset-password') {
+      router.replace('/pending-approval');
+      return;
+    }
     const inAuthPage = AUTH_PAGES.includes(firstSegment);
     const inRolePortal = ROLE_PORTALS.includes(firstSegment);
     const inLanding = firstSegment === '';
@@ -66,7 +71,7 @@ function InitialLayout() {
     // Use role from AuthContext; if it's null, fetch it ourselves as fallback.
     // Exception: never redirect away from reset-password.
     if (session && (inAuthPage || inLanding) && firstSegment !== 'reset-password') {
-      
+
       const routeWithRole = (resolvedRole: string | null) => {
         const normalized = normalizeRole(resolvedRole);
         // Just route to dashboard based on role, regardless of which login page was used
@@ -89,9 +94,8 @@ function InitialLayout() {
         .eq('id', session.user.id)
         .single()
         .then(({ data: profile }) => {
-          const metaRole = session.user.user_metadata?.role;
           const profileRole = profile?.role;
-          const resolvedRole = metaRole ?? profileRole ?? null;
+          const resolvedRole = profileRole ?? null;
           routeWithRole(resolvedRole);
         });
       return;
@@ -108,12 +112,19 @@ function InitialLayout() {
       }
     }
 
-  }, [session, role, isLoading, segments, rootNavigationState, router]);
+  }, [session, role, isLoading, isApproved, segments, rootNavigationState, router]);
 
 
   // Login/register pages: always render the SAME tree (Slot + optional spinner
   // overlay). Swapping wrappers remounts the page — that reset navigation to "/"
   // and wiped the login form and the Access Denied popup.
+  // Expo's server render can have no segments while the browser already knows
+  // the auth route. Keep the initial tree identical before rendering its Slot.
+  if (!hasMounted) {
+    return <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
+      <ActivityIndicator size="large" color="#F97316" />
+    </View>;
+  }
   const currentSegment = (segments as string[])[0] ?? '';
   if (AUTH_PAGES.includes(currentSegment)) {
     return (
@@ -149,7 +160,7 @@ function InitialLayout() {
     </View>;
   }
   const expectedPortal = normalizeRole(role) === 'site_manager' ? 'site-manager' : normalizeRole(role);
-  if (inRolePortal && (!session || firstSegment !== expectedPortal)) {
+  if (inRolePortal && (!session || !isApproved || firstSegment !== expectedPortal)) {
     return (
       <View className="flex-1 bg-brand-light dark:bg-[#0F172A] items-center justify-center">
         <ActivityIndicator size="large" color="#F97316" />
@@ -161,12 +172,11 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
-  console.log('=== APP STARTUP ===');
-  console.log('API Base URL Resolved To:', getApiUrl());
-  console.log('===================');
-  
+
+
   return (
     <SafeAreaProvider>
+      <PageMetadata />
       <SafeAreaView className="flex-1" style={{ backgroundColor: 'transparent' }}>
         <StatusBar style="light" />
         <ThemeProvider>

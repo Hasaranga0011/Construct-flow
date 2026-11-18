@@ -8,6 +8,9 @@ import { api } from '@/services/api';
 import { supabase } from '@/lib/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { OrderActionButton } from '@/components/common/OrderActionButton';
+
 type PurchaseOrder = {
   id: string;
   material_id: string;
@@ -24,9 +27,6 @@ type PurchaseOrder = {
 
 const formatCurrency = (amount: number | null | undefined) => amount == null || !Number.isFinite(Number(amount)) ? 'Not recorded' : `Rs. ${Number(amount).toLocaleString('en-LK')}`;
 const formatDate = (dateString?: string | null) => dateString ? new Date(dateString).toLocaleDateString('en-GB') : 'Not set';
-
-import { StatusBadge } from '@/components/common/StatusBadge';
-import { OrderActionButton } from '@/components/common/OrderActionButton';
 
 export default function PMSupplierOrdersPage() {
   const { isMobile } = useResponsive();
@@ -49,7 +49,7 @@ export default function PMSupplierOrdersPage() {
       try {
         const [profileRes, ordersRes, materialsRes] = await Promise.all([
           supabase.from('profiles').select('full_name, company_name').eq('id', id).single(),
-          supabase.auth.getSession().then(({ data }) => 
+          supabase.auth.getSession().then(({ data }) =>
             supabase.from('purchase_orders')
               .select('id, po_number, material_id, quantity_ordered, total_price, status, expected_date, created_at, items, projects!inner(name, pm_id)')
               .eq('supplier_id', id)
@@ -61,7 +61,7 @@ export default function PMSupplierOrdersPage() {
 
         if (profileRes.error) throw profileRes.error;
         if (ordersRes.error) throw ordersRes.error;
-        
+
         const materialsList = materialsRes?.data || [];
         const mergedOrders = (ordersRes.data || []).map(order => {
           const mat: any = materialsList.find(m => m.id === order.material_id) || {};
@@ -98,14 +98,14 @@ export default function PMSupplierOrdersPage() {
   const handleAction = async (orderId: string, action: 'approve' | 'reject' | 'deliver', poName: string) => {
     const isReject = action === 'reject';
     const confirmMessage = isReject ? `Reject ${poName}?` : `Are you sure you want to ${action} this order?`;
-    
+
     const executeAction = async () => {
       setActionLoading(orderId);
       try {
         if (action === 'approve') await api.purchaseOrders.approve(orderId, {});
         else if (action === 'reject') await api.purchaseOrders.reject(orderId);
         else if (action === 'deliver') await api.purchaseOrders.deliver(orderId);
-        
+
         setRefreshTrigger(v => v + 1);
         const msg = action === 'deliver' ? 'Order marked as delivered successfully' : `Order ${action}d successfully`;
         if (Platform.OS === 'web') window.alert(msg); else Alert.alert('Success', msg);
@@ -132,7 +132,7 @@ export default function PMSupplierOrdersPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title={`${supplierName} Orders`} showAction={false} />
-      
+
       {loading ? (
         <View className="flex-1 items-center justify-center p-8">
           <ActivityIndicator size="large" color="#F97316" />
@@ -170,7 +170,7 @@ export default function PMSupplierOrdersPage() {
                 const matUnit = order.materials?.unit || '';
                 const poName = order.po_number || 'Order';
                 const hasPrice = order.total_price != null && Number.isFinite(Number(order.total_price));
-                
+
                 return (
                   <View key={order.id} className="flex-row items-center border-b border-gray-100 py-4 px-4 bg-white">
                     <View className="flex-[0.8] pr-2">

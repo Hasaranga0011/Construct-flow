@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Platform } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useResponsive } from "../../hooks/useResponsive";
@@ -18,6 +18,7 @@ interface StatCardProps {
   fullWidth?: boolean;
   compact?: boolean;
   colorScheme?: StatCardColorScheme;
+  onPress?: () => void;
 }
 
 const COLOR_CONFIGS: Record<StatCardColorScheme, {
@@ -194,26 +195,33 @@ export const StatCard = ({
   fullWidth,
   compact = false,
   colorScheme,
+  onPress,
 }: StatCardProps) => {
   const { isPhone, isTablet, isDesktop } = useResponsive();
   const { isDark } = useTheme();
 
   const scheme = colorScheme || getAutoColorScheme(label, indicatorType);
   const config = COLOR_CONFIGS[scheme] || COLOR_CONFIGS.blue;
+  const Container = onPress ? Pressable : View;
 
   return (
-    <View
+    <Container
+      onPress={onPress}
+      accessibilityRole={onPress ? 'link' : undefined}
+      accessibilityLabel={onPress ? `Open ${label} details` : undefined}
+      testID={onPress ? 'dashboard-stat-link' : undefined}
       style={[
         {
-          backgroundColor: isDark ? config.bgDark : config.bgLight,
-          borderColor: isDark ? config.borderDark : config.borderLight,
-          borderWidth: 1.2,
-          borderRadius: 16,
-          shadowColor: config.shadowColor,
+          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+          borderColor: isDark ? '#334155' : '#e2e8f0',
+          borderWidth: 1,
+          borderRadius: 20,
+          minHeight: compact ? 120 : isPhone ? 154 : 164,
+          shadowColor: '#0f172a',
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0 : 0.07,
-          shadowRadius: 8,
-          elevation: 2,
+          shadowOpacity: isDark ? 0 : 0.035,
+          shadowRadius: 10,
+          elevation: 1,
         },
         !fullWidth && isTablet ? { flexBasis: "45%", flexGrow: 1, minWidth: 0 } : { minWidth: 0 },
       ]}
@@ -225,16 +233,16 @@ export const StatCard = ({
           : "flex-1 mx-1 md:mx-2 mb-3 md:mb-0"
       }`}
     >
-      <View className="flex-row justify-between items-center mb-3">
+      <View className="flex-row justify-between items-center min-h-[40px] mb-3">
         <Text
           style={{
             flexShrink: 1,
             minWidth: 0,
-            color: isDark ? config.labelColorDark : config.labelColorLight,
+            color: isDark ? '#cbd5e1' : '#64748b',
           }}
           maxFontSizeMultiplier={1.3}
-          className={`flex-1 min-w-0 text-xs font-bold tracking-wider ${
-            compact ? "" : "pr-2 uppercase"
+          className={`flex-1 min-w-0 text-xs font-semibold leading-5 ${
+            compact ? "" : "pr-2"
           }`}
         >
           {label}
@@ -243,7 +251,7 @@ export const StatCard = ({
           style={{
             width: compact ? 30 : 36,
             height: compact ? 30 : 36,
-            borderRadius: 10,
+            borderRadius: 12,
             backgroundColor: isDark ? config.iconBgDark : config.iconBgLight,
             alignItems: "center",
             justifyContent: "center",
@@ -255,7 +263,7 @@ export const StatCard = ({
             <Ionicons
               name={getDefaultIcon(label, scheme)}
               size={compact ? 15 : 18}
-              color={config.iconColor}
+              color={isDark ? config.indicatorTextColorDark : config.iconColor}
             />
           )}
         </View>
@@ -263,15 +271,15 @@ export const StatCard = ({
 
       <AutoFitText
         value={value}
-        maxFontSize={compact || !isDesktop ? 24 : 30}
+        maxFontSize={compact || !isDesktop ? 25 : 32}
         minFontSize={16}
         className="font-extrabold text-brand-text dark:text-white"
-        containerStyle={{ marginBottom: 8 }}
+        containerStyle={{ marginBottom: 12 }}
         captionClassName="text-brand-text-muted"
       />
 
       {indicatorText ? (
-        <View className="flex-row items-center gap-1.5 mt-auto">
+        <View className="flex-row items-center gap-1.5 min-h-[44px] mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
           <View
             style={{
               width: 7,
@@ -293,11 +301,11 @@ export const StatCard = ({
               minWidth: 0,
               color:
                 indicatorType === "danger"
-                  ? "#DC2626"
+                  ? (isDark ? '#fca5a5' : "#DC2626")
                   : indicatorType === "warning"
-                  ? "#D97706"
+                  ? (isDark ? '#fbbf24' : "#D97706")
                   : indicatorType === "success"
-                  ? "#059669"
+                  ? (isDark ? '#34d399' : "#059669")
                   : (isDark ? config.indicatorTextColorDark : config.indicatorTextColorLight),
             }}
             maxFontSizeMultiplier={1.3}
@@ -305,8 +313,9 @@ export const StatCard = ({
           >
             {indicatorText}
           </Text>
+          {!!onPress && <Ionicons name="arrow-forward" size={15} color={isDark ? '#fb923c' : '#ea580c'} />}
         </View>
       ) : null}
-    </View>
+    </Container>
   );
 };

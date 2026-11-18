@@ -27,13 +27,38 @@
  *   winget install Gyan.FFmpeg
  */
 
+/**
+ * ConstructAi — Home / Landing Page (rewritten)
+ *
+ * SCROLL-DRIVEN VIDEO BACKGROUND
+ * ─────────────────────────────────
+ * injectVideoBackground() (web-only, called in useEffect) creates a fixed
+ * <video> element behind all content and drives it with a requestAnimationFrame
+ * loop that maps scroll progress (0→1) to video.currentTime (0→duration).
+ * Lerp easing (LERP_FACTOR) makes forward and reverse scrubbing feel smooth.
+ *
+ * TUNEABLE constants at the top of this file:
+ *   BLUR          — video layer backdrop blur        (default "10px")
+ *   DIM           — dark overlay opacity, 0–1        (default "0.45")
+ *   SCROLL_LENGTH — scroll height for one full orbit (default "600vh")
+ *   LERP_FACTOR   — easing smoothness, lower=smoother (default 0.10)
+ *
+ * VIDEO ASSET
+ * ───────────
+ * Place homepage.mp4 (or homepage_scroll.mp4) at:
+ *   frontend/assets/images/homepage.mp4
+ *
+ * For smooth reverse scrubbing, re-encode with ffmpeg (all-keyframe):
+ *   ffmpeg -i homepage.mp4 -c:v libx264 -g 1 -crf 23 -an
+ *          -movflags +faststart -vf "scale=1920:-2" homepage_scroll.mp4
+ *
+ * ffmpeg install on Windows (if missing):
+ *   winget install Gyan.FFmpeg
+ */
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
-import { Alert } from 'react-native';
-import {
-  View, Text, ScrollView, Pressable, Image,
-  TextInput, useWindowDimensions, Platform, Animated,
-} from 'react-native';
+
+import { Alert, View, Text, ScrollView, Pressable, Image, TextInput, useWindowDimensions, Platform, Animated } from 'react-native';
+
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -41,16 +66,20 @@ import { getDashboardForRole } from '../utils/auth';
 import { getApiUrl } from '../lib/apiUrl';
 
 
-import { LinearGradient } from 'expo-linear-gradient';
-
-// ─── Tuneable constants (adjust here — no other file needs changing) ──────────
-const BLUR: string   = '3px';   // CSS blur on the video layer
-const DIM: string    = '0.45';   // dark overlay opacity 0=none 1=black
-const SCROLL_LENGTH  = '600vh';  // scroll distance for one full video pass
-const LERP_FACTOR    = 0.10;    // easing factor (lower=smoother/more lag)
+import { LinearGradient } from 'expo-linear-gradient'; // easing factor (lower=smoother/more lag)
+    // easing factor (lower=smoother/more lag)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
 import { injectVideoBackground } from '@/components/landing/LandingVideoBg';
+
+import { BlurView } from 'expo-blur';
+
+// ─── Tuneable constants (adjust here — no other file needs changing) ──────────
+   // CSS blur on the video layer
+   // dark overlay opacity 0=none 1=black
+  // scroll distance for one full video pass
+
 
 
 const AnimatedCounter = ({
@@ -121,20 +150,18 @@ const PortalToggle = () => {
   );
 };
 
-import { BlurView } from 'expo-blur';
-
 const GlassSection = ({ style, className, children, id, onLayout, intensity = 20, tint = 'dark' }: any) => {
   if (Platform.OS === 'web') {
     return <View id={id} onLayout={onLayout} style={style} className={className}>{children}</View>;
   }
-  
+
   let bg = 'transparent';
   let newStyle = { ...style };
   if (newStyle.backgroundColor) {
     bg = newStyle.backgroundColor;
     delete newStyle.backgroundColor;
   }
-  
+
   return (
     <View id={id} onLayout={onLayout} style={[newStyle, { overflow: 'hidden' }]} className={className}>
       <BlurView intensity={intensity} tint={tint} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg }} />
@@ -170,15 +197,15 @@ export default function LandingPage() {
           message: contactMessage
         })
       });
-      
+
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         throw new Error(`Server status ${response.status}: ${errText}`);
       }
-      
+
       if (Platform.OS === 'web') { alert('Message Sent! Our team will get back to you shortly.'); }
       else { Alert.alert('Message Sent', 'Our team will get back to you shortly.'); }
-      
+
       setContactName('');
       setContactEmail('');
       setContactProject('');
@@ -193,17 +220,16 @@ export default function LandingPage() {
   };
 
   const { session, role } = useAuth();
-  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [countersTriggered, setCountersTriggered] = useState(false);
   const [countersY, setCountersY] = useState(0);
   const { height: wh, width: ww } = useWindowDimensions();
   const isMobile = ww < 768;
-  const isTablet = ww >= 768 && ww < 1024;
+
   const isSmallPhone = ww < 480;
   const isSm = ww >= 640;
-  const isWeb = Platform.OS === 'web';
+
   const cleanup = useRef<() => void>(() => {});
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -213,16 +239,13 @@ export default function LandingPage() {
     return () => cleanup.current?.();
   }, []);
 
-  const handleCTA = () => {
-    if (session) router.push((role ? getDashboardForRole(role) : '/') as any);
-    else router.push('/register');
-  };
+
 
   const handleScroll = (e: any) => {
     const y = e.nativeEvent.contentOffset.y;
     const contentHeight = e.nativeEvent.contentSize.height;
     const layoutHeight = e.nativeEvent.layoutMeasurement.height;
-    
+
     if (Platform.OS === 'web') {
       const sm = contentHeight - layoutHeight;
       (window as any).__cfScrollProgress = sm > 0 ? Math.max(0, Math.min(y / sm, 1)) : 0;
@@ -253,7 +276,7 @@ export default function LandingPage() {
   ];
 
   const features = [
-    { icon: <Ionicons name="people" size={28} color="#F97316" />,          title: 'Role-Based Portals',  desc: 'Separate dashboards for Admin, PM, Site Manager, Supplier, Client and Worker \u2014 each scoped to their data with live Supabase sync.' },
+    { icon: <Ionicons name="people" size={28} color="#F97316" />,          title: 'Role-Based Portals',  desc: 'Separate dashboards for Admin, Project Manager, Site Manager, Supplier, Client and Worker \u2014 each scoped to their data with live Supabase sync.' },
     { icon: <Ionicons name="layers" size={26} color="#F97316" />,          title: 'Live Inventory',      desc: 'Track Portland Cement, River Sand, Steel Rebar and 200+ materials across all sites with instant low-stock alerts to your phone.' },
     { icon: <Ionicons name="hammer" size={28} color="#F97316" />,          title: 'QR Attendance',       desc: 'Workers scan site-specific QR codes to check in. Masons, carpenters, plumbers \u2014 all tracked with hours worked and daily snapshots.' },
     { icon: <Ionicons name="pie-chart" size={28} color="#F97316" />,       title: 'AI Cost Estimator',   desc: 'RandomForest ML trained on 50,000 Sri Lankan data points. Get LKR-accurate predictions with R\u00b2 = 0.95 confidence in seconds.' },
@@ -270,7 +293,7 @@ export default function LandingPage() {
         />
       )}
 
-      
+
       <ScrollView bounces={false} keyboardShouldPersistTaps="handled" ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 
       {/* NAVBAR */}
@@ -567,11 +590,11 @@ export default function LandingPage() {
                   <TextInput maxFontSizeMultiplier={1.3} placeholder="Your Name" placeholderTextColor="rgba(156,163,175,0.65)"
                     value={contactName} onChangeText={setContactName}
                     style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
-                  
+
                   <TextInput maxFontSizeMultiplier={1.3} placeholder="Email Address" placeholderTextColor="rgba(156,163,175,0.65)"
                     value={contactEmail} onChangeText={setContactEmail} keyboardType="email-address" autoCapitalize="none"
                     style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
-                    
+
                   <TextInput maxFontSizeMultiplier={1.3} placeholder="Company / Project Name" placeholderTextColor="rgba(156,163,175,0.65)"
                     value={contactProject} onChangeText={setContactProject}
                     style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
@@ -579,7 +602,7 @@ export default function LandingPage() {
                   <TextInput maxFontSizeMultiplier={1.3} placeholder="Your message" placeholderTextColor="rgba(156,163,175,0.65)"
                     multiline textAlignVertical="top" value={contactMessage} onChangeText={setContactMessage}
                     style={[{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 16, color: '#fff', height: 120, marginBottom: 14 }, { minHeight: 44, minWidth: 44 }]} />
-                  
+
                   <Pressable className="w-full py-4 rounded-xl items-center" disabled={isSubmitting} onPress={handleContactSubmit}
                     style={[{ backgroundColor: isSubmitting ? '#fb923c' : '#F97316', shadowColor: '#F97316', shadowOpacity: 0.4, shadowRadius: 16 }, { minHeight: 44, minWidth: 44 }]}>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-bold text-lg">
@@ -655,15 +678,15 @@ export default function LandingPage() {
           </View>
         </View>
 
-      
-      <Pressable 
-        style={{ minHeight: 44, minWidth: 44, position: 'absolute', right: 24, bottom: 24, zIndex: 9999 }} 
-        onPress={() => scrollRef.current?.scrollTo({y: 0, animated: true})} 
+
+      <Pressable
+        style={{ minHeight: 44, minWidth: 44, position: 'absolute', right: 24, bottom: 24, zIndex: 9999 }}
+        onPress={() => scrollRef.current?.scrollTo({y: 0, animated: true})}
         className="bg-brand-orange p-3 rounded-full shadow-2xl hover:scale-110 transition-transform cursor-pointer"
       >
         <Ionicons name="arrow-up" size={24} color="white" />
       </Pressable>
-      
+
       </ScrollView>
 
     </View>

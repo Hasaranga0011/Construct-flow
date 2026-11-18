@@ -1,39 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Modal, TextInput, Platform } from 'react-native';
-import { api } from '../../services/api';
-import { useResponsive } from '../../hooks/useResponsive';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import React from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
+import { useTableLayout } from '@/hooks/useTableLayout';
 
-const showError = (fallback: string, e: any) => {
-  const msg = e?.message || e?.detail || fallback;
-  if (Platform.OS === 'web') window.alert(msg); else Alert.alert('Error', msg);
-};
 
 
 
 const OrderRow = ({ order, onOpen, isMobile }: any) => {
   const projectName = order.project_name || order.projects?.name || 'Unknown Project';
-  const isPending = order.status === 'Pending Delivery';
-  const isConfirmed = order.status === 'Confirmed';
-  const isRejected = order.status === 'Rejected';
-  const isSuggested = order.status === 'Suggested';
-  const isDelivered = order.status === 'Delivered';
-  const isReceived = order.status === 'Received';
 
-  const getStatusColor = () => {
-    if (isPending) return 'bg-orange-100 text-brand-warning';
-    if (isConfirmed) return 'bg-blue-100 text-blue-600';
-    if (isRejected) return 'bg-red-100 text-red-600';
-    if (isSuggested) return 'bg-yellow-100 text-yellow-700';
-    if (isDelivered) return 'bg-purple-100 text-purple-700';
-    if (isReceived) return 'bg-green-100 text-green-700';
-    return 'bg-green-100 text-green-600';
-  };
+  const isSuggested = order.status === 'Suggested';
 
   if (isMobile) {
     return (
       <View style={{ flexDirection: 'column', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', width: '100%' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, width: '100%' }}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text maxFontSizeMultiplier={1.3} onPress={onOpen ? () => onOpen(order.id) : undefined} style={[[{ flexShrink: 1, minWidth: 0 }, { color: '#111827', fontWeight: 'bold', fontSize: 16, textDecorationLine: onOpen ? 'underline' : 'none' }], { minHeight: 44, minWidth: 44 }]}>{order.po_number}</Text>
             <Text maxFontSizeMultiplier={1.3}
               onPress={() => {
@@ -48,9 +30,7 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <View className={`px-2 py-1 rounded ${getStatusColor().split(' ')[0]}`}>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusColor().split(' ')[1]}`}>{order.status}</Text>
-            </View>
+            <StatusBadge status={order.status} />
           </View>
         </View>
 
@@ -67,7 +47,7 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
                   const lastNote = [...log].reverse().find((e: any) => e.note);
                   if (lastNote) return <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }]}>Note: {lastNote.note}</Text>;
                 }
-              } catch(e) {}
+              } catch {}
               return <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#CA8A04', fontSize: 11, fontStyle: 'italic', marginTop: 4 }]}>Note: {order.supplier_notes}</Text>;
             })()}
           </View>
@@ -109,7 +89,7 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
   return (
     <View className="flex-row items-center py-4 border-b border-gray-100">
       <View className="w-[15%] pr-2">
-        <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} onPress={onOpen ? () => onOpen(order.id) : undefined} className={`text-brand-text font-bold text-sm ${onOpen ? 'hover:text-brand-orange underline' : ''}`}>{order.po_number}</Text>
+        <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} onPress={onOpen ? () => onOpen(order.id) : undefined} className={`text-brand-text dark:text-slate-100 font-bold text-sm ${onOpen ? 'hover:text-brand-orange underline' : ''}`}>{order.po_number}</Text>
         <Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3}
           onPress={() => {
             if (order.project_location) {
@@ -117,7 +97,7 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
               else Alert.alert('Project Location', order.project_location);
             }
           }}
-          className={`text-gray-500 text-xs ${order.project_location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
+          className={`text-slate-500 dark:text-slate-400 text-xs ${order.project_location ? 'underline cursor-pointer hover:text-brand-orange' : ''}`}
 
         >
           {projectName}
@@ -125,7 +105,7 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
       </View>
 
       <View className="w-[20%] pr-2">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm">
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-sm">
           {order.items || `Material ID: ${order.material_id}`}
         </Text>
         {isSuggested && order.supplier_notes && (() => {
@@ -135,16 +115,16 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
               const lastNote = [...log].reverse().find((e: any) => e.note);
               if (lastNote) return <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-600 text-xs italic mt-1">Note: {lastNote.note}</Text>;
             }
-          } catch(e) {}
+          } catch {}
           return <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-600 text-xs italic mt-1">Note: {order.supplier_notes}</Text>;
         })()}
       </View>
 
       <View className="w-[12%]">
         {isSuggested ? (
-           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium line-through text-gray-400">{order.quantity_ordered}</Text>
+           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-sm font-medium line-through text-gray-400">{order.quantity_ordered}</Text>
         ) : (
-           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">{order.quantity_ordered}</Text>
+           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-sm font-medium">{order.quantity_ordered}</Text>
         )}
         {isSuggested && (
            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-700 text-sm font-bold">{order.suggested_quantity}</Text>
@@ -154,21 +134,17 @@ const OrderRow = ({ order, onOpen, isMobile }: any) => {
 
       <View className="w-[12%]">
         {isSuggested ? (
-           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium line-through text-gray-400">{order.expected_date}</Text>
+           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-sm font-medium line-through text-gray-400">{order.expected_date}</Text>
         ) : (
-           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-medium">{order.expected_date}</Text>
+           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 text-sm font-medium">{order.expected_date}</Text>
         )}
         {isSuggested && (
            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-yellow-700 text-sm font-bold">{order.suggested_date}</Text>
         )}
       </View>
 
-      <View className="w-[12%]">
-        <View className={`px-2 py-1 rounded self-start ${getStatusColor().split(' ')[0]}`}>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold ${getStatusColor().split(' ')[1]}`}>
-            {order.status}
-          </Text>
-        </View>
+      <View className="w-[144px] shrink-0">
+        <StatusBadge status={order.status} />
       </View>
 
       <View className="flex-1 flex-row justify-end pl-1">
@@ -194,25 +170,25 @@ export const SupplierOrdersTable = ({
   title?: string,
   subtitle?: string,
 }) => {
-  const { isMobile } = useResponsive();
+  const { isCompact:isMobile, onLayout } = useTableLayout(980);
   const orders = sourceOrders.map(o => ({ ...o, projects: o.projects || { name: o.project_name } }));
   const loading = sourceLoading;
 
   return (
-    <View className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[500px]'}`}>
+    <View onLayout={onLayout} className={`bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 ${isMobile ? '' : 'flex-1 min-h-[500px]'}`}>
       <View className="mb-6">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">{title}</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">{title}</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">{subtitle}</Text>
       </View>
 
       {!isMobile && (
         <View className="flex-row py-3 border-b border-gray-200 pr-2">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO / Project</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Items</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Quantity / Cost</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Expected By</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">PO / Project</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Items</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Quantity / Cost</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Expected By</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[144px] shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Status</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-right">Action</Text>
         </View>
       )}
 

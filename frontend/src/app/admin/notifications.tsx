@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { ModalViewport } from '../../components/common/ModalViewport';
@@ -14,7 +14,7 @@ export default function NotificationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
-  
+
   const visibleNotifications = notifications.filter(n => {
     if (unreadOnly && n.is_read) return false;
     if (searchQuery) {
@@ -36,7 +36,7 @@ export default function NotificationsScreen() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-    
+
     if (diffInMinutes < 60) return `${diffInMinutes} mins ago`;
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours} hrs ago`;
@@ -47,13 +47,13 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Notifications" 
-        showAction={false} 
+      <TopNav
+        title="Notifications"
+        showAction={false}
       />
-      
+
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6 max-w-4xl mx-auto w-full'}`} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header Controls */}
         <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Notifications</Text>
@@ -90,7 +90,7 @@ export default function NotificationsScreen() {
               const props = getIconProps(n.title || '');
               return (
                 <Pressable style={{ minHeight: 44, minWidth: 44 }} key={n.id} onPress={() => !n.is_read && markAsRead(n.id)}>
-                  <NotificationCard 
+                  <NotificationCard
                     title={n.title}
                     subtitle={`${n.message} · ${getTimeAgo(n.created_at)}`}
                     iconFamily={props.iconFamily}
@@ -107,7 +107,7 @@ export default function NotificationsScreen() {
             })
           )}
         </View>
-        
+
       </ScrollView>
 
       {/* Notification Detail Modal */}
@@ -124,7 +124,7 @@ export default function NotificationsScreen() {
               <View className="p-6">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 text-base leading-relaxed mb-6">{selectedNotification.message}</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-sm mb-6">{new Date(selectedNotification.created_at).toLocaleString()}</Text>
-                
+
                 <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setSelectedNotification(null)} className="bg-gray-100 rounded-xl py-3 items-center">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">Close</Text>
                 </Pressable>

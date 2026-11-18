@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,8 +10,13 @@ type AuthPageLayoutProps = {
 export default function AuthPageLayout({ children, hero }: AuthPageLayoutProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const viewportHeight = Math.max(0, height - insets.top - insets.bottom);
-  const showHero = width >= 1024;
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+  // Static HTML and the first browser render must have the same structure.
+  // Apply viewport-dependent panels only after hydration resolves real dimensions.
+  const dimensionsReady = Platform.OS !== 'web' || hydrated;
+  const viewportHeight = dimensionsReady ? Math.max(0, height - insets.top - insets.bottom) : 0;
+  const showHero = dimensionsReady && width >= 1024;
 
   return (
     <KeyboardAvoidingView
@@ -31,7 +36,7 @@ export default function AuthPageLayout({ children, hero }: AuthPageLayoutProps) 
           flexShrink: 0,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingHorizontal: width < 768 ? 24 : 48,
+          paddingHorizontal: !dimensionsReady || width < 768 ? 24 : 48,
           paddingVertical: 32,
         }}>
           <View style={{ width: '100%', maxWidth: 448, flexShrink: 1 }}>

@@ -4,7 +4,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView 
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { toast } from '../../lib/toast';
+
 import { notify } from '../../utils/notify';
 import { noAutofill } from '../../lib/formAutofill';
 
@@ -24,7 +24,7 @@ export const InviteClientModal = ({ visible, onClose, onSuccess }: InviteClientM
 
   const [loading, setLoading] = useState(false);
   const [fetchingProjects, setFetchingProjects] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [, setErrorMsg] = useState('');
 
   // Fetch active projects and reset inputs when modal opens
   useEffect(() => {

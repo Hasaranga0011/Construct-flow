@@ -35,7 +35,7 @@ export default function SupplierDetailPage() {
           .select('*')
           .eq('id', supplierId)
           .single();
-          
+
         if (supErr) {
           if (supErr.code === 'PGRST116') {
              if (isMounted) setSupplier(null);
@@ -45,7 +45,7 @@ export default function SupplierDetailPage() {
         } else {
            if (isMounted) setSupplier(sup);
         }
-        
+
         const { data: sessionData } = await supabase.auth.getSession();
         const pmId = sessionData.session?.user.id;
         if (!pmId) throw new Error('Please sign in again.');
@@ -57,7 +57,7 @@ export default function SupplierDetailPage() {
           .eq('projects.pm_id', pmId)
           .order('created_at', { ascending: false });
         if (ordErr) throw ordErr;
-        
+
         if (isMounted) {
           setOrders(ords || []);
         }
@@ -70,7 +70,7 @@ export default function SupplierDetailPage() {
     };
     fetchData();
     return () => { isMounted = false; };
-  }, [id, refreshTrigger]);
+  }, [supplierId, refreshTrigger]);
 
   if (loading) {
     return (
@@ -127,7 +127,7 @@ export default function SupplierDetailPage() {
     <View className="flex-1 bg-gray-50">
       <TopNav title={supplier.full_name || 'Supplier'} actionLabel="Back" onActionPress={() => router.back()} />
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        
+
         {/* Contact Details Card */}
         <View className="bg-white rounded-2xl p-6 mb-5 shadow-sm border border-gray-200/90">
           <View className="flex-row items-start justify-between mb-4">
@@ -182,10 +182,10 @@ export default function SupplierDetailPage() {
         {/* Colorful Stat Cards Row */}
         <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
           <AnimatedCard delay={100} style={isMobile ? { width: '48%', marginBottom: 12 } : { flex: 1 }}>
-            <StatCard 
-              label="Active Orders" 
-              value={activeOrders.toString()} 
-              indicatorText={activeOrders > 0 ? "Pending fulfillment" : "All orders fulfilled"} 
+            <StatCard
+              label="Active Orders"
+              value={activeOrders.toString()}
+              indicatorText={activeOrders > 0 ? "Pending fulfillment" : "All orders fulfilled"}
               indicatorType={activeOrders > 0 ? "warning" : "success"}
               colorScheme="amber"
               icon={<Ionicons name="cart" size={18} color="#D97706" />}
@@ -193,22 +193,22 @@ export default function SupplierDetailPage() {
             />
           </AnimatedCard>
           <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 12 } : { flex: 1 }}>
-            <StatCard 
-              label="Delivered" 
-              value={deliveredOrders.toString()} 
-              indicatorText="Fulfilled orders" 
-              indicatorType="success" 
+            <StatCard
+              label="Delivered"
+              value={deliveredOrders.toString()}
+              indicatorText="Fulfilled orders"
+              indicatorType="success"
               colorScheme="emerald"
               icon={<Icon name="truck-check" size={18} color="#059669" />}
               fullWidth
             />
           </AnimatedCard>
           <AnimatedCard delay={300} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
-            <StatCard 
-              label="Total Spent" 
-              value={formatMoney(totalSpent)} 
-              indicatorText="Delivered materials" 
-              indicatorType="neutral" 
+            <StatCard
+              label="Total Spent"
+              value={formatMoney(totalSpent)}
+              indicatorText="Delivered materials"
+              indicatorType="neutral"
               colorScheme="purple"
               icon={<Ionicons name="wallet-outline" size={18} color="#7C3AED" />}
               fullWidth
@@ -216,7 +216,7 @@ export default function SupplierDetailPage() {
           </AnimatedCard>
         </View>
 
-        <Pressable 
+        <Pressable
           style={{ minHeight: 44 }}
           onPress={() => router.push(`/pm/suppliers/${id}/orders`)}
           className="bg-brand-orange hover:bg-orange-600 active:bg-orange-700 rounded-xl p-4 items-center justify-center mb-6 shadow-sm flex-row"

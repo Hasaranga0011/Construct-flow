@@ -1,7 +1,10 @@
+import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
+import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
 // Modified for Expo Go mobile compatibility
-import React, { useCallback, useMemo, useState } from 'react';
+// Modified for Expo Go mobile compatibility
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { AnimatedCard } from '../../components/common/AnimatedCard';
@@ -11,13 +14,7 @@ import { SupplierAlertsPanel } from '../../components/supplier/SupplierAlertsPan
 import { SupplierPendingDeliveries } from '../../components/supplier/SupplierPendingDeliveries';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useResponsive } from '../../hooks/useResponsive';
-import {
-  useSupplierOrders,
-  deriveSupplierStats,
-  matchesSupplierSearch,
-  buildOrderSuggestions,
-  PO_STATUS,
-} from '../../hooks/useSupplierOrders';
+import { useSupplierOrders, deriveSupplierStats, matchesSupplierSearch, buildOrderSuggestions, PO_STATUS } from '../../hooks/useSupplierOrders';
 
 const OPEN_STATUSES: string[] = [PO_STATUS.PENDING, PO_STATUS.SUGGESTED, PO_STATUS.CONFIRMED, PO_STATUS.DELIVERED];
 const DONE_STATUSES: string[] = [PO_STATUS.DELIVERED, PO_STATUS.RECEIVED];
@@ -25,6 +22,8 @@ const DONE_STATUSES: string[] = [PO_STATUS.DELIVERED, PO_STATUS.RECEIVED];
 export default function SupplierDashboardScreen() {
   const { isMobile } = useResponsive();
   const router = useRouter();
+  const inboxScroll = useRef<ScrollView>(null);
+  const inboxY = useRef(0);
   // Single realtime source for every widget on this screen.
   const { orders, projects, stats: globalStats, loading, lastUpdated, refresh } = useSupplierOrders();
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,9 +77,9 @@ export default function SupplierDashboardScreen() {
   };
 
   return (
-    <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Supplier Dashboard" 
+    <View className="flex-1 bg-brand-light dark:bg-slate-950">
+      <TopNav
+        title="Supplier Dashboard"
         showAction={false}
       />
 
@@ -89,12 +88,14 @@ export default function SupplierDashboardScreen() {
           <ActivityIndicator size="large" color="#F97316" />
         </View>
       ) : (
-        <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <DashboardContent scrollRef={inboxScroll}>
+          <DashboardHero eyebrow="Supplier workspace" title="Orders & deliveries" description="Purchase orders awaiting review and upcoming deliveries." icon="cube-outline" />
+
           {/* Header row with Title and Search */}
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <View>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Supplier Dashboard</Text>
-              <View className="flex-row items-center mt-1">
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-slate-900 dark:text-white">Order overview</Text>
+              <View className="flex-row flex-wrap items-center mt-1 gap-2">
                 <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">
                   Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}
@@ -102,6 +103,7 @@ export default function SupplierDashboardScreen() {
                 {searchQuery.trim() !== '' && (
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-brand-orange ml-3">Filtered by &quot;{searchQuery}&quot;</Text>
                 )}
+                <Pressable accessibilityRole="button" accessibilityLabel="Refresh supplier dashboard" onPress={refresh} className="min-w-[44px] min-h-[44px] items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"><Ionicons name="refresh-outline" size={17} color="#64748b" /></Pressable>
               </View>
             </View>
 
@@ -116,48 +118,57 @@ export default function SupplierDashboardScreen() {
           </View>
 
           {/* Top Stat Cards Row */}
-          <View className={isMobile ? "flex-col mb-6" : "flex-row gap-4 mb-6"}>
-            <AnimatedCard delay={100} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
-              <StatCard 
-                label="New Orders" 
-                value={stats.pendingOrders.toString()} 
-                indicatorText="Requires approval" 
-                indicatorType="warning" 
+          <View className="flex-row flex-wrap mb-6" style={{ gap:isMobile ? 0 : 16, justifyContent:isMobile ? 'space-between' : undefined }}>
+            <AnimatedCard delay={100} style={isMobile ? { width: '48%', minWidth: 0, marginBottom: 12 } : { flex: 1, minWidth: 0 }}>
+              <StatCard onPress={() => router.push('/supplier/orders' as Href)}
+                label="New Orders"
+                value={stats.pendingOrders.toString()}
+                indicatorText="Requires approval"
+                indicatorType="warning"
+                fullWidth
                 colorScheme="blue"
               />
             </AnimatedCard>
-            <AnimatedCard delay={200} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
-              <StatCard 
-                label="In Transit" 
-                value={stats.confirmedOrders.toString()} 
-                indicatorText="Confirmed, awaiting dispatch" 
+            <AnimatedCard delay={200} style={isMobile ? { width: '48%', minWidth: 0, marginBottom: 12 } : { flex: 1, minWidth: 0 }}>
+              <StatCard onPress={() => router.push('/supplier/deliveries')} 
+                label="In Transit"
+                value={stats.confirmedOrders.toString()}
+                indicatorText="Confirmed, awaiting dispatch"
                 indicatorType="success"
+                fullWidth
                 colorScheme="emerald"
               />
             </AnimatedCard>
-            <AnimatedCard delay={300} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
-              <StatCard 
-                label="Late Deliveries" 
-                value={stats.lateDeliveries.toString()} 
-                indicatorText="Overdue items" 
-                indicatorType={stats.lateDeliveries > 0 ? "danger" : "success"} 
+            <AnimatedCard delay={300} style={isMobile ? { width: '48%', minWidth: 0, marginBottom: 12 } : { flex: 1, minWidth: 0 }}>
+              <StatCard onPress={() => router.push('/supplier/deliveries')} 
+                label="Late Deliveries"
+                value={stats.lateDeliveries.toString()}
+                indicatorText="Overdue items"
+                indicatorType={stats.lateDeliveries > 0 ? "danger" : "success"}
+                fullWidth
                 colorScheme="rose"
               />
             </AnimatedCard>
-            <AnimatedCard delay={400} style={isMobile ? { width: '100%', marginBottom: 12 } : { flex: 1 }}>
-              <StatCard 
-                label="Total Revenue" 
-                value={formatCurrency(stats.totalRevenue)} 
-                indicatorText="Confirmed, delivered & received" 
+            <AnimatedCard delay={400} style={isMobile ? { width: '48%', minWidth: 0, marginBottom: 12 } : { flex: 1, minWidth: 0 }}>
+              <StatCard onPress={() => router.push('/supplier/orders/history')} 
+                label="Total Revenue"
+                value={formatCurrency(stats.totalRevenue)}
+                indicatorText="Confirmed, delivered & received"
+                fullWidth
                 colorScheme="purple"
               />
             </AnimatedCard>
           </View>
 
+          <DashboardActions actions={[
+            { label:'Order inbox', description:'Review and respond to orders', icon:'receipt-outline', onPress:()=>{ setSelectedProjectId(null); setSearchQuery(''); inboxScroll.current?.scrollTo({ y:inboxY.current, animated:true }); } },
+            { label:'Deliveries', description:'Plan your upcoming dispatches', icon:'car-outline', onPress:()=>router.push('/supplier/deliveries') },
+            { label:'Messages', description:'Coordinate with project teams', icon:'chatbubbles-outline', onPress:()=>router.push('/supplier/messages') },
+          ]} />
           {/* Assigned Projects Section */}
           <View className="mb-6">
             <View className="flex-row justify-between items-center mb-4">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800">Projects I Supply</Text>
+              <View className="flex-1 min-w-0"><DashboardSectionHeading title="Projects you supply" description="Select a project to focus your order inbox." icon="business-outline" /></View>
               {selectedProjectId && (
                  <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => setSelectedProjectId(null)}>
                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-sm">Clear Filter</Text>
@@ -166,7 +177,7 @@ export default function SupplierDashboardScreen() {
             </View>
 
             {assignedProjects.length === 0 ? (
-              <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 items-center justify-center">
+              <View className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 p-8 items-center justify-center">
                 <Ionicons name="business-outline" size={48} color="#D1D5DB" className="mb-4" />
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-medium">Not currently assigned to any projects.</Text>
               </View>
@@ -174,10 +185,11 @@ export default function SupplierDashboardScreen() {
               <View className="flex-row flex-wrap -mx-2">
                 {assignedProjects.map(proj => (
                   <View key={proj.id} style={{ width: isMobile ? '100%' : '33.333%', paddingHorizontal: 8, marginBottom: 16, minWidth: 0 }}>
-                    <Pressable 
+                    <Pressable
                       onPress={() => setSelectedProjectId(proj.id === selectedProjectId ? null : proj.id)}
-                      className={`bg-white rounded-2xl shadow-sm border p-4 ${proj.id === selectedProjectId ? 'border-brand-orange bg-orange-50' : 'border-gray-100'}`}
-                      style={[{ minHeight: 130 }, { minHeight: 44, minWidth: 44 }]}
+                      className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-5 ${proj.id === selectedProjectId ? 'border-brand-orange bg-orange-50' : 'border-gray-100'}`}
+                      style={{ minHeight: 176, minWidth: 0 }}
+                      accessibilityRole="button" accessibilityState={{ selected:proj.id===selectedProjectId }} accessibilityLabel={"Filter orders for "+proj.name}
                     >
                       <View className="flex-row items-start mb-3">
                         <View className={`w-9 h-9 rounded-full items-center justify-center mr-3 ${proj.id === selectedProjectId ? 'bg-orange-100' : 'bg-blue-50'}`}>
@@ -204,22 +216,22 @@ export default function SupplierDashboardScreen() {
           </View>
 
           {/* Center Row: Orders & Alerts */}
-          <View className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
+          <View onLayout={event => { inboxY.current = event.nativeEvent.layout.y; }} className={isMobile ? "flex-col gap-6 mb-6" : "flex-row gap-6 mb-6"}>
             {/* Main Content Area (Orders) */}
-            <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
-              <SupplierOrdersTable
+            <View className={isMobile ? "w-full" : "flex-[2] min-w-0"}>
+              <DashboardDetailLink href="/supplier/orders" label="order register" interactive><SupplierOrdersTable
                 orders={panelStats.incoming}
                 onOpenOrder={(id) => router.push(`/supplier/orders/${id}` as any)}
-              />
+              /></DashboardDetailLink>
             </View>
-            
+
             {/* Side Panel (Late Alerts & Deliveries) */}
-            <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
-              <SupplierPendingDeliveries orders={panelStats.pendingDeliveries} onOpenOrder={(id) => router.push(`/supplier/orders/${id}` as any)} />
-              <SupplierAlertsPanel orders={panelStats.late} />
+            <View className={isMobile ? "w-full" : "flex-[1] min-w-0"}>
+              <DashboardDetailLink href="/supplier/deliveries" label="delivery details" interactive><SupplierPendingDeliveries orders={panelStats.pendingDeliveries} onOpenOrder={(id) => router.push(`/supplier/orders/${id}` as any)} /></DashboardDetailLink>
+              <DashboardDetailLink href="/supplier/deliveries" label="delivery alerts" interactive><SupplierAlertsPanel orders={panelStats.late} /></DashboardDetailLink>
             </View>
           </View>
-        </ScrollView>
+        </DashboardContent>
       )}
     </View>
   );

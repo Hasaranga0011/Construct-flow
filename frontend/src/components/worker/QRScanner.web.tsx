@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
 import jsQR from 'jsqr';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,12 +18,12 @@ export function QRScanner({ onScan, onClose }: Props) {
   const [manualCode, setManualCode] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
 
-  const stop = () => {
+  const stop = useCallback(() => {
     stream.current?.getTracks().forEach(track => track.stop());
     stream.current = null;
-  };
+  }, []);
 
-  const submit = async (data: string) => {
+  const submit = useCallback(async (data: string) => {
     if (busy.current) return;
     busy.current = true;
     setScanned(true);
@@ -34,9 +34,9 @@ export function QRScanner({ onScan, onClose }: Props) {
     } finally {
       busy.current = false;
     }
-  };
+  }, []);
 
-  const start = async () => {
+  const start = useCallback(async () => {
     setError('');
     stop();
     try {
@@ -86,7 +86,7 @@ export function QRScanner({ onScan, onClose }: Props) {
           : 'Camera unavailable. Try uploading an image or entering code below.'
       );
     }
-  };
+  }, [stop]);
 
   useEffect(() => {
     mounted.current = true;
@@ -96,7 +96,7 @@ export function QRScanner({ onScan, onClose }: Props) {
       mounted.current = false;
       stop();
     };
-  }, []);
+  }, [start, stop]);
 
   useEffect(() => {
     if (!running || scanned) return;
@@ -113,7 +113,7 @@ export function QRScanner({ onScan, onClose }: Props) {
       if (code?.data) void submit(code.data);
     }, 250);
     return () => clearInterval(interval);
-  }, [running, scanned]);
+  }, [running, scanned, submit]);
 
   const upload = async (file?: File) => {
     if (!file || busy.current) return;

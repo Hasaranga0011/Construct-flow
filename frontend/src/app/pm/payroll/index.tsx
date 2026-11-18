@@ -1,11 +1,14 @@
-import React, { useCallback, useState } from 'react';
+import { SalaryPaymentAction } from '@/components/labour/SalaryPaymentAction';
+import { PayrollGenerationNotice, payrollFailure } from '@/components/labour/PayrollGenerationNotice';
+import { AttendancePeriodReview } from '@/components/labour/AttendancePeriodReview';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal, Alert } from 'react-native';
 import { SearchInput } from '@/components/common/SearchInput';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { managedPayroll, managedProjects } from '@/services/pmData';
-import { formatMoney } from '@/utils/format';
+import { formatMoney, formatCurrencyExact } from '@/utils/format';
 import { AutoFitText } from '@/components/common/AutoFitText';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/lib/apiUrl';
@@ -14,6 +17,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function PMPayrollPage() {
   const { isMobile } = useResponsive();
+  const params = useLocalSearchParams<{project?:string}>();
+  const requestedProject = String(params.project || "");
   const [slips, setSlips] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +30,8 @@ export default function PMPayrollPage() {
   // Batch generation modal state
   const [generateModalVisible, setGenerateModalVisible] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [genProjectId, setGenProjectId] = useState('');
+  const [generationFailure, setGenerationFailure] = useState<ReturnType<typeof payrollFailure> | null>(null);
+  const [genProjectId, setGenProjectId] = useState(requestedProject);
   const [genStartDate, setGenStartDate] = useState(
     new Date(new Date().setDate(1)).toISOString().split('T')[0]
   );
@@ -36,29 +42,28 @@ export default function PMPayrollPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [payrollData, projectData] = await Promise.all([
-        managedPayroll(),
-        managedProjects()
-      ]);
+      const projectData = await managedProjects();
+      const payrollData = await managedPayroll(projectData);
       setSlips(payrollData);
       setProjects(projectData);
-      if (projectData.length > 0 && !genProjectId && projectData[0]?.id) {
-        setGenProjectId(projectData[0].id);
-      }
+      setGenProjectId(current => projectData.some(project=>project.id===current) ? current : projectData.find(project=>project.id===requestedProject)?.id || projectData[0]?.id || '');
     }
     catch (e: any) { setError(e.message || 'Unable to load payroll.'); }
     finally { setLoading(false); }
-  }, [genProjectId]);
+  }, [requestedProject]);
+  useEffect(() => { setGenerationFailure(null); }, [genProjectId, genStartDate, genEndDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleGenerate = async () => {
+    if (generating) return;
     if (!genProjectId || !genStartDate || !genEndDate) {
       Alert.alert('Required', 'Please select a project and specify the date range.');
       return;
     }
 
     setGenerating(true);
+    setGenerationFailure(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
@@ -79,7 +84,8 @@ export default function PMPayrollPage() {
 
       const resData = await response.json();
       if (!response.ok) {
-        throw new Error(resData.detail || 'Failed to generate payroll batch');
+        setGenerationFailure(payrollFailure(resData.detail));
+        return;
       }
 
       setGenerateModalVisible(false);
@@ -91,16 +97,16 @@ export default function PMPayrollPage() {
       );
       load();
     } catch (err: any) {
-      Alert.alert('Generation Error', err.message || 'Failed to generate payroll');
+      setGenerationFailure(payrollFailure(err.message));
     } finally {
       setGenerating(false);
     }
   };
 
-  const amount = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? 'Not recorded' : formatMoney(Number(value));
-  const pending = slips.filter(s => String(s.status).toLowerCase() === 'pending' || String(s.status).toLowerCase() === 'generated');
+  const amount = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? 'Not recorded' : formatCurrencyExact(Number(value));
+  const pending = slips.filter(s => ['draft', 'approved', 'pending', 'generated'].includes(String(s.status).toLowerCase()));
   const pendingTotal = pending.reduce((sum, s) => sum + (Number.isFinite(Number(s.total_amount ?? s.total_pay)) ? Number(s.total_amount ?? s.total_pay) : 0), 0);
-  const visible = slips.filter(s => (filter === 'All' || String(s.status).toLowerCase() === filter.toLowerCase()) && `${s.worker?.full_name || ''} ${s.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
+  const visible = slips.filter(s => (filter === 'All' || (filter === 'Unpaid' ? ['draft', 'approved', 'pending', 'generated'].includes(String(s.status).toLowerCase()) : String(s.status).toLowerCase() === filter.toLowerCase())) && `${s.worker?.full_name || ''} ${s.project?.name || ''}`.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -126,6 +132,8 @@ export default function PMPayrollPage() {
 
           <Pressable
             style={{ minHeight: 44, minWidth: 44 }}
+            accessibilityRole="button"
+            accessibilityLabel="Run Payroll Batch"
             onPress={() => setGenerateModalVisible(true)}
             className="bg-white max-w-full px-4 py-3 rounded-xl shadow flex-row items-center z-10 hover:bg-gray-50 active:bg-gray-100"
           >
@@ -154,7 +162,7 @@ export default function PMPayrollPage() {
         </View>
 
         <View className="flex-row flex-wrap gap-2 mb-4">
-          {['All', 'Generated', 'Pending', 'Paid'].map(status => (
+          {['All', 'Unpaid', 'Paid'].map(status => (
             <Pressable
               style={{ minHeight: 40, minWidth: 44 }}
               key={status}
@@ -292,6 +300,8 @@ export default function PMPayrollPage() {
               </View>
             </View>
 
+            {selected && <SalaryPaymentAction slip={selected} onPaid={() => { setSelected(null); void load(); }} />}
+
             <Pressable
               style={{ minHeight: 44, minWidth: 44 }}
               onPress={() => setSelected(null)}
@@ -377,9 +387,13 @@ export default function PMPayrollPage() {
                   Cancel
                 </Text>
               </Pressable>
+              <AttendancePeriodReview projectId={genProjectId} start={genStartDate} end={genEndDate} />
+            {generationFailure && <PayrollGenerationNotice {...generationFailure} onView={row => { setGenerateModalVisible(false); setFilter('All'); setSearch(''); if (row) setSelected(slips.find(slip => slip.id === row.id) || null); void load(); }} />}
               <Pressable
                 style={{ minHeight: 44, minWidth: 44 }}
                 disabled={generating}
+                accessibilityRole="button"
+                accessibilityLabel="Generate Slips"
                 onPress={handleGenerate}
                 className="flex-1 bg-brand-orange rounded-xl p-3.5 items-center justify-center flex-row"
               >

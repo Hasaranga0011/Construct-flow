@@ -1,3 +1,4 @@
+import { api } from '@/services/api';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
@@ -5,7 +6,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 
-type Project = { id: string; name: string };
 type InvoiceRow = { id: string; title: string; projectName: string; amount: number; date?: string | null; source: 'Purchase order' | 'Expense' };
 
 const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
@@ -32,51 +32,8 @@ export default function ClientinvoicesPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .select('id, name')
-          .eq('client_id', user.id);
-        if (projectError) throw projectError;
-
-        const projects = (projectData || []) as Project[];
-        const projectIds = projects.map(project => project.id);
-        if (projectIds.length === 0) {
-          if (isMounted) setRows([]);
-          return;
-        }
-
-        const [orderResponse, expenseResponse] = await Promise.all([
-          supabase.from('purchase_orders').select('id, po_number, project_id, total_price, actual_delivery, status').in('project_id', projectIds).eq('status', 'Delivered').order('actual_delivery', { ascending: false }),
-          supabase.from('project_expenses').select('id, project_id, title, amount, expense_date').in('project_id', projectIds).order('expense_date', { ascending: false }),
-        ]);
-
-        if (orderResponse.error) throw orderResponse.error;
-        if (expenseResponse.error) throw expenseResponse.error;
-
-        const projectNames = projects.reduce<Record<string, string>>((result, project) => {
-          result[project.id] = project.name;
-          return result;
-        }, {});
-
-        const purchaseOrders: InvoiceRow[] = (orderResponse.data || []).map(order => ({
-          id: order.id || '',
-          title: order.po_number || 'Delivered purchase order',
-          projectName: (order.project_id && projectNames[order.project_id]) || 'Project',
-          amount: Number(order.total_price || 0),
-          date: order.actual_delivery,
-          source: 'Purchase order',
-        }));
-
-        const expenses: InvoiceRow[] = (expenseResponse.data || []).map(expense => ({
-          id: expense.id || '',
-          title: expense.title || 'Expense',
-          projectName: (expense.project_id && projectNames[expense.project_id]) || 'Project',
-          amount: Number(expense.amount || 0),
-          date: expense.expense_date,
-          source: 'Expense',
-        }));
-
-        if (isMounted) setRows([...purchaseOrders, ...expenses]);
+        const records = await api.getFresh('/workflow/cost-records') as InvoiceRow[];
+        if (isMounted) setRows(records);
       } catch (loadError: any) {
         if (isMounted) setError(loadError.message || 'Failed to load project financial records.');
       } finally {
@@ -102,7 +59,7 @@ export default function ClientinvoicesPage() {
       <TopNav title="Client Invoices" showAction={false} />
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-2">Project Financial Records</Text>
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-6">Delivered orders and recorded project expenses.</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mb-6">Accepted goods and recorded project expenses. Your payment stages and approvals are under Payments & variations.</Text>
         {loading ? (
           <View className="gap-3">
             {[1, 2, 3].map(item => <View key={item} className="bg-gray-100 rounded-2xl h-24 animate-pulse" />)}
@@ -118,7 +75,7 @@ export default function ClientinvoicesPage() {
           <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center">
             <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold mt-4">No financial records yet</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-2">Delivered purchase orders and approved project expenses will appear here.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-2">Accepted goods and recorded project expenses will appear here.</Text>
           </View>
         ) : (
           rows.map(row => (

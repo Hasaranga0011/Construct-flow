@@ -3,7 +3,26 @@ import { supabase } from '../lib/supabase';
 
 
 const apiCache = new Map<string, { data: any, timestamp: number, promise?: Promise<any> }>();
+const freshRequests = new Map<string, Promise<any>>();
 const CACHE_TTL = 60000; // 60 seconds
+let cacheGeneration = 0;
+export function apiErrorMessage(data: any): string {
+  if (typeof data?.detail === 'string') return data.detail;
+  if (Array.isArray(data?.detail)) {
+    return data.detail.map((item: any) => {
+      const field = Array.isArray(item.loc) ? item.loc.filter((part: unknown) => part !== 'body').join(' ').replace(/_/g, ' ') : '';
+      return `${field ? `${field}: ` : ''}${typeof item.msg === 'string' ? item.msg : 'Check this value.'}`;
+    }).join('\n');
+  }
+  if (typeof data?.detail?.message === 'string') return data.detail.message;
+  return typeof data?.message === 'string' ? data.message : 'Unable to complete this request. Please try again.';
+}
+export function clearApiCache() {
+  cacheGeneration++;
+  apiCache.clear();
+  freshRequests.clear();
+}
+supabase.auth.onAuthStateChange(() => clearApiCache());
 
 export async function getFreshAccessToken(forceRefresh = false): Promise<string | undefined> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -19,8 +38,13 @@ export async function getFreshAccessToken(forceRefresh = false): Promise<string 
   return session?.access_token;
 }
 
-async function executeFetch(endpoint: string, options: RequestInit, hasRetriedAuth = false): Promise<any> {
+async function executeFetch(endpoint: string, options: RequestInit, hasRetriedAuth = false, expectedUserId?: string): Promise<any> {
+  const { data: { session: initialSession } } = await supabase.auth.getSession();
+  const owner = expectedUserId || initialSession?.user.id;
+  if (!owner || initialSession?.user.id !== owner) throw new Error('Your account changed. Please retry this action.');
   const token = await getFreshAccessToken(hasRetriedAuth);
+  const { data: { session: activeSession } } = await supabase.auth.getSession();
+  if (!token || activeSession?.user.id !== owner) throw new Error('Your account changed. Please retry this action.');
 
   const headers = {
     'Content-Type': 'application/json',
@@ -41,23 +65,18 @@ async function executeFetch(endpoint: string, options: RequestInit, hasRetriedAu
     clearTimeout(timeoutId);
 
     if (response.status === 401 && !hasRetriedAuth) {
-      return executeFetch(endpoint, options, true);
+      return executeFetch(endpoint, options, true, owner);
     }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      let errMsg = 'API request failed';
-      if (errorData.detail) {
-         errMsg = typeof errorData.detail === 'string' 
-           ? errorData.detail 
-           : JSON.stringify(errorData.detail);
-      } else if (errorData.message) {
-         errMsg = errorData.message;
-      }
-      throw new Error(errMsg);
+      throw new Error(apiErrorMessage(errorData));
     }
 
-    return response.json();
+    const data = await response.json();
+    const { data: { session: completedSession } } = await supabase.auth.getSession();
+    if (completedSession?.user.id !== owner) throw new Error('Your account changed. Please retry this action.');
+    return data;
   } catch (err: any) {
     clearTimeout(timeoutId);
     throw normalizeFetchError(err);
@@ -65,21 +84,22 @@ async function executeFetch(endpoint: string, options: RequestInit, hasRetriedAu
 }
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+  // Resolve identity before consulting cached data, including in-flight requests.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Please sign in again.');
+  const key = `${session.user.id}:${endpoint}`;
+  const generation = cacheGeneration;
   const method = (options.method || 'GET').toUpperCase();
 
   // On mutation (POST, PATCH, DELETE, PUT), invalidate matching resource cache instead of wiping everything
   if (method !== 'GET') {
-    const resourceRoot = '/' + (endpoint.split('/').filter(Boolean)[0] || '');
-    for (const key of apiCache.keys()) {
-      if (resourceRoot === '/' || key.startsWith(resourceRoot)) {
-        apiCache.delete(key);
-      }
-    }
-    return executeFetch(endpoint, options);
+    clearApiCache();
+    try { return await executeFetch(endpoint, options, false, session.user.id); }
+    finally { clearApiCache(); }
   }
 
   // Handle GET requests with cache
-  const cached = apiCache.get(endpoint);
+  const cached = apiCache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     if (cached.data) {
       return cached.data; // Return instantly, no buffering
@@ -90,16 +110,29 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   }
 
   // No valid cache, fetch fresh
-  const promise = executeFetch(endpoint, options).then(data => {
-    apiCache.set(endpoint, { data, timestamp: Date.now() });
+  const promise = executeFetch(endpoint, options, false, session.user.id).then(data => {
+    if (generation === cacheGeneration) apiCache.set(key, { data, timestamp: Date.now() });
     return data;
   }).catch(err => {
-    apiCache.delete(endpoint);
+    apiCache.delete(key);
     throw err;
   });
 
-  apiCache.set(endpoint, { data: null, timestamp: Date.now(), promise });
+  apiCache.set(key, { data: null, timestamp: Date.now(), promise });
   return promise;
+}
+
+// Coalesce concurrent fresh reads, without retaining completed responses.
+async function freshGet(endpoint: string) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Please sign in again.');
+  const key = `${session.user.id}:${cacheGeneration}:${endpoint}`;
+  const pending = freshRequests.get(key);
+  if (pending) return pending;
+  const promise = executeFetch(endpoint, {}, false, session.user.id);
+  freshRequests.set(key, promise);
+  try { return await promise; }
+  finally { if (freshRequests.get(key) === promise) freshRequests.delete(key); }
 }
 
 export const api = {
@@ -277,6 +310,10 @@ export const api = {
 
   /** Raw fetch with auth — use when the above wrappers don't fit a specific call. */
   get: (path: string) => fetchWithAuth(path),
+  getFresh: freshGet,
+  patch: (path: string, data: any) => fetchWithAuth(path, { method: 'PATCH', body: JSON.stringify(data) }),
+  put: (path: string, data: any) => fetchWithAuth(path, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (path: string) => fetchWithAuth(path, { method: 'DELETE' }),
   post: (path: string, data: any) => fetchWithAuth(path, { method: 'POST', body: JSON.stringify(data) }),
   postFormData: (path: string, formData: FormData) => {
     return supabase.auth.getSession().then(({ data: { session } }) => {

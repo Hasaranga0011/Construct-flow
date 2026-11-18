@@ -1,5 +1,9 @@
+import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
+import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Linking, useWindowDimensions, Modal, Alert } from 'react-native';
+import { ModalViewport } from '@/components/common/ModalViewport';
+import { Button } from '@/components/ui';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '@/components/common/StatCard';
@@ -12,20 +16,10 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/lib/apiUrl';
 import { WorkerAttendanceChart } from '@/components/worker/WorkerAttendanceChart';
 import { timeLabel, dateLabel, monthRange, todayKey } from '@/services/workerData';
-import {
-  formatHoursMinutes,
-  formatOvertimeHoursMinutes,
-  formatMinutes,
-  getAttendanceStatus,
-  calculateWorkedMinutes,
-  calculateOvertimeMinutes,
-  sumWorkedMinutes,
-  sumOvertimeMinutes,
-} from '@/utils/format';
+import { formatHoursMinutes, formatMinutes, getAttendanceStatus, calculateOvertimeMinutes, sumWorkedMinutes, sumOvertimeMinutes } from '@/utils/format';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
 
 function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
   const svgRef = useRef<any>(null);
@@ -48,7 +42,7 @@ function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
           const safeName = (profile.worker_code || profile.id || 'code').replace(/[^a-zA-Z0-9_-]/g, '_');
           const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
           const fileUri = `${cacheDir}worker_qr_${safeName}.png`;
-          
+
           await FileSystem.writeAsStringAsync(fileUri, cleanBase64, {
             encoding: FileSystem.EncodingType.Base64,
           });
@@ -73,22 +67,17 @@ function QRModal({ profile, onClose }: { profile: any; onClose: () => void }) {
 
   if (!profile) return null;
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 100, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-      <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm shadow-2xl">
-        <Text className="text-2xl font-bold text-slate-900 mb-2">{profile.full_name}</Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <ModalViewport><ScrollView accessibilityViewIsModal style={{ flexShrink:1, flexGrow:0, minHeight:0 }} contentContainerStyle={{ padding:20, alignItems:'center' }} className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm border border-slate-200 dark:border-slate-700">
+        <Text accessibilityRole="header" className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">{profile.full_name}</Text>
         <Text className="text-cyan-600 font-semibold mb-6">{profile.worker_code || 'Pending'}</Text>
         <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={200} getRef={(c) => (svgRef.current = c)} />
+          <QRCode value={profile.qr_code || profile.id || 'unknown'} size={180} getRef={(c) => (svgRef.current = c)} />
         </View>
         <Text className="text-slate-500 text-sm text-center mt-6">Show this QR code to your Site Manager when arriving at or leaving the site.</Text>
-        <Pressable onPress={downloadQR} className="mt-8 bg-brand-orange px-8 py-3 rounded-xl w-full items-center">
-          <Text className="font-bold text-white">Download QR</Text>
-        </Pressable>
-        <Pressable onPress={onClose} className="mt-4 bg-slate-100 px-8 py-3 rounded-xl w-full items-center">
-          <Text className="font-bold text-slate-700">Close</Text>
-        </Pressable>
-      </View>
-    </View>
+        <View className="mt-6 gap-3 w-full"><Button label="Download QR" onPress={downloadQR} /><Button label="Close" variant="secondary" onPress={onClose} /></View>
+      </ScrollView></ModalViewport>
+    </Modal>
   );
 }
 
@@ -136,7 +125,7 @@ export default function WorkerDashboardScreen() {
       };
 
       const [profRes, siteRes, attRes, payrollRes, slipsRes] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, email, role, avatar_url, contact_number').eq('id', user.id).single(),
+        supabase.from('profiles').select('id, full_name, email, role, avatar_url, contact_number, qr_code').eq('id', user.id).single(),
         fetchJson(`${getApiUrl()}/labour/worker/site`),
         supabase.from('attendance')
           .select('*')
@@ -204,8 +193,7 @@ export default function WorkerDashboardScreen() {
   const totalWorkedMinutes = sumWorkedMinutes(attendance);
   const totalOvertimeMinutes = sumOvertimeMinutes(attendance);
   const hoursWorked = totalWorkedMinutes / 60;
-  const overtimeHours = totalOvertimeMinutes / 60;
-  
+
   const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
   const currentDay = month === todayStr.slice(0,7) ? new Date().getDate() : daysInMonth;
 
@@ -239,20 +227,17 @@ export default function WorkerDashboardScreen() {
   const latestPayslip = payslips.length > 0 ? payslips[0] : null;
 
   return (
-    <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="My Dashboard" 
+    <View className="flex-1 bg-brand-light dark:bg-slate-950">
+      <TopNav
+        title="My Dashboard"
         showAction={true}
         actionLabel="Show my QR"
         onActionPress={() => setQrVisible(true)}
       />
       {qrVisible && <QRModal profile={profile} onClose={() => setQrVisible(false)} />}
-      
-      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-          <View style={{ flexDirection: 'column', marginBottom: 24, gap: 12, zIndex: 50, elevation: 50 }}>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Worker Dashboard</Text>
-          </View>
 
+      <DashboardContent>
+          <DashboardHero eyebrow="Worker workspace" title="Work summary" description="Your assigned site, attendance and recent salary records." icon="briefcase-outline" />
           {loading && attendance.length === 0 ? (
             <ActivityIndicator color="#F97316" size="large" className="mt-8" />
           ) : error ? (
@@ -266,38 +251,35 @@ export default function WorkerDashboardScreen() {
             <>
               <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
                 <AnimatedCard delay={150} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-                  <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Days Present" value={daysPresent.toString()} indicatorText={`of ${currentDay} working days`} indicatorType="success" colorScheme="emerald" fullWidth />
-                  </Pressable>
+                  <StatCard onPress={() => router.push('/worker/attendance')}  label="Days Present" value={daysPresent.toString()} indicatorText="Recorded this month" indicatorType="success" colorScheme="emerald" fullWidth />
                 </AnimatedCard>
                 <AnimatedCard delay={200} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-                  <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Hours Worked" value={formatMinutes(totalWorkedMinutes)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
-                  </Pressable>
+                  <StatCard onPress={() => router.push('/worker/attendance')}  label="Hours Worked" value={formatMinutes(totalWorkedMinutes)} indicatorText="This month" indicatorType="neutral" colorScheme="blue" fullWidth />
                 </AnimatedCard>
                 <AnimatedCard delay={250} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-                  <Pressable onPress={() => router.push('/worker/attendance')} className="flex-1">
-                    <StatCard label="Overtime Hours" value={formatMinutes(totalOvertimeMinutes)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
-                  </Pressable>
+                  <StatCard onPress={() => router.push('/worker/attendance')}  label="Overtime Hours" value={formatMinutes(totalOvertimeMinutes)} indicatorText="This month" indicatorType="warning" colorScheme="amber" fullWidth />
                 </AnimatedCard>
                 <AnimatedCard delay={300} style={isMobile ? { width: '48%', marginBottom: 16 } : { flex: 1 }}>
-                  <Pressable onPress={() => router.push('/worker/payroll')} className="flex-1">
-                    <StatCard label="Estimated Earnings" value={payroll ? money(payroll.total_pay) : '-'} indicatorText="Estimated" indicatorType="neutral" colorScheme="purple" fullWidth />
-                  </Pressable>
+                  <StatCard onPress={() => router.push('/worker/payroll')}  label={payroll?.summary_kind === 'recorded_slips' ? "Recorded pay" : "Estimated earnings"} value={payroll ? money(payroll.total_pay) : '-'} indicatorText={payroll?.summary_kind === 'recorded_slips' ? "From recorded payslips" : "Attendance estimate"} indicatorType="neutral" colorScheme="purple" fullWidth />
                 </AnimatedCard>
               </View>
 
+              <DashboardActions actions={[
+                { label:'My attendance', description:'Review your check-ins and hours', icon:'calendar-outline', onPress:()=>router.push('/worker/attendance') },
+                { label:'My payslips', description:'View your recorded salary details', icon:'wallet-outline', onPress:()=>router.push('/worker/payroll') },
+                { label:'Messages', description:'Stay connected with your team', icon:'chatbubbles-outline', onPress:()=>router.push('/worker/messages') },
+              ]} />
               <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-                <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
-                  <AnimatedCard delay={350} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 min-h-[400px] h-full">
+                <View className={isMobile ? "w-full" : "flex-[2] min-w-0"}>
+                  <DashboardDetailLink href="/worker/attendance" label="hours and attendance"><AnimatedCard delay={350} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 min-h-[400px] h-full">
                   <View className="flex-row flex-wrap justify-between items-start md:items-center gap-4 mb-6">
                     <View className="flex-1 min-w-[200px]">
-                      <Text className="text-lg font-bold text-brand-text mb-1">My Hours This Month</Text>
+                      <Text className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">My Hours This Month</Text>
                       <Text className="text-xs text-slate-500">Regular hours and overtime per day</Text>
                     </View>
                     <View className="flex-row items-center bg-slate-50 rounded-lg p-1 border border-slate-200">
                       <Pressable onPress={() => changeMonth(-1)} className="p-2"><Ionicons name="chevron-back" size={16} color="#64748b" /></Pressable>
-                      <Text className="text-sm font-semibold text-slate-700 px-4">{new Date(month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' })}</Text>
+                      <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-4">{new Date(month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' })}</Text>
                       <Pressable onPress={() => changeMonth(1)} className="p-2"><Ionicons name="chevron-forward" size={16} color="#64748b" /></Pressable>
                     </View>
                   </View>
@@ -316,48 +298,46 @@ export default function WorkerDashboardScreen() {
                       <View className="flex-row items-center gap-2"><View className="w-3 h-3 rounded-sm bg-brand-orange" /><Text className="text-xs text-slate-600 font-medium">Overtime</Text></View>
                     </View>
                   )}
-                </AnimatedCard>
+                </AnimatedCard></DashboardDetailLink>
                 </View>
 
-                <View className={isMobile ? "w-full" : "flex-[1] w-full"}>
-                  <AnimatedCard delay={400} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 min-h-[400px] h-full">
-                  <View className="mb-6">
-                    <Text className="text-lg font-bold text-brand-text">My Month at a Glance</Text>
-                  </View>
-                  
+                <View className={isMobile ? "w-full" : "flex-[1] min-w-0"}>
+                  <DashboardDetailLink href="/worker/payroll" label="monthly pay summary" interactive><AnimatedCard delay={400} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 min-h-[400px] h-full">
+                  <DashboardSectionHeading title="My month at a glance" description="Attendance, hours and your current pay period." icon="calendar-outline" />
+
                   <View className="flex-1">
-                    <View className="mb-6">
+                    <Pressable accessibilityRole="link" accessibilityLabel="Open attendance summary details" onPress={() => router.push('/worker/attendance')}  className="mb-6">
                       <View className="flex-row justify-between items-center mb-1">
-                        <Text className="text-slate-700 font-semibold text-sm">Attendance</Text>
+                        <Text className="text-slate-700 dark:text-slate-200 font-semibold text-sm">Attendance</Text>
                         <Text className="font-bold text-brand-success">{Math.round((daysPresent/Math.max(1, currentDay))*100)}%</Text>
                       </View>
                       <View className="h-2 bg-slate-100 rounded-full mb-1">
                         <View className="h-full rounded-full bg-brand-success" style={{ width: `${Math.min((daysPresent/Math.max(1, currentDay))*100, 100)}%` }} />
                       </View>
-                      <Text className="text-slate-500 text-xs">{daysPresent} days present vs {currentDay} working days</Text>
-                    </View>
+                      <Text className="text-slate-500 text-xs">{daysPresent} recorded days this month</Text>
+                    </Pressable>
 
-                    <View className="mb-6">
+                    <Pressable accessibilityRole="link" accessibilityLabel="Open hours summary details" onPress={() => router.push('/worker/attendance')}  className="mb-6">
                       <View className="flex-row justify-between items-center mb-1">
-                        <Text className="text-slate-700 font-semibold text-sm">Hours</Text>
-                        <Text className="font-bold text-brand-text">{Math.round((hoursWorked/(Math.max(1, currentDay)*8))*100)}%</Text>
+                        <Text className="text-slate-700 dark:text-slate-200 font-semibold text-sm">Hours</Text>
+                        <Text className="font-bold text-brand-text dark:text-slate-100">{Math.round((hoursWorked/(Math.max(1, currentDay)*8))*100)}%</Text>
                       </View>
                       <View className="h-2 bg-slate-100 rounded-full mb-1">
                         <View className="h-full rounded-full bg-slate-800" style={{ width: `${Math.min((hoursWorked/(Math.max(1, currentDay)*8))*100, 100)}%` }} />
                       </View>
                       <Text className="text-slate-500 text-xs">{formatMinutes(totalWorkedMinutes)} worked vs {currentDay*8}h 0m expected</Text>
-                    </View>
+                    </Pressable>
 
-                    <View className="mb-6">
+                    <Pressable accessibilityRole="link" accessibilityLabel="Open pay period details" onPress={() => router.push('/worker/payroll')}  className="mb-6">
                       <View className="flex-row justify-between items-center mb-1">
-                        <Text className="text-slate-700 font-semibold text-sm">Pay Period Progress</Text>
+                        <Text className="text-slate-700 dark:text-slate-200 font-semibold text-sm">Pay Period Progress</Text>
                         <Text className="font-bold text-cyan-600">{Math.round((currentDay/daysInMonth)*100)}%</Text>
                       </View>
                       <View className="h-2 bg-slate-100 rounded-full mb-1">
                         <View className="h-full rounded-full bg-cyan-500" style={{ width: `${(currentDay/daysInMonth)*100}%` }} />
                       </View>
                       <Text className="text-slate-500 text-xs">{currentDay} days elapsed of {daysInMonth}</Text>
-                    </View>
+                    </Pressable>
                   </View>
 
                   <View className="mt-4 pt-4 border-t border-slate-100">
@@ -365,26 +345,26 @@ export default function WorkerDashboardScreen() {
                     {latestPayslip ? (
                       <View className="flex-row justify-between items-center">
                         <View>
-                          <Text className="font-bold text-slate-800">{dateLabel(latestPayslip.period_start)} - {dateLabel(latestPayslip.period_end)}</Text>
+                          <Text className="font-bold text-slate-800 dark:text-slate-100">{dateLabel(latestPayslip.period_start)} - {dateLabel(latestPayslip.period_end)}</Text>
                           <Text className="text-brand-success font-bold text-sm mt-1">{money(latestPayslip.total_amount ?? latestPayslip.total_pay)}</Text>
                         </View>
-                        <Pressable onPress={() => router.push('/worker/payroll')} className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">
-                          <Text className="text-xs font-bold text-slate-700">View</Text>
+                        <Pressable onPress={() => router.push('/worker/payroll')} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 px-3 py-2 rounded-lg">
+                          <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">View</Text>
                         </Pressable>
                       </View>
                     ) : (
                       <Text className="text-slate-500 text-sm">No salary slips generated yet.</Text>
                     )}
                   </View>
-                  </AnimatedCard>
+                  </AnimatedCard></DashboardDetailLink>
                 </View>
               </View>
 
               <View className={`pb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-                <View className={isMobile ? "w-full" : "flex-[2] w-full"}>
-                  <AnimatedCard delay={450} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 min-h-[300px] h-full">
+                <View className={isMobile ? "w-full" : "flex-[2] min-w-0"}>
+                  <AnimatedCard delay={450} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 min-h-[300px] h-full">
                   <View className="flex-row justify-between items-center mb-6">
-                    <Text className="text-lg font-bold text-brand-text">Recent Check-Ins</Text>
+                    <Text className="text-lg font-bold text-brand-text dark:text-slate-100">Recent Check-Ins</Text>
                     <Pressable onPress={() => router.push('/worker/attendance')}>
                       <Text className="text-brand-orange font-bold text-sm">View all →</Text>
                     </Pressable>
@@ -409,10 +389,10 @@ export default function WorkerDashboardScreen() {
                           : formatHoursMinutes(a.hours_worked, a.check_in_time, a.check_out_time);
                         return (
                         <View key={a.id} className="flex-row items-center border-b border-slate-50 py-3 last:border-0">
-                          <Text className="flex-1 font-bold text-slate-700">{dateLabel(a.date)}</Text>
+                          <Text className="flex-1 font-bold text-slate-700 dark:text-slate-200">{dateLabel(a.date)}</Text>
                           <Text className="flex-[1.5] text-slate-500">{timeLabel(a.check_in_time)} - {timeLabel(a.check_out_time)}</Text>
                           <View className="flex-1 items-end">
-                            <Text className="font-medium text-slate-700">{hoursLabel}</Text>
+                            <Text className="font-medium text-slate-700 dark:text-slate-200">{hoursLabel}</Text>
                             {otMins > 0 && <Text className="text-xs text-brand-orange font-bold">+{formatMinutes(otMins)} OT</Text>}
                           </View>
                           <View className="flex-1 items-end">
@@ -435,11 +415,11 @@ export default function WorkerDashboardScreen() {
                         return (
                         <View key={a.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50">
                           <View className="flex-row justify-between items-center mb-2">
-                            <Text className="font-bold text-slate-800">{dateLabel(a.date)}</Text>
+                            <Text className="font-bold text-slate-800 dark:text-slate-100">{dateLabel(a.date)}</Text>
                             <Text className={`text-xs font-bold ${status === 'Present' ? 'text-emerald-600' : 'text-slate-500'}`}>{status}</Text>
                           </View>
                           <Text className="text-sm text-slate-600 mb-2">{timeLabel(a.check_in_time)} to {timeLabel(a.check_out_time)}</Text>
-                          <Text className="text-sm font-medium text-slate-700">Hours: {hoursLabel} {otMins > 0 && <Text className="text-brand-orange">(+{formatMinutes(otMins)} OT)</Text>}</Text>
+                          <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">Hours: {hoursLabel} {otMins > 0 && <Text className="text-brand-orange">(+{formatMinutes(otMins)} OT)</Text>}</Text>
                         </View>
                         );
                       })}
@@ -449,39 +429,39 @@ export default function WorkerDashboardScreen() {
                 </View>
 
                 <View className={`flex-col ${isMobile ? 'w-full' : 'flex-[1] w-full'}`} style={{ gap: 24 }}>
-                  
-                  <AnimatedCard delay={500} className="bg-white rounded-xl shadow-sm border border-slate-100 min-h-[300px] w-full">
+
+                  <DashboardDetailLink href="/worker/notifications" label="notifications" interactive><AnimatedCard delay={500} className="bg-white rounded-xl shadow-sm border border-slate-100 min-h-[300px] w-full">
                     <RecentAlertsPanel basePath="/worker" />
-                  </AnimatedCard>
+                  </AnimatedCard></DashboardDetailLink>
 
                   {siteAssignment && (
-                    <AnimatedCard delay={550} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-                      <Text className="text-lg font-bold text-brand-text mb-4">My Site</Text>
-                      <Text className="font-bold text-slate-800 text-base">{siteAssignment.project.name}</Text>
+                    <DashboardDetailLink href="/worker/site" label="assigned site" interactive><AnimatedCard delay={550} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6">
+                      <Text className="text-lg font-bold text-brand-text dark:text-slate-100 mb-4">My Site</Text>
+                      <Text className="font-bold text-slate-800 dark:text-slate-100 text-base">{siteAssignment.project.name}</Text>
                       <Text className="text-slate-500 text-sm mt-1 mb-4">{siteAssignment.site.address || 'Address not recorded'}</Text>
-                      
+
                       {siteAssignment.site.address && (
-                        <Pressable 
-                          className="bg-slate-50 border border-slate-200 rounded-lg py-2 items-center mb-4"
+                        <Pressable
+                          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 rounded-lg py-2 items-center mb-4"
                           onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(siteAssignment.site.address)}`)}
                         >
-                          <Text className="font-bold text-slate-700 text-sm">Open in Maps</Text>
+                          <Text className="font-bold text-slate-700 dark:text-slate-200 text-sm">Open in Maps</Text>
                         </Pressable>
                       )}
 
                       {siteAssignment.manager && (
                         <View className="pt-4 border-t border-slate-100 mt-2">
                           <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Site Manager</Text>
-                          <Text className="font-semibold text-slate-700 mb-3">{siteAssignment.manager.full_name}</Text>
+                          <Text className="font-semibold text-slate-700 dark:text-slate-200 mb-3">{siteAssignment.manager.full_name}</Text>
                           {siteAssignment.manager.contact_number && (
                             <View className="flex-row gap-2">
-                              <Pressable 
+                              <Pressable
                                 className="flex-1 bg-brand-orange py-2 rounded-lg items-center"
                                 onPress={() => Linking.openURL(`tel:${siteAssignment.manager.contact_number.replace(/[^+0-9]/g, "").replace(/^0/, "+94")}`)}
                               >
                                 <Text className="text-white font-bold text-sm">Call</Text>
                               </Pressable>
-                              <Pressable 
+                              <Pressable
                                 className="flex-1 bg-green-500 py-2 rounded-lg items-center"
                                 onPress={() => Linking.openURL(`https://wa.me/${siteAssignment.manager.contact_number.replace(/[^+0-9]/g, "").replace(/^0/, "+94").replace("+", "")}`)}
                               >
@@ -491,7 +471,7 @@ export default function WorkerDashboardScreen() {
                           )}
                         </View>
                       )}
-                    </AnimatedCard>
+                    </AnimatedCard></DashboardDetailLink>
                   )}
 
                 </View>
@@ -499,7 +479,7 @@ export default function WorkerDashboardScreen() {
             </>
           )}
 
-      </ScrollView>
+      </DashboardContent>
     </View>
   );
 }

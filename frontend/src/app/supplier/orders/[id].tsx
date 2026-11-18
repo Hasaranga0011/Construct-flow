@@ -1,6 +1,6 @@
+import React, { useCallback, useEffect, useState } from 'react';
 import { ModalViewport } from '@/components/common/ModalViewport';
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -8,10 +8,10 @@ import { notify, confirmAction } from '@/utils/notify';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
-import { ChatWidget } from '../../../components/shared/ChatWidget';
-import { sendSystemNotification } from '../../../utils/notifications';
+
+
 import { api } from '../../../services/api';
-import { Modal, TextInput } from 'react-native';
+
 import { OrderItemRow } from '@/components/materials/OrderItemRow';
 import { useResponsive } from '@/hooks/useResponsive';
 import { AutoFitText } from '@/components/common/AutoFitText';
@@ -98,10 +98,10 @@ export default function AdminMaterialsOrdersIdPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [suggestModalVisible, setSuggestModalVisible] = useState(false);
   const [unitPrice, setUnitPrice] = useState<string>('');
-  const [currentUserId, setCurrentUserId] = useState('');
+  const [, setCurrentUserId] = useState('');
   useEffect(() => { supabase.auth.getSession().then(({data}) => setCurrentUserId(data.session?.user.id || '')); }, []);
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('purchase_orders')
@@ -136,11 +136,11 @@ export default function AdminMaterialsOrdersIdPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchOrder();
-  }, [id]);
+  }, [fetchOrder]);
 
   const handleUpdateStatus = async (newStatus: 'Confirmed' | 'Rejected' | 'Delivered' | 'Received') => {
     const isDestructive = newStatus === 'Rejected';
@@ -244,7 +244,7 @@ export default function AdminMaterialsOrdersIdPage() {
         negotiationLog = parsed;
       }
     }
-  } catch (e) {}
+  } catch {}
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -318,7 +318,7 @@ export default function AdminMaterialsOrdersIdPage() {
             {/* Items Ordered Section */}
             <View className="bg-gray-50 rounded-xl p-6 border border-gray-100">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">Items Ordered</Text>
-              <OrderItemRow 
+              <OrderItemRow
                 itemName={order.items}
                 quantity={order.quantity_ordered}
                 unitPrice={order.unit_price}
@@ -346,7 +346,7 @@ export default function AdminMaterialsOrdersIdPage() {
                   {negotiationLog.map((event, idx) => (
                     <View key={idx} className="mb-4 relative">
                       <View className={`absolute -left-6 w-4 h-4 rounded-full ${event.role === 'supplier' ? 'bg-blue-500' : 'bg-green-500'} border-4 border-white`} />
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'You' : 'Admin/PM'}</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 mb-1">{event.timestamp ? format(new Date(event.timestamp), 'MMM dd, yyyy h:mm a') : ''} • {event.role === 'supplier' ? 'You' : 'Admin / Project Manager'}</Text>
                       <View className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-700 capitalize mb-1">{event.action}</Text>
                         {event.quantity && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm text-gray-600">Qty: {event.quantity}</Text>}

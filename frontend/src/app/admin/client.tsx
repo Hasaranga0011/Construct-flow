@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, TextInput, Text } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
 import { ClientAccountsPanel } from '../../components/client/ClientAccountsPanel';
@@ -21,12 +21,12 @@ export default function ClientPortalScreen() {
     pendingInvoices: 0,
   });
   const [loading, setLoading] = useState(true);
-  
+
   const [isModalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchClients, setSearchClients] = useState<any[]>([]);
   const { isMobile } = useResponsive();
-  
+
   const { tick, lastUpdated } = useTableRealtime(['profiles', 'projects', 'invoices', 'client_activity', 'shared_documents']);
 
   useEffect(() => {
@@ -69,19 +69,19 @@ export default function ClientPortalScreen() {
 
   return (
     <View className="flex-1 bg-brand-light">
-      <TopNav 
-        title="Client Updates" 
-        actionLabel="+ Invite Client" 
-        onActionPress={() => setModalVisible(true)} 
+      <TopNav
+        title="Client Updates"
+        actionLabel="+ Invite Client"
+        onActionPress={() => setModalVisible(true)}
       />
-      
+
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'p-6'}`} showsVerticalScrollIndicator={false}>
-          
+
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <View>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Clients</Text>
@@ -90,9 +90,9 @@ export default function ClientPortalScreen() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-500">Live{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ''}</Text>
               </View>
             </View>
-            
-            <SearchInput items={searchClients} entityLabel="clients" 
-              placeholder="Search clients..." 
+
+            <SearchInput items={searchClients} entityLabel="clients"
+              placeholder="Search clients..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               className={isMobile ? "w-full" : "w-80"}
@@ -111,22 +111,22 @@ export default function ClientPortalScreen() {
 
           {/* Top Stat Cards Row */}
           <View style={isMobile ? { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 } : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, marginHorizontal: -8 }}>
-            <StatCard 
-              label="Active Clients" 
-              value={stats.activeClients.toString()} 
-              indicatorText="" 
+            <StatCard
+              label="Active Clients"
+              value={stats.activeClients.toString()}
+              indicatorText=""
               icon={<Icon name="user-friends" size={16} color="#9CA3AF" />}
             />
-            <StatCard 
-              label="Shared Projects" 
-              value={stats.sharedProjects.toString()} 
-              indicatorText="" 
+            <StatCard
+              label="Shared Projects"
+              value={stats.sharedProjects.toString()}
+              indicatorText=""
               icon={<Icon name="folder-open" size={16} color="#9CA3AF" />}
             />
-            <StatCard 
-              label="Pending Invoices" 
+            <StatCard
+              label="Pending Invoices"
               value={stats.pendingInvoices.toString()}
-              indicatorText="Requires client sign-off" 
+              indicatorText="Requires client sign-off"
               indicatorType="warning"
               icon={<Ionicons name="time" size={16} color="#F97316" />}
             />
@@ -138,7 +138,7 @@ export default function ClientPortalScreen() {
             <View style={isMobile ? { width: '100%' } : { flex: 2, marginRight: 24 }}>
               <ClientAccountsPanel refreshTrigger={tick} searchQuery={searchQuery} />
             </View>
-            
+
             {/* Side Panel (Activity & Documents) */}
             <View style={isMobile ? { width: '100%', gap: 16 } : { flex: 1, flexDirection: 'column', gap: 24 }}>
               <RecentClientActivity refreshTrigger={tick} />
@@ -148,10 +148,10 @@ export default function ClientPortalScreen() {
         </ScrollView>
       )}
 
-      <InviteClientModal 
-        visible={isModalVisible} 
-        onClose={() => setModalVisible(false)} 
-        onSuccess={handleInvite} 
+      <InviteClientModal
+        visible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        onSuccess={handleInvite}
       />
     </View>
   );

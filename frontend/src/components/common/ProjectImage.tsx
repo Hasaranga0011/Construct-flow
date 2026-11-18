@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Image, Text, StyleSheet, ViewStyle, ImageResizeMode } from 'react-native';
+import { View, Image, Text, ViewStyle, ImageResizeMode } from 'react-native';
 import { getProjectImageUrl } from '../../utils/projectImages';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -34,7 +34,7 @@ export const ProjectImage: React.FC<ProjectImageProps> = ({
   fallbackIconSize = 24,
 }) => {
   const [hasError, setHasError] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   const resolvedUrl =
     imageUrl ||

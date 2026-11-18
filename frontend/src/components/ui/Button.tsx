@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, ActivityIndicator, Platform, ViewStyle, TextStyle } from 'react-native';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost';
 export type ButtonSize = 'default' | 'compact';
 
 interface ButtonProps {
@@ -30,7 +30,7 @@ export const Button = ({
   icon,
 }: ButtonProps) => {
   const isCompact = size === 'compact';
-  
+
   // Base heights and paddings
   const baseClasses = `flex-row items-center justify-center rounded-xl overflow-hidden ${
     isCompact ? 'min-h-[44px] px-4' : 'min-h-[48px] px-5'
@@ -42,8 +42,13 @@ export const Button = ({
   let spinnerColor = '#ffffff';
 
   switch (variant) {
+    case 'success':
+      variantClasses = 'bg-green-700';
+      textClasses = 'text-white';
+      spinnerColor = '#ffffff';
+      break;
     case 'primary':
-      variantClasses = 'bg-brand-orange';
+      variantClasses = 'bg-orange-700';
       textClasses = 'text-white';
       spinnerColor = '#ffffff';
       break;
@@ -59,13 +64,13 @@ export const Button = ({
       break;
     case 'ghost':
       variantClasses = 'bg-transparent';
-      textClasses = 'text-brand-orange';
+      textClasses = 'text-orange-700 dark:text-orange-400';
       spinnerColor = '#F97316';
       break;
   }
 
   const disabledClasses = disabled || loading ? 'opacity-60' : 'active:opacity-80';
-  
+
   // Font rendering fixes for Android
   const fontFixes: TextStyle = Platform.OS === 'android' ? {
     includeFontPadding: false,
@@ -77,10 +82,11 @@ export const Button = ({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       onPress={onPress}
       disabled={disabled || loading}
       className={`${baseClasses} ${variantClasses} ${disabledClasses} ${className}`}
-      style={style}
+      style={[{ minWidth: 44 }, style]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={spinnerColor} />

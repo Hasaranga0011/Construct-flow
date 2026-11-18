@@ -1,72 +1,23 @@
+import { useNotifications as useSharedNotifications } from '../context/NotificationContext';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Alert } from 'react-native';
 
-export function useNotifications(userId: string | null, role: string | null) {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [badgeCount, setBadgeCount] = useState(0);
-
-  useEffect(() => {
-    if (!userId || !role) return;
-
-    // Initial fetch
-    supabase
-      .from('notifications')
-      .select('*')
-      .or(`user_id.eq.${userId},target_role.eq.All,target_role.eq.${role}`)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) {
-          setNotifications(data);
-          setBadgeCount(data.filter(n => !n.is_read).length);
-        }
-      });
-
-    // Subscriptions
-    const userSub = supabase.channel('user-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, handleNewNotification)
-      .subscribe();
-
-    const roleSub = supabase.channel('role-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `target_role=eq.${role}` }, handleNewNotification)
-      .subscribe();
-
-    const allSub = supabase.channel('all-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `target_role=eq.All` }, handleNewNotification)
-      .subscribe();
-
-    function handleNewNotification(payload: any) {
-      setNotifications(prev => [payload.new, ...prev]);
-      setBadgeCount(prev => prev + 1);
-      Alert.alert(payload.new.title, payload.new.message);
-    }
-
-    return () => {
-      supabase.removeChannel(userSub);
-      supabase.removeChannel(roleSub);
-      supabase.removeChannel(allSub);
-    };
-  }, [userId, role]);
-
-  const markAllRead = async () => {
-    // Optimistic UI
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    setBadgeCount(0);
-  };
-
-  return { notifications, badgeCount, markAllRead };
+export function useNotifications(_userId: string | null, _role: string | null) {
+  const shared = useSharedNotifications();
+  return { notifications: shared.notifications, badgeCount: shared.unreadCount, markAllRead: shared.markAllAsRead };
 }
 
 export function useAttendance() {
-  const [attendance, setAttendance] = useState<any[]>([]);
+  const [attendance] = useState<any[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
   useEffect(() => {
     const sub = supabase.channel('attendance-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, () => setRefreshTrigger(prev => prev + 1))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'attendance' }, () => setRefreshTrigger(prev => prev + 1))
       .subscribe();
-      
+
     return () => { supabase.removeChannel(sub); };
   }, []);
 

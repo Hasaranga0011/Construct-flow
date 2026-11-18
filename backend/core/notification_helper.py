@@ -1,12 +1,11 @@
 import logging
-from core.database import supabase as admin_supabase
 import uuid
 
 ALLOWED_NOTIFICATION_TYPES = {
-    'material_low', 
-    'delay_risk', 
-    'payroll_due', 
-    'milestone_missed', 
+    'material_low',
+    'delay_risk',
+    'payroll_due',
+    'milestone_missed',
     'general'
 }
 
@@ -16,9 +15,10 @@ def create_notification(type: str, user_id: str, title: str, message: str, **kwa
     Validates type against ALLOWED_NOTIFICATION_TYPES, defaulting to 'general' without failing.
     """
     try:
-        create_notifications([{"type": type, "user_id": user_id, "title": title, "message": message, **kwargs}])
+        return create_notifications([{"type": type, "user_id": user_id, "title": title, "message": message, **kwargs}])
     except Exception as e:
-        logging.error(f"create_notification failed silently: {e}")
+        logging.error(f"create_notification failed: {e}")
+        return 0
 
 def create_notifications(notifications: list):
     """
@@ -43,15 +43,17 @@ def create_notifications(notifications: list):
             "sent_via": channel
         }
         valid_notifs.append(item)
-    
+
     if not valid_notifs:
-        return
-        
+        return 0
+
     try:
         from core.attendance_setup import setup_client
         setup_client().table("notifications").insert(valid_notifs).execute()
+        return len(valid_notifs)
     except Exception as e:
         logging.error(f"Failed to insert notifications: {e}")
+        return 0
 
 def notify_project_event(project_id: str, project_name: str, event_type: str, pm_id: str = None, client_id: str = None, extra_message: str = ""):
     """
@@ -60,7 +62,7 @@ def notify_project_event(project_id: str, project_name: str, event_type: str, pm
     notifs = []
     # 1. Admin notification
     notifs.append({
-        "user_id": "11111111-1111-1111-1111-111111111111",
+        "user_id": None,
         "project_id": project_id,
         "target_user_id": None,
         "target_role": "super_admin",
@@ -72,7 +74,7 @@ def notify_project_event(project_id: str, project_name: str, event_type: str, pm
     # 2. PM notification
     if pm_id:
         notifs.append({
-            "user_id": "11111111-1111-1111-1111-111111111111",
+            "user_id": None,
             "project_id": project_id,
             "target_user_id": pm_id,
             "target_role": "pm",
@@ -84,7 +86,7 @@ def notify_project_event(project_id: str, project_name: str, event_type: str, pm
     # 3. Client notification
     if client_id:
         notifs.append({
-            "user_id": "11111111-1111-1111-1111-111111111111",
+            "user_id": None,
             "project_id": project_id,
             "target_user_id": client_id,
             "target_role": "client",

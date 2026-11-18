@@ -13,7 +13,7 @@ export const MonthlyAttendanceChart = () => {
       const today = new Date();
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(today.getDate() - 30);
-      
+
       const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
 
       const { data: attendanceData, error } = await supabase
@@ -22,10 +22,10 @@ export const MonthlyAttendanceChart = () => {
         .gte('date', dateStr);
 
       if (error) throw error;
-      
+
       // Group by date
       const counts: Record<string, number> = {};
-      
+
       // Initialize last 30 days with 0 to ensure continuous line
       for (let i = 29; i >= 0; i--) {
         const d = new Date();
@@ -79,7 +79,7 @@ export const MonthlyAttendanceChart = () => {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <ActivityIndicator color="#F97316" size="large" />
       </View>
     );
@@ -87,7 +87,7 @@ export const MonthlyAttendanceChart = () => {
 
   if (data.length === 0 || data.every(d => d.workers === 0)) {
     return (
-      <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px] items-center justify-center">
+      <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px] items-center justify-center">
         <Ionicons name="people-outline" size={48} color="#D1D5DB" />
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-2">No attendance data for the last 30 days.</Text>
       </View>
@@ -95,36 +95,36 @@ export const MonthlyAttendanceChart = () => {
   }
 
   return (
-    <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[300px]">
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Monthly Attendance Trend</Text>
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mb-6">Daily checked-in workers over the last 30 days</Text>
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 min-h-[300px]">
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">Monthly Attendance Trend</Text>
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs mb-6">Daily checked-in workers over the last 30 days</Text>
 
       <View className="flex-1 min-h-[200px]">
         {/* @ts-ignore */}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis 
-              dataKey="label" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 10, fill: '#9ca3af' }} 
-              dy={10} 
+            <XAxis
+              dataKey="label"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 10, fill: '#9ca3af' }}
+              dy={10}
               minTickGap={20}
             />
             <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-            <Tooltip 
-              cursor={{ stroke: '#f3f4f6', strokeWidth: 2 }} 
+            <Tooltip
+              cursor={{ stroke: '#f3f4f6', strokeWidth: 2 }}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
               formatter={(val) => [`${val} Workers`, 'Present']}
             />
-            <Line 
-              type="monotone" 
-              dataKey="workers" 
+            <Line
+              type="monotone"
+              dataKey="workers"
               stroke="#F97316" // brand-orange
-              strokeWidth={3} 
-              dot={{ r: 3, fill: '#F97316', strokeWidth: 0 }} 
-              activeDot={{ r: 6, fill: '#1e293b' }} 
+              strokeWidth={3}
+              dot={{ r: 3, fill: '#F97316', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: '#1e293b' }}
             />
           </LineChart>
         </ResponsiveContainer>

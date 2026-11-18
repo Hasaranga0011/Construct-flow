@@ -45,12 +45,18 @@ def test_assigned_site_manager_uses_caller_token(monkeypatch):
 def test_milestone_from_another_project_cannot_be_updated(monkeypatch):
     client = Client()
     monkeypatch.setattr(projects, "client_for_token", lambda token: client)
+    calls=[]
+    class Failure(Exception): code="P0002"
+    def rpc(name, arguments):
+        calls.append((name, arguments))
+        raise Failure("Milestone not found")
+    client.rpc=rpc
     with pytest.raises(HTTPException) as error:
-        projects.update_milestone("project", "foreign-milestone", projects.MilestoneUpdate(status="Completed"), {"id": "pm", "role": "pm", "token": "jwt"})
-    assert error.value.status_code == 404
-    assert ("milestones", "id", "foreign-milestone") in client.filters
-    assert ("milestones", "project_id", "project") in client.filters
-    assert len(client.mutations) == 1
+        projects.update_milestone("project", "foreign-milestone", projects.MilestoneUpdate(status="Completed"), {"id":"pm","role":"pm","token":"jwt"})
+    assert error.value.status_code==404
+    assert calls[0][1]["p_project_id"]=="project"
+    assert calls[0][1]["p_milestone_id"]=="foreign-milestone"
+    assert client.mutations==[]
 
 @pytest.mark.parametrize("role", ["worker", "supplier", "site_manager", "client"])
 def test_non_management_cannot_create_expenses(role):

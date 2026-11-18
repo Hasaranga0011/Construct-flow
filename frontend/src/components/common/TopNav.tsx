@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Text, TextInput, Platform, Modal, ScrollView } from 'react-native';
+import { View, Pressable, Text, Platform, Modal, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';
@@ -43,7 +43,7 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
   const notificationsHref = portalRole === 'site-manager'
     ? '/site-manager/notifications'
     : `/${portalRole}/notifications`;
-  const getInitials = (email?: string) => email ? email.slice(0, 2).toUpperCase() : 'U';
+
   const { user, role: userRole, avatarUrl, fullName, signOut } = useAuth();
 
 
@@ -120,10 +120,10 @@ export const TopNav = ({ title = '', showAction = true, actionLabel = '+ New Pro
       {isMobile && showAction && onActionPress && <Pressable style={{ minHeight: 48, minWidth: 48 }} accessibilityRole="button" onPress={onActionPress} className="mx-4 mb-3 px-4 py-3 rounded-lg bg-brand-orange"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-white font-semibold text-center">{actionLabel}</Text></Pressable>}
       {onSearch && (
         <View className="mx-4 my-2 z-50 flex-row justify-end">
-          <SearchInput 
-            placeholder="Search..." 
+          <SearchInput
+            placeholder="Search..."
             value={initialSearchQuery}
-            onChangeText={onSearch} 
+            onChangeText={onSearch}
             items={searchItems}
             entityLabel={searchEntityLabel}
             config={searchConfig}

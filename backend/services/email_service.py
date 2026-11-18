@@ -1,4 +1,5 @@
 import os
+from html import escape
 import sys
 import smtplib
 import logging
@@ -140,7 +141,7 @@ def generate_welcome_credentials_email(
         password_html_row = f"""<tr>
                         <td style="color: #64748B; font-weight: 600; padding: 4px 0;">Temporary Password:</td>
                         <td style="color: #EA580C; font-weight: 700; padding: 4px 0; font-family: Consolas, monospace; font-size: 15px;">
-                          <span style="background: #FFFFFF; padding: 3px 8px; border-radius: 6px; border: 1px dashed #F97316;">{password}</span>
+                          <span style="background: #FFFFFF; padding: 3px 8px; border-radius: 6px; border: 1px dashed #F97316;">{escape(password, quote=True)}</span>
                         </td>
                       </tr>"""
         password_text_row = f"Temporary Password:   {password}"
@@ -213,7 +214,7 @@ def generate_welcome_credentials_email(
               
               <!-- Welcome Title -->
               <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; color: #0F172A; line-height: 1.3;">
-                Welcome to ConstructFlow, {name}!
+                Welcome to ConstructFlow, {escape(name, quote=True)}!
               </h1>
               <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">
                 Your user account has been successfully {intro_action}. You have been assigned the role of 
@@ -231,7 +232,7 @@ def generate_welcome_credentials_email(
                     <table role="presentation" width="100%" style="font-size: 14px; line-height: 1.6;">
                       <tr>
                         <td style="width: 130px; color: #64748B; font-weight: 600; padding: 4px 0;">Login Email:</td>
-                        <td style="color: #0F172A; font-weight: 700; padding: 4px 0; font-family: Consolas, monospace;">{email}</td>
+                        <td style="color: #0F172A; font-weight: 700; padding: 4px 0; font-family: Consolas, monospace;">{escape(email, quote=True)}</td>
                       </tr>
                       {password_html_row}
                       <tr>
@@ -251,7 +252,7 @@ def generate_welcome_credentials_email(
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 32px 0;">
                 <tr>
                   <td align="center">
-                    <a href="{portal_url}" style="display: inline-block; background: #EA580C; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 36px; border-radius: 10px; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); transition: background 0.2s;">
+                    <a href="{escape(portal_url, quote=True)}" style="display: inline-block; background: #EA580C; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 36px; border-radius: 10px; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); transition: background 0.2s;">
                       Sign In to {portal_name} &rarr;
                     </a>
                   </td>
@@ -259,7 +260,7 @@ def generate_welcome_credentials_email(
                 <tr>
                   <td align="center" style="padding-top: 10px;">
                     <span style="font-size: 12px; color: #94A3B8;">Portal URL: 
-                      <a href="{portal_url}" style="color: #EA580C; text-decoration: underline;">{portal_url}</a>
+                      <a href="{escape(portal_url, quote=True)}" style="color: #EA580C; text-decoration: underline;">{escape(portal_url, quote=True)}</a>
                     </span>
                   </td>
                 </tr>
@@ -289,7 +290,7 @@ def generate_welcome_credentials_email(
                   Getting Started in 3 Easy Steps
                 </h3>
                 <ol style="margin: 0; padding-left: 20px; font-size: 13.5px; color: #475569; line-height: 1.7;">
-                  <li><strong>Open Your Portal:</strong> Click the access button above or visit <a href="{portal_url}" style="color: #EA580C;">{portal_url}</a>.</li>
+                  <li><strong>Open Your Portal:</strong> Click the access button above or visit <a href="{escape(portal_url, quote=True)}" style="color: #EA580C;">{escape(portal_url, quote=True)}</a>.</li>
                   {step2_html}
                   {step3_html}
                 </ol>
@@ -321,7 +322,7 @@ def generate_welcome_credentials_email(
               <div style="font-weight: 700; color: #FFFFFF; font-size: 13px; margin-bottom: 4px;">ConstructFlow Technologies</div>
               <div>AI-Driven Construction Operations & Management Platform</div>
               <div style="margin-top: 8px; color: #64748B;">
-                &copy; {datetime.now().year} ConstructFlow. All rights reserved. &bull; <a href="{base_url}" style="color: #F97316; text-decoration: none;">{base_url}</a>
+                &copy; {datetime.now().year} ConstructFlow. All rights reserved. &bull; <a href="{escape(base_url, quote=True)}" style="color: #F97316; text-decoration: none;">{escape(base_url, quote=True)}</a>
               </div>
             </td>
           </tr>
@@ -798,6 +799,6 @@ def send_email(to: str, subject: str, html: str) -> str:
         return f"{provider}_sent"
 
     logger.info(f"Mock email to {to}: {subject}")
-    return "mock_message_id"
+    raise RuntimeError("Email could not be delivered by a configured provider")
 
 

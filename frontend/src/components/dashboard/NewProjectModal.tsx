@@ -1,5 +1,7 @@
 import { DateField } from '../common/DateField';
 import { getApiUrl } from '../../lib/apiUrl';
+import { useMapProvider } from '@/hooks/useMapProvider';
+import { SiteLocationSearch, SitePinDetails } from '@/components/common/SiteLocationSearch';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
@@ -14,14 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { formatMoney } from '../../utils/format';
 import { downloadBoqTemplateXlsx } from '../../utils/boqDownload';
 import { getFreshAccessToken } from '../../services/api';
-import {
-  EditableMilestone,
-  recalculateScheduleFromStart,
-  seedMilestonesFromBoq,
-  isValidYMD,
-  addDaysToYMD,
-  getTodayYMD,
-} from '../../utils/boqSchedule';
+import { EditableMilestone, recalculateScheduleFromStart, seedMilestonesFromBoq, isValidYMD, addDaysToYMD, getTodayYMD } from '../../utils/boqSchedule';
 
 type NewProjectModalProps = {
   visible: boolean;
@@ -37,8 +32,6 @@ const defaultCenter: MapLocation = {
 export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModalProps) => {
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
-  const [mapSearchQuery, setMapSearchQuery] = useState('');
-  const [mapSearchResults, setMapSearchResults] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -149,12 +142,12 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     const fetchUsers = async () => {
       try {
         const [pmData, clientData, smData, workerData, supplierData, adminData] = await Promise.all([
-          supabase.from('profiles').select('*').in('role', ['pm', 'Project Manager', 'project_manager']),
-          supabase.from('profiles').select('*').in('role', ['client', 'Client']),
-          supabase.from('profiles').select('*').in('role', ['site_manager', 'Site Manager', 'site manager']),
-          supabase.from('profiles').select('*').in('role', ['worker', 'Worker']),
-          supabase.from('profiles').select('*').in('role', ['supplier', 'Supplier']),
-          supabase.from('profiles').select('*').in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['pm', 'Project Manager', 'project_manager']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['client', 'Client']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['site_manager', 'Site Manager', 'site manager']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['worker', 'Worker']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['supplier', 'Supplier']),
+          supabase.from('profiles').select('*').eq('is_approved', true).in('role', ['admin', 'Admin', 'super_admin', 'Super Admin']),
         ]);
 
         setPms(pmData.data || []);
@@ -171,118 +164,15 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
     if (visible) fetchUsers();
   }, [visible]);
 
-  const [isSearchingMap, setIsSearchingMap] = useState(false);
+  const mapProvider = useMapProvider(visible);
+  const locationSelection = useRef(0);
+  useEffect(() => () => { locationSelection.current++; }, [visible]);
 
-  const handleSearchMap = async () => {
-    if (!mapSearchQuery || !mapSearchQuery.trim()) return;
-    const query = mapSearchQuery.trim();
-    setIsSearchingMap(true);
-    setErrorMsg('');
-
-    try {
-      let foundResults: { lat: number; lon: number; display_name: string }[] = [];
-
-      // 1. Primary: ConstructFlow backend geocoding route
-      try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const res = await fetch(`${getApiUrl()}/projects/geocode?q=${encodeURIComponent(query)}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            foundResults = data.map((item: any) => ({
-              lat: typeof item.lat === 'number' ? item.lat : parseFloat(item.lat),
-              lon: typeof item.lon === 'number' ? item.lon : parseFloat(item.lon),
-              display_name: item.display_name || '',
-            }));
-          }
-        }
-      } catch (backendErr) {
-        console.warn('Backend geocode request failed, falling back to direct client search:', backendErr);
-      }
-
-      // 2. Client-side fallback: Photon (free Komoot OSM with typo tolerance)
-      if (!foundResults || foundResults.length === 0) {
-        try {
-          const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
-          if (photonRes.ok) {
-            const photonData = await photonRes.json();
-            const features = photonData?.features || [];
-            if (features.length > 0) {
-              foundResults = features.map((f: any) => {
-                const props = f.properties || {};
-                const coords = f.geometry?.coordinates || [0, 0];
-                const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean);
-                const uniqueParts = parts.filter((val: string, idx: number) => parts.indexOf(val) === idx);
-                return {
-                  lat: coords[1],
-                  lon: coords[0],
-                  display_name: uniqueParts.join(', ') || props.name || 'Selected Location',
-                };
-              });
-            }
-          }
-        } catch (photonErr) {
-          console.warn('Photon geocode fallback error:', photonErr);
-        }
-      }
-
-      // 3. Fallback: Nominatim OpenStreetMap with progressive retries
-      if (!foundResults || foundResults.length === 0) {
-        let queryParts = query.split(/\s+/);
-        while (queryParts.length > 0) {
-          const subQuery = queryParts.join(' ');
-          try {
-            const osmRes = await fetch(
-              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(subQuery)}&format=json&limit=5&countrycodes=lk`,
-              { headers: { 'User-Agent': 'ConstructFlow/1.0' } }
-            );
-            if (osmRes.ok) {
-              const text = await osmRes.text();
-              if (text.startsWith('[') || text.startsWith('{')) {
-                const osmData = JSON.parse(text);
-                if (Array.isArray(osmData) && osmData.length > 0) {
-                  foundResults = osmData.map((item: any) => ({
-                    lat: parseFloat(item.lat),
-                    lon: parseFloat(item.lon),
-                    display_name: item.display_name || '',
-                  }));
-                  break;
-                }
-              }
-            }
-          } catch {
-            // Drop trailing word and retry
-          }
-          queryParts.pop();
-        }
-      }
-
-      if (foundResults && foundResults.length > 0) {
-        const topResult = foundResults[0];
-        const loc = { lat: topResult.lat, lng: topResult.lon };
-        setMarkerPos(loc);
-        setLocation(topResult.display_name);
-
-        mapRef.current?.flyTo(loc.lat, loc.lng, 15);
-
-        setMapSearchResults(foundResults);
-        setErrorMsg('');
-      } else {
-        setMapSearchResults([]);
-        setErrorMsg('Location not found. Try searching a nearby city, street, or landmark.');
-      }
-    } catch (e: any) {
-      console.warn('Map search error:', e);
-      setErrorMsg('Failed to search map. Please click on the map to pin a location directly.');
-    } finally {
-      setIsSearchingMap(false);
-    }
-  };
-
-  const handleLocationSelect = useCallback(async ({ lat, lng }: MapLocation) => {
+  const handleLocationSelect = useCallback(async ({ lat, lng, address }: MapLocation) => {
+    const selection = ++locationSelection.current;
     setMarkerPos({ lat, lng });
+    if (address) { setLocation(address); return; }
+    setLocation(`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
 
     // 1. Try backend reverse geocoding
     try {
@@ -292,6 +182,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       });
       if (res.ok) {
         const data = await res.json();
+        if (selection !== locationSelection.current) return;
         if (data?.display_name) {
           setLocation(data.display_name);
           return;
@@ -306,6 +197,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       const pRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
       if (pRes.ok) {
         const pData = await pRes.json();
+        if (selection !== locationSelection.current) return;
         const f = pData?.features?.[0];
         if (f) {
           const props = f.properties || {};
@@ -321,23 +213,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       // Fallback
     }
 
-    // 3. Fallback to client-side Nominatim reverse geocode
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-        headers: { 'User-Agent': 'ConstructFlow/1.0' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.display_name) {
-          setLocation(data.display_name);
-          return;
-        }
-      }
-    } catch {
-      // Keep fallback
-    }
-
-    setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    if (selection === locationSelection.current) setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
   }, []);
 
   // BOQ Handlers
@@ -657,7 +533,6 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
       setIsTest(false);
       setImages([PROJECT_IMAGE_PRESETS[0].url]);
       setMarkerPos(null);
-      setMapSearchResults([]);
       setMilestones([]);
       setPmId('');
       setClientId('');
@@ -682,16 +557,16 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <ModalViewport>
-        <View className="bg-white max-h-full w-full max-w-4xl lg:max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <View style={{ minWidth: 0, flexShrink: 1 }} className="bg-white max-h-full w-full max-w-4xl lg:max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col">
 
           {/* Sticky Header */}
           <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-100 bg-brand-light flex-shrink-0">
-            <View className="flex-row items-center gap-2.5">
+            <View className="flex-1 min-w-0 flex-row items-center gap-2.5">
               <View className="w-9 h-9 rounded-xl bg-orange-100 items-center justify-center">
                 <Ionicons name="business" size={20} color="#EA580C" />
               </View>
-              <View>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">
+              <View className="flex-1 min-w-0">
+                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100">
                   Create New Project
                 </Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">
@@ -708,7 +583,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ padding: 24, paddingBottom: 28 }}
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: 0, minHeight: 0 }}
             showsVerticalScrollIndicator={true}
           >
             {errorMsg ? (
@@ -1060,73 +935,25 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                     className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
                     placeholder="Exact address will appear here"
                     value={location}
-                    onChangeText={setLocation}
+                    onChangeText={value => { locationSelection.current++; setLocation(value); }}
                   />
                 </View>
 
-                <View className="mb-2">
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 mb-1">
-                    Search Location & Pin Site
-                  </Text>
-                  <View className="flex-row gap-2">
-                    <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 40, minWidth: 44 }}
-                      className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-                      placeholder="Type city or place name..."
-                      value={mapSearchQuery}
-                      onChangeText={setMapSearchQuery}
-                      onSubmitEditing={handleSearchMap}
-                      returnKeyType="search"
-                    />
-                    <Pressable style={{ minHeight: 40, minWidth: 44 }}
-                      onPress={handleSearchMap}
-                      disabled={isSearchingMap}
-                      className="bg-blue-600 px-3.5 items-center justify-center rounded-xl hover:bg-blue-700 transition-colors"
-                    >
-                      {isSearchingMap ? (
-                        <ActivityIndicator size="small" color="white" />
-                      ) : (
-                        <Ionicons name="search" size={18} color="white" />
-                      )}
-                    </Pressable>
-                  </View>
-                  <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1 mb-2">
-                    Type a city or click anywhere on the map to pin the construction site.
-                  </Text>
-
-                  {mapSearchResults.length > 1 && (
-                    <View className="mb-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] font-semibold text-gray-500 bg-gray-50 px-3 py-1.5 border-b border-gray-200">
-                        Alternative Matches
-                      </Text>
-                      {mapSearchResults.slice(1).map((result, idx) => (
-                        <Pressable style={{ minHeight: 36, minWidth: 44 }}
-                          key={idx}
-                          onPress={() => {
-                            const loc = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
-                            setMarkerPos(loc);
-                            setLocation(result.display_name);
-                            mapRef.current?.flyTo(loc.lat, loc.lng, 14);
-                            setMapSearchResults([]);
-                          }}
-                          className={`px-3 py-2 ${idx !== mapSearchResults.length - 2 ? 'border-b border-gray-100' : ''}`}
-                        >
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-700">
-                            {result.display_name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                <SiteLocationSearch enabled={visible} onPreview={(location, zoom) => mapRef.current?.previewLocation(location.lat, location.lng, zoom)} onSelect={(location, zoom) => {
+                  void handleLocationSelect(location);
+                  mapRef.current?.flyTo(location.lat, location.lng, zoom);
+                }} />
 
                 {/* Map */}
                 <View className="mb-4 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                   <InteractiveMap
+                    key={mapProvider}
+                    provider={mapProvider}
                     ref={mapRef}
                     markerPos={markerPos}
                     onLocationSelect={handleLocationSelect}
                     defaultCenter={defaultCenter}
-                    height={230}
+                    height={mapProvider === 'google' ? 400 : 230}
                     interactive={true}
                     showControls={true}
                     showCurrentLocationButton={true}
@@ -1134,6 +961,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                   />
                 </View>
 
+                <SitePinDetails location={markerPos} />
                 {/* Team Assignment Dropdowns */}
                 <ProjectAssignmentDropdown
                   label="Assign Project Manager"
@@ -1277,7 +1105,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
           </ScrollView>
 
           {/* Sticky Modal Action Footer */}
-          <View className="flex-shrink-0 border-t border-gray-100 bg-gray-50 px-6 py-4 flex-row items-center justify-between gap-3">
+          <View className="flex-shrink-0 border-t border-gray-100 bg-gray-50 px-6 py-4 flex-row flex-wrap items-center justify-between gap-3">
             <View className="flex-row items-center">
               {boqData ? (
                 <View className="flex-row items-center bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
@@ -1293,7 +1121,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
               )}
             </View>
 
-            <View className="flex-row items-center gap-3">
+            <View className="flex-row items-center gap-2">
               <Pressable
                 style={{ minHeight: 44, minWidth: 90 }}
                 onPress={onClose}

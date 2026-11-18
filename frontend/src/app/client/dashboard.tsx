@@ -1,6 +1,9 @@
+import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
+import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
+// Modified for Expo Go mobile compatibility
 // Modified for Expo Go mobile compatibility
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +11,6 @@ import { api } from '../../services/api';
 import { ClientBudgetRing } from '../../components/client/ClientBudgetRing';
 import { useAuth } from '../../context/AuthContext';
 import { router } from 'expo-router';
-import { AutoFitText } from '@/components/common/AutoFitText';
 import { StatCard } from '../../components/common/StatCard';
 import { ProjectImage } from '../../components/common/ProjectImage';
 import { RoleAvatar } from '../../components/common/RoleAvatar';
@@ -74,12 +76,12 @@ export default function ClientDashboardPage() {
   useEffect(() => {
     // Setup Realtime subscriptions
     if (!user) return;
-    
+
     const subProjects = supabase.channel('client-dashboard-projects')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `client_id=eq.${user.id}` }, () => {
         setRetryKey(prev => prev + 1);
       }).subscribe();
-      
+
     const subMilestones = supabase.channel('client-dashboard-milestones')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, () => {
         setRetryKey(prev => prev + 1);
@@ -123,7 +125,7 @@ export default function ClientDashboardPage() {
 
         // Fetch PM profiles and milestones in parallel
         const pmIds = [...new Set(clientProjects.map(p => p.pm_id).filter((id): id is string => Boolean(id)))];
-        
+
         const [pmProfilesRes, milestoneResponse] = await Promise.all([
           pmIds.length > 0
             ? supabase.from('profiles').select('id, full_name, role, avatar_url').in('id', pmIds)
@@ -208,14 +210,10 @@ export default function ClientDashboardPage() {
     : 0;
 
   return (
-    <View className="flex-1 bg-brand-light">
+    <View className="flex-1 bg-brand-light dark:bg-slate-950">
       <TopNav title="Client Dashboard" showAction={false} />
-      <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-6" showsVerticalScrollIndicator={false}>
-        <View className="mb-6">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Your Projects</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 mt-1">Live progress, budget, and milestone updates.</Text>
-        </View>
-
+      <DashboardContent>
+        <DashboardHero eyebrow="Client workspace" title="Project summary" description="Current progress, upcoming milestones and payments." icon="home-outline" />
         {loading ? (
           <>
             <View className="flex-row flex-wrap gap-4 mb-6">
@@ -237,82 +235,87 @@ export default function ClientDashboardPage() {
         ) : projects.length === 0 ? (
           <View className="bg-white rounded-2xl border border-gray-100 p-10 items-center">
             <Ionicons name="business-outline" size={48} color="#D1D5DB" />
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-lg mt-4">No projects assigned yet</Text>
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-center mt-2">Your project information will appear here once an administrator assigns a project to your account.</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-slate-200 font-bold text-lg mt-4">No projects assigned yet</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-slate-400 text-center mt-2">Your project information will appear here once an administrator assigns a project to your account.</Text>
           </View>
         ) : (
           <>
             <View className="flex-row flex-wrap gap-4 mb-6">
-              <View className="flex-1 min-w-[45%]">
-                <StatCard 
-                  label="Active Projects" 
-                  value={projects.length.toString()} 
-                  indicatorText="Assigned to you" 
-                  indicatorType="success" 
-                  colorScheme="blue" 
-                  fullWidth 
+              <View className="flex-1 min-w-[45%] xl:min-w-0">
+                <StatCard onPress={() => router.push('/client/project')} 
+                  label="Assigned Projects"
+                  value={projects.length.toString()}
+                  indicatorText="Assigned to you"
+                  indicatorType="success"
+                  colorScheme="blue"
+                  fullWidth
                 />
               </View>
-              <View className="flex-1 min-w-[45%]">
-                <StatCard 
-                  label="Average Progress" 
-                  value={`${averageProgress}%`} 
-                  indicatorText="Overall completion" 
-                  indicatorType="success" 
-                  colorScheme="emerald" 
-                  fullWidth 
+              <View className="flex-1 min-w-[45%] xl:min-w-0">
+                <StatCard onPress={() => router.push('/client/project/milestones')} 
+                  label="Average Progress"
+                  value={`${averageProgress}%`}
+                  indicatorText="Overall completion"
+                  indicatorType="success"
+                  colorScheme="emerald"
+                  fullWidth
                 />
               </View>
-              <View className="flex-1 min-w-[45%]">
-                <StatCard 
-                  label="Total Budget" 
-                  value={formatCurrency(totalBudget)} 
-                  indicatorText="Approved estimates" 
-                  colorScheme="purple" 
-                  fullWidth 
+              <View className="flex-1 min-w-[45%] xl:min-w-0">
+                <StatCard onPress={() => router.push('/client/financials')} 
+                  label="Total Budget"
+                  value={formatCurrency(totalBudget)}
+                  indicatorText="Approved estimates"
+                  colorScheme="purple"
+                  fullWidth
                 />
               </View>
-              <View className="flex-1 min-w-[45%]">
-                <StatCard 
-                  label="Total Spent" 
-                  value={formatCurrency(totalSpent)} 
-                  indicatorText="Verified expenses" 
-                  colorScheme="amber" 
-                  fullWidth 
+              <View className="flex-1 min-w-[45%] xl:min-w-0">
+                <StatCard onPress={() => router.push('/client/invoices')} 
+                  label="Total Spent"
+                  value={formatCurrency(totalSpent)}
+                  indicatorText="Verified expenses"
+                  colorScheme="amber"
+                  fullWidth
                 />
               </View>
             </View>
 
-            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4">Project Progress</Text>
+            <DashboardActions actions={[
+              { label:'Project milestones', description:'Follow each stage of your project', icon:'flag-outline', onPress:()=>router.push('/client/project/milestones') },
+              { label:'Payments & variations', description:'Review your project’s financial records', icon:'wallet-outline', onPress:()=>router.push('/client/financials') },
+              { label:'Message your team', description:'Keep the conversation in one place', icon:'chatbubbles-outline', onPress:()=>router.push('/client/messages') },
+            ]} />
+            <DashboardDetailLink href="/client/project" label="project progress" interactive><View className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 md:p-6 mb-6">
+              <DashboardSectionHeading title="Project progress" description="The latest progress and people behind your project." icon="business-outline" />
               {projects.map(project => {
                 const projectMilestones = milestones.filter(milestone => milestone.project_id === project.id);
                 const projectProgress = Number(project.completion_percentage || 0);
                 return (
                   <View key={project.id} className="border-b border-gray-100 py-4 last:border-b-0">
-                    <View className="flex-row justify-between items-center">
+                    <Pressable accessibilityRole="link" accessibilityLabel={"Open project " + project.name} onPress={() => router.push(`/client/project/${project.id}/reports` as any)} className="flex-row justify-between items-center">
                       <View className="flex-row items-center flex-1 pr-4">
                         <ProjectImage
                           project={project}
                           className="w-12 h-12 rounded-xl mr-3 shadow-sm shrink-0"
                         />
                         <View className="flex-1 min-w-0">
-                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{project.name}</Text>
-                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
+                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-bold">{project.name}</Text>
+                          <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-slate-400 text-xs mt-1">{project.location || 'Location not provided'} · {project.status || 'Status not provided'}</Text>
                         </View>
                       </View>
-                      <ClientBudgetRing 
-                        spent={spentCosts[project.id] || 0} 
-                        total={Number(project.total_budget || 1)} 
+                      <ClientBudgetRing
+                        spent={spentCosts[project.id] || 0}
+                        total={Number(project.total_budget ?? 0)}
                       />
-                    </View>
+                    </Pressable>
                     <View className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
                       <View className={`h-full bg-brand-orange rounded-full ${getProgressWidthClass(projectProgress)}`} />
                     </View>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mt-2">{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'} · Target end {formatDate(project.end_date)}</Text>
                     {project.pm && (
-                      <View className="mt-4 p-3 bg-brand-light rounded-xl flex-row items-center justify-between border border-gray-100">
-                        <View className="flex-row items-center">
+                      <View className="mt-4 p-3 bg-brand-light dark:bg-slate-800 rounded-xl flex-row flex-wrap gap-3 items-center justify-between border border-gray-100">
+                        <View className="flex-row items-center" style={{ flex: 1, minWidth: 0 }}>
                           <RoleAvatar
                             size="sm"
                             avatarUrl={project.pm.avatar_url}
@@ -320,29 +323,30 @@ export default function ClientDashboardPage() {
                             name={project.pm.full_name}
                             className="mr-3"
                           />
-                          <View>
-                            <Text className="text-sm font-bold text-brand-text">{project.pm.full_name}</Text>
-                            <Text className="text-xs text-gray-500">Project Manager</Text>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text className="text-sm font-bold text-brand-text dark:text-slate-100">{project.pm.full_name}</Text>
+                            <Text className="text-xs text-gray-500 dark:text-slate-400">Project Manager</Text>
                           </View>
                         </View>
-                        <Pressable onPress={() => router.push(`/client/messages/${project.id}?channel=pm` as any)} className="bg-white border border-gray-200 px-3 py-2 rounded-lg shadow-sm">
-                          <Text className="text-xs font-bold text-brand-text">Message</Text>
+                        <Pressable onPress={() => router.push(`/client/messages/${project.id}?channel=pm` as any)} accessibilityRole="button" accessibilityLabel={"Message the manager of "+project.name} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg shadow-sm min-h-[44px] items-center justify-center">
+                          <Text className="text-xs font-bold text-brand-text dark:text-slate-100">Message</Text>
                         </Pressable>
                       </View>
                     )}
                   </View>
                 );
               })}
-            </View>
+            </View></DashboardDetailLink>
 
-            <View className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-4">Milestone Summary</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">{completedMilestones} of {milestones.length} milestones completed.</Text>
+            <DashboardDetailLink href="/client/project/milestones" label="milestone summary"><View className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 md:p-6 mb-6">
+              <DashboardSectionHeading title="Milestone summary" description="Every completed stage brings your project closer." icon="flag-outline" />
+              <View className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full mb-4 overflow-hidden"><View className="h-full bg-orange-600 rounded-full" style={{width: (milestones.length ? completedMilestones / milestones.length * 100 : 0) + '%' as any}} /></View>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600 dark:text-slate-300">{completedMilestones} of {milestones.length} milestones completed.</Text>
               {milestones.length === 0 && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-3">No milestones have been created for your projects yet.</Text>}
-            </View>
+            </View></DashboardDetailLink>
           </>
         )}
-      </ScrollView>
+      </DashboardContent>
     </View>
   );
 }

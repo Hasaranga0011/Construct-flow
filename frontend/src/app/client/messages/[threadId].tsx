@@ -1,8 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View, Text, ScrollView, TextInput, KeyboardAvoidingView,
-  Platform, Pressable, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -11,6 +8,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { normalizeFetchError } from '../../../lib/apiUrl';
 import { ChatComposer } from '../../../components/chat/ChatComposer';
+import { roleLabel } from '@/utils/roles';
 
 type Message = {
   id: string;
@@ -188,7 +186,7 @@ export default function ClientMessagesThreadPage() {
 
   useEffect(() => {
     const fetchMissingProfiles = async () => {
-      const missingIds = [...new Set(messages.map(m => m.sender_id).filter(id => id && !profiles[id]))];
+      const missingIds = [...new Set(messages.map(m => m.sender_id).filter(Boolean))];
       if (missingIds.length > 0) {
         const { data } = await supabase.from('profiles').select('id, full_name').in('id', missingIds);
         if (data) {
@@ -224,7 +222,7 @@ export default function ClientMessagesThreadPage() {
         receiver_role: activeChannel,
         content: trimmed,
       });
-      
+
       if (data) {
         setMessages(current =>
           current.some(m => m.id === data.id) ? current : [...current, data as Message]
@@ -296,7 +294,7 @@ export default function ClientMessagesThreadPage() {
         ) : messages.map(message => {
           const isSender = message.sender_id === user?.id;
           const text = message.message_text;
-          const senderName = isSender ? 'You' : (profiles[message.sender_id] || (message.sender_role ? message.sender_role.replace('_', ' ') : 'Contact'));
+          const senderName = isSender ? 'You' : (profiles[message.sender_id] || (message.sender_role ? roleLabel(message.sender_role) : 'Contact'));
           return (
             <View key={message.id} className={`mb-4 ${isSender ? 'self-end' : 'self-start'} max-w-[80%]`}>
               <View className={`p-3 rounded-2xl ${isSender ? 'bg-brand-orange rounded-tr-sm' : 'bg-white rounded-tl-sm shadow-sm border border-gray-100'}`}>

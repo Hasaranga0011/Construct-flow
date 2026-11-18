@@ -12,6 +12,8 @@ class MockQuery:
         return self
     def eq(self, col, val):
         return MockQuery([d for d in self._data if str(d.get(col)) == str(val)])
+    def in_(self, col, values):
+        return MockQuery([d for d in self._data if d.get(col) in values])
     def order(self, *args):
         return self
     def range(self, start, end):

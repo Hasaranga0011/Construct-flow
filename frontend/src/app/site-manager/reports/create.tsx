@@ -4,10 +4,7 @@ import { PhotoCaptureModal } from '@/components/common/PhotoCaptureModal';
 import { validReportDate, validWorkerCount } from '@/utils/siteWorkflow';
 import { notify } from '@/utils/notify';
 import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TextInput, Pressable,
-  ActivityIndicator, Platform, Image, Modal,
-} from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Platform, Image, Modal } from 'react-native';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
@@ -30,7 +27,7 @@ const WORK_TEMPLATES = [
   'Site Safety Inspection',
 ];
 
-const FALLBACK_MATERIALS: Array<{ name: string; unit: string }> = [
+const FALLBACK_MATERIALS: { name: string; unit: string }[] = [
   { name: 'Cement (50kg Bag)', unit: 'bags' },
   { name: 'River Sand', unit: 'cubes' },
   { name: 'Aggregate / Metal', unit: 'cubes' },
@@ -63,7 +60,7 @@ export default function CreateSiteReportPage() {
   // Enhanced context & materials used
   const [attendanceCount, setAttendanceCount] = useState<number | null>(null);
   const [duplicateExists, setDuplicateExists] = useState(false);
-  const [projectMaterials, setProjectMaterials] = useState<Array<{ name: string; unit: string }>>([]);
+  const [projectMaterials, setProjectMaterials] = useState<{ name: string; unit: string }[]>([]);
   const [materialsUsed, setMaterialsUsed] = useState<MaterialUsedItem[]>([]);
   const [matModalOpen, setMatModalOpen] = useState(false);
   const [matName, setMatName] = useState('');
@@ -128,7 +125,7 @@ export default function CreateSiteReportPage() {
         setDuplicateExists(Boolean(dupRes.data && dupRes.data.length > 0));
 
         const seen = new Set<string>();
-        const mergedMats: Array<{ name: string; unit: string }> = [];
+        const mergedMats: { name: string; unit: string }[] = [];
         for (const m of (matRes.data || [])) {
           const n = String(m.name || '').trim();
           if (!n || seen.has(n.toLowerCase())) continue;

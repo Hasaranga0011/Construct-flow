@@ -6,14 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import {
-  ScreenContainer,
-  Card,
-  Button,
-  LoadingState,
-  EmptyState,
-  ErrorState,
-} from "@/components/ui";
+import { ScreenContainer, Card, Button, LoadingState, EmptyState, ErrorState } from "@/components/ui";
 import { LogoutConfirmationModal } from "@/components/common/LogoutConfirmationModal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { rows } from "@/services/workerData";
@@ -74,6 +67,7 @@ export default function WorkerAccount({
   settings?: boolean;
 }) {
   const { user, signOut } = useAuth();
+  const userId = user?.id;
   const { isDark, toggleTheme } = useTheme();
   const [form, setForm] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -86,13 +80,13 @@ export default function WorkerAccount({
   const lastAction = useRef<(() => Promise<void>) | null>(null);
   const load = useCallback(
     async (signal: AbortSignal) => {
-      if (!user) throw new Error("Please sign in.");
+      if (!userId) throw new Error("Please sign in.");
       return rows(
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("profiles").select("*").eq("id", userId).single(),
         signal,
       );
     },
-    [user?.id],
+    [userId],
   );
   const profile = useAsyncData(load);
   useEffect(() => {

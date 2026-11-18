@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from concurrent.futures import ThreadPoolExecutor
 from .reports_export import (
     generate_pdf_report,
     generate_excel_report,
@@ -21,19 +22,28 @@ router = APIRouter(
     dependencies=[Depends(require_manager_or_admin)]
 )
 
-def _report_rows(client, table: str, columns: str = "*") -> List[Dict[str, Any]]:
+_REPORT_READS = ThreadPoolExecutor(max_workers=8, thread_name_prefix="report-read")
+
+
+def _report_rows(client, table: str, columns: str = "*", filters: Optional[Dict[str, List[str]]] = None) -> List[Dict[str, Any]]:
     """Read all visible rows respecting user's RLS scope."""
+    if filters and any(not values for values in filters.values()):
+        return []
     rows = []
     page_size = 500
     while True:
         try:
-            page = (client.table(table).select(columns).order("id")
-                    .range(len(rows), len(rows) + page_size - 1).execute()).data or []
+            query = client.table(table).select(columns).order("id")
+            for column, values in (filters or {}).items():
+                query = query.in_(column, values)
+            page = query.range(len(rows), len(rows) + page_size - 1).execute().data or []
             rows.extend(page)
             if len(page) < page_size:
                 return rows
-        except Exception:
-            return rows
+        except Exception as exc:
+            import logging
+            logging.exception('Report source read failed: %s', table)
+            raise HTTPException(status_code=503, detail=f"Unable to load complete {table} report") from exc
 
 def _parse_colombo_date(date_str: str, is_end: bool = False) -> Optional[datetime]:
     """Parse YYYY-MM-DD string into UTC datetime boundary based on Asia/Colombo midnight."""
@@ -117,7 +127,7 @@ def get_management_report(
     client = get_auth_client(request)
     try:
         if not current_user or not isinstance(current_user, dict):
-            current_user = {"role": "super_admin", "id": "admin"}
+            raise HTTPException(401, "Authentication required")
 
         from_date_str = from_date if isinstance(from_date, str) else None
         to_date_str = to_date if isinstance(to_date, str) else None
@@ -135,34 +145,41 @@ def get_management_report(
         dt_from = _parse_colombo_date(from_date_str, is_end=False)
         dt_to = _parse_colombo_date(to_date_str, is_end=True)
 
-        all_projects = _report_rows(client, "projects")
-        all_materials = _report_rows(client, "materials")
-        all_orders = _report_rows(client, "purchase_orders")
-        all_payroll = _report_rows(client, "salary_slips")
-        all_people = _report_rows(client, "profiles", "id, full_name")
-
-        all_expenses = []
-        all_attendance = []
-        all_issues = []
-
-        role = normalize_role(current_user.get("role"))
-        if role == "pm" and not req_project_ids:
-            # Scope to PM projects automatically
-            pm_id = current_user.get("id")
-            all_projects = [p for p in all_projects if p.get("pm_id") == pm_id]
-        elif req_project_ids:
-            all_projects = [p for p in all_projects if p.get("id") in req_project_ids]
-
-        allowed_ids = {p["id"] for p in all_projects}
+        project_filters = {"id": req_project_ids} if req_project_ids else {}
+        if normalize_role(current_user.get("role")) == "pm":
+            project_filters["pm_id"] = [current_user["id"]]
+        all_projects = _report_rows(client, "projects", filters=project_filters)
+        allowed_ids = {row["id"] for row in all_projects}
+        scope = {"project_id": list(allowed_ids)}
+        # Bounded shared pool overlaps independent database reads; source failures still fail the report.
+        pending = {
+            "materials": _REPORT_READS.submit(_report_rows, client, "materials", "*", scope),
+            "orders": _REPORT_READS.submit(_report_rows, client, "purchase_orders", "*", scope),
+            "payroll": _REPORT_READS.submit(_report_rows, client, "salary_slips", "*", scope),
+            "people": _REPORT_READS.submit(_report_rows, client, "profiles", "id, full_name"),
+            "expenses": _REPORT_READS.submit(_report_rows, client, "project_expenses", "*", scope),
+            "sites": _REPORT_READS.submit(_report_rows, client, "sites", "id,project_id", scope),
+        }
+        all_materials = pending["materials"].result()
+        all_orders = pending["orders"].result()
+        all_payroll = pending["payroll"].result()
+        all_people = pending["people"].result()
+        all_expenses = pending["expenses"].result()
+        report_sites = pending["sites"].result()
+        project_for_site = {site["id"]: site.get("project_id") for site in report_sites}
+        site_scope = {"site_id": list(project_for_site)}
+        attendance = _REPORT_READS.submit(_report_rows, client, "attendance", "*", site_scope)
+        issues = _REPORT_READS.submit(_report_rows, client, "issues", "*", site_scope)
+        all_attendance = [{**row, "project_id": project_for_site.get(row.get("site_id"))} for row in attendance.result()]
+        all_issues = [{**row, "project_id": project_for_site.get(row.get("site_id"))} for row in issues.result()]
 
         # Filter by project access
-        if allowed_ids:
-            all_materials = [m for m in all_materials if m.get("project_id") in allowed_ids]
-            all_orders = [o for o in all_orders if o.get("project_id") in allowed_ids]
-            all_payroll = [s for s in all_payroll if not s.get("project_id") or s.get("project_id") in allowed_ids]
-            all_expenses = [e for e in all_expenses if e.get("project_id") in allowed_ids]
-            all_attendance = [a for a in all_attendance if a.get("project_id") in allowed_ids]
-            all_issues = [r for r in all_issues if r.get("project_id") in allowed_ids]
+        all_materials = [m for m in all_materials if m.get("project_id") in allowed_ids]
+        all_orders = [o for o in all_orders if o.get("project_id") in allowed_ids]
+        all_payroll = [s for s in all_payroll if s.get("project_id") in allowed_ids]
+        all_expenses = [e for e in all_expenses if e.get("project_id") in allowed_ids]
+        all_attendance = [a for a in all_attendance if a.get("project_id") in allowed_ids]
+        all_issues = [r for r in all_issues if r.get("project_id") in allowed_ids]
 
         # Filter by date boundaries
         if dt_from or dt_to:
@@ -236,7 +253,7 @@ def export_reports(
     Produces PDF, Excel (.xlsx), CSV, and multi-project ZIP files.
     """
     client = get_auth_client(request)
-    
+
     # Check authorization
     req_project_ids = [p.strip() for p in projects.split(",") if p.strip()] if projects else []
     _verify_pm_project_access(current_user, req_project_ids, client)
@@ -341,7 +358,7 @@ def export_reports(
             })
             po_headers = ["PO Number", "Project", "Supplier", "Status", "Total Amount (LKR)", "Expected Delivery"]
             po_rows = [
-                [o.get("po_number", "—"), project_map.get(o.get("project_id"), "—"), o.get("supplier_name", "—"), o.get("status", "—"), float(o.get("total_amount") or 0), format_date_str(o.get("expected_date"))]
+                [o.get("po_number", "—"), project_map.get(o.get("project_id"), "—"), o.get("supplier_name", "—"), o.get("status", "—"), float(o.get("total_price") if o.get("total_price") is not None else o.get("total_amount") or 0), format_date_str(o.get("expected_date"))]
                 for o in orders
             ]
             sections.append({

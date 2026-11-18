@@ -6,6 +6,12 @@ export function formatMoney(n: number): string {
   return `Rs. ${n.toLocaleString()}`;
 }
 
+/** Exact amounts for salary slips, payment confirmations and financial records. */
+export function formatCurrencyExact(value: number): string {
+  if (!Number.isFinite(value)) return 'Not recorded';
+  return `Rs. ${value.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function getAttendanceStatus(record: {
   status?: string | null;
   check_in_time?: string | null;
@@ -96,11 +102,11 @@ export function formatOvertimeHoursMinutes(
 }
 
 export function sumWorkedMinutes(
-  records: Array<{
+  records: {
     hours_worked?: number | string | null;
     check_in_time?: string | null;
     check_out_time?: string | null;
-  }> | null | undefined
+  }[] | null | undefined
 ): number {
   if (!Array.isArray(records)) return 0;
   return records.reduce(
@@ -110,12 +116,12 @@ export function sumWorkedMinutes(
 }
 
 export function sumOvertimeMinutes(
-  records: Array<{
+  records: {
     overtime_hours?: number | string | null;
     hours_worked?: number | string | null;
     check_in_time?: string | null;
     check_out_time?: string | null;
-  }> | null | undefined
+  }[] | null | undefined
 ): number {
   if (!Array.isArray(records)) return 0;
   return records.reduce(

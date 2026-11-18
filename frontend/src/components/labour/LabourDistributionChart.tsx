@@ -6,13 +6,13 @@ const Bar = ({ label, percentage, count }: { label: string, percentage: number, 
   <View className="items-center justify-end flex-1 mx-2 h-full">
     {/* Label at top */}
     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-xs mb-1">{count}</Text>
-    
+
     {/* The Bar */}
-    <View 
-      className="w-full bg-brand-orange rounded-t-sm" 
-      style={{ height: `${percentage}%`, minHeight: '5%' }} 
+    <View
+      className="w-full bg-brand-orange rounded-t-sm"
+      style={{ height: `${percentage}%`, minHeight: '5%' }}
     />
-    
+
     {/* X-axis Label */}
     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-[10px] text-center mt-2 h-8 leading-tight">
       {label}
@@ -26,7 +26,7 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadData = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -36,22 +36,28 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
         }
 
         // Fetch all active projects
-        let query = supabase.from('projects').select('id, name').eq('status', 'active');
+        let query = supabase.from('projects').select('id, name').in('status', ['Active', 'active', 'In Progress', 'in_progress']);
         if (pmId) {
           query = query.eq('pm_id', pmId);
         }
-        const { data: projects } = await query;
-        
+        const { data: projects, error: projectError } = await query;
+        if (projectError) throw projectError;
+
         // Fetch all attendance for today
-        const today = new Date().toISOString().split('T')[0];
-        const { data: todayLabour } = await supabase.from('legacy_labour').select('project_id, worker_name').eq('date', today);
-        
-        if (projects && todayLabour) {
+        const dayParts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+        const today = ['year', 'month', 'day'].map(type => dayParts.find(part => part.type === type)?.value).join('-');
+        const sites = projects?.length ? await supabase.from('sites').select('id,project_id').in('project_id', projects.map(project => project.id)) : { data: [], error: null };
+        if (sites.error) throw sites.error;
+        const physicalSites = new Map((sites.data || []).map(site => [site.id, site.project_id]));
+        const attendance = physicalSites.size ? await supabase.from('attendance').select('worker_id,site_id,status').in('site_id', [...physicalSites.keys()]).eq('date', today) : { data: [], error: null };
+        if (attendance.error) throw attendance.error;
+
+        if (projects) {
           const counts = projects.map(p => {
-            const count = todayLabour.filter(l => l.project_id === p.id).length;
+            const count = new Set((attendance.data || []).filter(row => physicalSites.get(row.site_id) === p.id && (!row.status || row.status === 'Present')).map(row => row.worker_id)).size;
             return { label: p.name || 'Unnamed Project', count };
           });
-          
+
           if (isMounted) setData(counts);
         }
       } catch (error) {
@@ -60,10 +66,10 @@ export const LabourDistributionChart = ({ refreshTrigger = 0, pmId }: { refreshT
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadData();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, pmId]);
 
   const maxCount = Math.max(...data.map(d => d.count), 1); // Avoid division by zero
 

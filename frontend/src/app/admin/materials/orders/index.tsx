@@ -1,98 +1,111 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Pagination } from '@/components/common/Pagination';
+import { View, Text, TextInput, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
-import { SearchInput } from '@/components/common/SearchInput';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { format } from 'date-fns';
-import { useResponsive } from '../../../../hooks/useResponsive';
+import { useTableLayout } from '@/hooks/useTableLayout';
 import { formatMoney } from '../../../../utils/format';
 import { FilterChipGrid } from '@/components/common/FilterChipGrid';
 import { useAuth } from '@/context/AuthContext';
+import { ErrorState } from '@/components/ui';
 
 export default function AdminPurchaseOrders() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ project_id?: string; supplier_id?: string }>();
+  const scopedProjectId = Array.isArray(params.project_id) ? params.project_id[0] : params.project_id;
+  const scopedSupplierId = Array.isArray(params.supplier_id) ? params.supplier_id[0] : params.supplier_id;
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const basePath = isPM ? '/pm/materials/orders' : '/admin/materials/orders';
-  const { isMobile } = useResponsive();
+  const { isCompact:isMobile, onLayout } = useTableLayout(1000);
+  const [loadError,setLoadError]=useState('');
+  const [retryTick,setRetryTick]=useState(0);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const pageSize = 25;
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearchTerm(search.trim()); setPage(0); }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
     const fetchOrders = async () => {
+      setLoadError('');
+      setLoading(true);
       try {
         let pmProjectIds: string[] = [];
         if (isPM && user?.id) {
-          const { data: projData } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          const { data: projData, error: projectError } = await supabase.from('projects').select('id').eq('pm_id', user.id);
+          if (projectError) throw projectError;
           pmProjectIds = (projData || []).map(p => p.id).filter((id): id is string => Boolean(id));
           if (pmProjectIds.length === 0) {
-            if (isMounted) setOrders([]);
+            if (isMounted) { setOrders([]); setTotal(0); }
             return;
           }
         }
 
-        let query = supabase.from('purchase_orders').select(`*`).order('created_at', { ascending: false });
+        let query = supabase.from('purchase_orders').select('*', { count: 'exact' }).order('created_at', { ascending: false }).order('id', { ascending: false });
 
         if (pmProjectIds.length > 0) {
           query = query.in('project_id', pmProjectIds);
         }
 
+        if (scopedProjectId) query = query.eq('project_id', scopedProjectId);
+        if (scopedSupplierId) query = query.eq('supplier_id', scopedSupplierId);
         if (statusFilter !== 'All') {
           query = query.eq('status', statusFilter);
         }
 
-        const { data, error } = await query;
+        if (searchTerm) {
+          // Quote PostgREST values so commas/parentheses cannot alter the filter.
+          const literal = `"%${searchTerm.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/%/g, '\\%').replace(/_/g, '\\_')}%"`;
+          query = query.or(`po_number.ilike.${literal},items.ilike.${literal},supplier_name.ilike.${literal}`);
+        }
+        const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1).abortSignal(controller.signal);
         if (error) throw error;
 
-        // Manual search filter since Supabase ilike doesn't cross join tables easily without a view
-        let filteredData = data || [];
-        if (search) {
-          filteredData = filteredData.filter(o =>
-            o.po_number?.toLowerCase().includes(search.toLowerCase()) ||
-            o.items?.toLowerCase().includes(search.toLowerCase()) ||
-            o.supplier_name?.toLowerCase().includes(search.toLowerCase())
-          );
+        if (isMounted) {
+          setTotal(count || 0);
+          if (page > 0 && page * pageSize >= (count || 0)) setPage(Math.max(0, Math.ceil((count || 0) / pageSize) - 1));
+          setOrders(data || []);
         }
-
-        if (isMounted) setOrders(filteredData);
       } catch (err) {
-        console.error('Error fetching orders', err);
+        if(isMounted)setLoadError(err instanceof Error?err.message:'Unable to load purchase orders.');
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
     fetchOrders();
-    return () => { isMounted = false; };
-  }, [search, statusFilter, isPM, user?.id]);
+    return () => { isMounted = false; controller.abort(); };
+  }, [statusFilter, isPM, user?.id, scopedProjectId, scopedSupplierId, retryTick, page, searchTerm]);
 
-  const statuses = ['All', 'Pending Delivery', 'Suggested', 'Rejected', 'Confirmed', 'Delivered', 'Cancelled'];
+  const visibleOrders = orders;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Delivered': return 'bg-green-100 text-green-700';
-      case 'Pending Delivery': return 'bg-orange-100 text-orange-700';
-      case 'Suggested': return 'bg-yellow-100 text-yellow-700';
-      case 'Rejected': case 'Cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-blue-100 text-blue-700';
-    }
-  };
+  const statuses = ['All', 'Pending Delivery', 'Suggested', 'Rejected', 'Confirmed', 'Delivered', 'Received', 'Cancelled'];
+
 
   return (
     <View className="flex-1 flex-col bg-gray-50">
       <TopNav
         title="Purchase Orders"
         actionLabel="+ New Order"
-        onActionPress={() => router.push('/admin/materials/orders/create')}
+        onActionPress={() => router.push(`${basePath}/create${scopedProjectId?'?project_id='+scopedProjectId:''}` as any)}
       />
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
-        <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/materials')} className="flex-row items-center mb-6 self-start">
+        <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`/${isPM?'pm':'admin'}/materials${scopedProjectId?'?project='+scopedProjectId:''}` as any)} className="flex-row items-center mb-6 self-start">
           <Ionicons name="arrow-back" size={20} color="#6B7280" />
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 font-semibold ml-2">Back to Materials</Text>
         </Pressable>
@@ -101,22 +114,21 @@ export default function AdminPurchaseOrders() {
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">All Orders</Text>
 
-            <SearchInput
-              placeholder="Search PO, Item, Supplier..."
-              value={search}
-              onChangeText={setSearch}
-              className={isMobile ? "w-full" : "w-80"}
-            />
+            <View className={`flex-row items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 ${isMobile ? 'w-full' : 'w-80'}`}>
+              <Ionicons name="search-outline" size={18} color="#64748b" />
+              <TextInput accessibilityLabel="Search purchase orders" placeholder="Search PO, item or supplier" value={search} onChangeText={setSearch} className="flex-1 min-w-0 py-3 text-sm text-slate-800" />
+              {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear order search" onPress={() => setSearch('')} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={18} color="#64748b" /></Pressable>}
+            </View>
           </View>
 
           <FilterChipGrid
             options={statuses.map(s => ({ id: s, label: s }))}
             selectedValue={statusFilter}
-            onSelect={setStatusFilter}
+            onSelect={value => { setStatusFilter(value); setPage(0); }}
           />
         </View>
 
-        <View style={isMobile ? {} : { backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
+        <View onLayout={onLayout} style={isMobile ? {} : { backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
           {!isMobile && (
             <View className="flex-row py-3 border-b border-gray-200 pr-2">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO Number</Text>
@@ -128,28 +140,26 @@ export default function AdminPurchaseOrders() {
             </View>
           )}
 
-          {loading ? (
+          {loadError ? <ErrorState message={loadError} onRetry={()=>setRetryTick(tick=>tick+1)}/> : loading ? (
             <View className="py-20 items-center justify-center">
               <ActivityIndicator color="#F97316" />
             </View>
-          ) : orders.length === 0 ? (
+          ) : visibleOrders.length === 0 ? (
             <View className="py-20 items-center justify-center">
               <Ionicons name="cart-outline" size={48} color="#D1D5DB" className="mb-4" />
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg font-medium">No purchase orders found.</Text>
             </View>
           ) : (
-            orders.map(o => (
+            visibleOrders.map(o => (
               isMobile ? (
                 <View key={o.id} style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#111827', fontWeight: 'bold', fontSize: 16 }]}>{o.items || 'Unknown'}</Text>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#6B7280', fontSize: 12 }]}>PO: {o.po_number || 'N/A'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <View className={`px-2 py-1 rounded ${getStatusColor(o.status)}`}>
-                        <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }]}>{o.status}</Text>
-                      </View>
+                      <StatusBadge status={o.status} />
                     </View>
                   </View>
 
@@ -204,11 +214,7 @@ export default function AdminPurchaseOrders() {
                   </View>
 
                   <View className="w-[15%]">
-                    <View className={`px-2 py-1 rounded self-start ${getStatusColor(o.status)}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase`}>
-                        {o.status}
-                      </Text>
-                    </View>
+                    <StatusBadge status={o.status} />
                   </View>
 
                   <View className="flex-1 flex-row justify-end pl-1">
@@ -224,6 +230,7 @@ export default function AdminPurchaseOrders() {
             ))
           )}
         </View>
+        {!loadError && <Pagination page={page} pageSize={pageSize} total={total} loading={loading} onChange={setPage} />}
       </ScrollView>
     </View>
   );

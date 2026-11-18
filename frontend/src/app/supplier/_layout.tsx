@@ -1,17 +1,18 @@
 import React from 'react';
-import { View, Platform, useWindowDimensions } from 'react-native';
+import { View, Platform, useWindowDimensions, Text, Pressable } from 'react-native';
 import { Slot } from 'expo-router';
 import { MobileSidebar as Sidebar, NavItem } from '../../components/common/MobileSidebar';
 import { SidebarProvider } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Icon } from '@/components/ui/Icon';
-import { Text, Pressable } from 'react-native';
+
 
 const SUPPLIER_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',    href: '/dashboard',  IconFamily: Icon, iconName: 'chart-bar' },
   { label: 'My Deliveries',   href: '/deliveries', IconFamily: Icon, iconName: 'truck-loading' },
   { label: 'Messages',     href: '/messages',   IconFamily: Ionicons,     iconName: 'chatbubbles' },
+  { label: 'Notifications', href: '/notifications', IconFamily: Ionicons, iconName: 'notifications-outline' },
   { label: 'My Profile',   href: '/profile',    IconFamily: Ionicons,     iconName: 'person-circle-outline' },
   { label: 'Settings',     href: '/settings',   IconFamily: Ionicons,     iconName: 'settings-sharp' },
 ];

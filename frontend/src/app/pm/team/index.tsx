@@ -1,4 +1,4 @@
-import { firstRelation } from '@/utils/relations';
+
 import { assignedWorkers } from '@/services/siteData';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
 import { RoleAvatar } from '@/components/common/RoleAvatar';
+import { roleLabel } from '@/utils/roles';
 
 type TeamMember = { id: string; full_name?: string | null; email?: string | null; role?: string | null; avatar_url?: string | null };
 
@@ -43,11 +44,11 @@ export default function PMTeamPage() {
 					assignedWorkers(projectIds)
 				]);
 				if (managerError) throw managerError;
-				
+
 				const workerUserIds = workers.map(w => w.profiles?.id).filter((id): id is string => Boolean(id));
 				const managerIds = (managers || []).map(manager => manager.site_manager_id).filter((id): id is string => Boolean(id));
 				const memberIds = [...new Set([...workerUserIds, ...managerIds])];
-				
+
 				if (memberIds.length === 0) {
 					if (mounted) setMembers([]);
 					return;
@@ -75,12 +76,12 @@ export default function PMTeamPage() {
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text mb-1">Your Project Team</Text>
 						<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500">Only workers and site managers assigned to your projects are shown.</Text>
 					</View>
-					<SearchInput 
-						placeholder="Search team members..." 
-						value={search} 
-						onChangeText={setSearch} 
-						items={members} 
-						entityLabel="team" 
+					<SearchInput
+						placeholder="Search team members..."
+						value={search}
+						onChangeText={setSearch}
+						items={members}
+						entityLabel="team"
 						className={isMobile ? "w-full" : "w-80"}
 						config={{
 							table: 'profiles',
@@ -112,7 +113,7 @@ export default function PMTeamPage() {
 							</View>
 						</View>
 						<View className="px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 shrink-0">
-							<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-[10px] font-bold uppercase">{(member.role || 'team member').replace('_', ' ')}</Text>
+							<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange text-[10px] font-bold uppercase">{roleLabel(member.role || 'Team Member')}</Text>
 						</View>
 					</Pressable>
 				))}

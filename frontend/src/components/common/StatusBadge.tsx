@@ -1,32 +1,21 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
-type StatusBadgeProps = {
-  status: string;
+const tones: Record<string, { background: string; foreground: string }> = {
+  success: { background: 'bg-green-100', foreground: 'text-green-800' },
+  warning: { background: 'bg-orange-100', foreground: 'text-orange-800' },
+  info: { background: 'bg-blue-100', foreground: 'text-blue-800' },
+  danger: { background: 'bg-red-100', foreground: 'text-red-800' },
+  neutral: { background: 'bg-slate-100', foreground: 'text-slate-700' },
 };
-
-export function StatusBadge({ status }: StatusBadgeProps) {
-  const getBadgeStyle = (s: string) => {
-    switch (s) {
-      case 'Pending Delivery': return 'bg-orange-100 text-orange-700';
-      case 'Suggested': return 'bg-yellow-100 text-yellow-700';
-      case 'Confirmed': return 'bg-blue-100 text-blue-700';
-      case 'Delivered': return 'bg-purple-100 text-purple-700';
-      case 'Received': return 'bg-green-100 text-green-700';
-      case 'Rejected': return 'bg-red-100 text-red-700';
-      case 'Cancelled': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  const colorClass = getBadgeStyle(status);
-  const [bgClass, textClass] = colorClass.split(' ');
-
-  return (
-    <View className={`px-2 py-1 rounded-full ${bgClass} self-start`}>
-      <Text numberOfLines={1} className={`text-xs font-bold ${textClass}`}>
-        {status || 'Unknown'}
-      </Text>
-    </View>
-  );
+export function StatusBadge({ status }: { status: string | null | undefined }) {
+  const value = status?.trim() || 'Not recorded';
+  const normalized = value.toLowerCase().replace(/_/g, ' ');
+  const tone = ['received', 'completed', 'paid', 'approved', 'resolved', 'present', 'in stock'].includes(normalized) ? 'success'
+    : ['rejected', 'overdue', 'absent', 'high', 'critical', 'out of stock'].includes(normalized) ? 'danger'
+    : ['confirmed', 'in progress', 'active', 'delivered'].includes(normalized) ? 'info'
+    : ['pending', 'pending delivery', 'pending approval', 'suggested', 'generated', 'planning', 'open', 'low stock', 'on leave'].includes(normalized) ? 'warning' : 'neutral';
+  return <View testID="status-badge" accessibilityLabel={value} className={`px-3 py-1.5 rounded-full self-start shrink-0 ${tones[tone].background}`}>
+    <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className={`text-xs font-semibold shrink-0 ${tones[tone].foreground}`}>{value}</Text>
+  </View>;
 }

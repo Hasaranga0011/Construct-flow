@@ -1,5 +1,5 @@
+import React, { useCallback, useEffect, useState } from 'react';
 import { ModalViewport } from './ModalViewport';
-import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
@@ -8,28 +8,26 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { useNotifications } from '../../context/NotificationContext';
 
 export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'inbox' | 'settings'>('inbox');
   const [pushEnabled, setPushEnabled] = useState(false);
 
   const { notifications, loading, markAsRead, markAllAsRead } = useNotifications();
 
   // Initialize Push Token listener (already handled in root layout, but we need it to trigger permission requests)
-  const { expoPushToken, requestToken } = usePushNotifications(user?.id || null);
+  const { requestToken } = usePushNotifications(user?.id || null);
 
-  useEffect(() => {
-    if (visible && user) {
-      checkPushStatus();
-    }
-  }, [visible, user]);
-
-  const checkPushStatus = async () => {
+  const checkPushStatus = useCallback(async () => {
     if (!user) return;
     try {
       const { data } = await supabase.from('profiles').select('expo_push_token').eq('id', user.id).single();
       setPushEnabled(!!(data as any)?.expo_push_token);
-    } catch (e) {}
-  };
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    if (visible && user) void checkPushStatus();
+  }, [visible, user, checkPushStatus]);
 
   const togglePush = async (val: boolean) => {
     setPushEnabled(val);

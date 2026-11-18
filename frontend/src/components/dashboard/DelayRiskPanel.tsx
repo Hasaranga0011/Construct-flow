@@ -1,4 +1,4 @@
-import { getApiUrl } from '../../lib/apiUrl';
+
 import { useApi } from '../../hooks/useApi';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
@@ -17,7 +17,7 @@ const RiskRow = ({
 }) => (
   <View className="mb-4">
     <View className="flex-row justify-between items-center mb-1">
-      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text font-semibold text-sm flex-1 mr-2">
+      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text dark:text-slate-100 font-semibold text-sm flex-1 mr-2">
         {project}
       </Text>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold ${colorClass}`}>{percentage}%</Text>
@@ -30,7 +30,7 @@ const RiskRow = ({
       />
     </View>
 
-    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs">{message}</Text>
+    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-slate-500 dark:text-slate-400 text-xs">{message}</Text>
   </View>
 );
 
@@ -65,7 +65,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
 
   const [retryKey, setRetryKey] = useState(0);
 
-  const { request: apiRequest, loading: apiLoading, error: apiError } = useApi();
+  const { request: apiRequest } = useApi();
 
   useEffect(() => {
     let isMounted = true;
@@ -169,7 +169,7 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
     return () => {
       isMounted = false;
     };
-  }, [pmId, retryKey]);
+  }, [pmId, retryKey, apiRequest, cacheKey]);
 
   const getRiskColor = (score: number) => {
     if (score > 70) return 'text-brand-danger';
@@ -178,9 +178,9 @@ export const DelayRiskPanel = ({ pmId }: { pmId?: string }) => {
   };
 
   return (
-    <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 min-h-[300px] w-full">
+    <View className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 min-h-[300px] w-full">
       <View className="flex-row justify-between items-center mb-1">
-        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">AI Delay Risk</Text>
+        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100">AI Delay Risk</Text>
         <View className="w-5 h-5 bg-red-100 rounded flex items-center justify-center">
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-danger text-xs font-bold">!</Text>
         </View>

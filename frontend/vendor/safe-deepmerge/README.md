@@ -1,0 +1,1 @@
+Derived from deepmerge 4.3.1 under the included MIT license. Both target-copy and source-merge paths reject __proto__, constructor and prototype keys, including null-prototype objects. This guards against GHSA-gcqx-w48m-w2h4. Regression coverage is in scripts/test-security-boundaries.cjs.

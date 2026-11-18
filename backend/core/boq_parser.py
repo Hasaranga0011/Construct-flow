@@ -7,6 +7,8 @@ and prepares project baselines.
 from typing import Dict, Any, List, Optional
 import io
 import re
+import math
+from core.spreadsheet_limits import validate_spreadsheet
 import pandas as pd
 
 # Sri Lankan CIDA / Market Price Benchmarks (approximate mid-range 2024-2026 in LKR)
@@ -135,14 +137,27 @@ def _promote_header_row(df: pd.DataFrame, header_keywords: List[str]) -> pd.Data
 def _clean_float(val: Any) -> float:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return 0.0
-    try:
-        cleaned = re.sub(r"[^\d.]", "", str(val))
-        return float(cleaned) if cleaned else 0.0
-    except Exception:
+    text = str(val).strip()
+    if text.lower() in {'', '-', '—', '–', 'n/a', 'na', 'none', 'nil'}:
         return 0.0
+    # Remove formatting, never numeric signs or exponent characters. Stripping
+    # arbitrary characters turned -5 into +5, 1e3 into 13, and Rs. 3,500 into 0.
+    text = re.sub(r'(?i)^(?:lkr|rs\.?|rupees)\s*', '', text)
+    if text.startswith('(') and text.endswith(')'):
+        text = '-' + text[1:-1]
+    text = re.sub(r'[,\s]', '', text)
+    try:
+        number = float(text)
+    except (ValueError, OverflowError) as exc:
+        raise ValueError('BOQ contains an invalid numeric value') from exc
+    if not math.isfinite(number) or number < 0:
+        raise ValueError('BOQ quantities, rates and amounts must be finite and nonnegative')
+    return number
 
 
 def parse_boq_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
+    if len(df) > 20000 or len(df.columns) > 100:
+        raise ValueError("BOQ exceeds the 20000-row or 100-column limit")
     # Clean empty rows and columns
     df = df.dropna(how="all").dropna(axis=1, how="all")
     if df.empty:
@@ -193,6 +208,8 @@ def parse_boq_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
         qty_val = _clean_float(row.get(qty_col)) if qty_col else 0.0
         rate_val = _clean_float(row.get(rate_col)) if rate_col else 0.0
         amt_val = _clean_float(row.get(amount_col)) if amount_col else 0.0
+        if any(not math.isfinite(n) or n < 0 for n in (qty_val, rate_val, amt_val)):
+            raise ValueError("BOQ quantities, rates and amounts must be finite and nonnegative")
 
         if banner_candidate and qty_val == 0.0 and rate_val == 0.0 and amt_val == 0.0:
             current_phase = re.sub(r"^(PHASE|STAGE|SECTION|MILESTONE)\s*\d*\s*[—\-:]*\s*", "", banner_candidate, flags=re.IGNORECASE).strip() or banner_candidate
@@ -306,7 +323,7 @@ def parse_boq_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
     return {
         "total_budget": round(total_budget, 2),
         "items_count": len(items),
-        "items": items[:100],  # preview up to first 100 items
+        "items": items,  # Persist every line; the UI limits its own visible preview.
         "stage_budgets": {k: round(v, 2) for k, v in stage_budgets.items()},
         "milestones": milestones,
         "materials": materials,
@@ -389,21 +406,22 @@ def _parse_labour_rates_sheet(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 
 def parse_boq_file(file_bytes: bytes, filename: str) -> Dict[str, Any]:
+    validate_spreadsheet(file_bytes, filename)
     fn = filename.lower()
     if fn.endswith(".csv"):
         # Attempt UTF-8, then fallback to latin1; handle messy CSVs gracefully
         try:
-            df = pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8", on_bad_lines="skip")
+            df = pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8", on_bad_lines="error", nrows=20001, keep_default_na=False)
         except Exception:
             try:
-                df = pd.read_csv(io.BytesIO(file_bytes), encoding="latin1", on_bad_lines="skip")
+                df = pd.read_csv(io.BytesIO(file_bytes), encoding="latin1", on_bad_lines="error", nrows=20001, keep_default_na=False)
             except Exception as e:
                 raise ValueError(f"Failed to parse CSV file: {e}")
         return parse_boq_dataframe(df)
 
     elif fn.endswith(".xlsx") or fn.endswith(".xls"):
         try:
-            sheets: Dict[str, pd.DataFrame] = pd.read_excel(io.BytesIO(file_bytes), sheet_name=None)
+            sheets: Dict[str, pd.DataFrame] = pd.read_excel(io.BytesIO(file_bytes), sheet_name=None, nrows=20001, keep_default_na=False)
         except Exception as e:
             raise ValueError(f"Failed to parse Excel file: {e}")
 
@@ -422,9 +440,9 @@ def parse_boq_file(file_bytes: bytes, filename: str) -> Dict[str, Any]:
         if mat_sheet_name:
             sheet_materials = _parse_material_rates_sheet(sheets[mat_sheet_name])
             if sheet_materials:
-                existing_by_name = {m["name"].lower(): m for m in result.get("materials", [])}
+                existing_by_name = {(m["name"].strip().lower(), m.get("unit", "units").strip().lower()): m for m in result.get("materials", [])}
                 for sm in sheet_materials:
-                    key = sm["name"].lower()
+                    key = (sm["name"].strip().lower(), sm.get("unit", "units").strip().lower())
                     if key in existing_by_name:
                         if sm["unit_price"] > 0:
                             existing_by_name[key]["unit_price"] = sm["unit_price"]

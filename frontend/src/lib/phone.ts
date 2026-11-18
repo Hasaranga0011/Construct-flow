@@ -1,7 +1,10 @@
 /**
  * Sri Lankan phone number parsing, validation and formatting using libphonenumber-js.
  */
-import { parsePhoneNumberFromString, AsYouType } from 'libphonenumber-js';
+/**
+ * Sri Lankan phone number parsing, validation and formatting using libphonenumber-js.
+ */
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export const LK_PHONE_ERROR_MESSAGE = 'Enter a valid Sri Lankan phone number, for example 077 123 4567';
 
@@ -66,7 +69,7 @@ export function normalizeToE164(input: string | null | undefined): string | null
     if (parsed && parsed.isValid() && parsed.country === 'LK') {
       return parsed.number as string; // E.164: +94XXXXXXXXX
     }
-  } catch (e) {
+  } catch {
     // Fall back to regex if libphonenumber fails on newly assigned operator prefixes
   }
 

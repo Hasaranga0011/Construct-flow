@@ -6,3 +6,5 @@ export * from './Section';
 export * from './States';
 export * from './Select';
 export * from './Toolbar';
+export * from './FormModal';
+export * from './InlineNotice';

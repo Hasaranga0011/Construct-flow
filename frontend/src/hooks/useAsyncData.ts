@@ -13,7 +13,7 @@ export function useAsyncData<T>(
   const retry = useCallback(() => setRevision((n) => n + 1), []);
   useEffect(() => {
     const controller = new AbortController();
-    setState({ data: null, loading: true, error: null, loader: load });
+    setState(previous => ({ data: previous.loader === load ? previous.data : null, loading: true, error: null, loader: load }));
     const timer = setTimeout(() => {
       controller.abort();
       setState({

@@ -1,3 +1,4 @@
+import { SalaryPaymentAction } from '@/components/labour/SalaryPaymentAction';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -8,6 +9,7 @@ import { supabase } from '../../../lib/supabase';
 type SalarySlip = {
   id: string;
   worker_id: string;
+  project_id?: string | null;
   total_days?: number | null;
   overtime_hours?: number | null;
   daily_rate?: number | null;
@@ -121,6 +123,7 @@ export default function AdminPayrollWorkerDetailPage() {
 										{formatCurrency(total)}
 									</Text>
 								</View>
+								<SalaryPaymentAction slip={slip} onPaid={() => setRefreshTrigger(value => value + 1)} />
 								<View className="border-t border-gray-100 mt-5 pt-4 gap-2">
 									<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">
 										Rate: <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-text">{formatCurrency(workerRate)} / day</Text>

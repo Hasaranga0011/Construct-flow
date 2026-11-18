@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Button } from './Button';
 
 export const LoadingState = ({ message = 'Loading...' }: { message?: string }) => (
   <View className="flex-1 items-center justify-center p-8">
     <View className="w-12 h-12 rounded-full items-center justify-center mb-4 bg-orange-50 dark:bg-orange-900/20">
-      <Ionicons name="sync" size={24} color="#F97316" className="animate-spin" />
+      <ActivityIndicator accessibilityLabel={message} size="small" color="#C2410C" />
     </View>
     <Text maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-gray-400 font-medium">{message}</Text>
   </View>

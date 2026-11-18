@@ -34,3 +34,9 @@ __pycache__/
 .validation-db/
 .validation-web/
 .lint-results.json
+
+# Local credentials and verification artifacts
+/Credintials
+.validation-*/
+
+.validation-*.json
