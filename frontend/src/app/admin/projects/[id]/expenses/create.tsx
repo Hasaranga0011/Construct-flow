@@ -1,7 +1,9 @@
+import { DateField } from '@/components/common/DateField';
 import { getApiUrl } from '../../../../../lib/apiUrl';
 import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -130,7 +132,7 @@ export default function AdminCreateExpensePage() {
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
         <View className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 shadow-sm mb-10 border border-gray-100 dark:border-gray-800 max-w-2xl w-full mx-auto">
 
-          <BoqItemSelect projectId={String(projectId || '')} value={boqItemId} onChange={id => setBoqItemId(id)} />
+          <BoqItemSelect expenseContext projectId={String(projectId || '')} value={boqItemId} onChange={id => setBoqItemId(id)} />
           {/* Expense Category Selector */}
           <View className="mb-5">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">
@@ -239,15 +241,8 @@ export default function AdminCreateExpensePage() {
 
           <View className="mb-4">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 dark:text-gray-300 font-bold mb-2">Expense Date *</Text>
-            <View className="flex-row items-center bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
-              <Ionicons name="calendar-outline" size={20} color="#9CA3AF" className="mr-3" />
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="flex-1 text-gray-800 dark:text-white font-medium"
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9CA3AF"
-                value={form.expense_date}
-                onChangeText={(t) => setForm({...form, expense_date: t})}
-              />
+            <View className="w-full">
+              <DateField label="Expense Date" value={form.expense_date} onChange={(t) => setForm({...form, expense_date: t})} />
             </View>
           </View>
 

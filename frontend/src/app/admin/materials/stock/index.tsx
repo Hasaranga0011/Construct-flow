@@ -1,9 +1,12 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { SearchInput } from '@/components/common/SearchInput';
 import { firstRelation } from '@/utils/relations';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -19,6 +22,7 @@ export default function AdminStockLevels() {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const { isMobile } = useResponsive();
+  const tableSort = useTableSort({"Material Name":r=>r.name,"Project Site":r=>r.project?.name,"Quantity":r=>r.current_stock,"Stock Level":r=>Math.min(100,Number(r.current_stock||0)/Number(r.minimum_threshold||1)*100),"Status":r=>Number(r.current_stock||0)===0?'Out of Stock':Number(r.current_stock)<Number(r.minimum_threshold||1)?'Low Stock':'In Stock'});
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -126,6 +130,7 @@ export default function AdminStockLevels() {
         actionLabel="+ New Order"
         onActionPress={() => router.push('/admin/materials/orders/create')}
       />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/materials')} className="flex-row items-center mb-6 self-start">
@@ -154,11 +159,11 @@ export default function AdminStockLevels() {
         <View style={isMobile ? {} : { backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
           {!isMobile && (
             <View className="flex-row items-center bg-gray-50 py-4 border-b border-gray-200">
-              <View className="w-[25%] px-6"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Material Name</Text></View>
-              <View className="w-[25%]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Project Site</Text></View>
-              <View className="w-[15%]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Quantity</Text></View>
-              <View className="w-[20%]"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Stock Level</Text></View>
-              <View className="w-[15%] pr-6"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase text-right">Status</Text></View>
+              <View className="w-[25%] px-6"><SortableHeader sort={tableSort} column="Material Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Material Name</SortableHeader></View>
+              <View className="w-[25%]"><SortableHeader sort={tableSort} column="Project Site" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Project Site</SortableHeader></View>
+              <View className="w-[15%]"><SortableHeader sort={tableSort} column="Quantity" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Quantity</SortableHeader></View>
+              <View className="w-[20%]"><SortableHeader sort={tableSort} column="Stock Level" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase">Stock Level</SortableHeader></View>
+              <View className="w-[15%] pr-6"><SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-500 uppercase text-right">Status</SortableHeader></View>
             </View>
           )}
 
@@ -173,7 +178,7 @@ export default function AdminStockLevels() {
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg font-medium">No materials found.</Text>
             </View>
           ) : (
-            filteredData.map(m => {
+            tableSort.sort(filteredData).map(m => {
               const currentStock = m.current_stock || 0;
               const minThreshold = m.minimum_threshold || 1;
               const pct = Math.min(100, Math.round((currentStock / minThreshold) * 100));
@@ -203,7 +208,7 @@ export default function AdminStockLevels() {
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                     <View>
-                      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 12, marginBottom: 4 }]}>Quantity</Text>
+                      <SortableHeader sort={tableSort} column="Quantity" maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 12, marginBottom: 4 }]}>Quantity</SortableHeader>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#374151', fontWeight: 'bold', fontSize: 14 }]}>{currentStock} {m.unit || 'units'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', width: '40%' }}>

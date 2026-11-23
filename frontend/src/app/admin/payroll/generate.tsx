@@ -1,9 +1,13 @@
+import { DateField } from '@/components/common/DateField';
+import { payrollToday, payrollMonthStart } from '@/utils/payrollDate';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PayrollGenerationNotice, payrollFailure } from '@/components/labour/PayrollGenerationNotice';
 import { AttendancePeriodReview } from '@/components/labour/AttendancePeriodReview';
+import { PayrollDeductions, PayrollDeduction, deductionPayload } from '@/components/labour/PayrollDeductions';
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
 
@@ -12,11 +16,12 @@ export default function AdminPayrollGeneratePage() {
   const router = useRouter();
   const [failure, setFailure] = useState<ReturnType<typeof payrollFailure> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deductions,setDeductions]=useState<PayrollDeduction[]>([]);
   const [sites, setSites] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
-    start_date: new Date(new Date().setDate(1)).toISOString().split('T')[0],
-    end_date: new Date().toISOString().split('T')[0],
+    start_date: payrollMonthStart(),
+    end_date: payrollToday(),
     site_id: String(params.project || '')
   });
 
@@ -50,7 +55,7 @@ export default function AdminPayrollGeneratePage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionData.session?.access_token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({...formData,deductions:deductionPayload(deductions)})
       });
 
       const resData = await response.json();
@@ -92,23 +97,16 @@ export default function AdminPayrollGeneratePage() {
           <View className="flex-col sm:flex-row gap-4 mb-8">
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Start Date (YYYY-MM-DD)</Text>
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
-                value={formData.start_date}
-                onChangeText={(t) => setFormData({...formData, start_date: t})}
-              />
+              <DateField label="Start Date" value={formData.start_date} onChange={(t) => setFormData({...formData, start_date: t})} />
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">End Date (YYYY-MM-DD)</Text>
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
-                value={formData.end_date}
-                onChangeText={(t) => setFormData({...formData, end_date: t})}
-              />
+              <DateField label="End Date" value={formData.end_date} onChange={(t) => setFormData({...formData, end_date: t})} />
             </View>
           </View>
 
           <AttendancePeriodReview projectId={formData.site_id} start={formData.start_date} end={formData.end_date} />
+          <PayrollDeductions projectId={formData.site_id} start={formData.start_date} end={formData.end_date} value={deductions} onChange={setDeductions}/>
           {failure && <PayrollGenerationNotice {...failure} onView={row => router.push((row ? `/admin/payroll/${row.worker_id}` : '/admin/payroll') as any)} />}
           <TouchableOpacity
             accessibilityRole="button"

@@ -1,7 +1,10 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { RecordCard } from '@/components/common/RecordCard';
 import { useResponsive } from '@/hooks/useResponsive';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, Text, View, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
@@ -19,6 +22,7 @@ type Material = {
 export default function AdminSiteStockPage() {
   const { isMobile } = useResponsive();
   const { siteId } = useLocalSearchParams<{ siteId: string }>();
+  const tableSort = useTableSort({"Name":r=>r.name||r.item_name,"Unit":r=>r.unit,"Quantity":r=>r.current_stock,"Min Qty":r=>r.minimum_threshold,"Status":r=>Number(r.current_stock||0)===0?'Out of Stock':Number(r.current_stock)<Number(r.minimum_threshold||1)?'Low Stock':'In Stock'});
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +66,8 @@ export default function AdminSiteStockPage() {
     };
   }, [siteId, refreshTrigger]);
 
-  if (isMobile && !loading && !error && materials.length) return <View className="flex-1 bg-brand-light"><TopNav title="Site Stock" showAction={false} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>{materials.map(material => <RecordCard key={material.id} title={material.name || material.item_name || 'Material'} fields={[{ label: 'Stock', value: `${material.current_stock ?? 0} ${material.unit || ''}` }, { label: 'Minimum quantity', value: material.minimum_threshold ?? 0 }, { label: 'Status', value: Number(material.current_stock ?? 0) < Number(material.minimum_threshold ?? 0) ? 'Low stock' : 'In stock' }]} />)}</ScrollView></View>;
+  if (isMobile && !loading && !error && materials.length) return <View className="flex-1 bg-brand-light"><TopNav title="Site Stock" showAction={false} />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>{tableSort.sort(materials).map(material => <RecordCard key={material.id} title={material.name || material.item_name || 'Material'} fields={[{ label: 'Stock', value: `${material.current_stock ?? 0} ${material.unit || ''}` }, { label: 'Minimum quantity', value: material.minimum_threshold ?? 0 }, { label: 'Status', value: Number(material.current_stock ?? 0) < Number(material.minimum_threshold ?? 0) ? 'Low stock' : 'In stock' }]} />)}</ScrollView></View>;
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Site Stock" showAction={false} />
@@ -91,15 +96,15 @@ export default function AdminSiteStockPage() {
             <View style={{ minWidth: 600 }} className="w-full">
               {/* Table Header */}
               <View className="flex-row items-center bg-gray-50 border-b border-gray-200 py-3 px-4 rounded-t-lg">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-semibold text-gray-500 uppercase">Name</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Unit</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Quantity</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Min Qty</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Status</Text>
+                <SortableHeader sort={tableSort} column="Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-semibold text-gray-500 uppercase">Name</SortableHeader>
+                <SortableHeader sort={tableSort} column="Unit" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Unit</SortableHeader>
+                <SortableHeader sort={tableSort} column="Quantity" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Quantity</SortableHeader>
+                <SortableHeader sort={tableSort} column="Min Qty" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Min Qty</SortableHeader>
+                <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-center">Status</SortableHeader>
               </View>
 
               {/* Table Rows */}
-              {materials.map((material) => {
+              {tableSort.sort(materials).map((material) => {
                 const current = Number(material.current_stock ?? 0);
                 const minimum = Number(material.minimum_threshold ?? 1);
                 const isLow = current < minimum;

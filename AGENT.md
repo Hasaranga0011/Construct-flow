@@ -193,6 +193,7 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - `SUPABASE_URL`
   - `SUPABASE_KEY` (Anon Key)
 - **Running Locally**:
+  - From the project root on Windows: `.\start-backend.cmd` (uses the root virtual environment and watches only `backend`). Stop an existing backend/reloader with Ctrl+C first. An equivalent root command is `.\.venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --reload --reload-dir backend --host 0.0.0.0 --port 8000`. `uvicorn main:app` without `--app-dir backend` must be run from the `backend` folder, because that is where `main.py` resides.
   1. Backend: `cd backend`, activate venv (`..\.venv\Scripts\Activate.ps1`), `pip install -r requirements.txt`, `uvicorn main:app --reload --port 8000`.
   2. Frontend: `cd frontend`, `npm install`, `npm run web`.
 

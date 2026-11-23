@@ -1,5 +1,6 @@
 """Reviewed workflow transitions. All mutations execute in database transactions."""
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from uuid import UUID
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -162,7 +163,7 @@ def attendance_for_review(project_id: str, start_date: date, end_date: date, cur
     require_project_member(client, project_id, current_user)
     if end_date < start_date:
         raise HTTPException(status_code=422, detail="Invalid date range")
-    sites = client.table("sites").select("id").eq("project_id", project_id).execute().data or []
+    sites = client.table("sites").select("id,address").eq("project_id", project_id).execute().data or []
     ids = [row["id"] for row in sites]
     if not ids:
         return []
@@ -175,12 +176,28 @@ def attendance_for_review(project_id: str, start_date: date, end_date: date, cur
     profiles = client.table("profiles").select("id,full_name").in_("id", profile_ids).execute().data or [] if profile_ids else []
     names = {row["id"]: row["full_name"] for row in profiles}
     mapping = {row["id"]: names.get(row.get("user_id"), row["id"]) for row in workers}
-    return [{**row, "worker_name": mapping.get(row["worker_id"], row["worker_id"])} for row in rows]
+    identities = {row['id']:row.get('user_id') for row in workers}
+    site_names = {row['id']: row.get('address') or 'Site address not recorded' for row in sites}
+    return [{**row, "site_name":site_names.get(row['site_id'], 'Site name not recorded'), "worker_profile_id":identities.get(row['worker_id']) or row['worker_id'], "worker_name": mapping.get(row["worker_id"], row["worker_id"])} for row in rows]
+
+
+class MissingCheckout(BaseModel):
+    check_out_time: datetime
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+@router.post('/attendance/{attendance_id}/resolve-checkout')
+def resolve_checkout(attendance_id: UUID, payload: MissingCheckout, current_user: dict = Depends(require_manager_or_admin)):
+    if payload.check_out_time.tzinfo is None:
+        raise HTTPException(422, 'Check-out time must include its timezone')
+    return transition(client_for_token(current_user['token']), 'resolve_missing_checkout', {
+        'p_attendance_id': str(attendance_id), 'p_checkout': payload.check_out_time.isoformat(), 'p_reason': payload.reason,
+    })
 
 
 @router.post("/attendance/review")
 def review_attendance(payload: AttendanceReview, current_user: dict = Depends(require_manager_or_admin)):
-    if payload.end_date < payload.start_date or payload.end_date > date.today():
+    if payload.end_date < payload.start_date or payload.end_date > datetime.now(ZoneInfo('Asia/Colombo')).date():
         raise HTTPException(status_code=422, detail="Choose a completed attendance period")
     return transition(client_for_token(current_user["token"]), "review_attendance_period", {
         "p_project_id": payload.project_id, "p_start": payload.start_date.isoformat(), "p_end": payload.end_date.isoformat(),

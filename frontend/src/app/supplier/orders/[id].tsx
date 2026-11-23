@@ -1,6 +1,9 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { DateField } from '@/components/common/DateField';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ModalViewport } from '@/components/common/ModalViewport';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform, Modal, TextInput } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Alert, Platform, Modal, TextInput } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -49,11 +52,7 @@ const SuggestModal = ({ visible, order, onClose, onSubmit }: any) => {
           />
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Suggested Date (YYYY-MM-DD)</Text>
-          <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-            className="border border-gray-300 rounded-lg p-3 mb-4 text-brand-text"
-            value={date}
-            onChangeText={setDate}
-          />
+          <DateField label="Suggested Date" value={date} onChange={setDate} />
 
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-700 mb-1">Suggested Unit Price (LKR)</Text>
           <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
@@ -223,15 +222,7 @@ export default function AdminMaterialsOrdersIdPage() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Delivered': return 'bg-green-100 text-green-700 border-green-200';
-      case 'Pending Delivery': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'Confirmed': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Rejected': case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
+
 
   const isCompleted = order.status === 'Received' || order.status === 'Rejected' || order.status === 'Cancelled';
 
@@ -267,9 +258,7 @@ export default function AdminMaterialsOrdersIdPage() {
                   <Ionicons name="calendar-outline" size={14} /> Created on {format(new Date(order.created_at), 'MMM dd, yyyy')}
                 </Text>
               </View>
-              <View className={`px-4 py-2 rounded-lg border ${getStatusColor(order.status)}`}>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold uppercase tracking-wide text-xs">{order.status}</Text>
-              </View>
+              <View className="shrink-0"><StatusBadge status={order.status}/></View>
             </View>
 
             <View className="flex-row flex-wrap mb-8">

@@ -1,6 +1,7 @@
 import { getApiUrl } from '../../../../lib/apiUrl';
 import React, { useState, useCallback } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../../lib/supabase';

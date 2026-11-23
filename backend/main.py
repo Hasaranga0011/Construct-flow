@@ -147,7 +147,8 @@ app.include_router(reports.router,         prefix="/api", dependencies=secure_de
 app.include_router(messages.router,        prefix="/api", dependencies=secure_dependency)
 app.include_router(site_reports.router,    prefix="/api", dependencies=secure_dependency)
 app.include_router(admin.router,           prefix="/api", dependencies=secure_dependency)
-from api.routes import workflow, boq, maps
+from api.routes import workflow, boq, maps, audit
+app.include_router(audit.router, prefix="/api", dependencies=secure_dependency)
 app.include_router(workflow.router, prefix="/api", dependencies=secure_dependency)
 app.include_router(boq.router, prefix="/api", dependencies=secure_dependency)
 app.include_router(maps.router, prefix="/api")
@@ -159,8 +160,9 @@ app.include_router(media.router,     prefix="/api", dependencies=secure_dependen
 
 # Static uploads (Local fallback)
 from fastapi.staticfiles import StaticFiles
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+if settings.ALLOW_LOCAL_UPLOADS and settings.ENVIRONMENT == "development" and not os.environ.get("VERCEL"):
+    os.makedirs("uploads", exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Health
 @app.get("/")

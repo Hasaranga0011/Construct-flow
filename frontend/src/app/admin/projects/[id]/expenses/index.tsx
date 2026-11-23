@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getApiUrl } from '../../../../../lib/apiUrl';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { supabase } from '../../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -13,6 +14,7 @@ export default function AdminExpensesIndexPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const projectId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
+  const portal=usePathname().split('/')[1];
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [project, setProject] = useState<any>(null);
@@ -24,7 +26,7 @@ export default function AdminExpensesIndexPage() {
 
       // Fetch project
       {
-        const { data: pData } = await supabase.from('projects').select('name, total_budget, spent_cost').eq('id', projectId).single();
+        const { data: pData } = await supabase.from('projects').select(portal==='site-manager'?'name':'name, total_budget, spent_cost').eq('id', projectId).single();
         if (pData) setProject(pData);
       }
 
@@ -43,7 +45,7 @@ export default function AdminExpensesIndexPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId,portal]);
 
   useEffect(() => {
     if (projectId) fetchExpenses();
@@ -56,13 +58,16 @@ export default function AdminExpensesIndexPage() {
       <TopNav title={project ? `${project.name} Expenses` : 'Project Expenses'} showBackButton />
 
       <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'p-4' : 'p-6'}`}>
+        {portal!=='site-manager'&&project&&<View className="bg-white rounded-xl border border-gray-100 p-4 mb-5 gap-2"><Text className="font-semibold">Project budget: {project.total_budget==null?'Not recorded':`Rs. ${Number(project.total_budget).toLocaleString()}`}</Text><Text>Recorded spend: {project.spent_cost==null?'Not recorded':`Rs. ${Number(project.spent_cost).toLocaleString()}`}</Text><Pressable accessibilityRole="link" onPress={()=>router.push(`/${portal}/materials/orders?project_id=${projectId}` as any)} style={{minHeight:44,justifyContent:'center'}}><Text className="font-semibold text-orange-700">View project purchase orders</Text></Pressable></View>}
         <View className="flex-row flex-wrap gap-3 justify-between items-center mb-6">
           <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 160 }}>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text dark:text-white mb-1">Expenses Log</Text>
             <AutoFitText value={`Total Logged: Rs. ${totalSpent.toLocaleString()}`} maxFontSize={14} minFontSize={11} className="text-gray-500 dark:text-gray-400" />
           </View>
           <Pressable style={{ minHeight: 44, minWidth: 44 }}
-            onPress={() => router.push(`/admin/projects/${projectId}/expenses/create`)}
+            accessibilityRole="button"
+            accessibilityLabel="Add Expense"
+            onPress={() => router.push(`/${portal}/projects/${projectId}/expenses/create` as any)}
             className="bg-brand-orange px-4 py-2.5 rounded-xl flex-row items-center"
           >
             <Ionicons name="add" size={20} color="white" className="mr-2" />

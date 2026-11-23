@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
@@ -7,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useResponsive } from '@/hooks/useResponsive';
 import { formatHoursMinutes } from '@/utils/format';
+import { StatusBadge } from '@/components/common/StatusBadge';
 
 type Attendance = { id: string; worker_id: string; worker_name?: string; date: string; check_in_time: string | null; check_out_time: string | null; hours_worked: number | null };
 export default function AdminSiteAttendancePage() {
@@ -16,12 +18,18 @@ export default function AdminSiteAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const [siteLabel,setSiteLabel]=useState('');
   useEffect(() => {
     if (!siteId) return;
     let active = true;
     async function load() {
       setLoading(true); setError('');
       try {
+        const site=await supabase.from('sites').select('address,project_id').eq('id',siteId).maybeSingle();
+        if(site.error)throw site.error;
+        const project=site.data?.project_id?await supabase.from('projects').select('name').eq('id',site.data.project_id).maybeSingle():null;
+        if(project?.error)throw project.error;
+        if(active)setSiteLabel([project?.data?.name,site.data?.address].filter(Boolean).join(' · ') || 'Site address not recorded');
         const result = await supabase.from('attendance').select('id,worker_id,date,check_in_time,check_out_time,hours_worked').eq('site_id', siteId).order('date', { ascending: false });
         if (result.error) throw result.error;
         const rows = (result.data || []) as Attendance[];
@@ -55,6 +63,7 @@ export default function AdminSiteAttendancePage() {
 
   return <View className="flex-1 bg-brand-light"><TopNav title="Site Attendance" showAction={false} />
     <ScrollView keyboardShouldPersistTaps="handled" className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+      <View className="bg-white border border-gray-200 rounded-xl p-4 mb-4"><Text className="font-bold text-brand-text">Working site</Text><Text className="text-slate-600 mt-1">{siteLabel || 'Loading site…'}</Text></View>
       
       <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
         <Text maxFontSizeMultiplier={1.3} className="text-2xl font-bold text-brand-text">Worker Attendance</Text>
@@ -79,7 +88,7 @@ export default function AdminSiteAttendancePage() {
         return <View key={record.id} className="bg-white rounded-lg border border-gray-100 p-4 mb-3 min-w-0">
           <Text maxFontSizeMultiplier={1.3} className="text-brand-text font-bold">{record.worker_name}</Text>
           <Text maxFontSizeMultiplier={1.3} className="text-gray-500 text-xs mt-1">{new Date(record.date).toLocaleDateString('en-GB')}</Text>
-          <Text maxFontSizeMultiplier={1.3} className="text-brand-orange font-semibold mt-2">{status}</Text>
+          <View className="mt-2"><StatusBadge status={status}/></View>
           <Text maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm mt-2">Hours worked: {record.check_out_time || record.hours_worked != null ? formatHoursMinutes(record.hours_worked, record.check_in_time, record.check_out_time) : (record.check_in_time ? 'In progress' : '0h 0m')}</Text>
         </View>;
       })}

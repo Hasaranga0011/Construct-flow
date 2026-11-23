@@ -38,6 +38,9 @@ def upload_file(file_bytes, folder: str = "site_uploads", filename: str = None) 
         except Exception as e:
             print(f"Supabase Storage upload error: {e}. Falling back to local storage.")
 
+    # Persistent uploads must use remote storage in production/serverless runtimes.
+    if os.environ.get("VERCEL") or not settings.ALLOW_LOCAL_UPLOADS or settings.ENVIRONMENT != "development":
+        raise RuntimeError("Secure file storage is unavailable; upload was not saved")
     # Local fallback
     upload_dir = os.path.join("uploads", clean_folder)
     os.makedirs(upload_dir, exist_ok=True)

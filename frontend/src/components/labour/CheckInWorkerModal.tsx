@@ -2,7 +2,8 @@ import { DateField } from '../common/DateField';
 import { getApiUrl } from '../../lib/apiUrl';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 
 import Ionicons from '@expo/vector-icons/Ionicons';

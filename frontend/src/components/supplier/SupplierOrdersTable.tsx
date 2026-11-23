@@ -1,6 +1,9 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import React from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Alert, Platform } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useTableLayout } from '@/hooks/useTableLayout';
 
 
@@ -170,12 +173,14 @@ export const SupplierOrdersTable = ({
   title?: string,
   subtitle?: string,
 }) => {
+  const tableSort = useTableSort({"PO / Project":r=>r.po_number||r.projects?.name,"Items":r=>r.items,"Quantity / Cost":r=>r.quantity_ordered,"Expected By":r=>r.status==='Suggested'?r.suggested_date:r.expected_date,"Status":r=>r.status});
   const { isCompact:isMobile, onLayout } = useTableLayout(980);
   const orders = sourceOrders.map(o => ({ ...o, projects: o.projects || { name: o.project_name } }));
   const loading = sourceLoading;
 
   return (
     <View onLayout={onLayout} className={`bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 dark:border-slate-700 ${isMobile ? '' : 'flex-1 min-h-[500px]'}`}>
+      <TableSortControl sort={tableSort}/>
       <View className="mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">{title}</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">{subtitle}</Text>
@@ -183,11 +188,11 @@ export const SupplierOrdersTable = ({
 
       {!isMobile && (
         <View className="flex-row py-3 border-b border-gray-200 pr-2">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">PO / Project</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Items</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Quantity / Cost</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Expected By</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[144px] shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Status</Text>
+          <SortableHeader sort={tableSort} column="PO / Project" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">PO / Project</SortableHeader>
+          <SortableHeader sort={tableSort} column="Items" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Items</SortableHeader>
+          <SortableHeader sort={tableSort} column="Quantity / Cost" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Quantity / Cost</SortableHeader>
+          <SortableHeader sort={tableSort} column="Expected By" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Expected By</SortableHeader>
+          <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[144px] shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Status</SortableHeader>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-right">Action</Text>
         </View>
       )}
@@ -202,7 +207,7 @@ export const SupplierOrdersTable = ({
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No orders awaiting your response.</Text>
           </View>
         ) : (
-          orders.map(order => (
+          tableSort.sort(orders).map(order => (
             <OrderRow
               key={order.id}
               order={order}

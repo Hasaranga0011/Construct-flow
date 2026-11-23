@@ -1,7 +1,11 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
 import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Linking, useWindowDimensions, Modal, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Platform, Linking, useWindowDimensions, Modal, Alert } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { Button } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -87,6 +91,7 @@ export default function WorkerDashboardScreen() {
   const { isMobile } = useResponsive();
   const { width } = useWindowDimensions();
 
+  const tableSort = useTableSort({"Date":r=>r.date,"Times":r=>r.check_in_time,"Hours":r=>r.hours_worked,"Status":r=>getAttendanceStatus(r)});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -234,6 +239,7 @@ export default function WorkerDashboardScreen() {
         actionLabel="Show my QR"
         onActionPress={() => setQrVisible(true)}
       />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
       {qrVisible && <QRModal profile={profile} onClose={() => setQrVisible(false)} />}
 
       <DashboardContent>
@@ -271,7 +277,7 @@ export default function WorkerDashboardScreen() {
               ]} />
               <View className={`mb-6 gap-6 ${isMobile ? 'flex-col' : 'flex-row'}`}>
                 <View className={isMobile ? "w-full" : "flex-[2] min-w-0"}>
-                  <DashboardDetailLink href="/worker/attendance" label="hours and attendance"><AnimatedCard delay={350} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 min-h-[400px] h-full">
+                  <DashboardDetailLink href="/worker/attendance" label="hours and attendance" interactive><AnimatedCard delay={350} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 min-h-[400px] h-full">
                   <View className="flex-row flex-wrap justify-between items-start md:items-center gap-4 mb-6">
                     <View className="flex-1 min-w-[200px]">
                       <Text className="text-lg font-bold text-brand-text dark:text-slate-100 mb-1">My Hours This Month</Text>
@@ -319,7 +325,7 @@ export default function WorkerDashboardScreen() {
 
                     <Pressable accessibilityRole="link" accessibilityLabel="Open hours summary details" onPress={() => router.push('/worker/attendance')}  className="mb-6">
                       <View className="flex-row justify-between items-center mb-1">
-                        <Text className="text-slate-700 dark:text-slate-200 font-semibold text-sm">Hours</Text>
+                        <SortableHeader sort={tableSort} column="Hours" className="text-slate-700 dark:text-slate-200 font-semibold text-sm">Hours</SortableHeader>
                         <Text className="font-bold text-brand-text dark:text-slate-100">{Math.round((hoursWorked/(Math.max(1, currentDay)*8))*100)}%</Text>
                       </View>
                       <View className="h-2 bg-slate-100 rounded-full mb-1">
@@ -376,12 +382,12 @@ export default function WorkerDashboardScreen() {
                   ) : width >= 768 ? (
                     <View>
                       <View className="flex-row border-b border-slate-100 pb-3 mb-3">
-                        <Text className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider">Date</Text>
-                        <Text className="flex-[1.5] font-semibold text-slate-500 text-xs uppercase tracking-wider">Times</Text>
-                        <Text className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Hours</Text>
-                        <Text className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Status</Text>
+                        <SortableHeader sort={tableSort} column="Date" className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider">Date</SortableHeader>
+                        <SortableHeader sort={tableSort} column="Times" className="flex-[1.5] font-semibold text-slate-500 text-xs uppercase tracking-wider">Times</SortableHeader>
+                        <SortableHeader sort={tableSort} column="Hours" className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Hours</SortableHeader>
+                        <SortableHeader sort={tableSort} column="Status" className="flex-1 font-semibold text-slate-500 text-xs uppercase tracking-wider text-right">Status</SortableHeader>
                       </View>
-                      {attendance.slice(0, 7).map(a => {
+                      {tableSort.sort(attendance).slice(0, 7).map(a => {
                         const status = getAttendanceStatus(a);
                         const otMins = calculateOvertimeMinutes(a.overtime_hours, a.hours_worked, a.check_in_time, a.check_out_time);
                         const hoursLabel = a.check_in_time && !a.check_out_time && a.hours_worked == null
@@ -396,9 +402,7 @@ export default function WorkerDashboardScreen() {
                             {otMins > 0 && <Text className="text-xs text-brand-orange font-bold">+{formatMinutes(otMins)} OT</Text>}
                           </View>
                           <View className="flex-1 items-end">
-                            <View className={`px-2 py-1 rounded-md ${status === 'Present' ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'} border`}>
-                              <Text className={`text-xs font-bold ${status === 'Present' ? 'text-emerald-700' : 'text-slate-600'}`}>{status}</Text>
-                            </View>
+                            <View className="shrink-0"><StatusBadge status={status}/></View>
                           </View>
                         </View>
                         );
@@ -406,7 +410,7 @@ export default function WorkerDashboardScreen() {
                     </View>
                   ) : (
                     <View className="gap-3">
-                      {attendance.slice(0, 5).map(a => {
+                      {tableSort.sort(attendance).slice(0, 5).map(a => {
                         const status = getAttendanceStatus(a);
                         const otMins = calculateOvertimeMinutes(a.overtime_hours, a.hours_worked, a.check_in_time, a.check_out_time);
                         const hoursLabel = a.check_in_time && !a.check_out_time && a.hours_worked == null
@@ -416,7 +420,7 @@ export default function WorkerDashboardScreen() {
                         <View key={a.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50">
                           <View className="flex-row justify-between items-center mb-2">
                             <Text className="font-bold text-slate-800 dark:text-slate-100">{dateLabel(a.date)}</Text>
-                            <Text className={`text-xs font-bold ${status === 'Present' ? 'text-emerald-600' : 'text-slate-500'}`}>{status}</Text>
+                            <View className="shrink-0"><StatusBadge status={status}/></View>
                           </View>
                           <Text className="text-sm text-slate-600 mb-2">{timeLabel(a.check_in_time)} to {timeLabel(a.check_out_time)}</Text>
                           <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">Hours: {hoursLabel} {otMins > 0 && <Text className="text-brand-orange">(+{formatMinutes(otMins)} OT)</Text>}</Text>

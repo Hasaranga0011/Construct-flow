@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Pressable, Text, Platform, Modal, ScrollView } from 'react-native';
+import { View, Pressable, Text, Platform, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';

@@ -1,5 +1,8 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, type Href } from 'expo-router';
 import { TopNav } from '../common/TopNav';
 import { SearchInput } from '../common/SearchInput';
@@ -42,17 +45,20 @@ function Table({ headers, rows, links = [] }: { headers: string[]; rows: string[
   const router = useRouter();
   const [limit, setLimit] = useState(25);
   const { width } = useWindowDimensions();
-  useEffect(() => setLimit(25), [rows]);
-  if (!rows.length) return <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 py-4">No records match these filters.</Text>;
-  if (width < 1024) return <View style={{ gap: 16 }}>{rows.slice(0, limit).map((row, index) => <View key={index} className="rounded-lg border border-gray-200 p-4">
-    {row.map((value, col) => <View key={col} className="mb-3 min-w-0"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500 mb-1">{headers[col]}</Text><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={col === 0 ? 'font-bold text-brand-text' : 'text-gray-700'}>{value}</Text></View>)}
-    {links[index] && <Button label="View details" onPress={() => router.push(links[index] as Href)} />}
-  </View>)}{limit < rows.length && <Button label="Show 25 more" onPress={() => setLimit(n => n + 25)} />}</View>;
-  const widths = headers.map((_, index) => index === 0 ? 240 : 170);
-  return <><ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator><View>
-    <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8 }}>{headers.map((header, index) => <Text maxFontSizeMultiplier={1.3} key={header} style={[{ flexShrink: 1, minWidth: 0 }, { width: widths[index], padding: 12, color: '#4B5563', fontWeight: '700', fontSize: 12 }]}>{header}</Text>)}</View>
-    {rows.slice(0, limit).map((row, index) => <View key={index} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#F3F4F6' }}>{row.map((value, col) => <View key={col} style={{ width: widths[col], padding: 12, justifyContent: 'center' }}>{col === 0 && links[index] ? <Pressable style={{ minHeight: 44, minWidth: 44 }} accessibilityRole="link" onPress={() => router.push(links[index] as Href)}><Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#C2410C', fontWeight: '600' }]}>{value} →</Text></Pressable> : <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#374151', fontSize: 13 }]}>{value}</Text>}</View>)}</View>)}
-  </View></ScrollView><View className="flex-row flex-wrap items-center justify-between mt-4" style={{ gap: 12 }}><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">Showing {Math.min(limit, rows.length)} of {rows.length} records · Scroll sideways for more columns</Text>{limit < rows.length && <Button label="Show 25 more" onPress={() => setLimit(n => n + 25)} />}</View></>;
+  const tableSort = useTableSort<{cells:string[];link:string|undefined;index:number}>(Object.fromEntries(headers.map((header,index)=>[header,row=>row.cells[index]])));
+  const sorted=tableSort.sort(rows.map((cells,index)=>({cells,link:links[index],index})));
+  useEffect(() => setLimit(25), [rows,tableSort.column,tableSort.direction]);
+  if (!rows.length) return <Text className="text-gray-500 py-4">No records match these filters.</Text>;
+  const more=limit<sorted.length&&<Button label="Show 25 more" onPress={()=>setLimit(n=>n+25)}/>;
+  if(width<1024)return <View style={{gap:16}}><TableSortControl sort={tableSort}/>{sorted.slice(0,limit).map(entry=><View key={entry.index} className="rounded-lg border border-gray-200 p-4">
+    {entry.cells.map((value,col)=><View key={col} className="mb-3 min-w-0"><Text className="text-xs text-gray-500 mb-1">{headers[col]}</Text><Text className={col===0?'font-bold text-brand-text':'text-gray-700'}>{value}</Text></View>)}
+    {entry.link&&<Button label="View details" onPress={()=>router.push(entry.link as Href)}/>}
+  </View>)}{more}</View>;
+  const widths=headers.map((_,index)=>index===0?240:170);
+  return <><TableSortControl sort={tableSort}/><ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator><View>
+    <View style={{flexDirection:'row',backgroundColor:'#F3F4F6',borderRadius:8}}>{headers.map((header,index)=><SortableHeader key={header} column={header} sort={tableSort} style={{width:widths[index],padding:12,color:'#4B5563',fontWeight:'700',fontSize:12}}>{header}</SortableHeader>)}</View>
+    {sorted.slice(0,limit).map(entry=><View key={entry.index} style={{flexDirection:'row',borderBottomWidth:1,borderColor:'#F3F4F6'}}>{entry.cells.map((value,col)=><View key={col} style={{width:widths[col],padding:12,justifyContent:'center'}}>{col===0&&entry.link?<Pressable style={{minHeight:44,minWidth:44}} accessibilityRole="link" onPress={()=>router.push(entry.link as Href)}><Text style={{flexShrink:1,minWidth:0,color:'#C2410C',fontWeight:'600'}}>{value} →</Text></Pressable>:<Text style={{flexShrink:1,minWidth:0,color:'#374151',fontSize:13}}>{value}</Text>}</View>)}</View>)}
+  </View></ScrollView><View className="flex-row flex-wrap items-center justify-between mt-4" style={{gap:12}}><Text className="text-gray-500 text-sm">Showing {Math.min(limit,rows.length)} of {rows.length} records · Scroll sideways for more columns</Text>{more}</View></>;
 }
 
 export default function ManagementReports({ kind }: { kind: Kind }) {

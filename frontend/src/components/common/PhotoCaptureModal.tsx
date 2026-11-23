@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Modal, Image, Platform, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Modal, Image, Platform } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { ModalViewport } from './ModalViewport';

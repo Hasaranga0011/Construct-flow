@@ -246,3 +246,154 @@ Added the missing `/supplier/notifications` route using the existing shared noti
 
 Verified on `localhost:8081` with the existing QA supplier account and application writes blocked: page opens without Unmatched Route, portal page title is present, search and unread filter work at widths 320/390/768/1440 without search-field clipping. Browser result: one page, zero failures. TypeScript and targeted ESLint pass. Report: `.validation-ui/current/supplier-notifications-results.json`.
 
+# Cross-role consistency audit — 2026-11-20
+
+Read-only audit prompted by Worker1's admin/worker payroll screenshots. No application source, salary, attendance, BOQ, project or payment records were changed during this audit.
+
+## Confirmed payroll discrepancies
+
+1. **Different periods without comparable labels.** Admin overview reads all attendance without a date filter; Worker payroll reads the selected month. Live Worker1 has eight Present records: three in October and five in November. The legacy admin formula reproduces Rs.32,016.25 across all eight dates. The canonical November calculation reproduces Rs.21,514.06 across five dates; October is Rs.10,500. The remaining Rs.2.19 difference comes from stored decimal overtime versus timestamp/minute-based canonical calculation. This is not evidence of a missing salary payment: no Worker1 salary slips exist.
+2. **“Unpaid” overview does not exclude generated/paid periods.** `frontend/src/app/admin/payroll/index.tsx` fetches salary slips but uses them only to display the latest run. Its pending totals include all matching attendance, regardless of existing slips. Exposure confirmed from code; no paid records were changed to manufacture a live example.
+3. **Attendance semantics differ.** Admin overview omits attendance status from its query and accepts any dated record as valid, so leave/absent rows can be counted. Canonical `calculate_payroll` excludes non-Present records and deduplicates daily hours/overtime. Worker1 currently has only Present records, so this is not the cause of its period difference.
+4. **Dashboard uses an hourly formula.** `PayrollSummary.tsx` pays `min(total_hours,8*days)*hourly_rate` and derives overtime from aggregated hours. The canonical worker/generated-slip flow pays per Present date and uses daily overtime. Short workdays and days with mixed overtime therefore produce different summaries.
+5. **Admin overview is disconnected from project BOQ pay terms.** It uses profile daily rate with a Rs.3,500 fallback and a fixed 1.5x overtime formula. Generation resolves project worker overrides/trade rates through `resolve_boq_pay_terms`. This can disagree when a BOQ pay rate or custom overtime rate is configured.
+6. **Zero/missing wage values can be presented as Rs.3,500.** Admin overview/detail and PM slip details contain truthiness-based rate fallbacks. Canonical payroll preserves an explicit zero rate and rejects an unset rate when attendance exists. Stored slip totals often prevent total corruption, but displayed/reconstructed rate breakdowns remain inconsistent.
+7. **Worker breakdown cannot explain all BOQ rate combinations.** `PaySummary` always labels estimates as a single daily rate and overtime x1.5. `estimate_project_payroll` can return multiple project rates (daily_rate null) or a custom BOQ overtime rate. The returned total can be correct while the displayed explanation is wrong.
+8. **Overview failures/truncation can look like valid results.** Admin overview reads full tables without pagination; rows beyond the Data API row cap may be omitted. Worker-mapping/slip-query errors are not checked; the catch logs errors without a user-visible failure state. These are source-confirmed risks, not a demonstrated row-cap event in Worker1's eight-row dataset.
+
+## Broader checks and limits
+
+- Literal role route references were compared against 155 Expo route files. No additional missing full literal route was found. `/admin` matches basePath configuration rather than a broken screen link. Dynamic templates, data-generated links and all end-to-end actions still require separate interaction coverage.
+- Existing-account, read-only role API audit: 13/13 expected responses across all six roles. Notification reads succeed; BOQ reads are allowed to admin/assigned PM/site manager/client and denied to worker/supplier; worker monthly payroll reads succeed.
+- Backend suite: 299 passed. Transactional/security/BOQ SQL suite: 63 passed. Frontend security-boundary script passed. These checks do not establish that all business flows are correct; the contradictions above survive the current suite.
+- An older multifunction BOQ verifier was rejected by automatic approval review because it contains financial-write functionality. It was not executed. A separate script with no mutation branch performed only existing-account authentication and GET requests; no financial-write approval was requested or needed.
+- Audit artifacts: `.validation-ui/current/payroll-consistency-audit.json`, `route-link-audit.json`, `role-read-audit.json`. These are ignored local QA artifacts; no passwords or tokens are included in their output.
+
+# System layout fixes — 2026-11-20
+
+Fixed the reported Project Manager payroll batch modal: attendance review and generation failure content now occupy separate full-width sections above the action row. Mobile/tablet dates and actions stack; desktop actions share available width and align. Long project selector labels wrap within the modal. Cancel has a named accessible button target.
+
+Shared fixes: buttons have vertical padding and can grow for wrapped labels (no two-line label truncation); toolbar/search/filter containers shrink/wrap within their available width; FormModal actions stack full-width on compact screens; filter chips constrain long labels and have vertical padding. New Project BOQ and milestone header containers now shrink and wrap within narrow columns. Attendance review content and its load action are bounded by their parent width.
+
+Verification uses synthetic fixture data and intercepts all database/API calls; no payroll generation, approvals, payments or business records were changed. The live localhost check uses the existing QA PM account with application writes blocked.
+
+- Broad page geometry: 144 role routes at 320/768/1440. Initial pass completed 429 width checks and one PM issues navigation timeout. PM issues passed all three widths on a dedicated rerun. No other overflow, outside-content, wrapped status/date token or render-error failures were detected. This covers closed-page geometry, not every action's state.
+- Interactive modals: New Project, project variation, PM batch payroll, site attendance, site issue reporting and supplier counter-offer: 30 checks at 320/390/768/1024/1440. Initially found BOQ/milestone headings and long attendance worker chips extending outside narrow panels; fixed and rerun passed 30/30.
+- PM payroll: empty review and loaded attendance/conflict notice layouts each passed six widths, including 1680. Fixture conflict POST is intercepted and returns a synthetic 409; it cannot create salary records.
+- Live `localhost:8081` PM payroll modal: passed six widths, cancellation tested, no application writes.
+- TypeScript, targeted ESLint, frontend security-boundary and error-regression scripts passed. Web export with fixture-only environment values succeeds. Physical mobile devices/native keyboards are not covered by these browser checks.
+- Artifacts under `.validation-ui/current/`: `layout-system-audit`, `pm-issues-layout-recheck`, `system-modal-layout`, `payroll-modal-layout`, `payroll-modal-conflict-layout`, `live-payroll-modal-layout.json`.
+
+# Central audit history — 2026-11-20
+
+Implemented `/admin/audit`, an admin sidebar entry, page metadata, and administrator-only `/api/audit/` reads using the caller's authenticated database client and RLS. Includes action/table filters, keyset pagination, precise string bigint cursors, expandable changed-field details, Sri Lanka timestamps, loading/empty/error states and refresh. API also supports actor/project UUID and timestamp filters.
+
+`backend/migrations/20261120_audit_events.sql` installs append-only audit storage and AFTER INSERT/UPDATE/DELETE triggers on existing supported business tables: projects, account profiles/worker records, assignments, attendance, materials/requests/orders/receipts, expenses, payslips, milestones, commercial records, BOQ revisions/rates, estimates, issues/reports and document/media metadata. Optional absent tables are skipped. Apply it after existing workflow migrations; tables created later require rerunning it to attach their trigger. The migration does not backfill, rewrite or delete business records. Existing purchase-order `workflow_audit`, inventory logs and BOQ version history remain intact.
+
+Audit events capture authenticated actor ID/role where available, action, table, record/project IDs, transaction/time, changed field names and allowlisted operational before/after values. Private message/note bodies, passwords, tokens, file URLs, profile contact details and arbitrary nested payloads are omitted. Fields outside the allowlist show as changed but without values. Service/SQL operations may lack an individual human actor; the UI explicitly states this. Login attempts and auth-provider events are not covered by these public-table triggers. Ordinary users cannot forge/update/delete/truncate logs; even direct owner DML is rejected by immutable triggers, but a database owner can still change schema/disable triggers and is not treated as an adversary this system can defeat.
+
+Audit insertion occurs in the same transaction as the business write, without swallowing errors: rollback removes the audit event, and audit failure prevents the business change. History has no business-record foreign keys, so deleting a project does not delete its history. No automatic retention deletion or historical-event synthesis was added.
+
+Validation: backend suite 307 passed; audit SQL 13 passed; workflow/security/BOQ SQL 64 passed with audit enabled and reapplied on the complete workflow schema; focused audit API 8 passed; TypeScript, targeted ESLint and frontend regression/title checks passed. Audit page before/after details fit widths 320/390/768/1024/1440 and dark mode 390/1440 (7 fixture browser checks passed). SQL application on connected Supabase is pending owner SQL Editor access; live persisted-event capture must be verified afterwards.
+
+Artifacts: `.validation-ui/current/audit-log-ui`, `audit-log-ui-dark`, `audit-live-boundaries.json`; SQL installation: `backend/migrations/20261120_audit_events.sql`.
+
+# Bounded content and compact actions across portals — 2026-11-20
+
+Added a shared `ContentScrollView` and pure route width policy: forms/profile/settings/site screens cap at 920px, worker reading views and messages/notifications at 1040px, project detail workspaces at 1160px, broad dashboards/lists at 1280px. Content is centered within the existing viewport; header/sidebar positioning is preserved. Public pages retain their layouts. Horizontal scrollers and nested scroll surfaces keep their local layout; refs, keyboard and scroll props are forwarded. Screens retain narrower existing child containers. The client milestone FlatList workspace has its own bounded wrapper.
+
+Replaced 120 existing scroll imports with the shared surface (one supplier dashboard import was subsequently removed because only its ref type was needed; its actual scrolling is handled by `DashboardContent`). Desktop shared buttons now size to their labels unless callers explicitly request a width. Mobile form actions retain their existing full-width behavior. Shared cards use softer explicit shadows, subtle theme-aware borders and rounded corners. Worker My Site uses a compact project/location card plus manager contact card side-by-side on desktop and stacked on smaller screens, with label-sized Maps/Call actions. No assignment, location, payroll, database or permission changes were made.
+
+Verification:
+
+- All **145 portal routes across six roles**, widths **320/768/1440/1680**: **580 geometry/content-width checks passed**, including bounds, status/date wrapping, headers, render errors and constrained scroll content.
+- Six interactive modals at five widths: **30 passed**. Representative dark-mode screens at 390/1680: **12 passed**. Worker site/payroll/profile at six widths: **18 passed**. Final card styling was checked again on these representative light/dark screens.
+- TypeScript passed. ESLint over **125 affected files: zero errors and zero warnings**. Frontend error/security regressions passed, including new content-width policy checks. Web export and Android bundle export succeeded. Physical device/native keyboard behavior is not verified.
+- Connected localhost QA worker: site page opens and its no-current-site empty state fits six widths. This QA account has no current site; assigned-site cards and Maps/Call sizing were verified with intercepted fixture data, without changing live assignments or opening external maps/phone applications.
+- Reports under `.validation-ui/current/`: `content-width-system-audit`, `content-width-modal-audit`, `content-width-dark-audit`, `content-width-site-preview`, `content-width-lint.json`, `live-content-width-site.json`. Source coverage manifest: `content-width-files.json`. Full page geometry does not prove every modal state or every possible content length.
+
+# Dashboard layout exception — 2026-11-20
+
+Per user correction, all six role dashboards (including portal root aliases) are excluded from the content-width redesign. `contentWidth` returns no override for these paths, preserving the original DashboardContent/WorkerPortal widths. Shared Button keeps its former alignment and Card keeps its former styling on dashboard paths. Other screens retain bounded widths and compact desktop actions. Regression checks cover all 12 dashboard/root paths; TypeScript and targeted ESLint pass.
+
+# Human-readable audit entries — 2026-11-20
+
+Audit reads now resolve current actor, affected profile/project and selected business-record labels in bounded batches through the caller's existing authenticated database client. No service-client bypass, schema migration, historical event rewrite or private contact-value storage was introduced. Failed/deleted-name lookups retain the event with a clear unavailable-name fallback. Display names are explicitly current-record labels, not asserted historical identity snapshots.
+
+The admin page uses friendly headings/table filters/role names, named affected records, readable Sri Lanka dates, comma-separated rupee amounts, Yes/No flags and reference names. Omitted contact/private fields show one privacy message rather than two empty Before/After values. Raw actor/record/project IDs and transaction identifiers are behind Show technical details. Routine ID/timestamp metadata is excluded from the main changed-field list.
+
+Verification: backend suite **311 passed** (12 focused audit API/name-resolution checks); TypeScript and targeted ESLint passed; frontend display regressions passed. Browser details/technical-toggle/hidden-value layouts passed five light widths (320/390/768/1024/1440) and two dark widths (390/1440). Live existing audit event resolves both its actor and affected record name; contact-number values remain absent. Admin GET returns 200 and all five other roles remain denied (403). No live business records were modified.
+
+Artifacts: `.validation-ui/current/readable-audit-ui`, `readable-audit-ui-dark`, `audit-live-boundaries.json`.
+
+# Super Admin business-detail visibility — 2026-11-20
+
+Owner confirmed migration application. A proposed live test would temporarily change the existing labelled QA worker contact number and restore it, producing two permanent audit events. Automatic approval review rejected that exact mutation because it lacked explicit authorization for the record change and persistent test history. The script was not executed; no contact value was changed. Live before/after capture verification is pending explicit approval for that QA test (or a genuine subsequent business change). Existing-account GET-only audit authorization checks remain available and do not create business records.
+
+User explicitly requested contact and other business before/after values rather than privacy masking for Super Admin. Prepared `backend/migrations/20261120_audit_business_details.sql`, to apply after the base audit migration. It captures all changed business fields, including contact numbers, emails, names, addresses and notes. UPDATE events retain changed fields only to avoid duplicating unchanged large BOQs; INSERT/DELETE snapshots retain the business record. Recursive filtering still excludes passwords, tokens, credentials, sessions, private/API keys, OTP/recovery and QR authentication material; URL credentials/query tokens and binary data URLs are not copied. Access remains administrator-only under existing RLS/API controls.
+
+The UI now displays all captured changed fields and record references directly in expanded details, including full reference IDs alongside names. Structured values can be viewed in full. Missing legacy values explicitly say they were never captured; historical snapshots are not rewritten or invented. Email addresses and other business strings retain their literal underscores. The old privacy-masking message has been removed for ordinary business fields.
+
+Validation: audit SQL **17 passed**, workflow/security/BOQ SQL **64 passed**, frontend display regressions, TypeScript and targeted lint passed; full-detail/contact before-after/legacy omission/reference layout passes five browser widths. No connected business records were changed. Database application is pending owner SQL Editor access; actual future contact snapshots must be verified after application. The contact event shown in the user's screenshot cannot acquire historical values that were never stored.
+
+# Legacy audit context for administrator review — 2026-11-20
+
+Added separate read-only `current_values` context for older omitted fields on known named entity tables. Super Admin can now see the current saved contact/business value on the screenshot's older profile event, while the UI explicitly states it is not historical before/after evidence. Original snapshots remain untouched. Lookups are batched through the caller's existing authenticated client, restricted to known tables and validated field names, and exclude credentials; nested secrets and signed URL authentication data are removed. No service-role fallback or business mutation was introduced.
+
+Verified live: one existing audit event resolves actor name, affected record name and current context; administrator reads succeed and all other five roles remain denied. No QA profile/contact change or permanent test audit entry was performed. Targeted audit API/context tests: 14 passed; TypeScript/lint passed. Browser checks cover captured before/after values plus separate current-context/legacy warning and visible references.
+
+# Expo Go startup diagnosis — 2026-11-20
+
+Confirmed phone-specific failure after HTTPS retry: tunnel inspection of protocol/version headers (no auth headers or bodies) shows the Android device reaches the server but receives manifest HTTP 500. Device headers identify Expo Go **57.0.9**, runtime **exposdk:57.0.0**, while this project is SDK **54.0.0**. The phone requests `expo-root` manifest signing. CLI logs show the manifest request fails because it needs Expo authentication but the server is non-interactive; `expo whoami` confirms **Not logged in**. Earlier generic HTTP-200 checks omitted signature negotiation and did not reproduce the real phone request; they were insufficient to establish phone compatibility.
+
+Installed CLI source confirms configured EAS project manifest-signing requests fetch a development certificate through authenticated Expo access. Do not disable verification, remove the EAS association, or upgrade the application SDK blindly. Owner action required: install the official SDK-54-compatible Android Expo Go build and log in to the project-authorized Expo account on the computer. The approved tunnel remains running; phone-specific signed manifest verification must be repeated after those steps.
+
+
+User supplied screenshots showing Expo Go's blue fatal update-download screen after the HTTP tunnel link. Verified both HTTP and HTTPS public manifests with Android-like headers. Created `exps://y3asfzi-anonymous-8082.exp.direct` and `.validation-ui/current/expo-go-tunnel-https-qr.png` so Expo Go requests HTTPS. HTTPS manifest advertises an HTTPS launch asset; full bundle downloads with HTTP 200/application-javascript (20,617,907 bytes), without a warning-bypass header. This is a transport alternative, not proof of a phone-side fix. Installed Expo Go version is requested to confirm SDK 54 compatibility; no SDK upgrades, app data resets or backend exposure were performed.
+
+Follow-up: user provided `java.io.IOException: Failed to download remote update` and said phone/PC cannot share one network. After explicit user approval, started a temporary Expo/ngrok tunnel on port 8082, leaving the original 8081 server intact. Public Android manifest and full native development bundle both return HTTP 200; bundle download verified (20,617,907 bytes). Expo Go link: `exp://y3asfzi-anonymous-8082.exp.direct`; QR artifact `.validation-ui/current/expo-go-tunnel-qr.png`. Running exec session: 56335. The tunnel exposes the Metro development server only; the local backend has not been exposed publicly. Phone execution remains to be confirmed. SDK remains 54.0.0; no dependency upgrades, firewall changes, account/data changes or backend tunnel were performed.
+
+User clarified the error occurs while opening the project from Expo Go's development QR, before the app opens, rather than inside the worker/site scanner. Camera/QR-specific exploratory runtime changes were reverted after that clarification. The native scanner mock now recognises the shared ContentScrollView import; native scanner and permission branch tests pass.
+
+Read-only checks: Expo SDK 54 dependency compatibility passes; Android manifest is served successfully; a LAN-address request advertises the matching LAN bundle URL and downloads the native development bundle with HTTP 200 (20,617,992 bytes). TypeScript passes. These checks do not reproduce device execution or establish phone-to-PC connectivity. The actual Expo Go error message/device screenshot is still required to distinguish download, SDK/runtime or JavaScript startup failure. No startup fix is claimed without that evidence.
+
+# Table heading sorting — 2026-11-20
+
+Added shared ascending/descending column controls across project, user, supplier, materials, stock, attendance, payroll, estimate, historical comparison and management-report tables, including shared role routes. Desktop headings are clickable; compact card layouts have a column selector and direction control. Initial ordering remains unchanged until a column is selected. Dashboard sizing/design is preserved.
+
+Sorting handles natural text, numeric quantities, currency amounts and dates, keeps empty values last, and preserves stable ties without mutating source records. Report detail links stay paired with their original rows. Paginated purchase orders use database ordering before pagination and reset to page one when the sort changes; permissions and filters remain in force. No database migration or live business writes are needed.
+
+Verification: TypeScript, targeted lint, sorting regressions, existing error/security/native-scanner regressions and web export passed. Browser interactions verified natural project-name ascending/descending sorting and mobile direction changes. A synthetic 51-order test verified sorting across page boundaries and returning to page one. Focused responsive checks: 51 checks across 17 routes at 320/768/1440 pixels, zero failures. Browser database/auth/API requests were intercepted; this does not establish physical-device coverage.
+
+Whole-portal follow-up covered 145 routes at three widths (435 route/width combinations). Two PM supplier routes overlapped a preview export rebuild and initially produced network/load failures; both were repeated after export completion and all six combinations passed. The remaining 429 combinations passed in the full run. Final sorting interaction rerun passed all six geometry checks, including 320-pixel mobile layouts; the harness now waits for the responsive sidebar transition before measuring off-screen content.
+
+# Vercel read-only startup correction — 2026-11-20
+
+Owner runtime traceback identifies `services/email_service.py` creating `/var/task/logs` during import (`OSError: [Errno 30] Read-only file system`). Added `core/runtime_paths.py` to place Vercel-only scratch logs and the historical SQLite cache in the OS temporary directory. The bundled historical database seeds a separate writable cache; model files remain in the original read-only model directory. Temporary files are not durable business storage; Supabase remains the hosted database.
+
+Production/serverless startup no longer creates or exposes a local uploads directory. Local uploads remain available only in explicitly enabled development mode, and the generic storage service refuses an ephemeral fallback on Vercel if remote storage fails.
+
+Added an isolated subprocess regression that rejects all application-directory creation, prevents network connections, imports the full FastAPI app, checks health, queries the seeded cache, and verifies Vercel cannot fall back to local uploads even with development flags. This passes locally. No GitHub push or Vercel redeployment was performed; `/health` and `/docs` must be checked after the owner publishes these files. Scheduled jobs and model retraining persistence require separate serverless adaptation; this correction alone is not full production certification.
+
+# Vercel direct-link / refresh routing correction — 2026-11-20
+
+Live read-only checks reproduce the screenshot: frontend `/admin/insights` returns 404 while `/admin/insights.html` returns 200. The static Expo export is present, but Vercel has no clean-URL configuration. Added `frontend/vercel.json` with the existing web build/output settings, `cleanUrls: true`, and a root fallback for client-resolved dynamic routes. Existing exported files/assets retain filesystem precedence; application authentication and role checks remain in the client/API.
+
+Added `frontend/scripts/test-hosted-routing.cjs`: all 156 source routes (including dynamic IDs and auth/reset pages) return HTML under a local server modelling clean URLs and fallback; existing route HTML and three JS/CSS assets are verified separately. This is local routing coverage, not proof of the not-yet-redeployed Vercel configuration. Existing error regressions passed.
+
+Public backend checks: `/health` and `/openapi.json` return 200; `/api/ai/insights` without credentials returns the expected 401. Actual-origin CORS and authorization preflight allow `https://construct-ai-frontend.vercel.app`. The dashboard's aggregate 52.4% error rate alone cannot identify individual backend failures and includes earlier request history; no authenticated production API coverage is claimed. No business records or deployed settings were changed. Publish `frontend/vercel.json` to GitHub and redeploy the frontend before checking extensionless deep links live.
+
+# Expo authenticated tunnel retry — 2026-11-20
+
+Owner successfully logged in (`expo whoami` -> `dimuthu1234`), then encountered ngrok connection timeout. Retried the previously authorized public Metro tunnel on port 8083 without another cache clear. Tunnel reached `Tunnel ready` (exec session 14262). Process-only API URL points to the already deployed HTTPS backend; no `.env` changes were made.
+
+New URL: `exps://y3asfzi-dimuthu1234-8083.exp.direct`; QR `.validation-ui/current/expo-go-logged-in-qr.png`. Public Android manifest verification with `expo-root` signature negotiation returns HTTP 200, SDK 54.0.0, an `expo-signature` header and an HTTPS launch bundle URL. This resolves the earlier reproduced unauthenticated signed-manifest failure at the server; physical phone launch still requires owner confirmation. Leave this tunnel terminal/process running while scanning the new QR.
+
+# Whole-system mobile responsiveness follow-up — 2026-11-20
+
+Preserved dashboard layouts and improved shared controls rather than narrowing desktop dashboards. `useVisibleViewport` observes browser visual-viewport resize/scroll with native window-dimension fallback; shared modals and Select menus use the visible keyboard-safe area. Select geometry clamps narrow/landscape menus, options have 48px targets and wrapped full labels, search uses 16px text and no automatic focus on phones. Small-screen web inputs use 16px text to avoid focus zoom, and shared section headings/actions stack on phones.
+
+Fixed two screen-specific issues found during interaction checks: Insights sorting was displayed only in its loading branch, and site-report material entry had a non-scrolling modal plus an unbounded long quick-select chip. Sorting now appears in the historical-data section. The material modal scrolls, close/action targets are accessible, and chips fit the modal's available width.
+
+Verification: 145 portal routes at four phone widths (580 checks), 145 landscape route checks, 11 public/auth pages at three sizes (33 checks, input focus/scroll reachability), six existing modals under simulated keyboard bounds plus scroll-to-action checks, and the seventh site-report material modal at four phone widths. Final Insights dropdown filtering/selection and simulated keyboard positioning pass four phone widths. All remote data/auth/API traffic in browser checks was intercepted; no business writes or emails were sent. Dropdown geometry has 60 cases plus viewport hook event/cleanup/native fallback tests; TypeScript, targeted lint, regression scripts and web export pass. Native permission/scanner tests use mocks. Actual Expo Go/iOS/Android rendering, physical keyboards, camera/GPS and push remain unverified. Changes are local and need GitHub publication/frontend redeployment to reach Vercel.
+

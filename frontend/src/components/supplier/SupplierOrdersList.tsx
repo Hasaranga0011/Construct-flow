@@ -1,24 +1,17 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { format } from 'date-fns';
 import { TopNav } from '../common/TopNav';
 import { SearchInput } from '../common/SearchInput';
-import { useResponsive } from '../../hooks/useResponsive';
+import { useTableLayout } from '@/hooks/useTableLayout';
 import { formatMoney } from '../../utils/format';
-import { useSupplierOrders, matchesSupplierSearch, buildOrderSuggestions, SUPPLIER_STATUS_TABS, PO_STATUS } from '../../hooks/useSupplierOrders';
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case PO_STATUS.RECEIVED: return 'bg-green-100 text-green-700';
-    case PO_STATUS.DELIVERED: return 'bg-purple-100 text-purple-700';
-    case PO_STATUS.PENDING: return 'bg-orange-100 text-orange-700';
-    case PO_STATUS.SUGGESTED: return 'bg-yellow-100 text-yellow-700';
-    case PO_STATUS.REJECTED: case PO_STATUS.CANCELLED: return 'bg-red-100 text-red-700';
-    default: return 'bg-blue-100 text-blue-700';
-  }
-};
+import { useSupplierOrders, matchesSupplierSearch, buildOrderSuggestions, SUPPLIER_STATUS_TABS } from '../../hooks/useSupplierOrders';
 
 const safeDate = (d?: string | null) => {
   if (!d) return '';
@@ -32,8 +25,9 @@ const safeDate = (d?: string | null) => {
  */
 export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: string; defaultStatus?: string }) {
   const router = useRouter();
-  const { isMobile } = useResponsive();
+  const { isCompact:isMobile,onLayout } = useTableLayout(980);
   const { orders, projects, loading, lastUpdated, refresh } = useSupplierOrders();
+  const tableSort = useTableSort({"PO Number":r=>r.po_number,"Material / Qty":r=>r.items,"Project":r=>r.project_name,"Total Cost":r=>r.total_price,"Status":r=>r.status});
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(defaultStatus);
   const [projectFilter, setProjectFilter] = useState('All');
@@ -75,8 +69,9 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
       : `No orders are currently "${statusFilter}".`;
 
   return (
-    <View className="flex-1 flex-col bg-gray-50">
+    <View onLayout={onLayout} className="flex-1 flex-col bg-gray-50">
       <TopNav title={title} actionLabel="Refresh" onActionPress={refresh} />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.canGoBack() ? router.back() : router.replace('/supplier/dashboard' as any)} className="flex-row items-center mb-6 self-start">
@@ -152,11 +147,11 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
         <View style={isMobile ? { zIndex: 1 } : { zIndex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
           {!isMobile && (
             <View className="flex-row py-3 border-b border-gray-200 pr-2">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO Number</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-semibold text-gray-500 uppercase">Material / Qty</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Project</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[14%] text-xs font-semibold text-gray-500 uppercase">Total Cost</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+              <SortableHeader sort={tableSort} column="PO Number" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO Number</SortableHeader>
+              <SortableHeader sort={tableSort} column="Material / Qty" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[22%] text-xs font-semibold text-gray-500 uppercase">Material / Qty</SortableHeader>
+              <SortableHeader sort={tableSort} column="Project" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Project</SortableHeader>
+              <SortableHeader sort={tableSort} column="Total Cost" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[14%] text-xs font-semibold text-gray-500 uppercase">Total Cost</SortableHeader>
+              <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
             </View>
           )}
@@ -171,7 +166,7 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg font-medium mt-4">{emptyMessage}</Text>
             </View>
           ) : (
-            visible.map(o => (
+            tableSort.sort(visible).map(o => (
               isMobile ? (
                 <View key={o.id} style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -179,9 +174,7 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#111827', fontWeight: 'bold', fontSize: 16 }]}>{o.items || 'Unknown'}</Text>
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#6B7280', fontSize: 12 }]}>PO: {o.po_number || 'N/A'}</Text>
                     </View>
-                    <View className={`px-2 py-1 rounded self-start ${getStatusColor(o.status)}`}>
-                      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }]}>{o.status}</Text>
-                    </View>
+                    <View className="shrink-0"><StatusBadge status={o.status}/></View>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
@@ -214,9 +207,7 @@ export function SupplierOrdersList({ title, defaultStatus = 'All' }: { title: st
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text text-sm font-bold">{formatMoney(o.total_price || 0)}</Text>
                   </View>
                   <View className="w-[15%]">
-                    <View className={`px-2 py-1 rounded self-start ${getStatusColor(o.status)}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold uppercase">{o.status}</Text>
-                    </View>
+                    <View className="shrink-0"><StatusBadge status={o.status}/></View>
                   </View>
                   <View className="flex-1 flex-row justify-end pl-1">
                     <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => openOrder(o.id)} className="bg-brand-orange px-3 py-1.5 rounded-md shadow-sm">

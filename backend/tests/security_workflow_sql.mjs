@@ -43,6 +43,7 @@ try {
  await db.query("INSERT INTO projects(id,name,location,status,total_budget,pm_id,client_id,start_date,end_date) VALUES($1,'House','Colombo','Planning',1000,$2,$3,'2026-01-01','2026-12-31')",[id(10),id(2),id(4)]);
  await db.query('INSERT INTO materials(id,project_id,name,current_stock) VALUES($1,$2,$3,10)',[id(20),id(10),'Cement']);
  await db.exec(await readFile(new URL('../migrations/20261116_security_workflow_integrity.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../migrations/20261120_audit_events.sql',import.meta.url),'utf8'));
  await check('workers cannot create projects through the privileged RPC',async()=>{
    await user(3); await assert.rejects(db.query('SELECT save_project_with_assignments(null,$1)',[JSON.stringify({name:'Attack',location:'Colombo'})]),/Manager access required/);
  });
@@ -297,6 +298,21 @@ try {
    await user(1);
  });
  await check('assignment normalization migration can be safely reapplied',async()=>{await db.exec(roleMigration);});
+ await check('complete workflow schema supports audit capture without bypassing project RPC',async()=>{
+   await db.exec(await readFile(new URL('../migrations/20261120_audit_events.sql',import.meta.url),'utf8'));
+   await db.exec(await readFile(new URL('../migrations/20261120_audit_business_details.sql',import.meta.url),'utf8'));
+   await user(1);
+   await db.query('SELECT save_project_with_assignments($1,$2)',[id(10),JSON.stringify({name:'Audited QA project'})]);
+   const event=(await db.query("SELECT * FROM audit_events WHERE table_name='projects' AND action='UPDATE' ORDER BY id DESC LIMIT 1")).rows[0];
+   assert.equal(event.project_id,id(10));assert.equal(event.actor_id,id(1));assert(event.changed_fields.includes('name'));
+   assert.equal(event.after_data.name,'Audited QA project');
+ });
+ const {runStaffIdentityChecks}=await import('./staff_identity_sql.mjs');
+ await runStaffIdentityChecks({db,id,user,check});
+ const {runAttendanceDeleteChecks}=await import('./attendance_delete_sql.mjs');
+ await runAttendanceDeleteChecks({db,id,user,check});
+ const {runRoleNotificationChecks}=await import('./role_notifications_sql.mjs');
+ await runRoleNotificationChecks({db,id,user,check});
  console.log(`${checks} transactional security checks passed.`);
-} catch (error) { console.error(error.message); process.exitCode=1; }
+} catch (error) { console.error({message:error.message,position:error.position,internalQuery:error.internalQuery,where:error.where}); process.exitCode=1; }
 finally { await db.close(); }

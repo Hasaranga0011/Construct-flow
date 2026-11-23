@@ -1,6 +1,8 @@
 import { api } from "@/services/api";
+import { notificationRoute } from '@/utils/notificationRoute';
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, Modal, useWindowDimensions, Linking, ScrollView, Alert, Platform } from "react-native";
+import { View, Text, Pressable, Modal, useWindowDimensions, Linking, Alert, Platform } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,7 +16,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { StatCard } from "@/components/common/StatCard";
 import { AutoFitText } from "@/components/common/AutoFitText";
 import { TopNav } from "@/components/common/TopNav";
-import { Attendance, rows, profileForWorker, cachedWorker, workerRequest, money, dateLabel, timeLabel, todayKey, monthRange } from "@/services/workerData";
+import { Attendance, attendanceForWorker, rows, profileForWorker, cachedWorker, workerRequest, money, dateLabel, timeLabel, todayKey, monthRange } from "@/services/workerData";
 import { formatHoursMinutes, formatOvertimeHoursMinutes, formatMinutes, getAttendanceStatus, sumWorkedMinutes, sumOvertimeMinutes } from "@/utils/format";
 import { deliverReport } from "@/components/reports/reportDelivery";
 
@@ -66,6 +68,7 @@ function UpdateItem({
           onPress={() => router.push("/worker/payroll")}
         />
       )}
+      {!!notification.link&&notification.link!=="/worker/payroll"&&<Button label="Open related page" variant="secondary" onPress={()=>{void markRead();router.push(notificationRoute(notification.link,'worker') as any);}}/>}
       {expanded && !notification.is_read && (
         <Button
           label="Mark as read"
@@ -141,28 +144,11 @@ function useWorkerResource(kind: string, month: string, enabled = true) {
             signal,
           );
         case "updates":
-          return api.getFresh("/notifications/");
+          { const feed=await api.getFresh('/notifications/feed');return Array.isArray(feed)?feed:feed.items; }
         case "recent":
-          return rows(
-            supabase
-              .from("attendance")
-              .select("*")
-              .eq("worker_id", id)
-              .order("date", { ascending: false })
-              .limit(7),
-            signal,
-          );
+          return attendanceForWorker(id,signal);
         default:
-          return rows(
-            supabase
-              .from("attendance")
-              .select("*")
-              .eq("worker_id", id)
-              .gte("date", range.start)
-              .lte("date", range.end)
-              .order("date", { ascending: false }),
-            signal,
-          );
+          return attendanceForWorker(id,signal,range.start,range.end);
       }
     },
     [id, kind, month, enabled],
@@ -282,6 +268,7 @@ export function AttendanceCalendar({
   records: Attendance[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => setSelected(null), [month]);
   const [width, setWidth] = useState(0);
   const [year, number] = month.split("-").map(Number);
   const count = new Date(year, number, 0).getDate();
@@ -307,11 +294,7 @@ export function AttendanceCalendar({
       className="gap-3"
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
     >
-      <BodyText>
-        {columns === 7
-          ? "Sun | Mon | Tue | Wed | Thu | Fri | Sat"
-          : "Select a date to see your times"}
-      </BodyText>
+      {columns === 7 ? <View style={{ flexDirection: 'row' }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day => <Text key={day} style={{ width: `${100 / 7}%`, textAlign: 'center', color: '#64748B', fontSize: 12, fontWeight: '600', paddingVertical: 8 }}>{day}</Text>)}</View> : <BodyText>Select a date to see your times</BodyText>}
       <View className="flex-row flex-wrap">
         {Array.from(
           { length: count + (columns === 7 ? offset : 0) },
@@ -410,7 +393,7 @@ function RecordList({ records }: { records: Attendance[] }) {
           r.check_out_time,
         );
         return (
-          <View key={r.id} className="border-b border-slate-100 pb-3">
+          <View key={r.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: open === r.id }}
@@ -420,6 +403,7 @@ function RecordList({ records }: { records: Attendance[] }) {
               <Text className="font-semibold text-sm dark:text-white">
                 {dateLabel(r.date)} · {status}
               </Text>
+              <Text className="text-xs text-slate-500 mt-2 mb-2">{r.site_name || 'Site name not recorded'}</Text>
               <BodyText>
                 {timeLabel(r.check_in_time)} · {timeLabel(r.check_out_time)} ·{" "}
                 {workedLabel} · OT {otLabel}
@@ -573,6 +557,9 @@ function QRModal({
     </Modal>
   );
 }
+function PayLine({ label, value }: { label: string; value: string }) {
+  return <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}><Text style={{ flex: 1, color: '#64748B', fontSize: 13 }}>{label}</Text><Text style={{ flexShrink: 1, textAlign: 'right', fontWeight: '600', color: '#172033', fontSize: 14 }}>{value}</Text></View>;
+}
 function PaySummary({ pay }: { pay: any }) {
   return (
     <View className="gap-3">
@@ -589,8 +576,11 @@ function PaySummary({ pay }: { pay: any }) {
         {formatHoursMinutes(pay.overtime_hours ?? 0)} {pay.summary_kind === 'recorded_slips' ? 'recorded overtime:' : 'overtime x hourly rate x 1.5 ='}{" "}
         {money(pay.overtime_pay)}
       </BodyText>
-      <BodyText>Deductions: {money(pay.deductions ?? 0)}</BodyText>
-      <Text className="text-2xl font-bold dark:text-white">
+      <PayLine label="Basic pay" value={money(pay.basic_pay)} />
+      <PayLine label="Overtime pay" value={money(pay.overtime_pay)} />
+      <PayLine label="Deductions" value={money(pay.deductions ?? 0)} />
+      <Text className="text-xs font-semibold text-slate-500 mt-2">{pay.summary_kind === 'recorded_slips' || pay.final ? 'NET PAY · LKR' : 'ESTIMATED NET PAY · LKR'}</Text>
+      <Text className="text-3xl font-bold dark:text-white">
         {money(pay.total_pay)}
       </Text>
       {!pay.total_days && <BodyText>No days recorded yet this period</BodyText>}
@@ -601,9 +591,11 @@ function PaySummary({ pay }: { pay: any }) {
 function Slip({
   slip,
   initialOpen = false,
+  workerName,
 }: {
   slip: any;
   initialOpen?: boolean;
+  workerName?: string;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const [error, setError] = useState("");
@@ -621,10 +613,17 @@ function Slip({
       await deliverReport(
         {
           title: `Payslip ${slip.slip_number || dateLabel(slip.period_start)}`,
+          layout: 'payslip',
           scope: `${dateLabel(slip.period_start)} - ${dateLabel(slip.period_end)}`,
           retrievedAt: now,
           exportedAt: now,
           sections: [
+            { title: 'Payslip details', headers: ['Detail', 'Value'], rows: [
+              ['Employee', workerName || slip.worker_name || 'Not recorded'],
+              ['Reference', slip.slip_number || slip.id || 'Not recorded'],
+              ['Payment status', String(slip.status).toLowerCase() === 'paid' ? 'Paid' : 'Generated · awaiting payment'],
+              ['Issued', dateLabel(slip.created_at)],
+            ] },
             {
               title: "Pay breakdown",
               headers: ["Item", "Value"],
@@ -636,6 +635,7 @@ function Slip({
                 ["Overtime pay", money(slip.overtime_pay)],
                 ["Gross", money(gross)],
                 ["Deductions", money(slip.deductions ?? 0)],
+                ...(slip.deduction_details||[]).map((row:any)=>[row.reason,money(row.amount)]),
                 ["Net pay", money(net)],
               ],
             },
@@ -650,7 +650,7 @@ function Slip({
     }
   };
   return (
-    <View className="gap-3 border-b border-slate-100 pb-4">
+    <View className="gap-3 border border-slate-200 rounded-2xl p-5 bg-slate-50">
       <Text className="font-semibold dark:text-white">
         {dateLabel(slip.period_start)} · {dateLabel(slip.period_end)}
       </Text>
@@ -674,10 +674,12 @@ function Slip({
             {slip.total_hours != null ? formatHoursMinutes(slip.total_hours) : "Not recorded"} worked ·{" "}
             {slip.overtime_hours != null ? formatHoursMinutes(slip.overtime_hours) : "Not recorded"} overtime
           </BodyText>
-          <BodyText>
-            Gross {money(gross)} | Deductions {money(slip.deductions ?? 0)} |
-            Net {money(net)}
-          </BodyText>
+          <PayLine label="Basic pay" value={money(slip.basic_pay)} />
+          <PayLine label="Overtime pay" value={money(slip.overtime_pay)} />
+          <PayLine label="Gross pay" value={money(gross)} />
+          <PayLine label="Deductions" value={money(slip.deductions ?? 0)} />
+          <PayLine label="Net pay" value={money(net)} />
+          {(slip.deduction_details||[]).map((row:any,index:number)=><BodyText key={index}>{row.reason}: {money(row.amount)}</BodyText>)}
         </>
       )}
       <Button label="Download PDF" onPress={exportPdf} loading={busy} />
@@ -698,7 +700,7 @@ export default function WorkerPortal({
   const [now, setNow] = useState(Date.now());
   const [qr, setQr] = useState(false);
   const [cached, setCached] = useState<any>(null);
-  const profile = useWorkerResource("profile", month, screen === "dashboard"),
+  const profile = useWorkerResource("profile", month, screen === "dashboard" || screen === "payroll"),
     site = useWorkerResource("site", month, screen === "dashboard"),
     attendance = useWorkerResource(
       "attendance",
@@ -889,7 +891,7 @@ export default function WorkerPortal({
       state={slips}
       empty="Your first payslip will appear here after your next pay period"
     >
-      {(data) => <Slip slip={data[0]} />}
+      {(data) => <Slip slip={data[0]} workerName={profile.data?.full_name} />}
     </Block>
   );
   const recentCard = (
@@ -1057,6 +1059,7 @@ export default function WorkerPortal({
                       <Slip
                         key={s.id}
                         slip={s}
+                        workerName={profile.data?.full_name}
                         initialOpen={params.id === s.id}
                       />
                     ))}

@@ -115,9 +115,19 @@ def test_generate_salary_resolves_sites_and_worker_profile_ids(monkeypatch):
     # Overtime pay: 2 * (4000/8) * 1.5 = 1500
     assert slip['overtime_pay'] == 1500
     assert slip['total_pay'] == 9500
-    # The connected legacy schema stores month as DATE and starts slips as Draft.
     assert slip['month'] == '2026-10-01'
     assert slip['status'] == 'Draft'
+
+
+def test_deductions_are_applied_before_slip_insert(monkeypatch):
+    client=MockClient()
+    monkeypatch.setattr(labour,'client_for_token',lambda token:client)
+    monkeypatch.setattr(labour,'managed_project_ids',lambda c,u:['proj-100'])
+    request=labour.SalaryGenerateRequest(start_date='2026-10-01',end_date='2026-10-15',site_id='site-1',deductions=[{'worker_id':'profile-uuid-1','amount':500.25,'reason':'Advance repayment'}])
+    result=labour.generate_salary(request,{'id':'admin-1','role':'super_admin','token':'fixture'})
+    assert result['slips'][0]['deductions']==500.25
+    assert result['slips'][0]['total_amount']==8999.75
+    assert result['slips'][0]['deduction_details'][0]['reason']=='Advance repayment'
 
 
 def run_generation(monkeypatch, existing=None, insert_error=None):

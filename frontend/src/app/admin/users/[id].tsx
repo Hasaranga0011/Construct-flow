@@ -1,6 +1,7 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,7 @@ import { AmountInput } from '@/components/common/AmountInput';
 
 import { RoleAvatar } from '@/components/common/RoleAvatar';
 import { roleLabel } from '@/utils/roles';
+import { UsernameRecovery } from '@/components/auth/UsernameRecovery';
 
 const ROLES = [
   { label: 'Admin', value: 'super_admin' },
@@ -263,6 +265,7 @@ export default function AdminUsersEditPage() {
           )}
 
           {/* Basic Info */}
+          {!!userId&&<UsernameRecovery userId={userId}/>}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-gray-800 mb-4">Basic Information</Text>
 

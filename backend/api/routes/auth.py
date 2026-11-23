@@ -6,11 +6,12 @@ from html import escape
 from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
+from uuid import uuid4
 from supabase import create_client
 
 from core.config import settings
 from core.phone import normalize_sri_lankan_phone
-from core.email_validator import validate_gmail_for_registration
+from core.email_validator import validate_gmail_for_registration, GMAIL_TYPO_DOMAINS
 from core.roles import (
     normalize_role,
     INTERNAL_PORTAL_ROLES,
@@ -44,6 +45,8 @@ def request_password_recovery(payload: PasswordRecoveryRequest):
     if redirect not in allowed:
         raise HTTPException(422, 'This password recovery redirect is not allowed')
     message = {'message': 'If an account exists, a password reset link will be sent.'}
+    if str(payload.email).lower().endswith('@accounts.example.com'):
+        return message
     try:
         result = get_service_client().auth.admin.generate_link({
             'type': 'recovery', 'email': str(payload.email), 'options': {'redirect_to': redirect}
@@ -66,7 +69,8 @@ def request_password_recovery(payload: PasswordRecoveryRequest):
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    username: Optional[str] = Field(default=None, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$')
     password: str = Field(min_length=12, max_length=128)
     full_name: str = Field(min_length=2, max_length=120)
     role: str
@@ -127,11 +131,18 @@ def register_user(payload: RegisterRequest) -> Dict:
         except ValueError as ve:
             raise HTTPException(status_code=422, detail=str(ve))
 
-    # Strictly validate valid Gmail address for registration
-    try:
-        normalized_email = validate_gmail_for_registration(payload.email)
-    except ValueError as ve:
-        raise HTTPException(status_code=422, detail=str(ve))
+    if bool(payload.email) == bool(payload.username):
+        raise HTTPException(422, 'Choose either email or username registration')
+    username = payload.username.lower() if payload.username else None
+    if username and not normalized_phone:
+        raise HTTPException(422, 'A contact number is required for administrator-assisted username recovery')
+    # A reserved-domain Auth identifier is never presented as a verified mailbox.
+    normalized_email = str(payload.email).strip().lower() if payload.email else f'{uuid4().hex}@accounts.example.com'
+    if payload.email and normalized_email.split('@')[-1] in {'gmail.com',*GMAIL_TYPO_DOMAINS}:
+        try:
+            normalized_email=validate_gmail_for_registration(normalized_email)
+        except ValueError as exc:
+            raise HTTPException(422,str(exc)) from exc
 
     if not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(status_code=503, detail="Service role key not configured.")
@@ -142,6 +153,8 @@ def register_user(payload: RegisterRequest) -> Dict:
     user_meta = {
         "full_name": payload.full_name,
         "role": canonical_role,
+        "identity_kind": 'username' if username else 'email',
+        "username": username,
     }
     if normalized_phone:
         user_meta["contact_number"] = normalized_phone
@@ -152,7 +165,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         auth_res = admin_db.auth.admin.create_user({
             "email": normalized_email,
             "password": payload.password,
-            "email_confirm": False,
+            "email_confirm": bool(username),
             "app_metadata": {"role": canonical_role},
             "user_metadata": user_meta,
         })
@@ -167,7 +180,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         raise HTTPException(status_code=400, detail=f"Registration failed: {err_str}")
 
     # Prepare profile
-    is_approved = canonical_role == "client"
+    is_approved = canonical_role == "client" and not username
     profile_data = {
         "id": user_id,
         "email": normalized_email,
@@ -182,10 +195,16 @@ def register_user(payload: RegisterRequest) -> Dict:
         profile_data["worker_type"] = payload.worker_type
 
     try:
+        if username:
+            admin_db.table('username_accounts').insert({'user_id':user_id,'username':username}).execute()
         admin_db.table("profiles").upsert(profile_data).execute()
     except Exception as exc:
         admin_db.auth.admin.delete_user(user_id)
         raise HTTPException(status_code=503, detail="Registration could not initialize the account") from exc
+
+    if username:
+        return {'id':user_id,'username':username,'role':canonical_role,'is_approved':False,
+                'message':'Account created. An administrator must verify and approve it before project access. Use your username and password to sign in.'}
 
     # A real verification email is required; never auto-confirm public accounts.
     try:
@@ -223,7 +242,8 @@ def register_user(payload: RegisterRequest) -> Dict:
             title="Welcome to ConstructFlow",
             message=f"Welcome {payload.full_name}! Your account has been registered with the {canonical_role} role.",
             target_user_id=user_id,
-            sent_via="in_app"
+            sent_via="in_app",
+            workflow=True,
         )
     except Exception as notif_err:
         logger.warning(f"Could not create welcome notification for {user_id}: {notif_err}")
@@ -236,5 +256,27 @@ def register_user(payload: RegisterRequest) -> Dict:
         "email_delivery": email_delivery,
         "message": "Check your email to verify your account. Staff and supplier accounts also require administrator approval.",
     }
+
+
+class UsernameLogin(BaseModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$')
+    password: str = Field(min_length=1, max_length=128)
+
+
+@router.post('/username-login')
+def username_login(payload: UsernameLogin):
+    from core.database import get_service_client
+    failure = HTTPException(401, 'Invalid username or password')
+    try:
+        service=get_service_client()
+        rows=service.table('username_accounts').select('user_id').eq('username',payload.username.lower()).execute().data or []
+        identity=service.auth.admin.get_user_by_id(rows[0]['user_id']).user if rows else None
+        auth_client=create_client(settings.SUPABASE_URL,settings.SUPABASE_KEY)
+        result=auth_client.auth.sign_in_with_password({'email':identity.email if identity else 'unknown@accounts.example.com','password':payload.password})
+        if not identity or not result.session:
+            raise failure
+        return {'access_token':result.session.access_token,'refresh_token':result.session.refresh_token}
+    except Exception:
+        raise failure from None
 
 

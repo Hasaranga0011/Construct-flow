@@ -1,7 +1,10 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { RecordCard } from '@/components/common/RecordCard';
 import { useResponsive } from '@/hooks/useResponsive';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { api } from '@/services/api';
@@ -32,6 +35,7 @@ export default function PMSupplierOrdersPage() {
   const { isMobile } = useResponsive();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const tableSort = useTableSort({"PO / Project":r=>r.po_number||r.projects?.name,"Material":r=>r.materials?.name||r.items,"Quantity":r=>r.quantity_ordered??r.quantity,"Total Amount":r=>r.total_price,"Expected":r=>r.expected_date||r.expected_delivery,"Status":r=>r.status});
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [supplierName, setSupplierName] = useState('Supplier');
   const [loading, setLoading] = useState(true);
@@ -128,7 +132,8 @@ export default function PMSupplierOrdersPage() {
     }
   };
 
-  if (isMobile && !loading && !error && orders.length) return <View className="flex-1 bg-brand-light"><TopNav title="Supplier Orders" showAction={false} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>{orders.map(order => <RecordCard key={order.id} title={order.materials?.name || 'Material order'} fields={[{ label: 'Quantity', value: `${order.quantity} ${order.materials?.unit || ''}` }, { label: 'Total', value: formatCurrency(order.total_price) }, { label: 'Status', value: order.status }, { label: 'Expected', value: formatDate(order.expected_delivery) }]} action={{ label: 'View order', onPress: () => router.push(`/pm/materials/orders/${order.id}` as any) }} />)}</ScrollView></View>;
+  if (isMobile && !loading && !error && orders.length) return <View className="flex-1 bg-brand-light"><TopNav title="Supplier Orders" showAction={false} />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>{tableSort.sort(orders).map(order => <RecordCard key={order.id} title={order.materials?.name || 'Material order'} fields={[{ label: 'Quantity', value: `${order.quantity} ${order.materials?.unit || ''}` }, { label: 'Total', value: formatCurrency(order.total_price) }, { label: 'Status', value: order.status }, { label: 'Expected', value: formatDate(order.expected_delivery) }]} action={{ label: 'View order', onPress: () => router.push(`/pm/materials/orders/${order.id}` as any) }} />)}</ScrollView></View>;
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title={`${supplierName} Orders`} showAction={false} />
@@ -155,17 +160,17 @@ export default function PMSupplierOrdersPage() {
             <View style={{ minWidth: 800 }} className="w-full">
               {/* Table Header */}
               <View className="flex-row items-center bg-gray-50 border-b border-gray-200 py-3 px-4 rounded-t-lg">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">PO / Project</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1.5] text-xs font-semibold text-gray-500 uppercase">Material</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1] text-xs font-semibold text-gray-500 uppercase">Total Amount</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">Expected</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+                <SortableHeader sort={tableSort} column="PO / Project" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">PO / Project</SortableHeader>
+                <SortableHeader sort={tableSort} column="Material" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1.5] text-xs font-semibold text-gray-500 uppercase">Material</SortableHeader>
+                <SortableHeader sort={tableSort} column="Quantity" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">Quantity</SortableHeader>
+                <SortableHeader sort={tableSort} column="Total Amount" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1] text-xs font-semibold text-gray-500 uppercase">Total Amount</SortableHeader>
+                <SortableHeader sort={tableSort} column="Expected" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[0.8] text-xs font-semibold text-gray-500 uppercase">Expected</SortableHeader>
+                <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[1] text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[180px] text-xs font-semibold text-gray-500 uppercase text-right">Actions</Text>
               </View>
 
               {/* Table Rows */}
-              {orders.map((order: any) => {
+              {tableSort.sort(orders).map((order: any) => {
                 const matName = order.materials?.name || order.items || 'Unknown Material';
                 const matUnit = order.materials?.unit || '';
                 const poName = order.po_number || 'Order';

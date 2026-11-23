@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
+import { View, ActivityIndicator, Text, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { StatCard } from '../../components/common/StatCard';

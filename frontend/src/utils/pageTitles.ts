@@ -12,6 +12,8 @@ const PUBLIC: Record<string, string> = {
 };
 
 const PAGES: Record<string, string> = {
+  expenses: 'Project Expenses', 'staff-payroll': 'Staff Salaries', 'my-salary': 'My Salary',
+  audit: 'Audit Logs',
   '': 'Dashboard', dashboard: 'Dashboard', projects: 'Projects', project: 'My Projects',
   'projects/create': 'New Project', 'projects/:id': 'Project Overview', 'projects/:id/edit': 'Edit Project',
   'projects/:id/boq': 'Project BOQ', 'project/:id/boq': 'Project BOQ',

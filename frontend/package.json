@@ -81,7 +81,7 @@
     "lint": "node ./node_modules/expo/bin/cli lint",
     "audit:responsive": "node scripts/audit-responsive.cjs",
     "postinstall": "node scripts/patch-nativewind.cjs",
-    "test": "node scripts/test-security-boundaries.cjs && node scripts/test-error-regressions.cjs && node scripts/test-report-metrics.cjs && node scripts/test-report-exports.cjs && node scripts/test-native-scanner.cjs && node scripts/test-native-permission-flows.cjs"
+    "test": "node scripts/test-security-boundaries.cjs && node scripts/test-error-regressions.cjs && node scripts/test-report-metrics.cjs && node scripts/test-report-exports.cjs && node scripts/test-native-scanner.cjs && node scripts/test-native-permission-flows.cjs && node scripts/test-mobile-layout.cjs"
   },
   "overrides": {
     "deepmerge": "$deepmerge",

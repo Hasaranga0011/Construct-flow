@@ -145,7 +145,7 @@ def invite_client(req: InviteClientRequest, request: Request):
             "type": "general",
             "project_id": req.project_id,
             "sent_via": "in_app"
-        }])
+        }], workflow=True)
 
         return {
             "message": "Client invited successfully",

@@ -1,3 +1,5 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { ScannerModal } from '@/components/worker/ScannerModal';
 import { RecordCard } from '@/components/common/RecordCard';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -6,7 +8,8 @@ import { dataError, assignedWorkers, projectSites } from '@/services/siteData';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import { notify } from '@/utils/notify';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Platform, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -44,10 +47,12 @@ export default function SMAttendancePage() {
   const [loadError, setLoadError] = useState('');
   const { assignedProjectIds, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
 
+  const tableSort = useTableSort({"Worker":r=>r.full_name,"Status":r=>getAttendanceForWorker(r.id)?.status||'Not checked in',"Hours":r=>getAttendanceForWorker(r.id)?.hours_worked});
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [siteByProject, setSiteByProject] = useState<Record<string, string>>({});
+  const [siteAddresses,setSiteAddresses]=useState<Record<string,string>>({});
 
   const [projectWorkers, setProjectWorkers] = useState<WorkerProfile[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
@@ -72,6 +77,7 @@ export default function SMAttendancePage() {
       if (!user?.id || sitesLoading || !isMounted.current) return;
 
       const actualSites = await projectSites(assignedProjectIds);
+      if(isMounted.current && version===requestVersion.current)setSiteAddresses(Object.fromEntries(actualSites.map(site=>[site.id,site.address || 'Site address not recorded'])));
       const siteMap: Record<string, string> = {};
       actualSites.forEach(s => { if (s.project_id && s.id && !siteMap[s.project_id]) siteMap[s.project_id] = s.id; });
       if (isMounted.current && version === requestVersion.current) setSiteByProject(siteMap);
@@ -243,6 +249,7 @@ export default function SMAttendancePage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Daily Attendance" actionLabel="Refresh" onActionPress={() => { fetchAttendanceData(); } } />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
       {loadError || assignmentError ? <View className="bg-red-50 p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{loadError || assignmentError}</Text><Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} accessibilityRole="button" onPress={refreshAssignments} className="text-brand-orange font-bold mt-2">Reload site assignments</Text></View> : null}
 
       {loading || sitesLoading ? (
@@ -272,6 +279,7 @@ export default function SMAttendancePage() {
               </View>
 
               <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 p-4 md:p-8" showsVerticalScrollIndicator={false}>
+                <View className="bg-white rounded-xl border border-gray-200 p-4 mb-4"><Text className="font-bold text-brand-text">Working site: {projects.find(project=>project.id===activeProjectId)?.name || 'Project'}</Text><Text className="text-slate-600 mt-1">{siteAddresses[siteByProject[activeProjectId || '']] || 'Site address not recorded'}</Text></View>
 
                 {/* Scan Result Card */}
                 {scanResult && (
@@ -321,9 +329,9 @@ export default function SMAttendancePage() {
 
                 <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <View className="hidden lg:flex flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Worker</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-bold text-gray-500 uppercase">Status</Text>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-bold text-gray-500 uppercase text-right">Hours</Text>
+                    <SortableHeader sort={tableSort} column="Worker" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Worker</SortableHeader>
+                    <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-bold text-gray-500 uppercase">Status</SortableHeader>
+                    <SortableHeader sort={tableSort} column="Hours" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-bold text-gray-500 uppercase text-right">Hours</SortableHeader>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-bold text-gray-500 uppercase text-right">Action</Text>
                   </View>
 
@@ -333,7 +341,7 @@ export default function SMAttendancePage() {
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4 font-medium">No workers assigned to this site yet.</Text>
                     </View>
                   ) : (
-                    projectWorkers.map((worker) => {
+                    tableSort.sort(projectWorkers).map((worker) => {
                       const attRecord = getAttendanceForWorker(worker.id);
                       const status = attRecord?.check_in_time ? 'Present' : 'Pending';
                       const hours = attRecord?.hours_worked;
@@ -416,7 +424,7 @@ export default function SMAttendancePage() {
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Select Worker</Text>
               {projectWorkers.length > 0 ? (
                 <FilterChipGrid
-                  options={projectWorkers.map(w => {
+                  options={tableSort.sort(projectWorkers).map(w => {
                     const att = getAttendanceForWorker(w.id);
                     const isCheckedIn = att?.check_in_time && !att?.check_out_time;
                     let label = w.full_name || 'Unknown';

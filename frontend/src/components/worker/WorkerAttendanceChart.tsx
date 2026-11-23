@@ -13,11 +13,12 @@ export function WorkerAttendanceChart({ chartData }: { chartData: ChartItem[] })
 
   return (
     <View className="flex-1 mt-4 justify-end">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'flex-end', gap: 12, paddingHorizontal: 4 }}>
+      <Text className="text-xs text-slate-500 mb-3">Swipe horizontally to see every day of the month →</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled style={{ flexGrow: 0 }} contentContainerStyle={{ alignItems: 'flex-end', gap: 12, paddingHorizontal: 4 }}>
         {chartData.map((item, idx) => {
           const total = (item.regular || 0) + (item.overtime || 0);
           const regHeight = Math.min(180, (item.regular / maxHours) * 180);
-          const otHeight = Math.min(60, (item.overtime / maxHours) * 180);
+          const otHeight = (item.overtime / maxHours) * 180;
 
           return (
             <View key={idx} className="items-center" style={{ width: 42 }}>

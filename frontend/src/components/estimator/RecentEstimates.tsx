@@ -1,3 +1,5 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { getApiUrl } from '../../lib/apiUrl';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform, Alert } from 'react-native';
@@ -64,6 +66,7 @@ const EstimateRow = ({ id, projectName, date, cost, status, onApprove, onReject,
 };
 
 export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: number }) => {
+  const tableSort = useTableSort({"Project":r=>{try{return JSON.parse(r.project_name).title||r.project_name;}catch{return r.project_name;}},"Date":r=>r.created_at,"Estimated cost":r=>r.estimated_cost,"Status":r=>r.status});
   const [estimations, setEstimations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -186,14 +189,15 @@ export const RecentEstimates = ({ refreshTrigger = 0 }: { refreshTrigger?: numbe
   };
 
   return <View onLayout={event=>setContentWidth(Math.max(0,event.nativeEvent.layout.width-48))} className="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 border border-slate-200 dark:border-slate-700 shadow-sm min-w-0">
+      <TableSortControl sort={tableSort}/>
     <View className="mb-4"><Text accessibilityRole="header" className="text-lg font-bold text-brand-text dark:text-white">Recent Estimates</Text><Text className="text-xs text-slate-500 dark:text-slate-400 mt-1">Review the latest estimates and download their details.</Text></View>
     {!compact&&<View className="flex-row items-center py-3 border-b border-slate-200 dark:border-slate-700">
-      <Text className="flex-1 min-w-0 text-xs font-semibold text-slate-500">Project</Text>
-      <Text className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.date,flexShrink:0}}>Date</Text>
-      <Text className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.cost,flexShrink:0}}>Estimated cost</Text>
-      <Text className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.status,flexShrink:0}}>Status</Text>
+      <SortableHeader sort={tableSort} column="Project" className="flex-1 min-w-0 text-xs font-semibold text-slate-500">Project</SortableHeader>
+      <SortableHeader sort={tableSort} column="Date" className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.date,flexShrink:0}}>Date</SortableHeader>
+      <SortableHeader sort={tableSort} column="Estimated cost" className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.cost,flexShrink:0}}>Estimated cost</SortableHeader>
+      <SortableHeader sort={tableSort} column="Status" className="text-xs font-semibold text-slate-500" style={{width:COLUMNS.status,flexShrink:0}}>Status</SortableHeader>
       <Text className="text-xs font-semibold text-slate-500 text-right" style={{width:COLUMNS.actions,flexShrink:0}}>Actions</Text>
     </View>}
-    {loading?<View className="py-10 items-center"><ActivityIndicator color="#c2410c"/></View>:!estimations.length?<Text className="py-10 text-center text-slate-500">No estimations generated yet.</Text>:estimations.map(est=><EstimateRow key={est.id} id={est.id} projectName={est.project_name||'Untitled estimate'} date={formatDate(est.created_at)} cost={formatCurrency(est.estimated_cost)} status={est.status||'Pending'} onApprove={handleApprove} onReject={handleReject} compact={compact}/>)}
+    {loading?<View className="py-10 items-center"><ActivityIndicator color="#c2410c"/></View>:!estimations.length?<Text className="py-10 text-center text-slate-500">No estimations generated yet.</Text>:tableSort.sort(estimations).map(est=><EstimateRow key={est.id} id={est.id} projectName={est.project_name||'Untitled estimate'} date={formatDate(est.created_at)} cost={formatCurrency(est.estimated_cost)} status={est.status||'Pending'} onApprove={handleApprove} onReject={handleReject} compact={compact}/>)}
   </View>;
 };

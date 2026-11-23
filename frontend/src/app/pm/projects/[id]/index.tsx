@@ -1,8 +1,10 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { ProjectWorkspaceNav } from '@/components/projects/ProjectWorkspaceNav';
 import { firstRelation } from '@/utils/relations';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -146,11 +148,7 @@ export default function PMProjectDetailsPage() {
                 />
                 <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
                 <View className="absolute top-4 right-4">
-                  <View className={`px-3 py-1.5 rounded-full ${project.status === 'active' ? 'bg-[#DCFCE7]' : 'bg-gray-100'}`}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider text-xs ${project.status === 'active' ? 'text-brand-success' : 'text-gray-600'}`}>
-                      {project.status}
-                    </Text>
-                  </View>
+                  <StatusBadge status={project.status}/>
                 </View>
                 <View className="absolute bottom-4 left-5 right-5">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-white mb-1 shadow-sm">{project.name}</Text>
@@ -296,8 +294,8 @@ export default function PMProjectDetailsPage() {
                  >
                     <Ionicons name="cash-outline" size={20} color="#EF4444" className="mr-3" />
                     <View className="flex-1">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">Budget & Procurement</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">Review recorded spend and purchase orders</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-gray-800">Manage Expenses</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-500">Review expenses and add BOQ-linked costs</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                  </TouchableOpacity>

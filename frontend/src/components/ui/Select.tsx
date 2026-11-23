@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, Platform, Modal, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, Platform, Modal, TextInput, useWindowDimensions } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useVisibleViewport } from '@/hooks/useVisibleViewport';
+import { dropdownLayout } from '@/utils/dropdownLayout';
 
 export interface SelectOption {
   value: string;
@@ -28,7 +31,8 @@ export const Select = ({
   const triggerRef = useRef<View>(null);
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 220, height: 48 });
   const [filterQuery, setFilterQuery] = useState('');
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const viewport = useVisibleViewport();
 
   const selectedOption = options.find(o => o.value === value);
 
@@ -69,13 +73,7 @@ export const Select = ({
     : options;
 
   // Compute clamped position so dropdown never overflows off-screen
-  const dropdownWidth = Math.max(layout.width, 240);
-  const leftPosition = Math.max(12, Math.min(layout.x, windowWidth - dropdownWidth - 12));
-  const spaceBelow = windowHeight - (layout.y + layout.height);
-  const showAbove = spaceBelow < 260 && layout.y > 260;
-  const topPosition = showAbove
-    ? Math.max(12, layout.y - Math.min(filteredOptions.length * 44 + 60, 260) - 4)
-    : layout.y + layout.height + 4;
+  const menuLayout = dropdownLayout(layout, viewport, Math.max(1,filteredOptions.length), options.length > 6);
 
   return (
     <>
@@ -112,12 +110,10 @@ export const Select = ({
           onPress={() => setOpen(false)}
         >
           <View
+            testID="select-options-menu"
             style={{
               position: 'absolute',
-              top: topPosition,
-              left: leftPosition,
-              width: dropdownWidth,
-              maxHeight: 280,
+              ...menuLayout,
               backgroundColor: '#FFFFFF',
               borderRadius: 12,
               borderWidth: 1,
@@ -133,7 +129,7 @@ export const Select = ({
           >
             {options.length > 6 && (
               <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 8, paddingHorizontal: 8, height: 36 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 8, paddingHorizontal: 8, minHeight: 44 }}>
                   <Ionicons name="search" size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
                   <TextInput
                     value={filterQuery}
@@ -141,8 +137,8 @@ export const Select = ({
                     accessibilityLabel="Search options"
                     placeholder="Search options…"
                     placeholderTextColor="#9CA3AF"
-                    style={{ flex: 1, fontSize: 13, color: '#111827', height: '100%', outlineStyle: 'none' as any }}
-                    autoFocus
+                    style={{ flex: 1, minWidth: 0, fontSize: 16, color: '#111827', minHeight: 44, outlineStyle: 'none' as any }}
+                    autoFocus={windowWidth >= 768}
                   />
                   {filterQuery ? (
                     <Pressable accessibilityRole="button" accessibilityLabel="Clear options search" style={{minWidth:44,minHeight:44,alignItems:"center",justifyContent:"center"}} onPress={() => setFilterQuery('')}>
@@ -164,12 +160,15 @@ export const Select = ({
                   return (
                     <Pressable
                       key={opt.value}
+                      accessibilityRole="button"
+                      accessibilityLabel={opt.label}
+                      accessibilityState={{selected:isSelected}}
                       onPress={(e) => {
                         e.stopPropagation?.();
                         handleSelect(opt.value);
                       }}
                       style={{
-                        minHeight: 40,
+                        minHeight: 48,
                         paddingHorizontal: 14,
                         paddingVertical: 10,
                         flexDirection: 'row',
@@ -180,12 +179,13 @@ export const Select = ({
                     >
                       <Text
                         maxFontSizeMultiplier={1.3}
-                        numberOfLines={1}
                         style={{
                           fontSize: 14,
+                          lineHeight: 20,
                           fontWeight: isSelected ? '700' : '400',
                           color: isSelected ? '#EA580C' : '#1F2937',
                           flex: 1,
+                          minWidth: 0,
                           marginRight: 8,
                         }}
                       >

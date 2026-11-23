@@ -1,6 +1,7 @@
 import { ModalViewport } from './ModalViewport';
 import React, { useState, useEffect } from 'react';
-import { Modal, Pressable, Text, View, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, Pressable, Text, View, TextInput, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface DeleteProjectModalProps {
@@ -68,7 +69,7 @@ export const DeleteProjectModal = ({
             maxFontSizeMultiplier={1.3}
             className={`text-sm leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}
           >
-            Permanently delete <Text className="font-bold">&quot;{projectName}&quot;</Text>? All project data, assignments, and local records will be deleted.
+            Permanently delete <Text className="font-bold">&quot;{projectName}&quot;</Text>? This removes its BOQ, attendance, payroll, orders, expenses, documents and assignments. User accounts and system audit history remain. Archive instead if you need this project history.
           </Text>
 
           {/* Confirmation Input Instructions */}

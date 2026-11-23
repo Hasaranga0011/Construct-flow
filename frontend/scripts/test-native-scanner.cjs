@@ -19,6 +19,7 @@ function scanner(permission,onScan){
   if(name==='expo-camera')return {CameraView:'CameraView',useCameraPermissions:()=>[permission,async()=>permission]};
   if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:24,bottom:16})};
   if(name==='@expo/vector-icons/Ionicons')return 'Ionicons';
+  if(name==='@/components/common/ContentScrollView')return {ContentScrollView:'ScrollView'};
   throw Error('Unexpected native test dependency: '+name);
  };
  component._compile(compiled,filename);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Pressable, Platform, BackHandler, Animated, Easing, TouchableOpacity, useWindowDimensions, StyleSheet, ScrollView, Image, PanResponder } from 'react-native';
+import { View, Text, Pressable, Platform, BackHandler, Animated, Easing, TouchableOpacity, useWindowDimensions, StyleSheet, Image, PanResponder } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';

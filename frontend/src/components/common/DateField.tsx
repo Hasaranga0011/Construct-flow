@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { ModalViewport } from './ModalViewport';
 
-type Props = { value: string; onChange: (value: string) => void; label: string; mode?: 'date' | 'time' };
-export function DateField({ value, onChange, label, mode = 'date' }: Props) {
+type Props = { value: string; onChange: (value: string) => void; label: string; mode?: 'date' | 'time'; disabled?: boolean };
+export function DateField({ value, onChange, label, mode = 'date', disabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const parsed = mode === 'time' ? new Date(`2000-01-01T${value || '08:00'}:00`) : new Date(`${value}T12:00:00`);
   const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
@@ -16,10 +17,10 @@ export function DateField({ value, onChange, label, mode = 'date' }: Props) {
   };
   const picker = <DateTimePicker value={date} mode={mode} display={Platform.OS === 'ios' ? 'inline' : 'default'} onChange={change} style={{ width: '100%' }} />;
   return <>
-    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={() => setOpen(true)} className="w-full min-h-[48px] rounded-lg border border-gray-300 bg-gray-50 p-4">
+    <Pressable disabled={disabled} accessibilityState={{disabled}} accessibilityLabel={label} accessibilityRole="button" onPress={() => setOpen(true)} className={`w-full min-h-[48px] rounded-lg border border-gray-300 bg-gray-50 p-4 ${disabled?'opacity-50':''}`}>
       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text">{value || (mode === 'date' ? 'Select date' : 'Select time')}</Text>
     </Pressable>
-    {open && (Platform.OS === 'android' ? picker : <Modal transparent visible onRequestClose={() => setOpen(false)}><ModalViewport>
+    {open && !disabled && (Platform.OS === 'android' ? picker : <Modal transparent visible onRequestClose={() => setOpen(false)}><ModalViewport>
       <View className="w-full max-w-[448px] rounded-lg bg-white p-4 flex-shrink">
         <ScrollView keyboardShouldPersistTaps="handled"><Text style={{ flexShrink: 1, minWidth: 0 }} className="font-bold mb-4">{label}</Text>{picker}</ScrollView>
         <Pressable onPress={() => setOpen(false)} className="min-h-[44px] items-center justify-center rounded-lg bg-brand-orange mt-4"><Text style={{ flexShrink: 1, minWidth: 0 }} className="font-semibold text-white">Done</Text></Pressable>

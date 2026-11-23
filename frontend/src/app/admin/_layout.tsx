@@ -12,6 +12,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: 'Users',        href: '/users',        IconFamily: Icon,  iconName: 'user-friends' },
   { label: 'Materials',    href: '/materials',    IconFamily: Icon,  iconName: 'box' },
   { label: 'Labour',       href: '/labour',       IconFamily: Icon,  iconName: 'users' },
+  { label: 'Staff Salaries', href: '/staff-payroll', IconFamily: Ionicons, iconName: 'wallet-outline' },
   { label: 'Client Portal',href: '/client',       IconFamily: Icon,  iconName: 'globe' },
   { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Suppliers',    href: '/suppliers',    IconFamily: Icon,  iconName: 'truck' },
@@ -19,6 +20,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: 'Notifications',href: '/notifications',badge: 4, IconFamily: Ionicons, iconName: 'notifications' },
   { label: 'ML Insights',  href: '/insights',     IconFamily: Icon,        iconName: 'line-graph' },
   { label: 'Reports',      href: '/reports',      IconFamily: Icon,  iconName: 'chart-bar' },
+  { label: 'Audit Logs',   href: '/audit',        IconFamily: Ionicons, iconName: 'shield-checkmark-outline' },
   { label: 'Profile',      href: '/profile',      IconFamily: Ionicons,      iconName: 'person-circle-outline' },
   { label: 'Settings',     href: '/settings',     IconFamily: Ionicons,      iconName: 'settings-sharp' },
 ];

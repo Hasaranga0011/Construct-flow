@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { getApiUrl } from '../../../lib/apiUrl';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';

@@ -1,6 +1,7 @@
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';

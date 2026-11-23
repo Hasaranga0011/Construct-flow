@@ -44,7 +44,7 @@ export async function deliverReport(report: ReportDocument, format: ExportFormat
 
   if (format === 'pdf') {
     const Print = await import('expo-print');
-    const result = await Print.printToFileAsync({ html: reportHtml(report), width: 842, height: 595 });
+    const result = await Print.printToFileAsync({ html: reportHtml(report), width: report.layout === 'payslip' ? 595 : 842, height: report.layout === 'payslip' ? 842 : 595 });
     const Sharing = await import('expo-sharing');
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: report.title });

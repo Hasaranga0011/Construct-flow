@@ -206,6 +206,7 @@ export default function DashboardScreen() {
           </View>
 
           <DashboardActions actions={[
+            { label: 'Manage Expenses', description: 'Review and add costs for your projects', icon: 'receipt-outline', onPress: () => router.push('/pm/expenses') },
             { label: 'Project workspace', description: 'Progress, people and project details', icon: 'business-outline', onPress: () => router.push('/pm/projects') },
             { label: 'Materials & orders', description: 'Stock levels and purchasing', icon: 'cube-outline', onPress: () => router.push('/pm/materials') },
             { label: 'Attendance & payroll', description: 'Review your team’s working records', icon: 'people-outline', onPress: () => router.push('/pm/payroll') },

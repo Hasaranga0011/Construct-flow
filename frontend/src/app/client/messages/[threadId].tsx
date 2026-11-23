@@ -1,5 +1,7 @@
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -40,7 +42,7 @@ const CHANNELS: { key: Channel; label: string }[] = [
 export default function ClientMessagesThreadPage() {
   const { threadId, channel: channelParam } = useLocalSearchParams<{ threadId: string; channel?: string }>();
   const { user } = useAuth();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewHandle>(null);
 
   const [activeChannel, setActiveChannel] = useState<Channel>((channelParam as Channel) || 'pm');
   const [messages, setMessages] = useState<Message[]>([]);

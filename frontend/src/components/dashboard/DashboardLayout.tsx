@@ -1,15 +1,18 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import type { ScrollView as ScrollViewHandle } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
+import { DashboardNotifications } from '@/components/notifications/DashboardNotifications';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 export type DashboardAction = { label: string; description: string; icon: IconName; onPress: () => void };
 export { DashboardHero } from './DashboardHero';
 
-export function DashboardContent({ children, scrollRef }: { children: React.ReactNode; scrollRef?: React.Ref<ScrollView> }) {
+export function DashboardContent({ children, scrollRef }: { children: React.ReactNode; scrollRef?: React.Ref<ScrollViewHandle> }) {
   return <ScrollView ref={scrollRef} accessibilityLabel="Dashboard workspace" keyboardShouldPersistTaps="handled" className="flex-1 bg-slate-50 dark:bg-slate-950" contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-    <View className="w-full max-w-[1600px] mx-auto p-4 md:p-6 xl:p-8 min-w-0">{children}</View>
+    <View className="w-full max-w-[1600px] mx-auto p-4 md:p-6 xl:p-8 min-w-0"><DashboardNotifications/>{children}</View>
   </ScrollView>;
 }
 

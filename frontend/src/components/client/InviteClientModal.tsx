@@ -1,6 +1,7 @@
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
 import Ionicons from '@expo/vector-icons/Ionicons';

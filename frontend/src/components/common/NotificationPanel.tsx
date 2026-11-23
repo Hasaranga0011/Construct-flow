@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ModalViewport } from './ModalViewport';
-import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, Text, Modal, Pressable, Switch, ActivityIndicator, Platform, Alert } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'expo-router';
+import { notificationRoute } from '@/utils/notificationRoute';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { useNotifications } from '../../context/NotificationContext';
 
 export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
-  const { user } = useAuth();
+  const { user,role } = useAuth();const router=useRouter();
   const [activeTab, setActiveTab] = useState<'inbox' | 'settings'>('inbox');
   const [pushEnabled, setPushEnabled] = useState(false);
 
@@ -96,7 +99,8 @@ export const NotificationPanel = ({ visible, onClose }: { visible: boolean; onCl
                     key={n.id}
                     onPress={() => {
                       if (!n.is_read) markAsRead(n.id);
-                      Alert.alert(n.title, n.message, [{ text: 'Close', style: 'cancel' }]);
+                      if(n.link)router.push(notificationRoute(n.link,role) as any);
+                      else Alert.alert(n.title, n.message, [{ text: 'Close', style: 'cancel' }]);
                     }}
                     className={`p-4 border-b border-gray-100 flex-row ${n.is_read ? 'bg-white opacity-60' : 'bg-orange-50/50'}`}
                   >

@@ -1,11 +1,15 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 import { useTableLayout } from '@/hooks/useTableLayout';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { RoleAvatar } from '../common/RoleAvatar';
 import { formatHoursMinutes } from '@/utils/format';
+import { api } from '@/services/api';
 
 const AttendanceRow = ({
   name,
@@ -108,6 +112,7 @@ const AttendanceRow = ({
 
 export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: { refreshTrigger?: number, searchQuery?: string, pmId?: string }) => {
   const { isCompact:isMobile, onLayout } = useTableLayout(900);
+  const tableSort = useTableSort({"Worker":r=>r.worker_name,"Project / Site":r=>r.project?.name,"Check-in":r=>r.check_in_time,"Hours":r=>r.hours_worked,"Status":r=>r.status});
   const [labour, setLabour] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -122,26 +127,9 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
           return;
         }
 
-        const today = new Date().toISOString().split('T')[0];
-
-        // Fetch attendance for today from labour table
-        let query = supabase
-          .from('legacy_labour')
-          .select(`
-            id, check_in_time, hours_worked, status, worker_name, role,
-            project:projects!inner(name, pm_id)
-          `)
-          .eq('date', today)
-          .order('check_in_time', { ascending: false });
-
-        if (pmId) {
-          query = query.eq('project.pm_id', pmId);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (isMounted) setLabour(data || []);
+        const today = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Colombo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+        const data = await api.getFresh('/labour/');
+        if (isMounted) setLabour((data || []).filter((row:any)=>row.date===today).map((row:any)=>({...row,project:{name:[row.project_name,row.site_name].filter(Boolean).join(' · ') || 'Site not recorded'}})));
       } catch (error) {
         console.warn('Failed to load attendance:', error);
       } finally {
@@ -165,6 +153,7 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
 
   return (
     <View onLayout={onLayout} className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[400px]'}`}>
+      <TableSortControl sort={tableSort}/>
       <View className="mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Worker Attendance</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">Daily check-in status across sites</Text>
@@ -173,11 +162,11 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
       {/* Table Header */}
       {!isMobile && (
         <View className="flex-row py-3 border-b border-gray-200">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Worker</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Project / Site</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Check-in</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Hours</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right pr-2">Status</Text>
+          <SortableHeader sort={tableSort} column="Worker" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Worker</SortableHeader>
+          <SortableHeader sort={tableSort} column="Project / Site" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/4 text-xs font-semibold text-gray-500 uppercase">Project / Site</SortableHeader>
+          <SortableHeader sort={tableSort} column="Check-in" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Check-in</SortableHeader>
+          <SortableHeader sort={tableSort} column="Hours" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Hours</SortableHeader>
+          <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right pr-2">Status</SortableHeader>
         </View>
       )}
 
@@ -192,7 +181,7 @@ export const AttendanceTable = ({ refreshTrigger = 0, searchQuery = '', pmId }: 
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No workers found.</Text>
             </View>
           ) : (
-            filteredLabour.map(l => {
+            tableSort.sort(filteredLabour).map(l => {
               const pName = l.project?.name || 'Unknown Site';
 
               // Format check-in time

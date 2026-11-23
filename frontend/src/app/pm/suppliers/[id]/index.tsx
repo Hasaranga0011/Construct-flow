@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -115,13 +117,7 @@ export default function SupplierDetailPage() {
   const totalSpent = orders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + (o.total_price || 0), 0);
   const recentOrders = orders.slice(0, 5);
 
-  const getOrderStatusBadge = (status: string) => {
-    const s = (status || '').toLowerCase();
-    if (s === 'delivered') return { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' };
-    if (s.includes('pending') || s.includes('confirmed') || s.includes('suggested')) return { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-800' };
-    if (s.includes('counter') || s.includes('reject') || s.includes('cancel')) return { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-700' };
-    return { bg: 'bg-gray-100 border-gray-200', text: 'text-gray-600' };
-  };
+
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -234,7 +230,6 @@ export default function SupplierDetailPage() {
           </View>
         ) : (
           recentOrders.map(order => {
-            const badge = getOrderStatusBadge(order.status);
             return (
               <Pressable
                 key={order.id}
@@ -252,9 +247,7 @@ export default function SupplierDetailPage() {
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-brand-orange text-base">
                     {order.total_price && order.total_price > 0 ? formatMoney(order.total_price) : 'Pending Price'}
                   </Text>
-                  <View className={`px-2.5 py-0.5 rounded-full border ${badge.bg}`}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[11px] font-bold ${badge.text}`}>{order.status}</Text>
-                  </View>
+                  <View className="shrink-0"><StatusBadge status={order.status}/></View>
                 </View>
               </Pressable>
             );

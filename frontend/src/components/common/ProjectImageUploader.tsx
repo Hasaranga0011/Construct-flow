@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PROJECT_IMAGE_PRESETS, ProjectImagePreset } from '../../utils/projectImages';
 import { pickAndUploadProjectPhotos } from '../../services/projectPhoto';

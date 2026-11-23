@@ -9,14 +9,16 @@ from email.mime.text import MIMEText
 from typing import Dict, Tuple, Optional
 import httpx
 import resend
+from pathlib import Path
 from core.config import settings
+from core.runtime_paths import runtime_directory
 from core.roles import normalize_role
 from supabase import create_client as create_sb_client
 
 logger = logging.getLogger("constructflow.email")
 
 # Ensure logs directory exists for audit trails
-LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+LOGS_DIR = str(runtime_directory("logs", Path(__file__).resolve().parents[1] / "logs"))
 os.makedirs(LOGS_DIR, exist_ok=True)
 SENT_EMAILS_LOG_PATH = os.path.join(LOGS_DIR, "sent_credentials_emails.log")
 

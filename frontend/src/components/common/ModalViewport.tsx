@@ -1,15 +1,19 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useVisibleViewport } from '@/hooks/useVisibleViewport';
 
 export function ModalViewport({ children }: { children: React.ReactNode }) {
-  const { height } = useWindowDimensions();
+  const { height, top } = useVisibleViewport();
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'web' ? undefined : Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{
-        flex: 1,
+        flex: Platform.OS === 'web' ? undefined : 1,
+        height: Platform.OS === 'web' ? height : undefined,
+        width: '100%',
+        marginTop: Platform.OS === 'web' ? top : undefined,
         backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',

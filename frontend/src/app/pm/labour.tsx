@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';

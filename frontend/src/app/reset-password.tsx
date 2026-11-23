@@ -69,8 +69,8 @@ export default function ResetPasswordScreen() {
       setErrorMsg('Please fill in both fields.');
       return;
     }
-    if (password.length < 8) {
-      setErrorMsg('Password must be at least 8 characters.');
+    if (password.length < 12) {
+      setErrorMsg('Password must be at least 12 characters.');
       return;
     }
     if (password !== confirmPassword) {
@@ -81,16 +81,17 @@ export default function ResetPasswordScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    const { error } = await supabase.auth.updateUser({ password });
-
-    if (error) {
-      setErrorMsg(error.message);
-    } else {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
       await supabase.auth.signOut();
       setSuccessMsg('Password updated successfully! Redirecting to login…');
       setTimeout(() => router.replace(loginRoute), 2500);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to update your password. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -166,7 +167,7 @@ export default function ResetPasswordScreen() {
             <View className="w-full flex-row items-center border border-gray-300 rounded-xl bg-gray-50 pr-2">
               <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
                 className="flex-1 p-4 text-brand-text outline-none"
-                placeholder="At least 8 characters"
+                placeholder="At least 12 characters"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}

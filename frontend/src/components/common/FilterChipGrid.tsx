@@ -21,7 +21,9 @@ export const FilterChipGrid = ({ options, selectedValue, onSelect }: FilterChipG
         return (
           <Pressable
             key={option.id}
-            style={{ minHeight: 44, paddingHorizontal: 16 }}
+            style={{ minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, maxWidth: '100%', minWidth: 0, flexShrink: 1 }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
             onPress={() => onSelect(option.id)}
             className={`flex-row items-center justify-center rounded-xl border ${
               isSelected ? 'bg-brand-orange border-brand-orange' : 'bg-white border-gray-200'

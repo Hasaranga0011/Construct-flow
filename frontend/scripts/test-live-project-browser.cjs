@@ -18,7 +18,7 @@ const routes = {
   site_manager:['/site-manager/materials','/site-manager/attendance','/site-manager/reports'],
   supplier:['/supplier/orders/'+state.order_id],
   client:['/client/dashboard',`/client/project/${pid}/boq`,'/client/financials','/client/documents','/client/invoices','/client/messages/'+pid],
-  worker:['/worker/payroll','/worker/attendance'],
+  worker:['/worker/payroll','/worker/attendance','/worker/site'],
 };
 (async()=>{
   const browser = await chromium.launch({channel:'chrome',headless:true});
@@ -65,7 +65,7 @@ const routes = {
         return route.continue();
       });
       const dashboardPortal = {super_admin:'admin',pm:'pm',site_manager:'site-manager',supplier:'supplier',client:'client',worker:'worker'};
-      const selectedPages=process.env.LIVE_UI_NOTIFICATIONS_ONLY?[`/${dashboardPortal[role]}/notifications`]:process.env.LIVE_UI_ORDERS_ONLY?[`/${dashboardPortal[role]}/materials/orders?project_id=${pid}`]:process.env.LIVE_UI_DASHBOARDS_ONLY?[`/${dashboardPortal[role]}/dashboard`]:pages;
+      const selectedPages=process.env.LIVE_UI_PAYROLL_MODAL?['/pm/payroll']:process.env.LIVE_UI_NOTIFICATIONS_ONLY?[`/${dashboardPortal[role]}/notifications`]:process.env.LIVE_UI_ORDERS_ONLY?[`/${dashboardPortal[role]}/materials/orders?project_id=${pid}`]:process.env.LIVE_UI_DASHBOARDS_ONLY?[`/${dashboardPortal[role]}/dashboard`]:pages;
       for(const route of selectedPages){
         if(process.env.LIVE_UI_BOQ_ONLY&&!route.endsWith('/boq'))continue;
         if(process.env.LIVE_UI_ROUTE&&route!==process.env.LIVE_UI_ROUTE)continue;
@@ -77,6 +77,34 @@ const routes = {
         const portalTitles = { super_admin: 'Admin', pm: 'Project Manager', site_manager: 'Site Manager', supplier: 'Supplier', client: 'Client', worker: 'Worker' };
         assert((await page.title()).endsWith(` | ${portalTitles[role]} | ConstructAi`), `Missing portal page title: ${route}`);
         if (route.endsWith('/boq')) assert.equal(await page.title(), `Project BOQ | ${portalTitles[role]} | ConstructAi`);
+        if(route==='/worker/site'){
+          const siteAction=page.getByRole('button',{name:'Open location in Maps',exact:true});
+          await Promise.any([siteAction.waitFor(),page.getByText('No site assigned',{exact:true}).waitFor()]);
+          const hasSite=await siteAction.count()>0;
+          for(const width of [320,390,768,1024,1440,1680]){
+            await page.setViewportSize({width,height:900});await page.waitForTimeout(250);
+            const target=hasSite?siteAction:page.getByText('No site assigned',{exact:true});
+            const bounds=await target.boundingBox();
+            assert(bounds.x>=0&&bounds.x+bounds.width<=width+1);
+            if(hasSite){assert(bounds.height>=44);if(width>=1024)assert(bounds.width<350,'Map action should fit its label on desktop');}
+          }
+          console.log('SITE STATE',hasSite?'assigned':'no current site assigned');
+        }
+        if(process.env.LIVE_UI_PAYROLL_MODAL){
+          await page.getByText('Run Payroll Batch',{exact:true}).click();
+          for(const width of [320,390,768,1024,1440,1680]){
+            await page.setViewportSize({width,height:900});await page.waitForTimeout(200);
+            const panel=await page.getByTestId('modal-content-viewport').last().boundingBox();
+            const generate=page.getByRole('button',{name:'Generate Slips',exact:true});
+            await generate.scrollIntoViewIfNeeded();
+            const cancel=await page.getByRole('button',{name:'Cancel payroll batch',exact:true}).boundingBox();
+            const button=await generate.boundingBox();
+            assert(button.x>=panel.x&&button.x+button.width<=panel.x+panel.width+1&&button.height>=44);
+            assert(cancel.width>=80&&cancel.x>=panel.x&&cancel.x+cancel.width<=panel.x+panel.width+1);
+            assert(width<1024?cancel.y>button.y:Math.abs(cancel.y-button.y)<3);
+          }
+          await page.getByRole('button',{name:'Cancel payroll batch',exact:true}).click();
+        }
         if(process.env.LIVE_UI_NOTIFICATIONS_ONLY){
           await page.getByText('All Notifications',{exact:true}).waitFor();
           assert.equal(await page.getByText('Unmatched Route',{exact:true}).count(),0);

@@ -16,7 +16,7 @@ class RequestLimits:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         path = scope.get("path", "")
-        public = path in {"/api/auth/register", "/api/auth/password-recovery", "/api/public-inquiry", "/api/projects/geocode",
+        public = path in {"/api/auth/register", "/api/auth/username-login", "/api/auth/password-recovery", "/api/public-inquiry", "/api/projects/geocode",
                           "/api/projects/reverse-geocode", "/api/projects/parse-boq", "/api/ai/compare-boq"}
         if public:
             now = time.monotonic()
@@ -26,7 +26,7 @@ class RequestLimits:
             queue = self.requests[key]
             while queue and queue[0] <= now - 60:
                 queue.popleft()
-            limit = 5 if path in {"/api/auth/register", "/api/auth/password-recovery"} else 30
+            limit = 5 if path in {"/api/auth/register", "/api/auth/username-login", "/api/auth/password-recovery"} else 30
             if len(queue) >= limit:
                 return await JSONResponse({"detail": "Too many requests. Try again later."}, 429, headers={"Retry-After": "60"})(scope, receive, send)
             queue.append(now)

@@ -74,6 +74,7 @@ export default function UnifiedRegisterScreen() {
   const [role, setRole] = useState<string>('pm');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [useUsername,setUseUsername]=useState(false);
   const [contactNumber, setContactNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -136,34 +137,10 @@ export default function UnifiedRegisterScreen() {
       return;
     }
 
-    // Enforce valid Gmail address
-    const trimmedEmail = email.trim().toLowerCase();
-    const typoDomains = [
-      'gnail.com', 'gamil.com', 'gmial.com', 'gmaill.com',
-      'gmai.com', 'gmal.com', 'gmaik.com', 'gmeil.com',
-      'gmail.co', 'gmail.con', 'gmail.cpm', 'gmail.cm',
-      'gemail.com', 'gmail.com.com', 'gmaild.com'
-    ];
-    const emailParts = trimmedEmail.split('@');
-    const domainPart = emailParts.length > 1 ? emailParts[1].trim() : '';
-
-    if (typoDomains.includes(domainPart)) {
-      setErrorMsg(`Did you mean @gmail.com? You entered '@${domainPart}'. Only valid Gmail accounts (@gmail.com) are permitted.`);
-      return;
-    }
-
-    if (domainPart !== 'gmail.com') {
-      setErrorMsg('Only valid Gmail accounts (@gmail.com) are permitted for registration. Please enter a valid @gmail.com address.');
-      return;
-    }
-
-    const usernamePart = emailParts[0];
-    const gmailUsernameRegex = /^[a-zA-Z0-9](?!.*\.\.)[a-zA-Z0-9.]{4,28}[a-zA-Z0-9]$/;
-    if (!gmailUsernameRegex.test(usernamePart)) {
-      setErrorMsg('Invalid Gmail address. Gmail usernames must be 6-30 characters long and contain only letters, numbers, and non-consecutive periods.');
-      return;
-    }
-
+    const trimmedEmail=email.trim().toLowerCase();
+    if(useUsername&&!/^[a-z0-9][a-z0-9_.-]{2,31}$/.test(trimmedEmail)){setErrorMsg('Use a username of 3–32 letters, numbers, dots, underscores or hyphens.');return;}
+    if(useUsername&&!contactNumber.trim()){setErrorMsg('A contact number is required for administrator-assisted recovery.');return;}
+    if(!useUsername&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)){setErrorMsg('Enter a valid email address.');return;}
     if (password.length < 12) {
       setErrorMsg('Password must be at least 12 characters long.');
       return;
@@ -186,7 +163,8 @@ export default function UnifiedRegisterScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: trimmedEmail,
+          email: useUsername ? undefined : trimmedEmail,
+          username: useUsername ? trimmedEmail : undefined,
           password,
           full_name: fullName.trim(),
           role,
@@ -197,15 +175,15 @@ export default function UnifiedRegisterScreen() {
 
       if (res.ok) {
         resetForm();
-        const targetLogin = portalType === 'partner' ? '/partner-login?registered=1' : '/team-login?registered=1';
+        const targetLogin = (portalType === 'partner' ? '/partner-login' : '/team-login')+'?registered='+(useUsername?'username':'email');
         router.replace(targetLogin as any);
         return;
       } else {
         const errJson = await res.json().catch(() => ({}));
         backendErrorMessage = errJson.detail || `Registration failed (${res.status})`;
       }
-    } catch (networkErr: any) {
-      console.warn('Backend API /auth/register unreachable, falling back to direct Supabase sign up:', networkErr);
+    } catch {
+      console.warn('Registration service could not be reached.');
     }
 
     if (backendErrorMessage) {
@@ -413,20 +391,20 @@ export default function UnifiedRegisterScreen() {
           />
         </View>
 
-        {/* Gmail Address */}
+        {/* Sign-in identity */}
         <View className="mb-4">
           <View className="flex-row items-center justify-between mb-1.5">
-            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700">Gmail Address *</Text>
-            <Text className="text-[11px] text-brand-orange font-medium">@gmail.com required</Text>
+            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700">{useUsername?'Username *':'Email Address *'}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Change registration identity" style={{minHeight:44,justifyContent:'center'}} onPress={()=>{setUseUsername(!useUsername);setEmail('');setErrorMsg('');}}><Text className="text-xs text-brand-orange font-semibold">{useUsername?'Use email instead':'No inbox? Use username'}</Text></Pressable>
           </View>
           <TextInput
             maxFontSizeMultiplier={1.3}
             style={{ minHeight: 44, minWidth: 44 }}
             className="w-full border border-gray-300 rounded-xl p-3.5 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-            placeholder="yourname@gmail.com"
+            placeholder={useUsername?'Choose a username':'name@example.com'}
             value={email}
             onChangeText={setEmail}
-            keyboardType="email-address"
+            keyboardType={useUsername?'default':'email-address'}
             autoCapitalize="none"
             {...noAutofill('reg_unified_email', 'email')}
           />
@@ -434,7 +412,7 @@ export default function UnifiedRegisterScreen() {
 
         {/* Contact Phone (Optional) */}
         <View className="mb-4">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 mb-1.5">Contact Number (Optional)</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-700 mb-1.5">{useUsername?'Contact Number *':'Contact Number (Optional)'}</Text>
           <TextInput
             maxFontSizeMultiplier={1.3}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -455,7 +433,7 @@ export default function UnifiedRegisterScreen() {
               maxFontSizeMultiplier={1.3}
               style={{ minHeight: 44, minWidth: 44 }}
               className="flex-1 p-3.5 text-brand-text outline-none"
-              placeholder="Minimum 6 characters"
+              placeholder="Minimum 12 characters"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}

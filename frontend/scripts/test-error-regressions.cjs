@@ -13,6 +13,52 @@ function load(relativePath, globals = {}) {
 }
 
 (async () => {
+  const { statusDisplay, progressDisplay } = load('../src/utils/statusDisplay.ts');
+  for(const status of ['active','Active',' ACTIVE '])assert.equal(statusDisplay(status),'Active');
+  assert.equal(statusDisplay('in_progress'),'In progress');
+  assert.equal(statusDisplay('PENDING_APPROVAL'),'Pending approval');
+  assert.equal(statusDisplay(null),'Not recorded');
+  assert.equal(statusDisplay('Custom project phase'),'Custom project phase');
+  assert.equal(progressDisplay(150),100);assert.equal(progressDisplay(-4),0);assert.equal(progressDisplay('invalid'),0);
+  console.log('PASS consistent status labels and bounded project progress');
+  const { notificationRoute } = load('../src/utils/notificationRoute.ts');
+  assert.equal(notificationRoute('/pm/payroll','project_manager'),'/pm/payroll');
+  assert.equal(notificationRoute('/site-manager/attendance','site_manager'),'/site-manager/attendance');
+  for(const link of ['https://example.invalid','//evil.invalid','/admin/users','/worker/../admin/users','/worker/%2e%2e/admin'])
+    assert.equal(notificationRoute(link,'worker'),'/worker/notifications');
+  console.log('PASS notification links stay within the signed-in portal');
+  const { payrollToday, payrollMonthStart } = load('../src/utils/payrollDate.ts');
+  assert.equal(payrollToday(new Date('2026-10-31T18:29:00Z')), '2026-10-31');
+  assert.equal(payrollToday(new Date('2026-10-31T18:30:00Z')), '2026-11-01');
+  assert.equal(payrollMonthStart(new Date('2026-10-31T18:30:00Z')), '2026-11-01');
+  console.log('PASS payroll calendar dates cross midnight/month boundaries in Sri Lanka time');
+  const { contentWidth } = load('../src/utils/contentWidth.ts');
+  for (const portal of ['admin','pm','site-manager','supplier','client','worker']) {
+    assert.equal(contentWidth(`/${portal}/dashboard`), undefined);
+    assert.equal(contentWidth(`/${portal}`), undefined);
+  }
+  assert.equal(contentWidth('/worker/site'),920);
+  assert.equal(contentWidth('/admin/users/create'),920);
+  assert.equal(contentWidth('/worker/payroll'),1040);
+  assert.equal(contentWidth('/pm/projects/qa-project/boq'),1160);
+  assert.equal(contentWidth('/admin/materials/orders'),1280);
+  assert.equal(contentWidth('/'),undefined);
+  assert.equal(contentWidth('/reset-password'),undefined);
+  console.log('PASS content widths distinguish reading, forms and wide workspaces');
+  const audit = load('../src/utils/auditDisplay.ts', { require: () => load('../src/utils/roles.ts') });
+  assert.equal(audit.auditHeading('profiles','UPDATE'),'User profile updated');
+  assert.equal(audit.auditFieldLabel('contact_number'),'Contact number');
+  assert.equal(audit.auditValue('total_budget',125000),'Rs. 125,000.00');
+  assert.equal(audit.auditValue('is_approved',false),'No');
+  assert.equal(audit.auditValue('role','super_admin'),'Super Admin');
+  assert.equal(audit.auditValue('supplier_id','00000000-0000-0000-0000-000000000001',{'00000000-0000-0000-0000-000000000001':'Acme Supplier'}),'Acme Supplier (00000000-0000-0000-0000-000000000001)');
+  assert.equal(audit.auditValue('project_id','00000000-0000-0000-0000-000000000001'),'00000000-0000-0000-0000-000000000001');
+  assert.equal(audit.auditValue('contact_number','+94000000001'),'+94000000001');
+  assert.equal(audit.auditValue('email','qa_user@example.invalid'),'qa_user@example.invalid');
+  assert(audit.auditOmittedMessage('contact_number').includes('older log'));
+  assert(audit.auditOmittedMessage('password').includes('credentials'));
+  assert.equal(audit.auditValue('status',null),'Not set');
+  console.log('PASS readable audit labels, money, roles, links and privacy messages');
   const { siteCoordinates, broadLocation, googleMapsSearchUrl } = load('../src/utils/siteLocation.ts');
   const googleSearch = new URL(googleMapsSearchUrl('Mr Kottu & branch=1'));
   assert.equal(googleSearch.hostname, 'www.google.com');

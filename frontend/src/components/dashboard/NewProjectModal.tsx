@@ -4,7 +4,8 @@ import { useMapProvider } from '@/hooks/useMapProvider';
 import { SiteLocationSearch, SitePinDetails } from '@/components/common/SiteLocationSearch';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, Platform } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { InteractiveMap, InteractiveMapRef, MapLocation } from '../common/InteractiveMap';
@@ -655,11 +656,11 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
                 {/* Smart BOQ & Budget Allocation Section */}
                 <View className="mb-4 bg-orange-50/60 border border-orange-200/80 rounded-2xl p-4">
                   <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-row items-center">
-                      <View className="w-7 h-7 rounded-lg bg-orange-100 items-center justify-center mr-2">
+                    <View className="flex-row items-center flex-1 min-w-0">
+                      <View style={{ flexShrink: 0 }} className="w-7 h-7 rounded-lg bg-orange-100 items-center justify-center mr-2">
                         <Ionicons name="calculator-outline" size={16} color="#EA580C" />
                       </View>
-                      <View>
+                      <View className="flex-1 min-w-0">
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-gray-800">
                           Bill of Quantities (BOQ) & Budget
                         </Text>
@@ -1007,7 +1008,7 @@ export const NewProjectModal = ({ visible, onClose, onSuccess }: NewProjectModal
             {/* Milestones Section */}
             <View className="mt-6 border-t border-gray-100 pt-5">
               <View className="flex-row flex-wrap gap-3 justify-between items-center mb-3">
-                <View>
+                <View style={{ flexGrow: 1, flexBasis: 240, minWidth: 0, maxWidth: '100%' }}>
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-bold text-gray-800">
                     Project Milestones & Schedule
                   </Text>

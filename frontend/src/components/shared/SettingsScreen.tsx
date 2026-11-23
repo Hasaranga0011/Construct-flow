@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Switch, Animated, Modal, TextInput } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Switch, Animated, Modal, TextInput } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -92,8 +93,8 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
 
   const handleUpdatePassword = async () => {
     setPasswordError('');
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters.');
+    if (!newPassword || newPassword.length < 12) {
+      setPasswordError('Password must be at least 12 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -232,7 +233,7 @@ export default function SettingsScreen({ profileHref, showNotificationPreference
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry={!showNewPassword}
-                placeholder="At least 6 characters"
+                placeholder="At least 12 characters"
                 placeholderTextColor="#94A3B8"
                 autoCapitalize="none"
                 className="flex-1 text-sm text-slate-900 dark:text-white py-2.5"

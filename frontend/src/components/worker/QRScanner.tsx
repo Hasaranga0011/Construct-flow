@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform, ScrollView, useWindowDimensions, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform, useWindowDimensions, TextInput } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';

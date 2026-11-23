@@ -1,10 +1,13 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { ScannerModal } from '@/components/worker/ScannerModal';
 import { RecordCard } from '@/components/common/RecordCard';
 import { useResponsive } from '@/hooks/useResponsive';
 import { dataError, assignedWorkers } from '@/services/siteData';
 import { notify, confirmAction } from '@/utils/notify';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,6 +21,7 @@ export default function SMTeamPage() {
   const { user } = useAuth();
   const [loadError, setLoadError] = useState('');
   const { assignedProjectIds, assignments, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
+  const tableSort = useTableSort({"Worker Name":r=>r.profiles?.full_name,"Status":r=>'Assigned'});
   const [loading, setLoading] = useState(true);
   const [sites, setSites] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
@@ -89,16 +93,11 @@ export default function SMTeamPage() {
 
       const { data: record, error: recordError } = await supabase.from('workers').select('id').eq('user_id', worker.id).single();
       if (recordError || !record) throw new Error('This profile is not linked to a worker record. Contact your administrator.');
-      const { error } = await supabase
-        .from('site_workers')
-        .insert({
-          project_id: selectedSiteId,
-          worker_id: record.id
-        });
+      const { error } = await supabase.rpc('assign_project_worker' as any,{p_project_id:selectedSiteId,p_worker_id:record.id} as any);
 
       if (error) {
         if (error.code === '23505') {
-          notify('Notice', 'This Worker is already assigned to this site.');
+          notify('Notice', 'This worker is already assigned to a project. Remove their previous assignment before moving them.');
         } else {
           throw error;
         }
@@ -116,10 +115,7 @@ export default function SMTeamPage() {
   const handleRemoveWorker = async (assignmentId: string) => {
     if (!await confirmAction('Remove worker?', 'Remove this worker from the project? Existing attendance records are retained.')) return;
     try {
-      const { error } = await supabase
-        .from('site_workers')
-        .delete()
-        .eq('id', assignmentId).in('project_id', assignedProjectIds);
+      const { error } = await supabase.rpc('remove_project_worker' as any,{p_assignment_id:assignmentId} as any);
       if (error) throw error;
       fetchTeamData();
     } catch (error: any) {
@@ -130,6 +126,7 @@ export default function SMTeamPage() {
   return (
     <View className="flex-1 bg-gray-50">
       <TopNav title="Worker Management" actionLabel="Refresh" onActionPress={() => { fetchTeamData(); } } />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
       {loadError || assignmentError ? <View className="bg-red-50 p-3"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{loadError || assignmentError}</Text><Text style={[{ flexShrink: 1, minWidth: 0 }, { minHeight: 44, minWidth: 44 }]} maxFontSizeMultiplier={1.3} accessibilityRole="button" onPress={refreshAssignments} className="text-brand-orange font-bold mt-2">Reload site assignments</Text></View> : null}
 
       {loading || sitesLoading ? (
@@ -184,11 +181,11 @@ export default function SMTeamPage() {
                     ) : (
                       <View className="space-y-3 mt-2">
                         <View className="hidden lg:flex flex-row py-2 px-4 border-b border-gray-100 bg-gray-50 rounded-t-lg">
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-bold text-gray-500 uppercase">Worker Name</Text>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Status</Text>
+                          <SortableHeader sort={tableSort} column="Worker Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-bold text-gray-500 uppercase">Worker Name</SortableHeader>
+                          <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Status</SortableHeader>
                           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-20 text-xs font-bold text-gray-500 uppercase text-right">Actions</Text>
                         </View>
-                        {siteWorkers.map((worker) => isMobile ? <RecordCard key={worker.id} title={worker.profiles?.full_name || 'Worker'} fields={[{ label: 'Status', value: 'Assigned' }]} action={{ label: 'Remove worker', accessibilityLabel: `Remove ${worker.profiles?.full_name || 'worker'}`, onPress: () => handleRemoveWorker(worker.id) }} /> : (
+                        {tableSort.sort(siteWorkers).map((worker) => isMobile ? <RecordCard key={worker.id} title={worker.profiles?.full_name || 'Worker'} fields={[{ label: 'Status', value: 'Assigned' }]} action={{ label: 'Remove worker', accessibilityLabel: `Remove ${worker.profiles?.full_name || 'worker'}`, onPress: () => handleRemoveWorker(worker.id) }} /> : (
                           <View key={worker.id} className="flex-row items-center p-4 bg-white border border-gray-100 rounded-lg hover:bg-gray-50">
                             <View className="flex-[2] flex-row items-center">
                               <View className="w-8 h-8 bg-orange-100 rounded-full items-center justify-center mr-3">

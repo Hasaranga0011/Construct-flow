@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Linking } from 'react-native';
+import { View, Text, Linking } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { Button, Card, EmptyState, ErrorState, FormField, FormModal, InlineNotice, LoadingState } from '@/components/ui';

@@ -1,7 +1,10 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { LoadingState, ErrorState } from '@/components/ui';
 import { VerificationQueue } from '@/components/common/VerificationQueue';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Platform, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, TextInput, Platform, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
 import { api } from '../../services/api';
@@ -13,6 +16,7 @@ import { AutoFitText } from '@/components/common/AutoFitText';
 
 export default function MLInsightsDashboard() {
   const [loading, setLoading] = useState(true);
+  const tableSort = useTableSort({"Project / District":r=>r.project_name,"Area / Year":r=>r.floor_area_sqft,"Est. Rate":r=>r.estimate_cost_per_sqft,"Act. Rate":r=>r.actual_cost_per_sqft,"Estimate":r=>r.estimate_total_lkr,"Actual":r=>r.actual_total_lkr,"Variance":r=>r.variance_pct,"Provenance":r=>r.source});
   const [insights, setInsights] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const { isMobile, isPhone, isTablet } = useResponsive();
@@ -393,12 +397,12 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               </View>
             </View>
             <View>
-              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Real Benchmarks</Text>
+              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Verified cost benchmarks</Text>
               <Text className="text-2xl font-black text-brand-text dark:text-white">
                 {insights?.verified_real_count ?? insights?.real_projects_count ?? 0}
               </Text>
-              <Text className="text-[11px] text-gray-400 dark:text-gray-500 mt-1" numberOfLines={1}>
-                Audited completed accounts &amp; BOQs
+              <Text className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 leading-4">
+                {(insights?.verified_real_count ?? insights?.real_projects_count ?? 0) === 0 ? 'No verified historical cost records yet. Import completed BOQs and verify their source evidence.' : 'Verified historical cost records; excludes active projects and sample data.'}
               </Text>
             </View>
           </View>
@@ -650,6 +654,8 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               </Pressable>
             </View>
 
+            <View className="mt-4"><TableSortControl sort={tableSort}/></View>
+
             {/* Warning when summary is based on fewer than 10 projects */}
             {insights?.historical_summary_metrics?.warning && (
               <View className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex-row items-center">
@@ -695,17 +701,17 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
                 >
                   <View className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden" style={{ minWidth: 880, width: '100%' }}>
                     <View className="bg-gray-50 dark:bg-gray-800/70 p-3 flex-row border-b border-gray-100 dark:border-gray-800">
-                      <Text className="flex-[2] font-bold text-xs text-gray-500 uppercase">Project / District</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Area / Year</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Est. Rate</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Act. Rate</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Estimate</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Actual</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Variance</Text>
-                      <Text className="flex-1 font-bold text-xs text-gray-500 uppercase text-center">Provenance</Text>
+                      <SortableHeader sort={tableSort} column="Project / District" className="flex-[2] font-bold text-xs text-gray-500 uppercase">Project / District</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Area / Year" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Area / Year</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Est. Rate" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Est. Rate</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Act. Rate" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Act. Rate</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Estimate" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Estimate</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Actual" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Actual</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Variance" className="flex-1 font-bold text-xs text-gray-500 uppercase text-right">Variance</SortableHeader>
+                      <SortableHeader sort={tableSort} column="Provenance" className="flex-1 font-bold text-xs text-gray-500 uppercase text-center">Provenance</SortableHeader>
                     </View>
 
-                    {insights.historical_projects.map((proj: any, idx: number) => {
+                    {tableSort.sort(insights.historical_projects).map((proj: any, idx: number) => {
                       const est = proj.estimate_total_lkr || 0;
                       const act = proj.actual_total_lkr || 0;
                       const variancePct = proj.variance_pct ?? (est > 0 ? ((act - est) / est) * 100 : 0);

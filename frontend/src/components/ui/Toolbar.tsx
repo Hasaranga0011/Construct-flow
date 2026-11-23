@@ -10,6 +10,8 @@ export const Toolbar = ({ children, style, className = '' }: { children: React.R
       flexDirection: isMobile ? 'column' : 'row',
       alignItems: isMobile ? 'stretch' : 'center',
       gap: 12,
+      minWidth: 0,
+      flexWrap: 'wrap',
       zIndex: 50
     }, style]}>
       {children}
@@ -22,7 +24,7 @@ export const ToolbarSearch = ({ children, style, className = '' }: { children: R
   const isMobile = width < 768;
 
   return (
-    <View className={className} style={[{ width: isMobile ? '100%' : 320 }, style]}>
+    <View className={className} style={[{ width: isMobile ? '100%' : 320, maxWidth: '100%', minWidth: 0, flexShrink: 1 }, style]}>
       {children}
     </View>
   );
@@ -33,7 +35,7 @@ export const ToolbarFilter = ({ children, style, className = '' }: { children: R
   const isMobile = width < 768;
 
   return (
-    <View className={className} style={[{ width: isMobile ? '100%' : 220 }, style]}>
+    <View className={className} style={[{ width: isMobile ? '100%' : 220, maxWidth: '100%', minWidth: 0, flexShrink: 1 }, style]}>
       {children}
     </View>
   );

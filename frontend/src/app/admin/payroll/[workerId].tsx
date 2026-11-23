@@ -1,6 +1,7 @@
 import { SalaryPaymentAction } from '@/components/labour/SalaryPaymentAction';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { TopNav } from '@/components/common/TopNav';
@@ -18,6 +19,8 @@ type SalarySlip = {
   total_payout?: number | null;
   total_amount?: number | null;
   total_pay?: number | null;
+  deductions?: number | null;
+  deduction_details?: { amount: number; reason: string }[] | null;
   period_start?: string | null;
   period_end?: string | null;
   status?: string | null;
@@ -123,6 +126,8 @@ export default function AdminPayrollWorkerDetailPage() {
 										{formatCurrency(total)}
 									</Text>
 								</View>
+								<Text className="text-gray-600 mt-3">Deductions: {formatCurrency(Number(slip.deductions || 0))}</Text>
+								{(slip.deduction_details || []).map((deduction, index) => <Text key={index} className="text-gray-500 mt-1">{deduction.reason}: {formatCurrency(deduction.amount)}</Text>)}
 								<SalaryPaymentAction slip={slip} onPaid={() => setRefreshTrigger(value => value + 1)} />
 								<View className="border-t border-gray-100 mt-5 pt-4 gap-2">
 									<Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-600">

@@ -1,5 +1,7 @@
 import React from 'react';
-import { Pressable, Text, ActivityIndicator, Platform, ViewStyle, TextStyle } from 'react-native';
+import { usePathname } from 'expo-router';
+import { isDashboardPath } from '@/utils/contentWidth';
+import { Pressable, Text, ActivityIndicator, Platform, ViewStyle, TextStyle, useWindowDimensions } from 'react-native';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost';
 export type ButtonSize = 'default' | 'compact';
@@ -29,11 +31,13 @@ export const Button = ({
   style,
   icon,
 }: ButtonProps) => {
+  const { width } = useWindowDimensions();
+  const dashboard = isDashboardPath(usePathname());
   const isCompact = size === 'compact';
 
   // Base heights and paddings
   const baseClasses = `flex-row items-center justify-center rounded-xl overflow-hidden ${
-    isCompact ? 'min-h-[44px] px-4' : 'min-h-[48px] px-5'
+    isCompact ? 'min-h-[44px] px-4 py-2' : 'min-h-[48px] px-5 py-3'
   }`;
 
   // Variant styling
@@ -86,7 +90,7 @@ export const Button = ({
       onPress={onPress}
       disabled={disabled || loading}
       className={`${baseClasses} ${variantClasses} ${disabledClasses} ${className}`}
-      style={[{ minWidth: 44 }, style]}
+      style={[{ minWidth: 44, maxWidth: '100%', flexShrink: 1, alignSelf: !dashboard && width >= 768 ? 'flex-start' : undefined }, style]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={spinnerColor} />
@@ -95,7 +99,6 @@ export const Button = ({
           {icon && <React.Fragment>{icon}</React.Fragment>}
           <Text
             maxFontSizeMultiplier={1.3}
-            numberOfLines={2}
             className={`font-semibold text-center ${isCompact ? 'text-[15px]' : 'text-base'} ${textClasses} ${icon ? 'ml-2' : ''}`}
             style={{ flexShrink: 1, minWidth: 0, ...fontFixes }}
           >

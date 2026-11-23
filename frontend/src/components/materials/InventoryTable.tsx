@@ -1,6 +1,9 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 import { useTableLayout } from '@/hooks/useTableLayout';
 import { useAuth } from '@/context/AuthContext';
@@ -100,6 +103,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
   const { isCompact:isMobile, onLayout } = useTableLayout(900);
   const { user, role } = useAuth();
   const isPM = role === 'pm';
+  const tableSort = useTableSort({"Material Name":r=>r.name,"Project ID":r=>r.projects?.name,"Quantity":r=>r.current_stock,"Stock Level":r=>Math.min(100,Number(r.current_stock||0)/Number(r.minimum_threshold||1)*100),"Status":r=>Number(r.current_stock||0)===0?'Out of Stock':Number(r.current_stock)<Number(r.minimum_threshold||1)?'Low Stock':'In Stock',"Last Updated":r=>r.last_updated});
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -170,6 +174,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
 
   return (
     <View onLayout={onLayout} className={`bg-white rounded-lg p-6 shadow-sm border border-gray-100 ${isMobile ? '' : 'flex-1 min-h-[400px]'}`}>
+      <TableSortControl sort={tableSort}/>
       <View className="mb-6">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Material Inventory</Text>
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-text-muted text-xs">Stock levels across all active projects</Text>
@@ -178,12 +183,12 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
       {/* Table Header */}
       {!isMobile && (
         <View className="flex-row py-3 border-b border-gray-200">
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</Text>
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</Text>
+          <SortableHeader sort={tableSort} column="Material Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Material Name</SortableHeader>
+          <SortableHeader sort={tableSort} column="Project ID" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/5 text-xs font-semibold text-gray-500 uppercase">Project ID</SortableHeader>
+          <SortableHeader sort={tableSort} column="Quantity" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Quantity</SortableHeader>
+          <SortableHeader sort={tableSort} column="Stock Level" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Stock Level</SortableHeader>
+          <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-1/6 text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
+          <SortableHeader sort={tableSort} column="Last Updated" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Last Updated</SortableHeader>
         </View>
       )}
 
@@ -197,7 +202,7 @@ export const InventoryTable = ({ refreshTrigger = 0, searchQuery = '', projectId
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400">No materials found.</Text>
           </View>
         ) : (
-          filteredMaterials.map((m: any) => {
+          tableSort.sort(filteredMaterials).map((m: any) => {
             const projectName = m.projects?.name || 'Unknown';
 
             const globalStock = m.current_stock || 0;

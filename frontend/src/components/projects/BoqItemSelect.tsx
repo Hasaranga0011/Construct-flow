@@ -4,11 +4,11 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { api } from '@/services/api';
 import { Select, ErrorState } from '@/components/ui';
 
-export function BoqItemSelect({ projectId, value, onChange, materialOnly = false }: { projectId?: string; value: string; onChange: (id: string, row?: any) => void; materialOnly?: boolean }) {
-  const load = useCallback(async () => projectId ? api.getFresh(`/boq/${projectId}`) : null, [projectId]);
+export function BoqItemSelect({ projectId, value, onChange, materialOnly = false, expenseContext=false }: { projectId?: string; value: string; onChange: (id: string, row?: any) => void; materialOnly?: boolean; expenseContext?:boolean }) {
+  const load = useCallback(async () => projectId ? api.getFresh(expenseContext?`/projects/${projectId}/expense-references`:`/boq/${projectId}`) : null, [projectId,expenseContext]);
   const resource = useAsyncData(load);
   if (!projectId) return null;
-  const rows: any[] = resource.data?.lines || (resource.data?.materials || []).map((row: any) => ({ ...row, description: row.name, quantity: row.allocated_quantity, kind: 'material' }));
+  const rows: any[] = expenseContext?(resource.data||[]):resource.data?.lines || (resource.data?.materials || []).map((row: any) => ({ ...row, description: row.name, quantity: row.allocated_quantity, kind: 'material' }));
   const choices = rows.filter(row => row.active && (materialOnly ? row.kind === 'material' : row.kind === 'work'));
   return <View className="gap-2 my-3">
     <Text className="font-semibold text-brand-text dark:text-white">BOQ reference</Text>

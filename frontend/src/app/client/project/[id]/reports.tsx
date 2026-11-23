@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, TextInput, Modal, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Image, TextInput, Modal, Linking } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import Ionicons from '@expo/vector-icons/Ionicons';

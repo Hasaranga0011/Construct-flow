@@ -1,7 +1,8 @@
 
 import { assignedWorkers } from '@/services/siteData';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, Text, View, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '../../../components/common/TopNav';
 import { SearchInput } from '@/components/common/SearchInput';
 import { supabase } from '../../../lib/supabase';

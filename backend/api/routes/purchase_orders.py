@@ -243,7 +243,7 @@ def create_purchase_order(order: PurchaseOrderCreate, current_user: dict = Depen
                     "title": "New Material Order",
                     "message": f"You have received a new purchase order: {po_number}",
                     "type": "general"
-                }])
+                }], workflow=True)
             except Exception as notif_err:
                 print(f"Failed to send notification to supplier: {notif_err}")
 
@@ -327,7 +327,7 @@ def approve_po(po_id: str, data: PurchaseOrderApprove, current_user: dict = Depe
             "title": "Order Approved",
             "message": f"Supplier has approved purchase order {order.get('po_number')}",
             "type": "general"
-        }])
+        }], workflow=True)
 
         return res.data[0]
     except HTTPException:
@@ -397,7 +397,7 @@ def reject_po(po_id: str, current_user: dict = Depends(get_current_user)):
             },
         ]
         try:
-            create_notifications(notifications_to_insert)
+            create_notifications(notifications_to_insert, workflow=True)
         except Exception:
             import logging
             logging.exception("Rejection notifications failed")
@@ -477,7 +477,7 @@ def suggest_po(po_id: str, suggestion: PurchaseOrderSuggest, current_user: dict 
                     "type": "general",
                     "is_read": False,
                 },
-            ])
+            ], workflow=True)
         except Exception:
             import logging
             logging.exception("Suggest notifications failed")
@@ -588,7 +588,7 @@ def check_late_orders(supabase):
                 })
 
         if notifications:
-            create_notifications(notifications)
+            create_notifications(notifications, workflow=True)
 
         return {"checked": len(res.data), "alerts_sent": len(notifications)}
     except HTTPException:

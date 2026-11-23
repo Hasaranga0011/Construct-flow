@@ -15,5 +15,7 @@ const { typedSection, reportHtml, reportFilename } = require('../src/components/
  assert.equal(section.rows[80][0],'FINAL RECORD');
  assert(html.includes('=SUM(A1:A2)'));assert(html.includes('display:table-header-group'));
  assert.equal(reportFilename(report),'project-performance-2026-10-05');
+ const payslip=reportHtml({...report,layout:'payslip',title:'Payslip <unsafe>',sections:[{title:'Pay breakdown',headers:['Item','Value'],rows:[['Deductions','Rs. 500'],['Net pay','Rs. 24500']]}]});
+ assert(payslip.includes('size:A4 portrait'));assert(payslip.includes('Salary Statement'));assert(payslip.includes('Net pay'));assert(payslip.includes('does not confirm payment'));assert(payslip.includes('Payslip &lt;unsafe&gt;'));
  console.log('PASS: frontend print document includes all 81 records, typed amounts, missing values, escaped HTML, empty sections and stable filenames. Binary PDF/XLSX generation is covered by backend export tests.');
 })().catch(e=>{console.error(e);process.exit(1)});

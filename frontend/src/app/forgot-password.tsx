@@ -1,6 +1,6 @@
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Image, Platform } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { getApiUrl } from '../lib/apiUrl';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -22,7 +22,7 @@ export default function ForgotPasswordScreen() {
     setErrorMsg('');
     setSuccessMsg('');
 
-    const redirectTo = typeof window !== 'undefined'
+    const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined' && window.location
       ? `${window.location.origin}/reset-password`
       : undefined;
     const controller = new AbortController();
@@ -87,7 +87,7 @@ export default function ForgotPasswordScreen() {
             </Pressable>
             <View className="w-full">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-3xl md:text-4xl font-extrabold text-brand-text mb-2">Reset Password</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-base leading-relaxed">Enter your email address and we&apos;ll send you a secure link to reset your password.</Text>
+              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-base leading-relaxed">Email accounts can request a reset link below. If you use a username without an inbox, contact your administrator for identity verification and password recovery.</Text>
             </View>
           </View>
 

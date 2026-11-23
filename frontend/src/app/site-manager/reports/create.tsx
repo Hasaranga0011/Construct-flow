@@ -1,10 +1,12 @@
+import { DateField } from '@/components/common/DateField';
 import { dataError } from '@/services/siteData';
 import { pickSitePhoto } from '@/services/sitePhoto';
 import { PhotoCaptureModal } from '@/components/common/PhotoCaptureModal';
 import { validReportDate, validWorkerCount } from '@/utils/siteWorkflow';
 import { notify } from '@/utils/notify';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, Platform, Image, Modal } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Platform, Image, Modal, useWindowDimensions } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
@@ -37,6 +39,7 @@ const FALLBACK_MATERIALS: { name: string; unit: string }[] = [
 ];
 
 export default function CreateSiteReportPage() {
+  const { width } = useWindowDimensions();
   const router = useRouter();
   const { user } = useAuth();
   const [loadError, setLoadError] = useState('');
@@ -271,12 +274,7 @@ export default function CreateSiteReportPage() {
                 </Pressable>
               </View>
             </View>
-            <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-              className={`border ${errors.date ? 'border-red-400' : 'border-gray-300'} rounded-xl p-3 mb-4 text-brand-text bg-gray-50`}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-            />
+            <DateField label="Report date" value={date} onChange={setDate} />
             {errors.date && <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-500 text-xs -mt-3 mb-3">{errors.date}</Text>}
 
             {duplicateExists && (
@@ -446,10 +444,10 @@ export default function CreateSiteReportPage() {
       {/* Add Material Used Modal */}
       <Modal visible={matModalOpen} transparent animationType="fade" onRequestClose={() => setMatModalOpen(false)}>
         <ModalViewport>
-          <View className="bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
+          <ScrollView keyboardShouldPersistTaps="handled" style={{flexGrow:0,flexShrink:1}} contentContainerStyle={{padding:20}} className="bg-white w-full max-w-md rounded-2xl shadow-xl">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-bold text-gray-800">Log Material Used</Text>
-              <Pressable onPress={() => setMatModalOpen(false)} style={{ minHeight: 40, minWidth: 40 }} className="items-center justify-center">
+              <Text className="flex-1 min-w-0 text-lg font-bold text-gray-800">Log Material Used</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close material entry" onPress={() => setMatModalOpen(false)} style={{ minHeight: 44, minWidth: 44 }} className="items-center justify-center">
                 <Ionicons name="close" size={22} color="#6B7280" />
               </Pressable>
             </View>
@@ -459,6 +457,7 @@ export default function CreateSiteReportPage() {
               {projectMaterials.map(m => (
                 <Pressable
                   key={m.name}
+                  style={{minHeight:44,justifyContent:'center',maxWidth:Math.min(408,Math.max(0,width-72))}}
                   onPress={() => { setMatName(m.name); setMatUnit(m.unit); }}
                   className={`mr-2 px-3 py-1.5 rounded-full border ${matName === m.name ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
                 >
@@ -510,11 +509,14 @@ export default function CreateSiteReportPage() {
                 setMatUnit('units');
                 setMatModalOpen(false);
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Add to Report"
+              style={{minHeight:48}}
               className="bg-brand-orange py-3.5 rounded-xl items-center"
             >
               <Text className="text-white font-bold">Add to Report</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </ModalViewport>
       </Modal>
     </View>

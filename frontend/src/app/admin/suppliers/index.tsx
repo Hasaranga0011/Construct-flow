@@ -1,5 +1,8 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -20,6 +23,7 @@ export default function AdminSuppliersIndex() {
   const { role } = useAuth();
   const basePath = role === 'pm' ? '/pm/suppliers' : '/admin/suppliers';
   const { isMobile } = useResponsive();
+  const tableSort = useTableSort({"Supplier Name":r=>r.full_name||r.company_name,"Contact":r=>r.email||r.contact_number,"Active Orders":r=>r.activeOrders,"Total Orders":r=>r.totalOrders,"Total Spent":r=>r.totalSpent});
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -112,6 +116,7 @@ export default function AdminSuppliersIndex() {
   return (
     <View className="flex-1 flex-col bg-gray-50">
       <TopNav title="Suppliers Directory" />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
 
@@ -221,7 +226,7 @@ export default function AdminSuppliersIndex() {
         ) : (viewMode === 'grid' || isMobile) ? (
           /* Colorful Supplier Boxes / Cards Grid */
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8 }}>
-            {filteredSuppliers.map((sup, idx) => (
+            {tableSort.sort(filteredSuppliers).map((sup, idx) => (
               <View key={sup.id} style={isMobile ? { width: '100%', padding: 8 } : { width: '33.33%', padding: 8 }}>
                 <View className="bg-white rounded-2xl border border-gray-200/90 hover:border-orange-200 p-5 shadow-sm hover:shadow-md transition-all flex-col justify-between h-full">
                   {/* Top Supplier Profile Row */}
@@ -280,27 +285,27 @@ export default function AdminSuppliersIndex() {
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-amber-800">
                         {sup.activeOrders}
                       </Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-amber-700 uppercase">
+                      <SortableHeader sort={tableSort} column="Active Orders" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-amber-700 uppercase">
                         Active Orders
-                      </Text>
+                      </SortableHeader>
                     </View>
 
                     <View className="flex-1 bg-blue-50 border border-blue-200/80 rounded-xl p-2.5 items-center">
                       <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-base font-extrabold text-blue-800">
                         {sup.totalOrders}
                       </Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-blue-700 uppercase">
+                      <SortableHeader sort={tableSort} column="Total Orders" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-blue-700 uppercase">
                         Total Orders
-                      </Text>
+                      </SortableHeader>
                     </View>
 
                     <View className="flex-1 bg-emerald-50 border border-emerald-200/80 rounded-xl p-2.5 items-center">
                       <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-extrabold text-emerald-800">
                         {formatMoney(sup.totalSpent || 0)}
                       </Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-emerald-700 uppercase">
+                      <SortableHeader sort={tableSort} column="Total Spent" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] font-bold text-emerald-700 uppercase">
                         Total Spent
-                      </Text>
+                      </SortableHeader>
                     </View>
                   </View>
 
@@ -323,15 +328,15 @@ export default function AdminSuppliersIndex() {
           /* Enriched Colorful Table View */
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 min-h-[400px]">
             <View className="flex-row py-3 border-b border-gray-200 pr-2">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Supplier Name</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Contact</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Active Orders</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Total Orders</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[10%] text-xs font-semibold text-gray-500 uppercase text-right">Total Spent</Text>
+              <SortableHeader sort={tableSort} column="Supplier Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Supplier Name</SortableHeader>
+              <SortableHeader sort={tableSort} column="Contact" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Contact</SortableHeader>
+              <SortableHeader sort={tableSort} column="Active Orders" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Active Orders</SortableHeader>
+              <SortableHeader sort={tableSort} column="Total Orders" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-center">Total Orders</SortableHeader>
+              <SortableHeader sort={tableSort} column="Total Spent" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[10%] text-xs font-semibold text-gray-500 uppercase text-right">Total Spent</SortableHeader>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
             </View>
 
-            {filteredSuppliers.map((sup) => (
+            {tableSort.sort(filteredSuppliers).map((sup) => (
               <View key={sup.id} className="flex-row items-center py-4 border-b border-gray-50 hover:bg-orange-50/20 transition-colors">
                 <View className="w-[30%] pr-2 flex-row items-center">
                   <RoleAvatar

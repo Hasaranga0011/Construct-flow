@@ -7,7 +7,7 @@ export function dataError(error: unknown, fallback = 'Unable to load site data. 
 
 export async function projectSites(projectIds: string[]) {
   if (!projectIds.length) return [];
-  const result = await supabase.from('sites').select('id, project_id, site_manager_id').in('project_id', projectIds).order('id');
+  const result = await supabase.from('sites').select('id, project_id, site_manager_id, address').in('project_id', projectIds).order('id');
   if (result.error) throw result.error;
   const rows = result.data || [];
   for (const id of projectIds.filter(id => !rows.some(site => site.project_id === id))) {

@@ -1,6 +1,8 @@
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 import { api } from '@/services/api';
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
@@ -17,7 +19,7 @@ export function ChatWidget({ projectId, currentUserId, currentUserRole, targetRo
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollViewHandle>(null);
 
 
 

@@ -37,7 +37,7 @@ def retry_order_client(monkeypatch):
     client = RetryClient()
     monkeypatch.setattr(orders, 'client_for_token', lambda token: client)
     monkeypatch.setattr('core.access.project_member', lambda *args: True)
-    monkeypatch.setattr(orders, 'create_notifications', lambda value: client.notifications.append(value))
+    monkeypatch.setattr(orders, 'create_notifications', lambda value, **kwargs: client.notifications.append(value))
     return client
 
 

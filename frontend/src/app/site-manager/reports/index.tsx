@@ -1,6 +1,7 @@
 import { dataError } from '@/services/siteData';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Image, Linking, TextInput, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Image, Linking, TextInput, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';

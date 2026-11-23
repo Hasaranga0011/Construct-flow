@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Platform, View, useWindowDimensions } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type AuthPageLayoutProps = {

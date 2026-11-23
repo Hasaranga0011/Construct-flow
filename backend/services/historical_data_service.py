@@ -21,17 +21,31 @@ import json
 import logging
 import os
 import sqlite3
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.database import get_service_client
 from core.config import settings
+from core.runtime_paths import runtime_directory
 
 logger = logging.getLogger(__name__)
 
 MODELS_DIR = Path(os.environ.get("CONSTRUCTFLOW_MODEL_DIR", str(Path(__file__).resolve().parents[1] / "models")))
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
-LOCAL_DB_PATH = MODELS_DIR / "real_construction_data.db"
+CACHE_DIR = runtime_directory("historical-cache", MODELS_DIR)
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+LOCAL_DB_PATH = CACHE_DIR / "real_construction_data.db"
+# Model artifacts stay in the deployment bundle. Only the SQLite cache is writable.
+seed_path = MODELS_DIR / "real_construction_data.db"
+if CACHE_DIR != MODELS_DIR and not LOCAL_DB_PATH.exists() and seed_path.is_file():
+    with tempfile.NamedTemporaryFile(dir=CACHE_DIR, suffix=".db", delete=False) as seed_file:
+        scratch_path = Path(seed_file.name)
+    try:
+        shutil.copyfile(seed_path, scratch_path)
+        os.replace(scratch_path, LOCAL_DB_PATH)
+    finally:
+        scratch_path.unlink(missing_ok=True)
 
 SRI_LANKA_DISTRICTS = [
     "Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo",

@@ -3,7 +3,7 @@ from typing import List, Optional
 from ..models import LabourCreate, LabourResponse
 from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
-from core.security import require_manager_or_admin, get_current_user
+from core.security import require_manager_or_admin, get_current_user, require_admin
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from core.worker_payroll import calculate_payroll, summarize_salary_slips, _is_present
@@ -58,6 +58,10 @@ def get_labour(project_id: Optional[str] = Query(None, description="Filter by pr
             return []
         records = client.table('attendance').select('*').in_('site_id',list(site_to_project)).execute().data or []
         people = attendance_people(client,records)
+        sites = client.table('sites').select('id,address').in_('id',list(site_to_project)).execute().data or []
+        site_names = {row['id']:row.get('address') for row in sites}
+        projects = client.table('projects').select('id,name').in_('id',list(set(site_to_project.values()))).execute().data or []
+        project_names = {row['id']:row.get('name') for row in projects}
 
         # Map back to LabourResponse format for backwards compatibility
         mapped = []
@@ -67,6 +71,8 @@ def get_labour(project_id: Optional[str] = Query(None, description="Filter by pr
                 "id": row["id"],
                 "project_id": site_to_project[row['site_id']],
                 "site_id":row['site_id'],
+                "site_name":site_names.get(row['site_id']),
+                "project_name":project_names.get(site_to_project[row['site_id']]),
                 "worker_id":row['worker_id'],
                 "role":prof.get('worker_type') or 'worker',
                 "created_at":row['created_at'],
@@ -350,14 +356,93 @@ def scan_qr_code(payload: ScanRequest, current_user: dict = Depends(get_current_
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class PayrollDeduction(BaseModel):
+    worker_id: str
+    amount: float = Field(ge=0, multiple_of=0.01, allow_inf_nan=False)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class SalaryGenerateRequest(BaseModel):
     start_date: str
     end_date: str
     site_id: str
+    deductions: list[PayrollDeduction] = Field(default_factory=list, max_length=1000)
 
 
 class SalaryPayment(BaseModel):
     amount: float = Field(ge=0, allow_inf_nan=False)
+
+
+class StaffCompensation(BaseModel):
+    user_id: str
+    monthly_salary: float = Field(gt=0, multiple_of=0.01, allow_inf_nan=False)
+
+
+class StaffSalaryRequest(BaseModel):
+    user_id: str
+    project_id: str
+    month: str
+    deduction: float = Field(default=0, ge=0, allow_inf_nan=False)
+    reason: str = Field(default='', max_length=500)
+
+
+@router.get('/staff/people')
+def staff_people(current_user: dict = Depends(require_admin)):
+    from core.roles import normalize_role
+    client=client_for_token(current_user['token'])
+    people=client.table('profiles').select('id,full_name,role,is_approved').execute().data or []
+    rates=client.table('staff_compensation').select('user_id,monthly_salary').execute().data or []
+    mapping={row['user_id']:row['monthly_salary'] for row in rates}
+    projects=client.table('projects').select('id,name,pm_id,status').execute().data or []
+    sites=client.table('site_manager_sites').select('project_id,site_manager_id').execute().data or []
+    assignments=client.table('project_role_assignments').select('project_id,user_id,role').execute().data or []
+    result=[]
+    for person in people:
+        role=normalize_role(person.get('role'))
+        if role not in {'pm','site_manager'} or person.get('is_approved') is not True:
+            continue
+        assigned={row['id'] for row in projects if row.get('pm_id')==person['id']}
+        assigned.update(row['project_id'] for row in sites if row.get('site_manager_id')==person['id'])
+        assigned.update(row['project_id'] for row in assignments if row.get('user_id')==person['id'] and normalize_role(row.get('role')) in {'pm','site_manager'})
+        result.append({**person,'role':role,'monthly_salary':mapping.get(person['id']),
+                       'projects':[{'id':row['id'],'name':row['name']} for row in projects if row['id'] in assigned]})
+    return sorted(result,key=lambda person:(person.get('full_name') or '').casefold())
+
+
+@router.post('/staff/compensation')
+def save_staff_compensation(payload: StaffCompensation, current_user: dict = Depends(require_admin)):
+    client=client_for_token(current_user['token'])
+    from core.roles import normalize_role
+    rows=client.table('profiles').select('role,is_approved').eq('id',payload.user_id).execute().data or []
+    if not rows or normalize_role(rows[0].get('role')) not in {'pm','site_manager'} or not rows[0].get('is_approved'):
+        raise HTTPException(422,'Choose an approved Project Manager or Site Manager')
+    return client.table('staff_compensation').upsert({'user_id':payload.user_id,'monthly_salary':payload.monthly_salary,'updated_by':current_user['id']}).execute().data
+
+
+@router.post('/staff/salary')
+def generate_staff_salary(payload: StaffSalaryRequest, current_user: dict = Depends(require_admin)):
+    from datetime import date
+    try:
+        month=date.fromisoformat(payload.month+'-01')
+    except ValueError:
+        raise HTTPException(422,'Choose a valid salary month') from None
+    if payload.deduction and not payload.reason.strip():
+        raise HTTPException(422,'A deduction reason is required')
+    client=client_for_token(current_user['token'])
+    try:
+        return client.rpc('create_staff_salary',{'p_employee_id':payload.user_id,'p_project_id':payload.project_id,'p_month':month.isoformat(),'p_deduction':payload.deduction,'p_reason':payload.reason.strip()}).execute().data
+    except Exception as exc:
+        raise HTTPException(409,'Salary was not generated. Check the monthly rate, project assignment, deductions and existing pay periods.') from exc
+
+
+@router.get('/staff/payroll')
+def own_staff_payroll(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] not in {'pm','site_manager','super_admin'}:
+        raise HTTPException(403,'Staff payroll access required')
+    client=client_for_token(current_user['token'])
+    query=client.table('salary_slips').select('*').eq('pay_basis','monthly')
+    if current_user['role']!='super_admin':query=query.eq('worker_id',current_user['id'])
+    return query.order('period_start',desc=True).execute().data or []
 
 
 @router.patch('/salary/{slip_id}/paid')
@@ -367,6 +452,8 @@ def record_salary_payment(slip_id: str, payload: SalaryPayment, current_user: di
     if not rows:
         raise HTTPException(404, 'Salary slip not found')
     slip = rows[0]
+    if slip.get('pay_basis')=='monthly' and current_user['role']!='super_admin':
+        raise HTTPException(403,'Only an administrator can record staff salary payments')
     project_id = slip.get('project_id')
     if not project_id:
         raise HTTPException(409, 'Reconcile this legacy salary slip with its project first')
@@ -415,6 +502,8 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
         if any(not r.get("reviewed_at") for r in present_records):
             raise HTTPException(status_code=409, detail="Review and approve attendance before generating salary slips")
         if not present_records:
+            if payload.deductions:
+                raise HTTPException(422, 'There is no reviewed attendance for these deductions')
             return {"generated": 0, "slips": []}
 
         # Resolve attendance worker_id (which could be workers.id) to profiles.id
@@ -448,6 +537,13 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                 'conflicts':[{**row,'worker_name':profile_by_user.get(row['worker_id'],{}).get('full_name') or 'Worker'} for row in conflicts],
             })
         existing_workers = {row['worker_id'] for row in existing_slips}
+        deduction_map = {}
+        for deduction in payload.deductions:
+            if deduction.worker_id not in target_uids:
+                raise HTTPException(422, 'Deductions must belong to a worker in this pay period')
+            if deduction.worker_id in existing_workers:
+                raise HTTPException(409, 'This salary slip already exists; deductions cannot be changed by regenerating it')
+            deduction_map.setdefault(deduction.worker_id, []).append({'amount': deduction.amount, 'reason': deduction.reason.strip()})
         # Worker preference settings are stored in worker_details, not profiles.
         try:
             from core.database import get_service_client
@@ -472,6 +568,11 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
             from core.project_boq import resolve_boq_pay_terms
             daily_rate, overtime_rate, rate_source = resolve_boq_pay_terms(boq_plan, prof)
             pay = calculate_payroll(worker_records, daily_rate, overtime_rate)
+            from core.payroll_deductions import apply_deductions
+            try:
+                pay = apply_deductions(pay, deduction_map.get(uid, []))
+            except ValueError as exc:
+                raise HTTPException(422, f"{prof.get('full_name') or 'Worker'}: {exc}") from exc
             slips_to_insert.append({
                 "worker_id": uid,
                 "project_id": project_id,
@@ -480,6 +581,8 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                 "period_end": payload.end_date,
                 **{key: pay[key] for key in ("total_days", "total_hours", "overtime_hours", "basic_pay", "overtime_pay", "total_pay")},
                 "total_amount": pay["total_pay"],
+                "deductions": pay['deductions'],
+                "deduction_details": pay['deduction_details'],
                 "daily_rate": pay["daily_rate"],
                 "status": "Draft"
             })
@@ -509,7 +612,7 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                         "is_read": False,
                     })
                     profile = profile_by_user.get(uid)
-                    if not is_test_project and profile and profile.get("email") and (profile.get("notification_preferences") or {}).get("email", True):
+                    if not is_test_project and profile and profile.get("email") and not profile['email'].lower().endswith('@accounts.example.com') and (profile.get("notification_preferences") or {}).get("email", True):
                         try:
                             from services.email_service import send_email
                             from html import escape
@@ -527,7 +630,7 @@ def generate_salary(payload: SalaryGenerateRequest, current_user: dict = Depends
                             logging.exception("Failed payroll email for worker %s", uid)
                 notifications_to_insert = [n for n in notifications_to_insert if (profile_by_user.get(n["target_user_id"], {}).get("notification_preferences") or {}).get("in_app", True)]
                 if notifications_to_insert:
-                    create_notifications(notifications_to_insert)
+                    create_notifications(notifications_to_insert, workflow=True)
             except Exception:
                 import logging
                 logging.exception("Payroll notification step failed (slips were still inserted)")

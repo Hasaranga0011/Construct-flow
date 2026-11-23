@@ -12,6 +12,27 @@ export type Attendance = {
   site_name?: string;
   project_id: string;
 };
+
+export async function attendanceForWorker(id:string, signal:AbortSignal, start?:string, end?:string) {
+  const workers = await rows(supabase.from('workers').select('id').eq('user_id',id),signal);
+  const ids=Array.from(new Set([id,...(workers||[]).map((worker:any)=>worker.id)]));
+  let query=supabase.from('attendance').select('*').in('worker_id',ids).order('date',{ascending:false});
+  if(start&&end)query=query.gte('date',start).lte('date',end);else query=query.limit(7);
+  const records=await rows(query,signal);
+  const siteIds=Array.from(new Set((records||[]).map((row:any)=>row.site_id).filter(Boolean))) as string[];
+  const sites=siteIds.length?await rows(supabase.from('sites').select('id,address,project_id').in('id',siteIds),signal):[];
+  const projectIds=Array.from(new Set([...(sites||[]).map((site:any)=>site.project_id),...(records||[]).map((record:any)=>record.project_id)].filter(Boolean))) as string[];
+  const projects=projectIds.length?await rows(supabase.from('projects').select('id,name,location').in('id',projectIds),signal):[];
+  return records.map((record:any)=>{
+    const site=sites.find((item:any)=>item.id===record.site_id);
+    const projectId=site?.project_id || record.project_id;
+    const project=projects.find((item:any)=>item.id===projectId);
+    const clean=(value:any)=>typeof value==='string'?value.trim():'';
+    const address=clean(site?.address)||clean(project?.location);
+    const name=clean(project?.name);
+    return {...record,project_id:projectId,site_name:[name,address].filter((value,index,list)=>value&&list.indexOf(value)===index).join(' · ') || clean(record.site_name) || 'Site details unavailable'};
+  });
+}
 export const money = (value: number | null | undefined) =>
   value == null || !Number.isFinite(Number(value))
     ? "Not recorded"

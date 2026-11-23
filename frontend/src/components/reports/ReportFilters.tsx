@@ -1,5 +1,7 @@
+import { DateField } from '@/components/common/DateField';
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, Modal, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -56,7 +58,7 @@ function formatDateDisplay(yyyyMmDd: string): string {
 
 function computePresetDates(preset: DurationPreset): { from: string; to: string } {
   const now = new Date();
-  const formatYmd = (d: Date) => d.toISOString().split('T')[0];
+  const formatYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
   if (preset === 'Today') {
     const today = formatYmd(now);
@@ -257,19 +259,11 @@ export function ReportFilters({
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-600 mb-1.5">
             From Date (DD/MM/YYYY)
           </Text>
-          <View style={{ height: 42 }} className="border border-gray-200 rounded-lg px-3 bg-gray-50 flex-row items-center">
-            <Ionicons name="calendar-outline" size={16} color="#6B7280" className="mr-2" />
-            <TextInput
-              maxFontSizeMultiplier={1.3}
-              style={{ flex: 1, height: '100%' }}
-              placeholder="YYYY-MM-DD"
-              value={fromDate}
-              onChangeText={val => {
+          <View className="w-full">
+            <DateField label="From date" value={fromDate} onChange={val => {
                 setFromDate(val);
                 setPreset('Custom');
-              }}
-              className="text-xs text-brand-text font-medium"
-            />
+              }} />
           </View>
           <View style={{ minHeight: 18, marginTop: 3 }}>
             {!!fromDate && (
@@ -285,19 +279,11 @@ export function ReportFilters({
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-semibold text-gray-600 mb-1.5">
             To Date (DD/MM/YYYY)
           </Text>
-          <View style={{ height: 42 }} className="border border-gray-200 rounded-lg px-3 bg-gray-50 flex-row items-center">
-            <Ionicons name="calendar-outline" size={16} color="#6B7280" className="mr-2" />
-            <TextInput
-              maxFontSizeMultiplier={1.3}
-              style={{ flex: 1, height: '100%' }}
-              placeholder="YYYY-MM-DD"
-              value={toDate}
-              onChangeText={val => {
+          <View className="w-full">
+            <DateField label="To date" value={toDate} onChange={val => {
                 setToDate(val);
                 setPreset('Custom');
-              }}
-              className="text-xs text-brand-text font-medium"
-            />
+              }} />
           </View>
           <View style={{ minHeight: 18, marginTop: 3 }}>
             {!!toDate && (

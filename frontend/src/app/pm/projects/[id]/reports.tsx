@@ -1,7 +1,8 @@
 import { api } from '@/services/api';
 import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Image, TextInput, Pressable, Modal, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, Image, TextInput, Pressable, Modal, Linking } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import Ionicons from '@expo/vector-icons/Ionicons';

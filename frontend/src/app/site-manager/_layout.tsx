@@ -9,7 +9,9 @@ import { Icon } from '@/components/ui/Icon';
 const SM_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',    href: '/dashboard',    IconFamily: Icon, iconName: 'dashboard' },
   { label: 'Attendance',   href: '/attendance',   IconFamily: Ionicons,      iconName: 'calendar' },
+  { label: 'My Salary', href: '/my-salary', IconFamily: Ionicons, iconName: 'wallet-outline' },
   { label: 'Reports',      href: '/reports',      IconFamily: Ionicons,      iconName: 'document-text' },
+  { label: 'Expenses', href: '/expenses', IconFamily: Ionicons, iconName: 'receipt-outline' },
   { label: 'Materials',    href: '/materials',    IconFamily: Icon,  iconName: 'box' },
   { label: 'Milestones',   href: '/milestones',   IconFamily: Ionicons,      iconName: 'flag' },
   { label: 'Issues',       href: '/issues',       IconFamily: Ionicons,      iconName: 'warning' },

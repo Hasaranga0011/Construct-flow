@@ -1,5 +1,8 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { getApiUrl } from '../../../lib/apiUrl';
@@ -15,6 +18,7 @@ import { RoleAvatar } from '@/components/common/RoleAvatar';
 
 export default function AdminUsersList() {
   const router = useRouter();
+  const tableSort = useTableSort({"User":r=>r.full_name,"Role":r=>r.role,"Contact":r=>r.email||r.contact_number,"Status":r=>r.is_approved});
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -174,6 +178,7 @@ export default function AdminUsersList() {
     <View className="flex-1 bg-gray-50">
       <View className="flex-1 flex-col min-h-0 overflow-hidden">
         <TopNav title="Users Directory" actionLabel="+ New User" onActionPress={() => router.push('/admin/users/create')} />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'column', marginBottom: 20, gap: 16, zIndex: 50, elevation: 50 }}>
@@ -234,10 +239,10 @@ export default function AdminUsersList() {
           <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>
             {!isMobile && (
               <View className="flex-row py-3 border-b border-gray-200 pr-2">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[28%] text-xs font-semibold text-gray-500 uppercase">User</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[18%] text-xs font-semibold text-gray-500 uppercase">Role</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[24%] text-xs font-semibold text-gray-500 uppercase">Contact</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+                <SortableHeader sort={tableSort} column="User" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[28%] text-xs font-semibold text-gray-500 uppercase">User</SortableHeader>
+                <SortableHeader sort={tableSort} column="Role" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[18%] text-xs font-semibold text-gray-500 uppercase">Role</SortableHeader>
+                <SortableHeader sort={tableSort} column="Contact" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[24%] text-xs font-semibold text-gray-500 uppercase">Contact</SortableHeader>
+                <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[12%] text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
               </View>
             )}
@@ -254,7 +259,7 @@ export default function AdminUsersList() {
                 </Text>
               </View>
             ) : isMobile ? (
-              filteredRows.map(u => {
+              tableSort.sort(filteredRows).map(u => {
                 const colors = getRoleColor(u.role);
                 const isPending = u.is_approved === false;
                 const isApproving = approvingId === u.id;
@@ -341,7 +346,7 @@ export default function AdminUsersList() {
                 );
               })
             ) : (
-              filteredRows.map(u => {
+              tableSort.sort(filteredRows).map(u => {
                 const isPending = u.is_approved === false;
                 const isApproving = approvingId === u.id;
                 const isRejecting = rejectingId === u.id;

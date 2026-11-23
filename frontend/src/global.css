@@ -25,3 +25,8 @@ input, textarea, [contenteditable] {
 
 /* Keep unbroken addresses and identifiers inside their text container. */
 [dir="auto"] { overflow-wrap: anywhere; }
+
+/* Keep mobile browsers from zooming the page when a form field receives focus. */
+@media (max-width: 767px) {
+  input, textarea, select { font-size: 16px !important; }
+}

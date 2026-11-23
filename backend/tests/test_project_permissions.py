@@ -58,7 +58,7 @@ def test_milestone_from_another_project_cannot_be_updated(monkeypatch):
     assert calls[0][1]["p_milestone_id"]=="foreign-milestone"
     assert client.mutations==[]
 
-@pytest.mark.parametrize("role", ["worker", "supplier", "site_manager", "client"])
+@pytest.mark.parametrize("role", ["worker", "supplier", "client"])
 def test_non_management_cannot_create_expenses(role):
     with pytest.raises(HTTPException) as error:
         projects.add_project_expense("project", None, {"id": role, "role": role})

@@ -1,7 +1,10 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import React, { useEffect, useState } from 'react';
 import { Pagination } from '@/components/common/Pagination';
-import { View, Text, TextInput, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, TextInput, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -24,6 +27,7 @@ export default function AdminPurchaseOrders() {
   const { isCompact:isMobile, onLayout } = useTableLayout(1000);
   const [loadError,setLoadError]=useState('');
   const [retryTick,setRetryTick]=useState(0);
+  const tableSort = useTableSort({"PO Number":r=>r.po_number,"Material / Qty":r=>r.items,"Supplier":r=>r.supplier_name,"Total Cost":r=>r.total_price,"Status":r=>r.status},()=>setPage(0));
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -55,7 +59,8 @@ export default function AdminPurchaseOrders() {
           }
         }
 
-        let query = supabase.from('purchase_orders').select('*', { count: 'exact' }).order('created_at', { ascending: false }).order('id', { ascending: false });
+        const fields:Record<string,string>={'PO Number':'po_number','Material / Qty':'items','Supplier':'supplier_name','Total Cost':'total_price','Status':'status'};
+        let query = supabase.from('purchase_orders').select('*', { count: 'exact' }).order(fields[tableSort.column]||'created_at', { ascending: !!tableSort.column&&tableSort.direction==='asc', nullsFirst:false }).order('id', { ascending: false });
 
         if (pmProjectIds.length > 0) {
           query = query.in('project_id', pmProjectIds);
@@ -89,7 +94,7 @@ export default function AdminPurchaseOrders() {
 
     fetchOrders();
     return () => { isMounted = false; controller.abort(); };
-  }, [statusFilter, isPM, user?.id, scopedProjectId, scopedSupplierId, retryTick, page, searchTerm]);
+  }, [statusFilter, isPM, user?.id, scopedProjectId, scopedSupplierId, retryTick, page, searchTerm, tableSort.column, tableSort.direction]);
 
   const visibleOrders = orders;
 
@@ -103,6 +108,7 @@ export default function AdminPurchaseOrders() {
         actionLabel="+ New Order"
         onActionPress={() => router.push(`${basePath}/create${scopedProjectId?'?project_id='+scopedProjectId:''}` as any)}
       />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push(`/${isPM?'pm':'admin'}/materials${scopedProjectId?'?project='+scopedProjectId:''}` as any)} className="flex-row items-center mb-6 self-start">
@@ -131,11 +137,11 @@ export default function AdminPurchaseOrders() {
         <View onLayout={onLayout} style={isMobile ? {} : { backgroundColor: '#fff', borderRadius: 12, padding: 24, minHeight: 400, borderWidth: 1, borderColor: '#F3F4F6' }}>
           {!isMobile && (
             <View className="flex-row py-3 border-b border-gray-200 pr-2">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO Number</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Material / Qty</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Supplier</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Total Cost</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+              <SortableHeader sort={tableSort} column="PO Number" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">PO Number</SortableHeader>
+              <SortableHeader sort={tableSort} column="Material / Qty" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Material / Qty</SortableHeader>
+              <SortableHeader sort={tableSort} column="Supplier" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Supplier</SortableHeader>
+              <SortableHeader sort={tableSort} column="Total Cost" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Total Cost</SortableHeader>
+              <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
             </View>
           )}

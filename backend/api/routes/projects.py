@@ -324,7 +324,7 @@ def create_project(project: ProjectCreate, request: Request, current_user: dict 
                     "type": "general",
                     "is_read": False,
                 })
-        notifications_failed = create_notifications(notifications) != len(notifications)
+        notifications_failed = create_notifications(notifications, workflow=True) != len(notifications)
     except Exception as e:
         import logging
         logging.warning(f"Notification dispatch failed: {e}")
@@ -490,7 +490,7 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
                 "message": f"You have been assigned as Project Manager for: {saved.get('name')}",
                 "type": "general",
                 "is_read": False,
-            }])
+            }], workflow=True)
 
         new_client_id = saved.get("client_id")
         if new_client_id and str(new_client_id) != str(old_client_id):
@@ -550,78 +550,22 @@ def update_project(project_id: str, project: ProjectUpdate, request: Request, cu
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: str, archive_only: bool = False, current_user: dict = Depends(require_admin)):
-    service_client = setup_client()
-
-    # 1. Verify project exists
-    proj_res = service_client.table("projects").select("*").eq("id", project_id).execute()
-    if not proj_res.data:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    project = proj_res.data[0]
-    project_name = project.get("name") or "Unnamed Project"
-
-    # 2. Archive handling
-    if archive_only or str(project.get("status", "")).lower() != "archived":
-        if archive_only:
-            service_client.table("projects").update({"status": "archived"}).eq("id", project_id).execute()
-            record_project_audit_log(current_user, "archive", project_id, {"name": project_name, "previous_status": project.get("status")})
-            return {"message": f"Project '{project_name}' has been archived successfully.", "status": "archived"}
-
-    # 3. Dependency check for permanent deletion
-    deps = get_project_dependencies(project_id)
-
-    # Financial and operational history check
-    blocking_keys = {
-        "purchase_orders": "purchase orders",
-        "project_expenses": "expenses",
-        "attendance": "attendance records",
-        "site_reports": "site reports",
-        "variation_orders": "variation orders",
-        "material_requests": "material requests",
-        "cost_estimates": "cost estimates",
-        "client_payment_schedule": "payment schedule entries",
-        "shared_documents": "shared documents",
-        "milestones": "milestones"
-    }
-
-    blocking_items = ['BOQ baseline/revision history'] if project.get('boq_data') or project.get('boq_revision') else []
-    for k, label in blocking_keys.items():
-        if deps.get(k, 0) > 0:
-            blocking_items.append(f"{deps[k]} {label}")
-
-    if blocking_items:
-        detail_msg = f"This project has {', '.join(blocking_items)}. Archive it instead."
-        raise HTTPException(status_code=409, detail=detail_msg)
-
-    # 4. Permanent delete for safe/empty projects
-    try:
-        # Delete auxiliary dependents first
-        service_client.table("notifications").delete().eq("project_id", project_id).execute()
-        service_client.table("client_activity").delete().eq("project_id", project_id).execute()
-        service_client.table("project_role_assignments").delete().eq("project_id", project_id).execute()
-        service_client.table("pm_projects").delete().eq("project_id", project_id).execute()
-        service_client.table("site_workers").delete().eq("project_id", project_id).execute()
-        service_client.table("site_manager_sites").delete().eq("project_id", project_id).execute()
-        service_client.table("materials").delete().eq("project_id", project_id).execute()
-        service_client.table("sites").delete().eq("project_id", project_id).execute()
-
-        # Delete project row
-        del_res = service_client.table("projects").delete().eq("id", project_id).execute()
-        if not del_res.data:
-            raise HTTPException(status_code=404, detail="Project could not be deleted")
-
-        record_project_audit_log(current_user, "permanent_delete", project_id, {
-            "name": project_name,
-            "previous_status": project.get("status"),
-            "deleted_at": datetime.now(timezone.utc).isoformat()
+def delete_project(project_id: str, archive_only: bool = False, confirmation_name: Optional[str] = None, current_user: dict = Depends(require_admin)):
+    if not archive_only:
+        if not confirmation_name:
+            raise HTTPException(422, 'Type the project name to confirm permanent deletion')
+        from api.routes.workflow import transition
+        return transition(client_for_token(current_user['token']), 'permanently_delete_project', {
+            'p_project_id': project_id, 'p_confirmation': confirmation_name,
         })
-
-        return {"message": f"Project '{project_name}' was permanently deleted.", "status": "deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+    service_client = setup_client()
+    rows = service_client.table('projects').select('*').eq('id', project_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, 'Project not found')
+    project = rows[0]
+    service_client.table('projects').update({'status': 'archived'}).eq('id', project_id).execute()
+    record_project_audit_log(current_user, 'archive', project_id, {'name': project.get('name'), 'previous_status': project.get('status')})
+    return {'message': 'Project archived successfully', 'status': 'archived'}
 
 
 @router.post("/{project_id}/restore")
@@ -818,7 +762,7 @@ def get_project_financials(project_id: str, current_user: dict = Depends(get_cur
 
 @router.get("/{project_id}/expenses", response_model=List[ExpenseResponse])
 def get_project_expenses(project_id: str, current_user: dict = Depends(get_current_user)):
-    supabase = authorized_project_client(project_id, current_user, write=False)
+    supabase = authorized_project_client(project_id, current_user, write=current_user['role']=='site_manager')
     try:
         res = supabase.table("project_expenses").select("*").eq("project_id", project_id).order("expense_date", desc=True).execute()
         return res.data
@@ -826,6 +770,14 @@ def get_project_expenses(project_id: str, current_user: dict = Depends(get_curre
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get('/{project_id}/expense-references')
+def expense_references(project_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] not in {'super_admin','pm','site_manager'}:
+        raise HTTPException(403,'Project expense access required')
+    client=authorized_project_client(project_id,current_user,write=True)
+    return client.rpc('expense_boq_references',{'p_project_id':project_id}).execute().data or []
 
 @router.post("/{project_id}/apply-boq")
 async def apply_boq_to_existing_project(
@@ -855,7 +807,7 @@ async def apply_boq_to_existing_project(
 
 @router.post("/{project_id}/expenses", response_model=ExpenseResponse)
 def add_project_expense(project_id: str, expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in {"super_admin", "pm"}:
+    if current_user["role"] not in {"super_admin", "pm", "site_manager"}:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     supabase = authorized_project_client(project_id, current_user, write=True)
     if expense.project_id != project_id:

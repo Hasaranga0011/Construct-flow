@@ -19,7 +19,7 @@ export async function managedPayroll(knownProjects?: Awaited<ReturnType<typeof m
     supabase.from('salary_slips').select('*').in('project_id', projectIds).order('created_at', { ascending: false }),
   ]);
   if (result.error) throw result.error;
-  const slips = result.data || [];
+  const slips = (result.data || []).filter(slip=>(slip as typeof slip & {pay_basis?:string}).pay_basis!=='monthly');
 
   return slips.map(slip => {
     const assign = assigned.find(a => a.profiles?.id === slip.worker_id);

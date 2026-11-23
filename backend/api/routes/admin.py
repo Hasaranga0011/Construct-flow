@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from supabase import create_client
 
 from core.config import settings
@@ -26,6 +26,36 @@ from services.email_service import send_credentials_welcome_email
 logger = logging.getLogger("constructflow.admin")
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class UsernamePasswordRecovery(BaseModel):
+    password: str = Field(min_length=12, max_length=128)
+    identity_confirmed: bool
+
+
+@router.get('/users/{user_id}/username')
+def username_identity(user_id: str, current_user: dict = Depends(get_current_user)):
+    _require_admin(current_user)
+    rows=_admin_supabase().table('username_accounts').select('username').eq('user_id',user_id).execute().data or []
+    return rows[0] if rows else {'username':None}
+
+
+@router.post('/users/{user_id}/username-password')
+def recover_username_password(user_id: str, payload: UsernamePasswordRecovery, current_user: dict = Depends(get_current_user)):
+    _require_admin(current_user)
+    if not payload.identity_confirmed:
+        raise HTTPException(422, 'Verify the account owner before resetting their password')
+    client=_admin_supabase()
+    rows=client.table('username_accounts').select('username').eq('user_id',user_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, 'Username account not found')
+    try:
+        client.auth.admin.update_user_by_id(user_id,{'password':payload.password})
+    except Exception:
+        raise HTTPException(503, 'Password could not be updated') from None
+    from datetime import datetime, timezone
+    client.table('username_accounts').update({'recovered_by':current_user['id'],'recovered_at':datetime.now(timezone.utc).isoformat()}).eq('user_id',user_id).execute()
+    return {'message':'Password updated. Share it privately with the verified owner and ask them to change it in Settings.'}
 
 
 def _require_admin(current_user: dict) -> dict:
@@ -278,7 +308,8 @@ def create_user(
             title="Welcome to ConstructFlow",
             message=f"Welcome {payload.full_name}! Your account has been setup with the {canonical_role} role.",
             target_user_id=new_uid,
-            sent_via="in_app"
+            sent_via="in_app",
+            workflow=True,
         )
     except Exception:
         pass
@@ -404,7 +435,7 @@ def approve_user(
             message=f"Hi {user_row.get('full_name') or 'User'}, your ConstructFlow account has been approved by an administrator.",
             target_user_id=user_id,
             sent_via="in_app",
-        )
+        workflow=True)
     except Exception as notif_err:
         logger.warning(f"Approval notification failed for {user_id}: {notif_err}")
 

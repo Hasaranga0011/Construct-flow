@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView, ViewStyle } from 'react-native';
+import { View, KeyboardAvoidingView, Platform, SafeAreaView, ViewStyle } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useTheme } from '../../context/ThemeContext';
 
 interface ScreenContainerProps {

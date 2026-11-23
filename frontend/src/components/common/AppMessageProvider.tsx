@@ -1,6 +1,7 @@
 import { ModalViewport } from './ModalViewport';
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, Text, View, ScrollView } from 'react-native';
+import { Alert, Modal, Pressable, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 
 type MessageButton = {
   text: string;

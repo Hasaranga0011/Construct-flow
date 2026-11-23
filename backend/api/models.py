@@ -160,6 +160,8 @@ class LabourCreate(LabourBase):
 
 class LabourResponse(LabourBase):
     id: str
+    site_name: Optional[str] = None
+    project_name: Optional[str] = None
     site_id: Optional[str] = None
     worker_id: Optional[str] = None
     check_in_time: Optional[datetime] = None

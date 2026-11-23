@@ -138,7 +138,7 @@ def create_site_report(payload: SiteReportCreate, current_user: dict = Depends(g
                         "is_read": False,
                     })
                 if notifications_to_add:
-                    create_notifications(notifications_to_add)
+                    create_notifications(notifications_to_add, workflow=True)
         except Exception:
             import logging
             logging.exception("Site report notification failed")

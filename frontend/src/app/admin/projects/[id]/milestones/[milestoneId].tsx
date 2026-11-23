@@ -1,6 +1,7 @@
 import { getApiUrl } from '../../../../../lib/apiUrl';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View, Image } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View, Image } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { api } from '@/services/api';

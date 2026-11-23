@@ -1,5 +1,7 @@
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase';
@@ -23,7 +25,7 @@ type Message = {
 export default function StaffMessagesThread({ threadId }: { threadId: string }) {
   const { user, role } = useAuth();
   const effectiveRole = role === 'admin' ? 'super_admin' : role;
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewHandle>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [projectName, setProjectName] = useState('Client Conversation');

@@ -1,6 +1,7 @@
 import { ModalViewport } from './ModalViewport';
 import React from 'react';
-import { Modal, Pressable, Text, View, ScrollView } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 
 interface LogoutConfirmationModalProps {
   visible: boolean;

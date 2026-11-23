@@ -1,8 +1,10 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { dataError, projectSites } from '@/services/siteData';
 import { notify } from '@/utils/notify';
 import { ModalViewport } from '@/components/common/ModalViewport';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../../lib/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Icon } from '@/components/ui/Icon';
@@ -123,14 +125,7 @@ export default function SMIssuesPage() {
     }
   };
 
-  const getStatusColors = (status: string) => {
-    switch (status) {
-      case 'Resolved': return 'bg-green-50 text-green-700 border-green-100';
-      case 'In Progress': return 'bg-blue-50 text-blue-700 border-blue-100';
-      case 'Open': return 'bg-orange-50 text-orange-700 border-orange-100';
-      default: return 'bg-gray-50 text-gray-700 border-gray-100';
-    }
-  };
+
 
   return (
     <View className="flex-1 bg-brand-light">
@@ -193,9 +188,7 @@ export default function SMIssuesPage() {
                       </View>
                       <View>
                         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Status</Text>
-                        <View className={`px-3 py-1 rounded-full border self-start ${getStatusColors(issue.status)}`}>
-                          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-xs">{issue.status}</Text>
-                        </View>
+                        <StatusBadge status={issue.status}/>
                       </View>
 
                       {issue.status !== 'Resolved' && (

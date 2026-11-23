@@ -168,6 +168,7 @@ export default function SiteManagerDashboard() {
           </View>
 
           <DashboardActions actions={[
+            { label: 'Manage Expenses', description: 'Review and add costs for your assigned sites', icon: 'receipt-outline', onPress: () => router.push('/site-manager/expenses') },
             { label:'Attendance', description:'Scan and manage check-ins', icon:'qr-code-outline', onPress:()=>router.push('/site-manager/attendance') },
             { label:'Materials', description:'Monitor stock and requests', icon:'cube-outline', onPress:()=>router.push('/site-manager/materials') },
             { label:'Daily reports', description:'Record the work completed', icon:'document-text-outline', onPress:()=>router.push('/site-manager/reports') },

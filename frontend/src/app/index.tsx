@@ -1,3 +1,4 @@
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 /**
  * ConstructAi — Home / Landing Page (rewritten)
  *
@@ -57,7 +58,8 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 
-import { Alert, View, Text, ScrollView, Pressable, Image, TextInput, useWindowDimensions, Platform, Animated } from 'react-native';
+import { Alert, View, Text, Pressable, Image, TextInput, useWindowDimensions, Platform, Animated } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -231,7 +233,7 @@ export default function LandingPage() {
   const isSm = ww >= 640;
 
   const cleanup = useRef<() => void>(() => {});
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewHandle>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
 
   useEffect(() => {

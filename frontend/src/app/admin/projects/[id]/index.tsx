@@ -1,7 +1,9 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { ProjectWorkspaceNav } from '@/components/projects/ProjectWorkspaceNav';
 import { firstRelation } from '@/utils/relations';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Image } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Platform, Image } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -286,7 +288,7 @@ export default function AdminProjectDetailsPage() {
       if (!targetId) {
         throw new Error('Project ID is missing');
       }
-      const targetUrl = `${getApiUrl()}/projects/${targetId}?archive_only=false`;
+      const targetUrl = `${getApiUrl()}/projects/${targetId}?archive_only=false&confirmation_name=${encodeURIComponent(project.name)}`;
       if (__DEV__) {
         console.log('[DEBUG DELETE (Permanent) /projects Request]:', targetUrl);
       }
@@ -297,23 +299,6 @@ export default function AdminProjectDetailsPage() {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (response.status === 409) {
-        let depMessage = 'This project has financial or operational history. Archive it instead.';
-        try {
-          const errData = await response.json();
-          depMessage = errData.detail || depMessage;
-        } catch {}
-
-        setDeleteModalVisible(false);
-        setDeleting(false);
-
-        const shouldArchive = await confirmAction('Archive Instead?', `${depMessage}\n\nWould you like to archive it instead?`, false);
-        if (shouldArchive) {
-          await handleArchiveProject(true);
-        }
-        return;
-      }
 
       if (!response.ok) {
         let errMessage = 'Failed to delete project';
@@ -371,11 +356,7 @@ export default function AdminProjectDetailsPage() {
                 />
                 <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
                 <View className="absolute top-4 right-4">
-                  <View className={`px-3 py-1.5 rounded-full ${project.status === 'active' ? 'bg-[#DCFCE7]' : String(project.status || '').toLowerCase() === 'archived' ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                    <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`font-bold uppercase tracking-wider text-xs ${project.status === 'active' ? 'text-brand-success' : String(project.status || '').toLowerCase() === 'archived' ? 'text-amber-800' : 'text-gray-600'}`}>
-                      {project.status}
-                    </Text>
-                  </View>
+                  <StatusBadge status={project.status}/>
                 </View>
                 <View className="absolute bottom-4 left-5 right-5">
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-2xl md:text-3xl font-black text-white mb-1 shadow-sm">{project.name}</Text>
@@ -579,8 +560,8 @@ export default function AdminProjectDetailsPage() {
                  >
                     <Ionicons name="trash" size={20} color="#EF4444" className="mr-3" />
                     <View className="flex-1">
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-red-700">Delete Project</Text>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-red-500">Permanently remove if no history</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-bold text-red-700">Permanently Delete Project</Text>
+                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-red-500">Remove this project and its linked records</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#EF4444" />
                  </TouchableOpacity>

@@ -151,7 +151,7 @@ def test_registration_rejects_typo_domain_gnail():
     assert "Did you mean @gmail.com?" in response.json()["detail"]
 
 
-def test_registration_rejects_non_gmail_domain():
+def test_non_gmail_registration_reaches_service_configuration_check():
     response = client.post("/api/auth/register", json={
         "email": "janindi@yahoo.com",
         "password": "Password123!",
@@ -159,8 +159,8 @@ def test_registration_rejects_non_gmail_domain():
         "role": "worker",
         "portal": "internal",
     })
-    assert response.status_code == 422
-    assert "Only valid Gmail accounts (@gmail.com) are permitted" in response.json()["detail"]
+    assert response.status_code == 503
+    assert 'Service role key not configured' in response.json()['detail']
 
 
 def test_registration_rejects_short_gmail_username():

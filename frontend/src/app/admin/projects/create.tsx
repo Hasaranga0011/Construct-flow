@@ -1,6 +1,8 @@
+import { DateField } from '@/components/common/DateField';
 import { getApiUrl } from '../../../lib/apiUrl';
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { supabase } from '../../../lib/supabase';
@@ -529,24 +531,14 @@ export default function AdminProjectsCreatePage() {
           <View className="flex-row space-x-4 mb-4">
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">Start Date (YYYY-MM-DD) *</Text>
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
-                placeholder="2025-01-01"
-                value={formData.start_date}
-                onChangeText={handleStartDateChange}
-              />
+              <DateField label="Start Date" value={formData.start_date} onChange={handleStartDateChange} />
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1">
                 Auto-calculates End Date & Milestone dates
               </Text>
             </View>
             <View className="flex-1">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-medium mb-2">End Date (YYYY-MM-DD) *</Text>
-              <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
-                className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800"
-                placeholder="2026-01-01"
-                value={formData.end_date}
-                onChangeText={(t) => setFormData({...formData, end_date: t})}
-              />
+              <DateField label="End Date" value={formData.end_date} onChange={(t) => setFormData({...formData, end_date: t})} />
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-[11px] text-gray-400 mt-1">
                 Auto-calculated from BOQ durations (Editable)
               </Text>
@@ -946,14 +938,7 @@ export default function AdminProjectsCreatePage() {
                     </View>
                     <View className="flex-1 min-w-[140px]">
                       <Text className="text-[10px] font-semibold text-gray-500 mb-1">Due Date (YYYY-MM-DD)</Text>
-                      <TextInput
-                        maxFontSizeMultiplier={1.3}
-                        style={{ minHeight: 40 }}
-                        placeholder="YYYY-MM-DD"
-                        className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800"
-                        value={ms.due_date}
-                        onChangeText={(val) => updateMilestone(index, 'due_date', val)}
-                      />
+                      <DateField label="Due Date" value={ms.due_date} onChange={(val) => updateMilestone(index, 'due_date', val)} />
                     </View>
                   </View>
 

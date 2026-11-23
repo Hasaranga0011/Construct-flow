@@ -1,9 +1,10 @@
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 import { DashboardDetailLink } from '@/components/dashboard/DashboardDetailLink';
 import { DashboardContent, DashboardHero, DashboardActions, DashboardSectionHeading } from '@/components/dashboard/DashboardLayout';
 // Modified for Expo Go mobile compatibility
 // Modified for Expo Go mobile compatibility
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, Text, Pressable } from 'react-native';
+import { View, ActivityIndicator, Text, Pressable } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../components/common/StatCard';
@@ -22,7 +23,7 @@ const DONE_STATUSES: string[] = [PO_STATUS.DELIVERED, PO_STATUS.RECEIVED];
 export default function SupplierDashboardScreen() {
   const { isMobile } = useResponsive();
   const router = useRouter();
-  const inboxScroll = useRef<ScrollView>(null);
+  const inboxScroll = useRef<ScrollViewHandle>(null);
   const inboxY = useRef(0);
   // Single realtime source for every widget on this screen.
   const { orders, projects, stats: globalStats, loading, lastUpdated, refresh } = useSupplierOrders();

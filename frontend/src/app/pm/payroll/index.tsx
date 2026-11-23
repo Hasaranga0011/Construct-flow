@@ -1,8 +1,12 @@
+import { DateField } from '@/components/common/DateField';
+import { payrollToday, payrollMonthStart } from '@/utils/payrollDate';
 import { SalaryPaymentAction } from '@/components/labour/SalaryPaymentAction';
 import { PayrollGenerationNotice, payrollFailure } from '@/components/labour/PayrollGenerationNotice';
 import { AttendancePeriodReview } from '@/components/labour/AttendancePeriodReview';
+import { PayrollDeductions, PayrollDeduction, deductionPayload } from '@/components/labour/PayrollDeductions';
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Modal, Alert } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { SearchInput } from '@/components/common/SearchInput';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
@@ -30,13 +34,14 @@ export default function PMPayrollPage() {
   // Batch generation modal state
   const [generateModalVisible, setGenerateModalVisible] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [deductions,setDeductions]=useState<PayrollDeduction[]>([]);
   const [generationFailure, setGenerationFailure] = useState<ReturnType<typeof payrollFailure> | null>(null);
   const [genProjectId, setGenProjectId] = useState(requestedProject);
   const [genStartDate, setGenStartDate] = useState(
-    new Date(new Date().setDate(1)).toISOString().split('T')[0]
+    payrollMonthStart()
   );
   const [genEndDate, setGenEndDate] = useState(
-    new Date().toISOString().split('T')[0]
+    payrollToday()
   );
 
   const load = useCallback(async () => {
@@ -78,7 +83,8 @@ export default function PMPayrollPage() {
         body: JSON.stringify({
           site_id: genProjectId,
           start_date: genStartDate,
-          end_date: genEndDate
+          end_date: genEndDate,
+          deductions: deductionPayload(deductions)
         })
       });
 
@@ -290,6 +296,7 @@ export default function PMPayrollPage() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 text-sm">Overtime</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="font-semibold text-gray-800 text-sm">{Number(selected?.overtime_hours ?? selected?.total_overtime_hours ?? 0).toFixed(2)} hrs ({amount(selected?.overtime_pay ?? 0)})</Text>
               </View>
+              <View className="py-2"><Text className="text-gray-600">Deductions: {amount(selected?.deductions??0)}</Text>{(selected?.deduction_details||[]).map((row:any,index:number)=><Text key={index} className="text-sm text-gray-500 mt-1">{row.reason}: {amount(row.amount)}</Text>)}</View>
               <View className="flex-row justify-between py-2 mt-2 bg-orange-50 px-3 rounded-lg border border-orange-100">
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-bold text-base">Total Pay</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-extrabold text-lg">{amount(selected?.total_amount ?? selected?.total_pay)}</Text>
@@ -340,7 +347,7 @@ export default function PMPayrollPage() {
                 <View className="flex-row flex-wrap gap-2">
                   {projects.map(p => (
                     <Pressable
-                      style={{ minHeight: 40, minWidth: 44 }}
+                      style={{ minHeight: 44, minWidth: 44, maxWidth: '100%', flexShrink: 1, justifyContent: 'center' }}
                       key={p.id}
                       onPress={() => setGenProjectId(p.id)}
                       className={`px-3 py-2 rounded-lg border ${genProjectId === p.id ? 'bg-brand-orange border-brand-orange' : 'bg-gray-50 border-gray-200'}`}
@@ -354,48 +361,39 @@ export default function PMPayrollPage() {
               )}
             </View>
 
-            <View className="flex-row gap-3 mb-6">
-              <View className="flex-1">
+            <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 24 }}>
+              <View style={{ flex: isMobile ? undefined : 1, minWidth: 0 }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-semibold mb-1 text-sm">Start Date</Text>
-                <TextInput
-                  value={genStartDate}
-                  onChangeText={setGenStartDate}
-                  placeholder="YYYY-MM-DD"
-                  style={{ minHeight: 44 }}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 text-sm"
-                />
+                <DateField label="Start Date" value={genStartDate} onChange={setGenStartDate} />
               </View>
-              <View className="flex-1">
+              <View style={{ flex: isMobile ? undefined : 1, minWidth: 0 }}>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-semibold mb-1 text-sm">End Date</Text>
-                <TextInput
-                  value={genEndDate}
-                  onChangeText={setGenEndDate}
-                  placeholder="YYYY-MM-DD"
-                  style={{ minHeight: 44 }}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 text-sm"
-                />
+                <DateField label="End Date" value={genEndDate} onChange={setGenEndDate} />
               </View>
             </View>
 
-            <View className="flex-row gap-3">
+            <AttendancePeriodReview projectId={genProjectId} start={genStartDate} end={genEndDate} />
+            <PayrollDeductions projectId={genProjectId} start={genStartDate} end={genEndDate} value={deductions} onChange={setDeductions}/>
+            {generationFailure && <PayrollGenerationNotice {...generationFailure} onView={row => { setGenerateModalVisible(false); setFilter('All'); setSearch(''); if (row) setSelected(slips.find(slip => slip.id === row.id) || null); void load(); }} />}
+            <View style={{ flexDirection: isMobile ? 'column-reverse' : 'row', gap: 12 }}>
               <Pressable
-                style={{ minHeight: 44, minWidth: 44 }}
+                style={{ minHeight: 48, minWidth: 0, flex: isMobile ? undefined : 1 }}
                 onPress={() => setGenerateModalVisible(false)}
-                className="flex-1 bg-gray-100 rounded-xl p-3.5 items-center justify-center"
+                className="bg-gray-100 rounded-xl p-3.5 items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel payroll batch"
               >
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-700 font-bold text-sm">
                   Cancel
                 </Text>
               </Pressable>
-              <AttendancePeriodReview projectId={genProjectId} start={genStartDate} end={genEndDate} />
-            {generationFailure && <PayrollGenerationNotice {...generationFailure} onView={row => { setGenerateModalVisible(false); setFilter('All'); setSearch(''); if (row) setSelected(slips.find(slip => slip.id === row.id) || null); void load(); }} />}
               <Pressable
-                style={{ minHeight: 44, minWidth: 44 }}
+                style={{ minHeight: 48, minWidth: 0, flex: isMobile ? undefined : 1 }}
                 disabled={generating}
                 accessibilityRole="button"
                 accessibilityLabel="Generate Slips"
                 onPress={handleGenerate}
-                className="flex-1 bg-brand-orange rounded-xl p-3.5 items-center justify-center flex-row"
+                className="bg-brand-orange rounded-xl p-3.5 items-center justify-center flex-row"
               >
                 {generating ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />

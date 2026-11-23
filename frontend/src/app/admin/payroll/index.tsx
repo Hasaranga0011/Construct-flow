@@ -1,5 +1,8 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -15,6 +18,7 @@ import { AutoFitText } from '@/components/common/AutoFitText';
 export default function AdminPayrollIndex() {
   const router = useRouter();
   const { isMobile } = useResponsive();
+  const tableSort = useTableSort({"Worker Info":r=>r.name||r.full_name,"Rate (Rs/Day)":r=>r.daily_rate,"Unpaid Days/OT":r=>r.totalDays,"Pending Payout":r=>r.pendingAmount});
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -140,6 +144,7 @@ export default function AdminPayrollIndex() {
   return (
     <View className="flex-1 flex-col bg-gray-50">
       <TopNav title="Payroll Management" />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
       <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8" showsVerticalScrollIndicator={false}>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => router.push('/admin/labour')} className="flex-row items-center mb-6 self-start">
@@ -203,10 +208,10 @@ export default function AdminPayrollIndex() {
 
           {!isMobile && (
             <View className="flex-row py-3 border-b border-gray-200 pr-2">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Worker Info</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Rate (Rs/Day)</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase text-center">Unpaid Days/OT</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-right">Pending Payout</Text>
+              <SortableHeader sort={tableSort} column="Worker Info" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[30%] text-xs font-semibold text-gray-500 uppercase">Worker Info</SortableHeader>
+              <SortableHeader sort={tableSort} column="Rate (Rs/Day)" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase">Rate (Rs/Day)</SortableHeader>
+              <SortableHeader sort={tableSort} column="Unpaid Days/OT" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[20%] text-xs font-semibold text-gray-500 uppercase text-center">Unpaid Days/OT</SortableHeader>
+              <SortableHeader sort={tableSort} column="Pending Payout" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase text-right">Pending Payout</SortableHeader>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">History</Text>
             </View>
           )}
@@ -221,7 +226,7 @@ export default function AdminPayrollIndex() {
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg font-medium">No workers pending payroll.</Text>
             </View>
           ) : (
-            filteredWorkers.map(w => (
+            tableSort.sort(filteredWorkers).map(w => (
               isMobile ? (
                 <View key={w.id} style={{ flexDirection: 'column', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -233,7 +238,7 @@ export default function AdminPayrollIndex() {
                       <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#16A34A', fontWeight: 'bold', fontSize: 18 }]}>
                         {formatMoney(w.pendingAmount)}
                       </Text>
-                      <Text maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 11 }]}>Pending Payout</Text>
+                      <SortableHeader sort={tableSort} column="Pending Payout" maxFontSizeMultiplier={1.3} style={[{ flexShrink: 1, minWidth: 0 }, { color: '#9CA3AF', fontSize: 11 }]}>Pending Payout</SortableHeader>
                     </View>
                   </View>
 

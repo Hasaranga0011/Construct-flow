@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { View } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { ProjectWorkspaceNav } from './ProjectWorkspaceNav';

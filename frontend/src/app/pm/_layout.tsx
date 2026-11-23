@@ -9,9 +9,11 @@ import { Icon } from '@/components/ui/Icon';
 const PM_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',    href: '/dashboard',    IconFamily: Icon, iconName: 'dashboard' },
   { label: 'Projects',     href: '/projects',     IconFamily: Icon,  iconName: 'building' },
+  { label: 'Expenses', href: '/expenses', IconFamily: Ionicons, iconName: 'receipt-outline' },
   { label: 'Materials',    href: '/materials',    IconFamily: Icon,  iconName: 'box' },
   { label: 'Labour',       href: '/labour',       IconFamily: Icon,  iconName: 'hard-hat' },
   { label: 'Payroll',      href: '/payroll',      IconFamily: Icon,  iconName: 'money-check-alt' },
+  { label: 'My Salary', href: '/my-salary', IconFamily: Ionicons, iconName: 'wallet-outline' },
   { label: 'Clients',      href: '/client',       IconFamily: Icon,  iconName: 'users' },
   { label: 'Messages',     href: '/messages',     IconFamily: Ionicons,      iconName: 'chatbubbles' },
   { label: 'Suppliers',    href: '/suppliers',    IconFamily: Icon,  iconName: 'truck' },

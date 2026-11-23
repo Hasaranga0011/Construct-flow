@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import os
@@ -77,6 +77,19 @@ def list_notifications(current_user: dict = Depends(get_current_user)):
         return client_for_token(current_user["token"]).rpc("get_own_notifications").execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Could not load notifications") from exc
+
+
+@router.get('/feed')
+def notification_feed(current_user: dict = Depends(get_current_user), offset: int = Query(0, ge=0, le=1000000)):
+    client = client_for_token(current_user['token'])
+    try:
+        return client.rpc('get_own_notification_feed',{'p_offset':offset}).execute().data or {'items': [], 'unread_count': 0, 'total_count':0}
+    except Exception as exc:
+        if str(getattr(exc, 'code', '')) == 'PGRST202':
+            # Transitional fallback until the owner applies the SQL upgrade.
+            rows = client.rpc('get_own_notifications').execute().data or []
+            return {'items': rows if offset==0 else [], 'unread_count': sum(not row.get('is_read') for row in rows), 'total_count':len(rows)}
+        raise HTTPException(503, 'Could not load notifications') from exc
 
 @router.get("/email/health")
 def email_health(current_user: dict = Depends(require_admin)):

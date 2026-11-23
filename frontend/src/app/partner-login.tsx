@@ -1,3 +1,4 @@
+import { signInWithIdentifier } from '@/lib/signIn';
 import React, { useState, useEffect } from 'react';
 import { Platform, View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Link, useRouter, useLocalSearchParams } from 'expo-router';
@@ -31,7 +32,7 @@ export default function LoginScreen() {
       setErrorMsg('This portal is for partners only. Team members must use the Team Portal.');
     }
     if (registered) {
-      setSuccessMsg('Account created successfully! Please sign in with your credentials.');
+      setSuccessMsg(registered==='username'?'Username account created. Sign in with your username and password; an administrator must approve project access.':'Account created. Verify the email link before signing in; supplier accounts also need administrator approval.');
     }
   }, [portalError, registered]);
 
@@ -75,12 +76,12 @@ export default function LoginScreen() {
 
     // Partner Login only admits client/supplier accounts — enforced in AuthContext.
     await setLoginPortal('partner');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await signInWithIdentifier(email, password);
 
     if (error) {
       await clearLoginPortal();
       setPassword('');
-      setErrorMsg('Incorrect email or password');
+      setErrorMsg('Incorrect email/username or password');
       setLoading(false);
       return;
     }
@@ -234,11 +235,11 @@ export default function LoginScreen() {
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-700 mb-2">Email</Text>
         <TextInput maxFontSizeMultiplier={1.3} style={{ minHeight: 44, minWidth: 44 }}
           className="w-full border border-gray-300 rounded-xl p-4 text-brand-text bg-gray-50 focus:border-brand-orange focus:bg-white transition-colors"
-          placeholder="name@company.com"
+          placeholder="Email or username"
           value={email}
           onChangeText={setEmail}
           {...loginEmailAutofill}
-          keyboardType="email-address"
+          keyboardType="default"
           returnKeyType="next"
         />
         {rememberMe && email ? (

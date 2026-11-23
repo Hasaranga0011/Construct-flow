@@ -1,5 +1,23 @@
 import logging
 import uuid
+import time
+
+_engine_state = (0.0, False)
+
+def workflow_notifications_enabled():
+    """Capability check keeps old deployments working while SQL is being applied."""
+    global _engine_state
+    now = time.monotonic()
+    if now < _engine_state[0]:
+        return _engine_state[1]
+    try:
+        from core.attendance_setup import setup_client
+        enabled = setup_client().rpc('cf_notification_engine_ready').execute().data is True
+    except Exception:
+        enabled = False
+    # Do not cache "not installed": SQL may be applied while this process runs.
+    _engine_state = (now + (30 if enabled else 0), enabled)
+    return enabled
 
 ALLOWED_NOTIFICATION_TYPES = {
     'material_low',
@@ -9,22 +27,26 @@ ALLOWED_NOTIFICATION_TYPES = {
     'general'
 }
 
-def create_notification(type: str, user_id: str, title: str, message: str, **kwargs):
+def create_notification(type: str, user_id: str, title: str, message: str, workflow: bool = False, **kwargs):
     """
     Shared server-side helper to insert a notification using the service-role Supabase client.
     Validates type against ALLOWED_NOTIFICATION_TYPES, defaulting to 'general' without failing.
     """
     try:
-        return create_notifications([{"type": type, "user_id": user_id, "title": title, "message": message, **kwargs}])
+        return create_notifications([{"type": type, "user_id": user_id, "title": title, "message": message, **kwargs}], workflow=workflow)
     except Exception as e:
         logging.error(f"create_notification failed: {e}")
         return 0
 
-def create_notifications(notifications: list):
+def create_notifications(notifications: list, workflow: bool = False):
     """
     Insert multiple notifications in one go using the service-role client.
     Never raises an exception so primary transactions are never interrupted.
     """
+    if workflow and notifications and workflow_notifications_enabled():
+        # The row-change trigger already persisted personal notifications in the
+        # same transaction; a second API request must not create duplicates.
+        return len(notifications)
     valid_notifs = []
     for notif in notifications:
         t = notif.get("type", "general")
@@ -96,6 +118,6 @@ def notify_project_event(project_id: str, project_name: str, event_type: str, pm
             "is_read": False,
         })
     try:
-        create_notifications(notifs)
+        create_notifications(notifs, workflow=True)
     except Exception as e:
         logging.warning(f"notify_project_event failed silently: {e}")

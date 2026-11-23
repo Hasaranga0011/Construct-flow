@@ -1,6 +1,7 @@
 import { MaterialRequestReview } from '@/components/materials/MaterialRequestReview';
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Text } from 'react-native';
+import { View, ActivityIndicator, Pressable, Text } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TopNav } from '@/components/common/TopNav';
 import { StatCard } from '../../../components/common/StatCard';

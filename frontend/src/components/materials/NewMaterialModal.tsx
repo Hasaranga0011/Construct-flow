@@ -1,7 +1,8 @@
 import { DateField } from '../common/DateField';
 import { ModalViewport } from '../common/ModalViewport';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../lib/supabase';
 import { useOrderSubmission } from '@/hooks/useOrderSubmission';
 import { validatePurchaseOrder } from '@/utils/procurement';

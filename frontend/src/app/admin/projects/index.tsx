@@ -1,5 +1,9 @@
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { useRouter, Link } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
@@ -18,6 +22,7 @@ export default function AdminProjectsList() {
   const { user, role } = useAuth();
   const isPM = role === 'pm';
   const basePath = isPM ? '/pm/projects' : '/admin/projects';
+  const tableSort = useTableSort({"Project Name":r=>r.name,"Location":r=>r.location,"Personnel":r=>r.pm_name,"Budget":r=>r.total_budget,"Status":r=>r.status});
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -88,13 +93,7 @@ export default function AdminProjectsList() {
     };
   }, [isPM, user?.id]);
 
-  const getStatusBadge = (status: string) => {
-    const s = String(status || '').toLowerCase();
-    if (s === 'active') return { bg: 'bg-[#DCFCE7]', text: 'text-brand-success' };
-    if (s === 'archived') return { bg: 'bg-amber-100', text: 'text-amber-800' };
-    if (s === 'completed') return { bg: 'bg-blue-100', text: 'text-blue-600' };
-    return { bg: 'bg-gray-100', text: 'text-gray-500' };
-  };
+
 
   const activeCount = projects.filter(p => String(p.status || '').toLowerCase() !== 'archived').length;
   const archivedCount = projects.filter(p => String(p.status || '').toLowerCase() === 'archived').length;
@@ -113,6 +112,7 @@ export default function AdminProjectsList() {
     <View className="flex-1 bg-gray-50">
       <View className="flex-1 flex-col min-h-0 overflow-hidden">
         <TopNav title="Projects" showAction={!isPM} actionLabel="+ New Project" onActionPress={() => router.push('/admin/projects/create')} />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
 
         <ScrollView keyboardShouldPersistTaps="handled" className={`flex-1 ${isMobile ? 'px-4 py-4' : 'px-8 py-6'}`} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, gap: isMobile ? 12 : 0, zIndex: 50, elevation: 50 }}>
@@ -168,11 +168,11 @@ export default function AdminProjectsList() {
           <View className={`bg-white shadow-sm border border-gray-100 min-h-[400px] ${isMobile ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-xl p-6'}`}>
             {!isMobile && (
               <View className="flex-row py-3 border-b border-gray-200 pr-2">
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[25%] text-xs font-semibold text-gray-500 uppercase">Project Name</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Location</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Personnel</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Budget</Text>
-                <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</Text>
+                <SortableHeader sort={tableSort} column="Project Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[25%] text-xs font-semibold text-gray-500 uppercase">Project Name</SortableHeader>
+                <SortableHeader sort={tableSort} column="Location" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Location</SortableHeader>
+                <SortableHeader sort={tableSort} column="Personnel" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Personnel</SortableHeader>
+                <SortableHeader sort={tableSort} column="Budget" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Budget</SortableHeader>
+                <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="w-[15%] text-xs font-semibold text-gray-500 uppercase">Status</SortableHeader>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-semibold text-gray-500 uppercase text-right">Action</Text>
               </View>
             )}
@@ -187,7 +187,7 @@ export default function AdminProjectsList() {
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-lg font-medium">No projects found.</Text>
               </View>
             ) : isMobile ? (
-              filteredRows.map(p => (
+              tableSort.sort(filteredRows).map(p => (
                 <View key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm overflow-hidden">
                   <ProjectImage
                     project={p}
@@ -222,7 +222,7 @@ export default function AdminProjectsList() {
                 </View>
               ))
             ) : (
-              filteredRows.map(p => (
+              tableSort.sort(filteredRows).map(p => (
                 <View key={p.id} className="flex-row items-center py-3.5 border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                   <View className="w-[25%] flex-row items-center pr-4">
                     <ProjectImage
@@ -259,11 +259,7 @@ export default function AdminProjectsList() {
                   </View>
 
                   <View className="w-[15%]">
-                    <View className={`px-2.5 py-1 rounded-full self-start ${getStatusBadge(p.status).bg}`}>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className={`text-[10px] font-bold uppercase ${getStatusBadge(p.status).text}`}>
-                        {p.status}
-                      </Text>
-                    </View>
+                    <StatusBadge status={p.status}/>
                   </View>
 
                 <View className="flex-1 flex-row justify-end space-x-2 pl-1">

@@ -78,7 +78,7 @@ def test_supplier_invitation_creates_pending_supplier_not_client(monkeypatch):
         return SimpleNamespace(user=SimpleNamespace(id='supplier'))
     db.auth = SimpleNamespace(admin=SimpleNamespace(invite_user_by_email=invite))
     monkeypatch.setattr(clients, 'new_supabase_client', lambda *a: db)
-    monkeypatch.setattr(clients, 'create_notifications', lambda *a: None)
+    monkeypatch.setattr(clients, 'create_notifications', lambda *a, **kwargs: None)
     result = clients.invite_client(clients.InviteClientRequest(email='qa@example.com', name='QA', company='QA', access_level='supplier', project_id=''), None)
     assert result['user_id'] == 'supplier'
     assert captured['metadata']['role'] == 'supplier'

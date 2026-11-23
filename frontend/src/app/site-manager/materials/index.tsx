@@ -1,3 +1,5 @@
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { GoodsReceiptForm } from '@/components/materials/GoodsReceiptForm';
 import { BoqItemSelect } from '@/components/projects/BoqItemSelect';
 import { RecordCard } from '@/components/common/RecordCard';
@@ -6,7 +8,8 @@ import { positiveQuantity } from '@/utils/siteWorkflow';
 import { firstRelation } from '@/utils/relations';
 import { notify } from '@/utils/notify';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, TextInput, Modal } from 'react-native';
+import { ContentScrollView as ScrollView } from '@/components/common/ContentScrollView';
 import { supabase } from '../../../lib/supabase';
 import { TopNav } from '@/components/common/TopNav';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -34,6 +37,7 @@ export default function SMMaterialsPage() {
   const { isMobile } = useResponsive();
   const { user } = useAuth();
   const { assignedProjectIds, loading: sitesLoading, error: assignmentError, refresh: refreshAssignments } = useAssignedSites(user?.id);
+  const tableSort = useTableSort({"Item Name":r=>r.name,"Stock":r=>r.current_stock,"Status":r=>Number(r.current_stock||0)===0?'Out of Stock':Number(r.current_stock)<Number(r.minimum_threshold||1)?'Low Stock':'In Stock'});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -195,6 +199,7 @@ export default function SMMaterialsPage() {
   return (
     <View className="flex-1 bg-brand-light">
       <TopNav title="Site Materials" actionLabel="Refresh" onActionPress={() => { fetchMaterialsData(); } } />
+      <View className="px-4 pt-3"><TableSortControl sort={tableSort}/></View>
       {loadError || assignmentError ? <Pressable style={{ minHeight: 44, minWidth: 44 }} onPress={() => { refreshAssignments(); fetchMaterialsData(); }} className="bg-red-50 p-4"><Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700">{loadError || assignmentError} Tap to retry.</Text></Pressable> : null}
 
       {projects.length > 0 && (
@@ -245,9 +250,9 @@ export default function SMMaterialsPage() {
         ) : activeTab === 'stock' ? (
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
             <View className="hidden lg:flex flex-row py-4 px-6 border-b border-gray-100 bg-gray-50">
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-bold text-gray-500 uppercase">Item Name</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Stock</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Status</Text>
+              <SortableHeader sort={tableSort} column="Item Name" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-[2] text-xs font-bold text-gray-500 uppercase">Item Name</SortableHeader>
+              <SortableHeader sort={tableSort} column="Stock" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Stock</SortableHeader>
+              <SortableHeader sort={tableSort} column="Status" style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="flex-1 text-xs font-bold text-gray-500 uppercase">Status</SortableHeader>
             </View>
 
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -257,7 +262,7 @@ export default function SMMaterialsPage() {
                   <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 mt-4">No materials recorded for this project yet.</Text>
                 </View>
               ) : (
-                projectStock.map(item => {
+                tableSort.sort(projectStock).map(item => {
                   const isLow = (item.current_stock || 0) < (item.minimum_threshold || 0);
                   if (isMobile) return <RecordCard key={item.id} title={item.name} fields={[{ label: 'Stock', value: `${item.current_stock ?? 0} ${item.unit || ''}` }, { label: 'Status', value: isLow ? 'Low stock' : 'In stock' }]} action={{ label: 'Request material', onPress: () => { setIsCustomMaterial(false); setItemName(item.name); setUnit(item.unit || ''); setActiveTab('request'); } }} />;
                   return (

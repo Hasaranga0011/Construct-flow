@@ -73,34 +73,11 @@ def test_project_update_whitelist(monkeypatch):
     assert "completion_percentage" not in payload
 
 
-def test_project_delete_409_with_dependencies(monkeypatch):
-    class MockServiceClient:
-        def table(self, name):
-            class Query:
-                def select(self, *args, count=None): return self
-                def eq(self, *args): return self
-                def in_(self, *args): return self
-                def execute(self):
-                    # Mock project existence
-                    if name == "projects":
-                        return SimpleNamespace(data=[{"id": "proj-1", "name": "Active Project", "status": "active"}], count=1)
-                    # Mock financial history
-                    if name == "purchase_orders":
-                        return SimpleNamespace(data=[{"id": "po-1"}], count=3)
-                    if name == "project_expenses":
-                        return SimpleNamespace(data=[{"id": "exp-1"}], count=12)
-                    return SimpleNamespace(data=[], count=0)
-            return Query()
-
-    monkeypatch.setattr(projects, "setup_client", lambda: MockServiceClient())
-
-    with pytest.raises(HTTPException) as exc_info:
-        projects.delete_project("proj-1", archive_only=False, current_user={"id": "admin-1", "email": "admin@test.com", "role": "super_admin"})
-
-    assert exc_info.value.status_code == 409
-    assert "purchase orders" in exc_info.value.detail
-    assert "expenses" in exc_info.value.detail
-    assert "Archive it instead" in exc_info.value.detail
+def test_project_delete_requires_explicit_confirmation():
+    with pytest.raises(HTTPException) as error:
+        projects.delete_project('proj-1', archive_only=False, current_user={'id':'admin-1','role':'super_admin'})
+    assert error.value.status_code == 422
+    assert 'confirm' in error.value.detail
 
 
 def test_project_delete_archive_only(monkeypatch):
@@ -132,35 +109,16 @@ def test_project_delete_archive_only(monkeypatch):
     assert ("projects", {"status": "archived"}) in updates
 
 
-def test_project_permanent_delete_empty_project(monkeypatch):
-    deletes = []
-    audit_logs = []
-
-    class MockServiceClient:
-        def table(self, name):
-            class Query:
-                def select(self, *args, **kwargs): return self
-                def eq(self, *args): return self
-                def in_(self, *args): return self
-                def delete(self):
-                    deletes.append(name)
-                    return self
-                def insert(self, data):
-                    audit_logs.append((name, data))
-                    return self
-                def execute(self):
-                    if name == "projects":
-                        return SimpleNamespace(data=[{"id": "proj-empty", "name": "Empty Project", "status": "planning"}], count=1)
-                    return SimpleNamespace(data=[], count=0)
-            return Query()
-
-    monkeypatch.setattr(projects, "setup_client", lambda: MockServiceClient())
-
-    res = projects.delete_project("proj-empty", archive_only=False, current_user={"id": "admin-1", "email": "admin@test.com", "role": "super_admin"})
-
-    assert res["status"] == "deleted"
-    assert "projects" in deletes
-    assert any("project_permanent_delete" in str(log) for log in audit_logs)
+def test_project_permanent_delete_uses_atomic_caller_rpc(monkeypatch):
+    calls=[]
+    class Client:
+        def rpc(self,name,args):
+            calls.append((name,args))
+            return SimpleNamespace(execute=lambda:SimpleNamespace(data={'status':'deleted'}))
+    monkeypatch.setattr(projects,'client_for_token',lambda token: Client())
+    result=projects.delete_project('proj-1',confirmation_name='Project name',current_user={'id':'admin-1','role':'super_admin','token':'fixture'})
+    assert result['status']=='deleted'
+    assert calls==[('permanently_delete_project',{'p_project_id':'proj-1','p_confirmation':'Project name'})]
 
 
 def test_project_restore(monkeypatch):
