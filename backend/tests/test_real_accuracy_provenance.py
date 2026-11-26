@@ -192,8 +192,8 @@ def test_insights_accuracy_status_and_gating():
     # If real_projects_count < 30, accuracy tile must explicitly state rate-based baseline
     real_n = data.get("real_projects_count", 0)
     if real_n < 30:
-        assert f"Not enough real projects yet ({real_n} of 30)" in data["accuracy_status"]
-        assert "Estimates use the rate-based baseline." in data["accuracy_status"]
+        assert data['cost_ml_ready'] is False
+        assert 'No verified ML model available' in data['accuracy_status']
         assert "Leave-one-out" in data["evaluation_method"] or "No held-out" in data["evaluation_method"]
         # Must report baseline_mape separately
         assert "baseline_mape" in data

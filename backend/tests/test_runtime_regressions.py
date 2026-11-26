@@ -48,15 +48,15 @@ def test_synthetic_estimate_does_not_claim_validated_confidence(monkeypatch):
     monkeypatch.setattr(ai, "_cost_model", SimpleNamespace(predict=lambda frame: [1000000.0]))
     monkeypatch.setattr(ai, "_cost_meta", {"data_source": "synthetic_demo"})
     monkeypatch.setattr(ai, "_per_input_importance", lambda *args: [])
-    result = ai.predict_cost(ai.PredictRequest(
+    with pytest.raises(HTTPException) as blocked:
+      ai.predict_cost(ai.PredictRequest(
         square_footage=1500, location="Colombo", project_type="Residential", quality_tier="Standard",
         num_floors=1, site_condition="Flat", structure_type="Concrete",
         finishing_flooring="Standard", finishing_sanitary="Standard",
         finishing_electrical="Standard", target_timeline="12 months",
     ), {})
-    assert result.estimated_cost == 1000000.0
-    assert result.confidence_score is None
-    assert result.model_source == "synthetic_demo"
+    assert blocked.value.status_code == 503
+    assert 'Verified cost model is not ready' in blocked.value.detail
 
 
 @pytest.mark.parametrize("length", ["bad", "-1"])

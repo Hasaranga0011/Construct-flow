@@ -189,7 +189,7 @@ def test_welcome_email_escapes_untrusted_profile_text():
     assert '&lt;img src=x' in html
 
 
-def test_mismatched_model_artifact_uses_baseline_without_unpickling(monkeypatch, tmp_path):
+def test_mismatched_model_artifact_refuses_prediction_without_unpickling(monkeypatch, tmp_path):
     import json
     from data_pipeline import model_engine as engine
     model = tmp_path / "cost.pkl"
@@ -200,5 +200,6 @@ def test_mismatched_model_artifact_uses_baseline_without_unpickling(monkeypatch,
     monkeypatch.setattr(engine,"COST_META_JSON",meta)
     monkeypatch.setattr(engine,"get_real_projects_count",lambda:30)
     monkeypatch.setattr(engine.joblib,"load",lambda *a,**kw:pytest.fail("Mismatched artifact was deserialized"))
-    result=engine.predict_cost_hybrid(1000,1,"Colombo","Residential House","Standard")
-    assert result["model_source"] == "rate_based_baseline"
+    from core.verified_ml import ModelNotReady
+    with pytest.raises(ModelNotReady):
+        engine.predict_cost_hybrid(1000,1,"Colombo","Residential House","Standard")

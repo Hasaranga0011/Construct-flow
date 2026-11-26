@@ -32,7 +32,7 @@ export default function LoginScreen() {
       setErrorMsg('This portal is for team members only. Clients and suppliers must use the Partner Portal.');
     }
     if (registered) {
-      setSuccessMsg(registered==='username'?'Username account created. Sign in with your username and password; an administrator must approve project access.':'Account created. Verify the email link before signing in; staff accounts also need administrator approval.');
+      setSuccessMsg(registered==='username'?'Username account created. Sign in with your username and password; an administrator must approve project access.':'Account created. Verify your email, then wait for administrator approval before workspace access.');
     }
   }, [portalError, registered]);
 

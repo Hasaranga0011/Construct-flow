@@ -46,19 +46,24 @@ async def delay_check_job():
     job_id = await _log_job_start("delay_check_job")
     try:
         print(f"[{datetime.now()}] Running delay_check_job")
-        # Reuse insights logic or simplified check here
-        res = supabase_db.table("ml_predictions").select("*, projects(name)").gte("delay_risk_score", 70).execute()
-        high_risk_projects = res.data
+        from core.database import get_service_client
+        from services.delay_risk_service import project_delay_risks, read_all
+        db = get_service_client()
+        projects = read_all(lambda: db.table('projects').select('id,name,status,pm_id,is_test,start_date,end_date,completion_percentage,total_budget,spent_cost'))
+        projects = [p for p in projects if not p.get('is_test') and not any(word in (p.get('name') or '').lower() for word in ('test', 'demo', 'sample'))]
+        assessments, _ = project_delay_risks(db, projects)
+        high_risk_projects = [p for p in assessments if p['delay_risk'] is not None and p['delay_risk'] >= 60]
         
         for p in high_risk_projects:
-            proj_name = p.get("projects", {}).get("name", "Project")
+            proj_name = p.get('project_name', 'Project')
             title = f"🚨 High Delay Risk: {proj_name}"
-            message = f"{p.get('delay_risk_score')}% delay probability. Immediate review needed."
+            message = f"Delay risk index {p['delay_risk']}/100 (High). {p['recommendation']}"
             
-            create_notifications([
-                {"title": title, "message": message, "type": "general", "target_role": "super_admin"},
-                {"title": title, "message": message, "type": "general", "target_role": "pm"}
-            ])
+            notices = [{"title": title, "message": message, "type": "general", "target_role": "super_admin", "project_id": p['project_id']}]
+            pm = next((row.get('pm_id') for row in projects if row['id'] == p['project_id']), None)
+            if pm:
+                notices.append({"title": title, "message": message, "type": "general", "target_role": "pm", "target_user_id": pm, "project_id": p['project_id']})
+            create_notifications(notices)
         await _log_job_end(job_id, "Success")
     except Exception as e:
         print(f"Delay check job error: {e}")

@@ -15,7 +15,23 @@ def override_auth():
     yield
     app.dependency_overrides.pop(get_current_user, None)
 
-def test_predict_cost_with_valid_districts():
+def test_predict_cost_with_valid_districts(monkeypatch, tmp_path):
+    # Isolated fitted fixture model: district differences come from training,
+    # never from production rate multipliers or unverified deployed artifacts.
+    import math
+    import pandas as pd
+    from data_pipeline import model_engine as engine
+    from data_pipeline.verified_delay_training import publish
+    rows=[]
+    for district,rate in [('Colombo',20000),('Anuradhapura',15000)]:
+        for area in [1000,1500,2000,2500]:
+            rows.append({'district':district,'project_type':'Residential House','quality_tier':'Premium','floors':2,
+                'structure_type':'RCC frame','site_condition':'Flat','floor_area_sqft':area,'cost_year':2026,'price_index':255,'target':math.log(rate)})
+    frame=pd.DataFrame(rows);model=engine._build_pipeline();model.fit(frame[engine.ALL_FEATURES],frame.target)
+    publish(tmp_path,'cost_predictor',model,{'data_provenance':'verified_real_only','synthetic_rows_included':False,
+        'production_ready':True,'real_projects_count':8,'features':engine.ALL_FEATURES,'model_type':'Fixture fitted model'})
+    monkeypatch.setattr(engine,'COST_MODEL_PKL',tmp_path/'cost_predictor.pkl')
+    monkeypatch.setattr(engine,'get_real_projects_count',lambda:8)
     # Colombo
     res_colombo = client.post(
         "/api/ai/predict-cost",

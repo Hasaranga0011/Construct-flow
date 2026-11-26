@@ -212,7 +212,7 @@ def update_google_role(payload: GoogleRoleUpdate, current_user: dict = Depends(g
     # another portal — the portal gate rejects them instead.
     res = client.table('profiles').select('role').eq('id', current_user['id']).single().execute()
     if res.data and res.data.get('role') in [None, '', 'pending']:
-        client.table('profiles').update({'role': payload.role, 'is_approved': payload.role == 'client'}).eq('id', current_user['id']).execute()
+        client.table('profiles').update({'role': payload.role, 'is_approved': False}).eq('id', current_user['id']).execute()
         client.auth.admin.update_user_by_id(current_user['id'], {"user_metadata": {'role': payload.role}})
         
     return {"success": True}

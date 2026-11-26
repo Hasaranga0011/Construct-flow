@@ -14,7 +14,7 @@ export const QuotationForm = ({
   onEstimateCreated?: () => void;
   projectId?: string;
 }) => {
-  const [projectType, setProjectType] = useState('Residential');
+  const [projectType, setProjectType] = useState('Residential House');
   const [squareFootage, setSquareFootage] = useState('');
   const [numFloors, setNumFloors] = useState('');
   const [district, setDistrict] = useState('Colombo');
@@ -30,6 +30,7 @@ export const QuotationForm = ({
   const [electricalTier, setElectricalTier] = useState('Standard');
   const [timeline, setTimeline] = useState('Standard');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState('');
 
   const cycleOption = (current: string, options: string[], setter: (v: string) => void) => {
     const idx = options.indexOf(current);
@@ -37,6 +38,7 @@ export const QuotationForm = ({
   };
 
   const handleGenerate = async () => {
+    setGenerationError('');
     if (!squareFootage || !Number.isFinite(Number(squareFootage)) || Number(squareFootage) <= 0) {
       toast.error('Please enter a valid square footage.');
       return;
@@ -90,6 +92,10 @@ export const QuotationForm = ({
         latitude,
         longitude,
         inputs: aiData.features_used,
+        model_source: aiData.model_source,
+        model_trained_on: aiData.model_trained_on,
+        training_samples: aiData.training_samples,
+        validation_mape: aiData.validation_mape,
         contributions: contributions,
         estimated_range_display: aiData.estimated_range_display,
         prediction_range_pct: aiData.prediction_range_pct,
@@ -124,6 +130,7 @@ export const QuotationForm = ({
       setNumFloors('');
       onEstimateCreated();
     } catch (error: any) {
+      setGenerationError(error.message || 'Verified model prediction is unavailable.');
       toast.error(error.message || 'Failed to generate estimate');
     } finally {
       setIsGenerating(false);
@@ -131,6 +138,7 @@ export const QuotationForm = ({
   };
   return (
     <View className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">
+      {!!generationError && <View accessibilityRole="alert" className="p-4 mb-4 rounded-xl border border-red-200 bg-red-50"><Text className="text-sm text-red-700 leading-5">{generationError}</Text></View>}
       <View className="flex-row flex-wrap gap-3 justify-between items-start mb-6">
         <View>
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text mb-1">Project Estimate Generator</Text>

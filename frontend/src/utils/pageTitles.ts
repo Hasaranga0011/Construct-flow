@@ -8,6 +8,7 @@ const PUBLIC: Record<string, string> = {
   'admin-login': 'Admin Login', 'team-login': 'Team Login', 'team-register': 'Team Registration',
   'partner-login': 'Partner Login', 'partner-register': 'Partner Registration',
   'forgot-password': 'Forgot Password', 'reset-password': 'Reset Password',
+  'auth/callback': 'Completing Sign In',
   'pending-approval': 'Account Approval', '+not-found': 'Page Not Found', '_sitemap': 'Site Map',
 };
 

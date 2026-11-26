@@ -15,6 +15,7 @@ Implements:
 """
 
 from __future__ import annotations
+from core.verified_ml import ModelNotReady, load_verified_model
 
 import datetime
 import hashlib
@@ -387,11 +388,6 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
                 train_fold_real = real_df.drop(index=real_df.index[i])
                 train_fold_df = train_fold_real.copy()
 
-                if len(train_fold_df) < 15:
-                    np.random.seed(42 + i)
-                    b_rows = _generate_parametric_bootstrap(300)
-                    train_fold_df = pd.concat([train_fold_df, pd.DataFrame(b_rows)], ignore_index=True)
-
                 fold_model = _build_pipeline()
                 if "log_cost_per_sqft" not in train_fold_df.columns:
                     train_fold_df["log_cost_per_sqft"] = np.log(train_fold_df["actual_total_lkr"] / train_fold_df["floor_area_sqft"])
@@ -410,12 +406,11 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
                     test_row["quality_tier"].values[0]
                 )
                 y_baseline_preds[i] = _evaluation_baseline(test_row.iloc[0])
-                y_heldout_preds[i] = 0.7 * y_heldout_preds[i] + 0.3 * y_baseline_preds[i]
 
             real_mape = round(calculate_mape(y_real_actual_cost, y_heldout_preds), 2)
             baseline_mape = round(calculate_mape(y_real_actual_cost, y_baseline_preds), 2)
             real_mae = round(float(mean_absolute_error(y_real_actual_cost, y_heldout_preds)), 2)
-            validation_status = f"Not enough real projects yet ({real_count} of 30). Estimates use the rate-based baseline."
+            validation_status = f"Evaluated on {real_count} held-out real projects ({evaluation_method}); activation also requires beating the baseline"
 
         else:
             # 5-Fold Cross Validation by project (when n >= 30)
@@ -441,7 +436,6 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
                         row_t["district"], row_t["project_type"], row_t["quality_tier"]
                     )
                     y_baseline_preds[t_i] = _evaluation_baseline(row_t)
-                    y_heldout_preds[t_i] = 0.7 * y_heldout_preds[t_i] + 0.3 * y_baseline_preds[t_i]
 
             real_mape = round(calculate_mape(y_real_actual_cost, y_heldout_preds), 2)
             baseline_mape = round(calculate_mape(y_real_actual_cost, y_baseline_preds), 2)
@@ -461,12 +455,12 @@ def evaluate_model_held_out(real_df: pd.DataFrame) -> Dict[str, Any]:
 
     elif real_count == 1:
         evaluation_method = "Leave-one-out, n = 1"
-        validation_status = "Not enough real projects yet (1 of 30). Estimates use the rate-based baseline."
+        validation_status = "More independently verified projects are required for held-out evaluation."
         is_indicative = True
         confidence_interval_note = "Indicative (n < 100)"
     else:
         evaluation_method = "Leave-one-out, n = 0"
-        validation_status = "Not enough real projects yet (0 of 30). Estimates use the rate-based baseline."
+        validation_status = "No independently verified cost projects are available for training."
         is_indicative = True
         confidence_interval_note = "Indicative (n < 100)"
 
@@ -506,11 +500,14 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
     # Prepare DataFrame with all 9 features
     data_rows = []
     for p in real_projects:
+        required = ['district','project_type','quality_tier','floors','structure_type','site_condition','cost_year','floor_area_sqft','actual_total_lkr']
+        if any(p.get(key) in (None, '') for key in required):
+            continue
         sqft = float(p.get("floor_area_sqft") or 0)
         actual = float(p.get("actual_total_lkr") or 0)
-        if sqft <= 0 or actual <= 0:
+        if not math.isfinite(sqft) or not math.isfinite(actual) or sqft <= 0 or actual <= 0:
             continue
-        c_year = int(p.get("cost_year") or 2024)
+        c_year = int(p['cost_year'])
         p_idx = get_construction_price_index(c_year)
 
         data_rows.append({
@@ -533,6 +530,9 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
         })
 
     real_df = pd.DataFrame(data_rows)
+    real_count = len(real_df)
+    if real_count < 2:
+        raise ModelNotReady("At least two independently verified projects with actual final costs and complete features are required; no synthetic rows will be substituted")
     eval_res = evaluate_model_held_out(real_df)
 
     real_mape = eval_res["mape"]
@@ -549,11 +549,8 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
     # ------------------------------------------------------------------
     production_df = real_df.copy()
     has_bootstrap = False
-    if len(production_df) < 15:
-        has_bootstrap = True
-        np.random.seed(42)
-        b_rows = _generate_parametric_bootstrap(300)
-        production_df = pd.concat([production_df, pd.DataFrame(b_rows)], ignore_index=True)
+    if real_mape is None or baseline_mape is None or real_mape > baseline_mape:
+        raise ModelNotReady('Verified cost model did not beat the baseline on held-out projects; previous artifact is preserved')
 
     production_model = _build_pipeline()
     production_model.fit(production_df[ALL_FEATURES], production_df["log_cost_per_sqft"])
@@ -566,7 +563,9 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
         "trained_at": now_iso,
         "real_projects_count": real_count,
         "total_training_samples": len(production_df),
-        "synthetic_rows_included": has_bootstrap,
+        "synthetic_rows_included": False,
+        "data_provenance": "verified_real_only",
+        "production_ready": True,
         "validation_mape": real_mape,
         "validation_mae": real_mae,
         "prediction_interval_pct": eval_res.get("prediction_interval_pct"),
@@ -578,6 +577,10 @@ def train_and_evaluate_cost_model(force: bool = False) -> Dict[str, Any]:
         "confidence_interval_display": confidence_interval_display,
         "target": "ln(actual_total_lkr / floor_area_sqft)",
         "features": ALL_FEATURES,
+        "training_support": {
+            "categories": {key: sorted(production_df[key].astype(str).unique().tolist()) for key in CATEGORICAL_FEATURES},
+            "numeric_ranges": {key: {"min": float(production_df[key].min()), "max": float(production_df[key].max())} for key in NUMERIC_FEATURES},
+        },
         "feature_importances": feature_importances,
         "cost_driver_note": "The model predicts log cost per sq ft, so floor area has a small direct importance by design.",
     }
@@ -617,179 +620,43 @@ def predict_cost_hybrid(
     cost_year: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
-    Hybrid Cost Estimation:
-    1. Computes Quantity-based Bottom-Up Estimate
-    2. Runs ML Log-Scale Regressor to predict local variance
-    3. Calculates Honest Prediction Range (conformal/uncertainty interval)
+    Predict directly from the verified fitted regressor. No rate estimate or
+    weighted formula is substituted when a validated model is unavailable.
     """
-    canonical_district = DISTRICTS_LOWER.get(district.strip().lower(), "Colombo")
-    canonical_type = project_type if project_type in PROJECT_TYPES else "Residential House"
-    canonical_tier = quality_tier if quality_tier in QUALITY_TIERS else "Standard"
+    model, meta = load_verified_model('cost_predictor', COST_MODEL_PKL.parent)
+    project_type = {'Residential':'Residential House','Commercial':'Commercial Building'}.get(project_type,project_type)
+    canonical_district = DISTRICTS_LOWER.get(district.strip().lower())
+    if not canonical_district or floor_area_sqft <= 0:
+        raise ValueError('A valid district and positive floor area are required')
     target_year = int(cost_year) if cost_year else datetime.date.today().year
-    target_price_index = get_construction_price_index(target_year)
-
-    # 1. Bottom-up Quantity Estimate
-    bottom_up = compute_hybrid_bottom_up(
-        floor_area_sqft=floor_area_sqft,
-        floors=num_floors,
-        project_type=canonical_type,
-        quality_tier=canonical_tier,
-        district=canonical_district,
-        site_condition=site_condition,
-        cost_year=target_year,
-    )
-
-    current_real_count = get_real_projects_count()
-    used_ml = False
-    # 2. ML Log-Scale Prediction
-    ml_predicted_cost = bottom_up["bottom_up_total_lkr"]
-    meta = {}
-    if COST_META_JSON.exists():
-        try:
-            meta = json.loads(COST_META_JSON.read_text())
-        except Exception:
-            pass
-
-    ml_enabled = (current_real_count >= 30 and meta.get("real_projects_count", 0) >= 30 and meta.get("validation_mape") is not None and meta.get("baseline_mape") is not None and meta["validation_mape"] <= meta["baseline_mape"])
-    if ml_enabled and COST_MODEL_PKL.exists():
-        try:
-            payload = COST_MODEL_PKL.read_bytes()
-            if not meta.get("artifact_sha256") or hashlib.sha256(payload).hexdigest() != meta["artifact_sha256"]:
-                raise ValueError("Cost model metadata does not match its published artifact; retrain the model")
-            model = joblib.load(io.BytesIO(payload))
-            input_df = pd.DataFrame([{
-                "district": canonical_district,
-                "project_type": canonical_type,
-                "quality_tier": canonical_tier,
-                "structure_type": structure_type,
-                "site_condition": site_condition,
-                "floors": num_floors,
-                "floor_area_sqft": floor_area_sqft,
-                "cost_year": target_year,
-                "price_index": target_price_index,
-            }])
-            pred_log_sqft = float(model.predict(input_df[ALL_FEATURES])[0])
-            pred_cost_sqft = math.exp(pred_log_sqft)
-            ml_predicted_cost = pred_cost_sqft * floor_area_sqft
-            used_ml = True
-        except Exception as e:
-            logger.warning("ML prediction failed, using bottom-up: %s", e)
-
-    # Blend Bottom-up & ML (70% ML, 30% physical bottom-up)
-    final_estimate = round(0.70 * ml_predicted_cost + 0.30 * bottom_up["bottom_up_total_lkr"], 2)
-    correction_factor = round(final_estimate / (bottom_up["bottom_up_total_lkr"] or 1), 3)
-
-    # 3. Empirical residual range, or an uncalibrated planning range.
-    uncertainty_pct = max(0.15, float(meta.get("prediction_interval_pct") or 0.35)) if used_ml else 0.35
-    range_min = round(final_estimate * (1.0 - uncertainty_pct), -3)
-    range_max = round(final_estimate * (1.0 + uncertainty_pct), -3)
-
-    return {
-        "estimated_cost_lkr": final_estimate,
-        "estimated_range_min_lkr": range_min,
-        "estimated_range_max_lkr": range_max,
-        "estimated_range_display": f"Rs. {range_min:,.0f} to Rs. {range_max:,.0f}",
-        "bottom_up_estimate_lkr": bottom_up["bottom_up_total_lkr"],
-        "ml_correction_factor": correction_factor,
-        "cost_breakdown": bottom_up["breakdown"],
-        "quantities_summary": bottom_up["quantities"],
-        "district": canonical_district,
-        "real_projects_count": current_real_count,
-        "model_source": "hybrid_real_calibrated" if used_ml else "rate_based_baseline",
-        "validation_mape": meta.get("validation_mape"),
-        "baseline_mape": meta.get("baseline_mape"),
-        "evaluation_method": meta.get("evaluation_method", "Leave-one-out"),
-        "validation_status": meta.get("validation_status", "Estimating with hybrid quantity model"),
-        "confidence_interval_display": meta.get("confidence_interval_display", ""),
-        "disclaimer": "Indicative early-stage estimate. With fewer than 30 verified projects the rate baseline is used with an uncalibrated 35% planning range. Final pricing requires a verified BOQ.",
-
-    }
+    features = pd.DataFrame([{'district':canonical_district,'project_type':project_type,'quality_tier':quality_tier,
+        'structure_type':structure_type,'site_condition':site_condition,'floors':num_floors,'floor_area_sqft':floor_area_sqft,
+        'cost_year':target_year,'price_index':get_construction_price_index(target_year)}])
+    support = meta.get('training_support', {})
+    warnings = []
+    for key, values in support.get('categories', {}).items():
+        if key in features and str(features.iloc[0][key]) not in values:
+            warnings.append(f'{key.replace("_", " ")} was not represented in verified training projects')
+    for key, bounds in support.get('numeric_ranges', {}).items():
+        if key in features and not bounds['min'] <= float(features.iloc[0][key]) <= bounds['max']:
+            warnings.append(f'{key.replace("_", " ")} is outside the verified training range ({bounds["min"]:g}–{bounds["max"]:g})')
+    estimate = float(math.exp(float(model.predict(features[ALL_FEATURES])[0])) * floor_area_sqft)
+    if not math.isfinite(estimate) or estimate <= 0:
+        raise ModelNotReady('Verified model returned an invalid prediction')
+    interval = meta.get('prediction_interval_pct') if not warnings else None
+    lower = round(estimate * max(0,1-interval),2) if interval is not None else None
+    upper = round(estimate * (1+interval),2) if interval is not None else None
+    return {'estimated_cost_lkr':round(estimate,2),'estimated_range_min_lkr':lower,'estimated_range_max_lkr':upper,
+        'estimated_range_display':f'Rs. {lower:,.0f} to Rs. {upper:,.0f}' if lower is not None else 'Prediction interval not established',
+        'bottom_up_estimate_lkr':None,'ml_correction_factor':None,'cost_breakdown':{},'quantities_summary':{},
+        'district':canonical_district,'real_projects_count':get_real_projects_count(),'model_source':'verified_real_ml',
+        'validation_mape':meta.get('validation_mape'),'baseline_mape':meta.get('baseline_mape'),
+        'evaluation_method':meta.get('evaluation_method'),'validation_status':meta.get('validation_status'),
+        'confidence_interval_display':meta.get('confidence_interval_display'),'trained_at':meta.get('trained_at'),
+        'training_samples':meta.get('real_projects_count'),'feature_importances':meta.get('feature_importances',[]),
+        'prediction_warnings':warnings,
+        'disclaimer':'Prediction from a model trained exclusively on independently verified real project costs. Held-out error is not a guarantee for this project.'}
 
 
-def compute_rule_based_delay_risk(
-    project_id: str,
-    project_name: str,
-    milestones: List[Dict[str, Any]],
-    purchase_orders: List[Dict[str, Any]],
-    attendance_count: int,
-    total_budget: float = 0.0,
-    spent_cost: float = 0.0,
-) -> Dict[str, Any]:
-    """
-    100% Rule-Based Delay Risk from LIVE milestones, orders, and attendance.
-    No synthetic classification model is used.
-    """
-    today = datetime.date.today().isoformat()
-
-    # 1. Milestone Overdue Signal
-    total_mils = len(milestones)
-    overdue_mils = sum(
-        1 for m in milestones
-        if (m.get("due_date") or "9999") < today
-        and str(m.get("status") or "").lower() not in ("completed", "done")
-        and (m.get("completion_percentage") or 0) < 100
-    )
-    avg_completion = (
-        sum(m.get("completion_percentage") or 0 for m in milestones) / total_mils
-        if total_mils else 50.0
-    )
-
-    # 2. Purchase Order Signal
-    total_pos = len(purchase_orders)
-    late_pos = sum(
-        1 for o in purchase_orders
-        if (o.get("expected_date") or "9999") < today
-        and str(o.get("status") or "").lower() not in ("delivered", "received", "cancelled")
-    )
-    suggested_pos = sum(1 for o in purchase_orders if str(o.get("status") or "").lower() == "suggested")
-
-    # 3. Calculate Risk Score
-    risk_score = 0.0
-    reasons = []
-
-    if overdue_mils > 0:
-        penalty = min(overdue_mils * 18.0, 50.0)
-        risk_score += penalty
-        reasons.append(f"{overdue_mils} milestone{'s' if overdue_mils > 1 else ''} past due")
-
-    if late_pos > 0:
-        penalty = min(late_pos * 12.0, 30.0)
-        risk_score += penalty
-        reasons.append(f"{late_pos} late purchase order{'s' if late_pos > 1 else ''}")
-
-    if suggested_pos > 0:
-        risk_score += min(suggested_pos * 5.0, 15.0)
-        reasons.append(f"{suggested_pos} supplier counter-offer pending")
-
-    # 4. Cost Overrun Forecast
-    is_over_budget = False
-    forecasted_cost = None
-    if avg_completion > 0 and avg_completion < 100 and spent_cost > 0:
-        forecasted_cost = spent_cost / (avg_completion / 100.0)
-        if total_budget > 0 and forecasted_cost > total_budget:
-            is_over_budget = True
-            overrun_pct = ((forecasted_cost - total_budget) / total_budget) * 100.0
-            risk_score += min(overrun_pct * 0.8, 20.0)
-            reasons.append(f"Trending over budget (+{overrun_pct:.1f}%)")
-
-    # Base baseline for active projects
-    if not reasons:
-        risk_score = 12.0
-        recommendation = "Project on schedule and budget"
-    else:
-        recommendation = "; ".join(reasons)
-
-    clamped_risk = round(min(max(risk_score, 5.0), 98.0), 1)
-
-    return {
-        "project_id": project_id,
-        "project_name": project_name,
-        "delay_risk": clamped_risk,
-        "recommendation": recommendation,
-        "milestone_overdue_count": overdue_mils,
-        "late_po_count": late_pos,
-        "attendance_gap": 0 if attendance_count > 0 else 1,
-        "is_over_budget": is_over_budget,
-        "forecasted_cost": forecasted_cost,
-        "total_budget": total_budget,
-    }
+# Shared implementation for backwards-compatible callers.
+from core.delay_risk import compute_rule_based_delay_risk

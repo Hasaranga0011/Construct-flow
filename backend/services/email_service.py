@@ -789,9 +789,31 @@ def send_credentials_welcome_email(
     return result
 
 
+class EmailDeliveryError(RuntimeError):
+    """Safe diagnostic category; never includes provider payloads or action links."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__('Email could not be delivered by a configured provider')
+
+
+def email_failure_reason(error: Optional[str]) -> str:
+    detail = (error or '').lower()
+    if not detail:
+        return 'not_configured'
+    if 'only send testing emails' in detail or 'own email address' in detail:
+        return 'sandbox_recipient_restricted'
+    if 'domain' in detail and ('not verified' in detail or 'unverified' in detail):
+        return 'sender_domain_unverified'
+    if '(401)' in detail or 'invalid api key' in detail or 'api key is invalid' in detail:
+        return 'invalid_credentials'
+    if '(429)' in detail or 'rate limit' in detail or 'quota' in detail:
+        return 'rate_limited'
+    return 'provider_rejected_or_unreachable'
+
+
 def send_email(to: str, subject: str, html: str) -> str:
     """General utility email function with SMTP and Resend support."""
-    sent_to_inbox, provider, _, _ = _send_email_via_smtp_or_resend(
+    sent_to_inbox, provider, _, error = _send_email_via_smtp_or_resend(
         to_email=to,
         subject=subject,
         html_content=html,
@@ -800,7 +822,8 @@ def send_email(to: str, subject: str, html: str) -> str:
     if sent_to_inbox:
         return f"{provider}_sent"
 
-    logger.info(f"Mock email to {to}: {subject}")
-    raise RuntimeError("Email could not be delivered by a configured provider")
+    reason = email_failure_reason(error)
+    logger.warning('Email dispatch failed reason=%s', reason)
+    raise EmailDeliveryError(reason)
 
 

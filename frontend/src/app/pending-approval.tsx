@@ -23,7 +23,7 @@ export default function PendingApprovalPage() {
 
       if (!error && data) {
         const profileData = data as any;
-        if (profileData.role && profileData.role !== 'pending' && profileData.is_approved !== false) {
+        if (profileData.role && profileData.role !== 'pending' && profileData.is_approved === true) {
           await refreshProfile();
           const target = getDashboardForRole(profileData.role);
           if (target) {
@@ -53,7 +53,7 @@ export default function PendingApprovalPage() {
           style={{ flexShrink: 1, minWidth: 0 }}
           className="text-2xl font-bold text-gray-900 mb-2 text-center"
         >
-          {isSupplierPending ? 'Supplier Approval Pending' : 'Account Verification Pending'}
+          {isSupplierPending ? 'Supplier Approval Pending' : 'Administrator Approval Pending'}
         </Text>
 
         <Text

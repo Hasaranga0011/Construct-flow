@@ -180,7 +180,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         raise HTTPException(status_code=400, detail=f"Registration failed: {err_str}")
 
     # Prepare profile
-    is_approved = canonical_role == "client" and not username
+    is_approved = False
     profile_data = {
         "id": user_id,
         "email": normalized_email,
@@ -207,17 +207,34 @@ def register_user(payload: RegisterRequest) -> Dict:
                 'message':'Account created. An administrator must verify and approve it before project access. Use your username and password to sign in.'}
 
     # A real verification email is required; never auto-confirm public accounts.
+    verification_stage = 'link_generation'
     try:
         from services.email_service import send_email
         from html import escape
         link = admin_db.auth.admin.generate_link({"type": "magiclink", "email": normalized_email,
             "options": {"redirect_to": settings.FRONTEND_URL.rstrip("/") + ("/partner-login" if canonical_role in {"client", "supplier"} else "/team-login")}})
-        action_url = link.properties.action_link
+        properties = getattr(link, 'properties', None)
+        action_url = getattr(properties, 'action_link', None)
+        if isinstance(link, dict):
+            action_url = link.get('action_link') or (link.get('properties') or {}).get('action_link')
+        if not action_url:
+            raise ValueError('No verification link returned')
+        verification_stage = 'email_delivery'
         send_email(normalized_email, "Verify your ConstructFlow email",
                    '<p>Verify your email to finish registration.</p><a href="' + escape(action_url, quote=True) + '">Verify email</a>')
     except Exception as exc:
-        admin_db.auth.admin.delete_user(user_id)
-        raise HTTPException(status_code=503, detail="Verification email could not be delivered. Please try again later.") from exc
+        # Log only fixed categories, not provider responses, emails or one-use links.
+        from services.email_service import EmailDeliveryError
+        reason = exc.reason if isinstance(exc, EmailDeliveryError) else 'operation_failed'
+        logger.warning('Registration verification failed stage=%s reason=%s', verification_stage, reason)
+        try:
+            admin_db.auth.admin.delete_user(user_id)
+        except Exception:
+            logger.error('Registration rollback failed; administrator cleanup required')
+        configuration_failure = reason in {'not_configured', 'invalid_credentials', 'sender_domain_unverified', 'sandbox_recipient_restricted'}
+        detail = ('Email verification is temporarily unavailable. Please contact the administrator to check the email service configuration.'
+                  if configuration_failure else 'Verification email could not be delivered. Please try again later.')
+        raise HTTPException(status_code=503, detail=detail) from None
 
     # 1. Dispatch registration welcome email (without password)
     email_delivery = None
@@ -254,7 +271,7 @@ def register_user(payload: RegisterRequest) -> Dict:
         "role": canonical_role,
         "is_approved": is_approved,
         "email_delivery": email_delivery,
-        "message": "Check your email to verify your account. Staff and supplier accounts also require administrator approval.",
+        "message": "Check your email to verify your account. All new accounts require administrator approval before workspace access.",
     }
 
 

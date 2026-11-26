@@ -149,7 +149,7 @@ export const CostBreakdown = ({
       {/* Header */}
       <View className="flex-row justify-between items-center mb-1">
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text">
-          {contribs.length > 0 ? 'Feature Contributions' : 'Cost Breakdown'}
+          {contribs.length > 0 ? 'Recorded Model Feature Importance' : 'Saved Estimate'}
         </Text>
         <Pressable style={{ minHeight: 44, minWidth: 44 }} className="flex-row items-center border border-gray-200 px-3 py-1.5 rounded-full">
           <Ionicons name="time-outline" size={14} color="#6B7280" />
@@ -159,7 +159,7 @@ export const CostBreakdown = ({
 
       {contribs.length > 0 ? (
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-4">
-          Which factors drove this specific prediction, ranked by contribution
+          Global model feature importance; not a per-prediction cost allocation
         </Text>
       ) : (
         <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-4">
@@ -175,7 +175,7 @@ export const CostBreakdown = ({
           </Text>
           <AutoFitText value={formatCurrency(cost)} maxFontSize={30} minFontSize={18} className="font-bold text-brand-orange" />
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-1">
-            Hybrid model — confirm with quantity surveyor.
+            Saved prediction — review its source and held-out validation.
           </Text>
         </View>
 
@@ -247,28 +247,11 @@ export const CostBreakdown = ({
             </View>
           ))}
           <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-2">
-            Contribution percentages reflect this prediction&apos;s feature weights from the trained RandomForest.
+            These are recorded model importances, not individual material or labour costs.
           </Text>
         </View>
       ) : (
-        /* Legacy static legend when no contribution data is available */
-        <View className="flex-row flex-wrap justify-between pt-4 border-t border-gray-100">
-          {[
-            { label: 'Materials', pct: '42%', color: '#6B7280' },
-            { label: 'Labour',    pct: '26%', color: '#0F1117' },
-            { label: 'Equipment', pct: '16%', color: '#EF4444' },
-            { label: 'Overhead',  pct: '16%', color: '#000' },
-          ].map(item => (
-            <View key={item.label} className="flex-row items-center w-[48%] mb-2">
-              <View className="w-3 h-3 rounded-sm mr-2" style={{ backgroundColor: item.color }} />
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-600 flex-1">{item.label}</Text>
-              <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs font-bold text-brand-text">{item.pct}</Text>
-            </View>
-          ))}
-          <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[10px] mt-2 w-full">
-            Illustrative split — generate a new estimate to see model-specific contributions.
-          </Text>
-        </View>
+        <Text className="text-xs text-slate-500 leading-5 pt-4">No model feature importances were recorded for this saved estimate. No illustrative percentages are substituted.</Text>
       )}
     </View>
   );

@@ -1,3 +1,4 @@
+import { DelayRiskAssessment } from '@/components/dashboard/DelayRiskAssessment';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableHeader, TableSortControl } from '@/components/common/SortableHeader';
 import { LoadingState, ErrorState } from '@/components/ui';
@@ -87,7 +88,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
   };
 
   const handleRetrain = async () => {
-    const confirmMessage = "Retrain the cost model on real projects now?";
+    const confirmMessage = "Train the cost model using independently verified real projects only? Training remains blocked when evidence or held-out validation is insufficient.";
     const confirmed = await confirmAction('Retrain Model', confirmMessage, false);
     if (!confirmed) return;
 
@@ -219,7 +220,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
         });
       }
 
-      notify('Success', `Imported ${res.inserted || 0} projects (${res.skipped_duplicates || 0} duplicates skipped). Model automatically calibrated!`);
+      notify('Success', `Imported ${res.inserted || 0} projects (${res.skipped_duplicates || 0} duplicates skipped). Independent source verification is required before training.`);
       setShowImportModal(false);
       setImportCsvText('');
       setEvidenceNote('');
@@ -318,66 +319,20 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
             <View>
               <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Cost Estimator</Text>
               <Text className="text-base font-bold text-brand-text dark:text-white" numberOfLines={1}>
-                Hybrid AI + CIDA
+                {insights?.cost_ml_ready ? insights.active_model : 'Verified ML unavailable'}
               </Text>
               <Text className="text-[11px] text-gray-400 dark:text-gray-500 mt-1" numberOfLines={1}>
-                RandomForest · Material BOQ rates
+                Model inference requires verified real training evidence
               </Text>
             </View>
           </View>
 
-          {/* Card 2: Estimation Accuracy / Benchmark */}
-          <View
-            className="bg-white dark:bg-[#1E293B] p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 justify-between min-h-[135px]"
-            style={{
-              flex: isPhone || isTablet ? undefined : 1,
-              width: isPhone ? '100%' : isTablet ? '48.5%' : undefined,
-            }}
-          >
-            <View className="flex-row items-center justify-between mb-3">
-              <View className={`w-10 h-10 rounded-xl items-center justify-center ${((insights?.real_projects_count ?? 0) >= 30) ? 'bg-emerald-50 dark:bg-emerald-900/30' : 'bg-amber-50 dark:bg-amber-900/30'}`}>
-                <Ionicons name="analytics-outline" size={20} color={((insights?.real_projects_count ?? 0) >= 30) ? '#10B981' : '#F59E0B'} />
-              </View>
-              <View className={`px-2.5 py-0.5 rounded-full border ${((insights?.real_projects_count ?? 0) >= 30) ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700'}`}>
-                <Text className={`text-[10px] font-bold ${((insights?.real_projects_count ?? 0) >= 30) ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'} uppercase tracking-wider`}>
-                  {((insights?.real_projects_count ?? 0) >= 30) ? 'Validated' : 'Calibrating'}
-                </Text>
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                {(insights?.real_projects_count ?? 0) >= 30 ? 'Real Accuracy' : 'Benchmark Status'}
-              </Text>
-
-              {(insights?.real_projects_count ?? 0) < 30 ? (
-                <View>
-                  <View className="flex-row items-center gap-1.5 flex-wrap">
-                    <Text className="text-base font-bold text-amber-700 dark:text-amber-400">
-                      Rate Baseline
-                    </Text>
-                    <View className="bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded text-[10px]">
-                      <Text className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                        {insights?.real_projects_count ?? 0}/30 Projects
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="text-[11px] text-gray-500 dark:text-gray-400 mt-1" numberOfLines={1}>
-                    Baseline error: <Text className="font-bold text-brand-orange">{insights?.baseline_mape != null ? `${insights.baseline_mape}%` : '—'}</Text>
-                    {insights?.validation_mape != null && ` · LOO: ${insights.validation_mape}%`}
-                  </Text>
-                </View>
-              ) : (
-                <View>
-                  <Text className="text-xl font-bold text-brand-text dark:text-white">
-                    {insights?.validation_mape}% MAPE
-                  </Text>
-                  <Text className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                    5-Fold Cross Validation ({insights?.real_projects_count} projects)
-                  </Text>
-                </View>
-              )}
-            </View>
+          <View className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-700" style={{flex:isPhone||isTablet?undefined:1,width:isPhone?'100%':isTablet?'48.5%':undefined}}>
+            <Text className="text-xs font-semibold text-slate-500 mb-3">Model readiness</Text>
+            <Text className="text-base font-bold text-brand-text dark:text-white">Cost: {insights?.model_readiness?.cost?.ready ? 'Verified ML ready' : 'Not ready'}</Text>
+            <Text className="text-xs text-slate-500 leading-5 mt-2">{insights?.model_readiness?.cost?.reason || 'Awaiting independently verified training data'}</Text>
+            <Text className="text-base font-bold text-brand-text dark:text-white mt-4">Delay: {insights?.model_readiness?.delay?.ready ? 'Verified ML ready' : 'Not ready'}</Text>
+            <Text className="text-xs text-slate-500 leading-5 mt-2">{insights?.model_readiness?.delay?.reason || 'Verified planned/actual completion observations required'}</Text>
           </View>
 
           {/* Card 3: Real Project Benchmarks */}
@@ -397,12 +352,12 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               </View>
             </View>
             <View>
-              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Verified cost benchmarks</Text>
+              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Verified cost training projects</Text>
               <Text className="text-2xl font-black text-brand-text dark:text-white">
                 {insights?.verified_real_count ?? insights?.real_projects_count ?? 0}
               </Text>
               <Text className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 leading-4">
-                {(insights?.verified_real_count ?? insights?.real_projects_count ?? 0) === 0 ? 'No verified historical cost records yet. Import completed BOQs and verify their source evidence.' : 'Verified historical cost records; excludes active projects and sample data.'}
+                {insights?.project_health?.total ?? 0} operational projects · {insights?.project_health?.completed ?? 0} completed. Only independently verified final cost records count as training data.
               </Text>
             </View>
           </View>
@@ -424,14 +379,14 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               </View>
             </View>
             <View>
-              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Last Calibration</Text>
+              <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Verified model training</Text>
               <Text className="text-base font-bold text-brand-text dark:text-white" numberOfLines={1}>
                 {insights?.model_info?.cost_model?.trained_at
                   ? new Date(insights.model_info.cost_model.trained_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                  : 'Up to Date'}
+                  : 'No verified model trained'}
               </Text>
               <Text className="text-[11px] text-gray-400 dark:text-gray-500 mt-1" numberOfLines={1}>
-                Synced with live PO rates
+                {insights?.cost_ml_ready ? 'Held-out validation passed' : 'Verified final project costs required'}
               </Text>
             </View>
           </View>
@@ -472,7 +427,7 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
               )) : <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 dark:text-gray-500 italic">No feature importance data. Run the training pipeline first.</Text>}
             </View>
             <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-xs text-gray-400 dark:text-gray-500 mt-6 italic">
-              Calibrated on {insights?.verified_real_count ?? insights?.real_projects_count ?? 0} verified real projects · Last updated {insights?.model_info?.cost_model?.trained_at ? new Date(insights.model_info.cost_model.trained_at).toLocaleDateString() : 'unknown'}
+              Training repository: {insights?.verified_real_count ?? insights?.real_projects_count ?? 0} verified real projects · Last updated {insights?.model_info?.cost_model?.trained_at ? new Date(insights.model_info.cost_model.trained_at).toLocaleDateString() : 'unknown'}
             </Text>
           </View>
 
@@ -481,71 +436,17 @@ Negombo Logistics Hub,Gampaha,Negombo,Industrial,6000,1,Standard,Pre-engineered,
             <View className="bg-white dark:bg-[#1E293B] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-lg font-bold text-brand-text dark:text-white mb-1">Project Delay Risk</Text>
               <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-xs mb-4">
-                Automated schedule &amp; budget health based on live milestones, supplier orders, and site attendance.
+                Verified trained classifier using recorded project features. Missing models or predictor data do not produce a fabricated score.
               </Text>
               {(insights?.projects?.length ?? 0) === 0 ? (
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 italic text-sm">No active projects to assess.</Text>
               ) : (
-                insights.projects.slice(0, 5).map((proj: any) => {
-                  const risk = proj.delay_risk ?? 0;
-                  const color = risk > 70 ? '#EF4444' : risk > 40 ? '#F97316' : '#22C55E';
-                  const statusLabel = risk > 70 ? 'High Risk' : risk > 40 ? 'Moderate' : 'On Track';
-                  return (
-                    <Pressable style={{ minHeight: 44, minWidth: 44 }}
-                      key={proj.project_id}
-                      className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-100 dark:border-gray-700/60"
-                      onPress={() => router.push(`/admin/projects/${proj.project_id}`)}
-                    >
-                      <View className="flex-row justify-between items-center mb-1.5">
-                        <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex-1 mr-2" numberOfLines={1}>
-                          {proj.project_name}
-                        </Text>
-                        <View className="flex-row items-center gap-1.5">
-                          <Text maxFontSizeMultiplier={1.3} className="text-xs font-bold" style={{ color }}>{risk}%</Text>
-                          <View className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: `${color}18` }}>
-                            <Text className="text-[10px] font-bold" style={{ color }}>{statusLabel}</Text>
-                          </View>
-                        </View>
-                      </View>
-                      <View className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                        <View style={{ width: `${Math.min(risk, 100)}%`, height: '100%', backgroundColor: color, borderRadius: 4 }} />
-                      </View>
-                      <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-500 dark:text-gray-400 text-xs mb-1">
-                        {proj.recommendation}
-                      </Text>
-                      <View className="flex-row items-center mt-2 flex-wrap gap-1.5">
-                        {proj.milestone_overdue_count > 0 && (
-                          <View className="bg-red-50 dark:bg-red-950/30 border border-red-200/50 px-2 py-0.5 rounded-md">
-                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-red-700 dark:text-red-300 text-[10px] font-bold">
-                              {proj.milestone_overdue_count} Overdue Milestone{proj.milestone_overdue_count > 1 ? 's' : ''}
-                            </Text>
-                          </View>
-                        )}
-                        {proj.late_po_count > 0 && (
-                          <View className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200/50 px-2 py-0.5 rounded-md">
-                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-700 dark:text-orange-300 text-[10px] font-bold">
-                              {proj.late_po_count} Late Order{proj.late_po_count > 1 ? 's' : ''}
-                            </Text>
-                          </View>
-                        )}
-                        {proj.is_over_budget && (
-                          <View className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200/50 px-2 py-0.5 rounded-md">
-                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-purple-700 dark:text-purple-300 text-[10px] font-bold">
-                              Over Budget
-                            </Text>
-                          </View>
-                        )}
-                        {proj.attendance_gap > 0 && (
-                          <View className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 px-2 py-0.5 rounded-md">
-                            <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-amber-700 dark:text-amber-300 text-[10px] font-bold">
-                              Low Attendance
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </Pressable>
-                  );
-                })
+                insights.projects.slice(0, 5).map((proj: any) => (
+                  <Pressable key={proj.project_id} accessibilityRole="link" accessibilityLabel={`Open project ${proj.project_name}`} onPress={() => router.push(`/admin/projects/${proj.project_id}`)} className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <Text className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{proj.project_name}</Text>
+                    <DelayRiskAssessment risk={proj} />
+                  </Pressable>
+                ))
               )}
             </View>
 

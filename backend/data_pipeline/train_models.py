@@ -1,42 +1,40 @@
-"""
-ConstructFlow Model Training Pipeline.
-
-Trains the Cost Predictor on real historical projects (and calibrated bootstrap if N < 15),
-evaluates MAPE and MAE exclusively on real projects, and saves artifacts to backend/models/.
-Delay risk is 100% rule-based from live project operational signals.
-"""
-
+"""Offline verified-data training. Never seed or substitute random CSV data."""
 import argparse
+import json
 import sys
 from pathlib import Path
-
-# Add backend directory to sys.path so imports work
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import pandas as pd
+from core.verified_ml import ModelNotReady
 from data_pipeline.model_engine import train_and_evaluate_cost_model
+from data_pipeline.verified_delay_training import train_verified_delay
+
 
 def main():
-    parser = argparse.ArgumentParser(description="ConstructFlow Real Cost Model Training Pipeline")
-    parser.add_argument("--skip-validation-gate", action="store_true", help="Force model deployment")
-    args = parser.parse_args()
-
-    print("=" * 60)
-    print("ConstructFlow Real Machine Learning Pipeline")
-    print("=" * 60)
-    meta = train_and_evaluate_cost_model(force=args.skip_validation_gate)
-    print("Training finished successfully.")
-    print(f"Model Type: {meta.get('model_type')}")
-    print(f"Real Projects Count: {meta.get('real_projects_count')}")
-    print(f"Validation Status: {meta.get('validation_status')}")
-    if meta.get("validation_mape") is not None:
-        print(f"Validation MAPE: {meta.get('validation_mape')}%")
-        print(f"Validation MAE: LKR {meta.get('validation_mae'):,}")
-        print(f"Baseline MAPE: {meta.get('baseline_mape')}%")
+    parser=argparse.ArgumentParser(description='Train cost and delay models exclusively on independently reviewed real project evidence')
+    parser.add_argument('--delay-csv',type=Path,help='Verified pre-outcome delay observations with planned/actual completion dates')
+    args=parser.parse_args()
+    report={}
+    try:
+        meta=train_and_evaluate_cost_model()
+        report['cost']={'state':'trained','projects':meta['real_projects_count'],'evaluation':meta['validation_status']}
+    except ModelNotReady as exc:
+        report['cost']={'state':'blocked','reason':str(exc)}
+    except Exception as exc:
+        report['cost']={'state':'error','reason':f'Could not read or train verified cost data ({type(exc).__name__})'}
+    if args.delay_csv:
+        try:
+            meta=train_verified_delay(pd.read_csv(args.delay_csv))
+            report['delay']={'state':'trained','projects':meta['real_projects_count'],'metrics':meta['metrics']}
+        except ModelNotReady as exc:
+            report['delay']={'state':'blocked','reason':str(exc)}
+        except (OSError,ValueError) as exc:
+            report['delay']={'state':'error','reason':f'Could not read reviewed delay observations ({type(exc).__name__})'}
     else:
-        print("Note: Need at least 5 real completed projects for held-out test evaluation.")
-    print("=" * 60)
+        report['delay']={'state':'blocked','reason':'Supply --delay-csv with independently verified, pre-outcome observations; legacy unverified CSVs are never used'}
+    print(json.dumps(report,indent=2))
+    return 0 if all(row['state']=='trained' for row in report.values()) else 2
 
-if __name__ == "__main__":
-    main()
+
+if __name__=='__main__':
+    raise SystemExit(main())

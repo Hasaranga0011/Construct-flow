@@ -290,7 +290,7 @@ The legacy `/site` portal remains for site-manager-compatible routes. Prefer `/s
   - Added mock user records (Admin, PM, Client, Site Manager) to properly populate the directory table.
 - [2026-07-30] (Phases 5-8 Completion)
   - Implemented AI Cost Estimator pages (`pm` and `admin` routes) connected to RandomForest ML backend endpoint.
-  - Fixed `DelayRiskPanel` on the PM Dashboard to consume synthetic ML delay data from `/api/ai/insights`.
+  - `DelayRiskPanel` now consumes the shared survey-weighted operational rule index from `/api/ai/insights`; no synthetic ML delay scores or fabricated fallback values are used.
   - Added Supplier Profile page to allow suppliers to manage their company info.
   - Built Cloudinary media upload backend endpoint (`/api/media/upload`) and configured `.env`.
   - Built Resend email notification backend endpoints (`/api/notifications/email/*`).
@@ -461,7 +461,7 @@ Additional interaction checks: 65 passed for drawer, single header, account over
 - **Physical Bottom-Up Quantity Baseline**: Computes physical quantities of materials (cement bags, steel kg, river sand cubes, aggregate cubes) and site labour worker-days at the configured Sri Lankan daily rate of Rs. 3,500/day + 15% preliminaries/overhead. The ML model predicts local calibration and correction factors.
 - **Honest Prediction Range**: Every estimate presents an uncertainty envelope ($\pm 15\text{--}20\%$, e.g. "LKR 14,500,000 to LKR 18,200,000") reflecting early-stage variance.
 - **Real Project Evaluation Gate**: Model accuracy is measured strictly on real completed projects using **MAPE** (Mean Absolute Percentage Error) and **MAE**. Synthetic rows are excluded from every reported accuracy figure. When real project count $N < 5$, ML Insights displays `"Not enough real data yet (based on N real projects)"`.
-- **Deterministic Delay Risk**: Delay risk is calculated 100% deterministically from operational milestones, late purchase orders, and site attendance rates.
+- **Deterministic Delay Risk**: Shared `core/delay_risk.py` uses Q16 weights supplied by the project owner: labour 33%, procurement 25%, schedule 21% split equally between schedule slip and overdue milestones, and cost 21%. Missing weights are normalized over available evidence; no evidence returns a null score. Low <30, Moderate 30–59.9, High >=60. Sri Lanka dates and seven completed days (Monday–Saturday) are used. Attendance is a current-roster coverage proxy, not proof of absence; history, holidays and weather are not modeled. This is an explainable index, not a calibrated delay probability or a trained classifier.
 - **Automated Learning Loop**:
   - Automatically records completed projects into `historical_projects` upon project status change to `Completed`.
   - Automatically records supplier-confirmed prices into `material_prices`.
@@ -515,3 +515,9 @@ Additional interaction checks: 65 passed for drawer, single header, account over
 - Android Metro bundle test: `npx expo export -p android` bundles successfully without warnings or missing symbols.
 - Detailed step-by-step user execution instructions, signing keystore backup, and troubleshooting matrix are documented in `frontend/BUILD.md`.
 
+
+## 2026-11-26 verified-only ML policy
+Production cost and delay predictions now require trained artifacts with independently verified real-data provenance, held-out validation and matching SHA256 metadata. Unverified legacy artifacts are rejected. Cost inference removes synthetic bootstrap and rate blending; delay uses learned classifier output with observed engineered inputs and no rule fallback. The earlier survey rule is retained only for comparison/input engineering. Missing models show readiness reasons and no numeric prediction. Operational/completed project totals are separate from verified training counts. Read-only connected-data audit found 67 operational projects, 13 Completed and zero historical verified training records; offline training correctly blocked without replacing artifacts. Delay needs independently reviewed pre-outcome observations (see backend/models/README.md and header-only template). Production real models have NOT been trained in this change. Full backend suite: 402 passed; frontend regressions, TypeScript and lint passed; readiness/blocked-estimate browser checks passed at 320/390/768/1440 widths. No live records, approvals or emails changed.
+
+## 2026-11-26 model reliability improvements
+Cost training saves observed category coverage and numeric ranges. Inference flags unseen categories and numeric extrapolation, suppresses unsupported uncertainty ranges and surfaces review warnings through the existing estimator note. API disclaimer now uses actual model provenance rather than a fixed variance claim. Delay training gives each project equal total sample weight across snapshots, rejects inconsistent project completion dates and conflicting same-day predictor records, and reports held-out project Brier score alongside discrimination metrics. All production training remains independently verified real-data-only; no real artifacts/data were synthesized or replaced. Targeted verified ML tests: 12 passed.

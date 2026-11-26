@@ -437,7 +437,7 @@ export default function LandingPage() {
               </View>
 
               <View className="flex-row flex-wrap justify-center items-center gap-6 sm:gap-10 md:gap-14">
-                {[{ val: '15+', label: 'Modules' }, { val: '6', label: 'Role Types' }, { val: 'LKR', label: 'Native Currency' }, { val: '95%', label: 'ML Accuracy' }].map(s => (
+                {[{ val: '15+', label: 'Modules' }, { val: '6', label: 'Role Types' }, { val: 'LKR', label: 'Native Currency' }, { val: 'Real only', label: 'ML Training Policy' }].map(s => (
                   <View key={s.label} className="items-center text-center px-2" style={{ minWidth: isSmallPhone ? '40%' : 'auto' }}>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-brand-orange font-extrabold text-2xl sm:text-3xl md:text-4xl mb-0.5 text-center">{s.val}</Text>
                     <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-gray-400 text-[11px] sm:text-xs tracking-widest uppercase font-semibold text-center">{s.label}</Text>
@@ -478,7 +478,7 @@ export default function LandingPage() {
         {/* STATS STRIP */}
         <View className="py-12 px-6" style={{ backgroundColor: 'rgba(249,115,22,0.90)' }}>
           <View className="max-w-5xl mx-auto flex-row flex-wrap justify-around">
-            {[{ val: '95%', label: 'Model Accuracy (R²)' }, { val: '50K+', label: 'ML Training Samples' }, { val: '6', label: 'User Roles' }, { val: '99.9%', label: 'Platform Uptime' }].map(s => (
+            {[{ val: 'Held-out', label: 'Model Validation' }, { val: 'Verified', label: 'Training Data Required' }, { val: '6', label: 'User Roles' }, { val: 'Scoped', label: 'Access Control' }].map(s => (
               <View key={s.label} className="items-center px-4 mb-6">
                 <Text maxFontSizeMultiplier={1.3} className="text-white font-extrabold" style={[{ flexShrink: 1, minWidth: 0 }, { fontSize: isMobile ? 32 : 44 }]}>{s.val}</Text>
                 <Text style={{ flexShrink: 1, minWidth: 0 }} maxFontSizeMultiplier={1.3} className="text-orange-100 text-sm font-medium mt-1 tracking-wide text-center">{s.label}</Text>

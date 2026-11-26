@@ -53,3 +53,16 @@ def test_editable_metadata_cannot_elevate_profile_role(monkeypatch):
     with pytest.raises(HTTPException) as error:
         security.require_admin(user)
     assert error.value.status_code == 403
+
+
+@pytest.mark.parametrize('role', ['pm', 'site_manager', 'worker', 'client', 'supplier'])
+def test_unapproved_identity_cannot_access_business_api(monkeypatch, role):
+    monkeypatch.setattr(security, '_fetch_auth_user', lambda token: SimpleNamespace(
+        user=SimpleNamespace(id='pending', email='pending@example.invalid')))
+    profile = ProfileClient(role)
+    profile.execute = lambda: SimpleNamespace(data={'role': role, 'is_approved': False})
+    monkeypatch.setattr(security, 'client_for_token', lambda token: profile)
+    with pytest.raises(HTTPException) as caught:
+        security.get_current_user(HTTPAuthorizationCredentials(scheme='Bearer', credentials='valid-identity-token'))
+    assert caught.value.status_code == 403
+    assert 'pending administrator approval' in caught.value.detail

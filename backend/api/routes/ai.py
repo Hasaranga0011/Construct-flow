@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from core.notification_helper import create_notifications, create_notification
 from core.database import client_for_token
+from core.verified_ml import ModelNotReady, model_status, load_verified_model
 from core.security import get_current_user, require_admin
 from data_pipeline.model_engine import (
     predict_cost_hybrid,
@@ -112,63 +113,18 @@ logger = logging.getLogger(__name__)
 
 
 def _load_models() -> None:
-    """
-    Load persisted ML artifacts from disk.
-
-    Each artifact is loaded independently so one corrupted / version-incompatible
-    file cannot prevent the others (or the rest of the app) from loading.
-    On any failure the relevant global is left as None and a clear ERROR is
-    written to the log — the app continues to boot, and endpoints that need
-    the model return 503 instead of crashing.
-    """
     global _cost_model, _delay_model, _cost_meta, _delay_meta
-
-    if _COST_PKL.exists():
+    _cost_model, _delay_model = None, None
+    _cost_meta, _delay_meta = {}, {}
+    for name in ('cost_predictor','delay_classifier'):
         try:
-            _cost_model = joblib.load(_COST_PKL)
-            # Fix joblib deadlock in Uvicorn threads
-            if hasattr(_cost_model, 'named_steps') and hasattr(_cost_model.named_steps.get('regressor'), 'n_jobs'):
-                _cost_model.named_steps['regressor'].n_jobs = 1
-            elif hasattr(_cost_model, 'n_jobs'):
-                _cost_model.n_jobs = 1
-            logger.info("cost_predictor loaded OK from %s", _COST_PKL)
-        except Exception as exc:  # KeyError, pickle errors, version mismatches…
-            _cost_model = None
-            logger.error(
-                "FAILED to load cost_predictor from %s — model will be unavailable. "
-                "Re-run data_pipeline/train_models.py to regenerate. Error: %s",
-                _COST_PKL, exc,
-            )
-    else:
-        logger.warning("cost_predictor.pkl not found at %s — skipping.", _COST_PKL)
-
-    if _DELAY_PKL.exists():
-        try:
-            _delay_model = joblib.load(_DELAY_PKL)
-            # Fix joblib deadlock in Uvicorn threads
-            if hasattr(_delay_model, 'n_jobs'):
-                _delay_model.n_jobs = 1
-            logger.info("delay_classifier loaded OK from %s", _DELAY_PKL)
-        except Exception as exc:
-            _delay_model = None
-            logger.error(
-                "FAILED to load delay_classifier from %s — model will be unavailable. "
-                "Error: %s", _DELAY_PKL, exc,
-            )
-    else:
-        logger.warning("delay_classifier.pkl not found at %s — skipping.", _DELAY_PKL)
-
-    if _COST_META.exists():
-        try:
-            _cost_meta = json.loads(_COST_META.read_text())
-        except Exception as exc:
-            logger.error("Failed to parse cost_predictor_meta.json: %s", exc)
-
-    if _DELAY_META.exists():
-        try:
-            _delay_meta = json.loads(_DELAY_META.read_text())
-        except Exception as exc:
-            logger.error("Failed to parse delay_classifier_meta.json: %s", exc)
+            model, meta = load_verified_model(name)
+            if name == 'cost_predictor':
+                _cost_model, _cost_meta = model, meta
+            else:
+                _delay_model, _delay_meta = model, meta
+        except ModelNotReady as exc:
+            logger.info('%s not ready: %s', name, exc)
 
 
 _load_models()
@@ -211,17 +167,7 @@ def _feature_importance_list(model, feature_names: Optional[List[str]] = None) -
             return extract_normalized_feature_importances(model)
         except Exception as e:
             logger.warning("Could not extract feature importances from pipeline: %s", e)
-    return [
-        {"key": "project_type", "name": "Project Type", "value": 30.0},
-        {"key": "district", "name": "District / Location", "value": 25.0},
-        {"key": "quality_tier", "name": "Quality Tier", "value": 20.0},
-        {"key": "structure_type", "name": "Structure Type", "value": 10.0},
-        {"key": "site_condition", "name": "Site Condition", "value": 7.0},
-        {"key": "floors", "name": "Number of Floors", "value": 4.0},
-        {"key": "cost_year", "name": "Cost Year", "value": 2.0},
-        {"key": "price_index", "name": "Price Index (CIDA Escalation)", "value": 1.5},
-        {"key": "floor_area_sqft", "name": "Floor Area (Sq Ft)", "value": 0.5},
-    ]
+    return []
 
 
 def _prediction_interval(model, X) -> float:
@@ -363,54 +309,25 @@ def predict_cost(
             detail=f"Unknown district '{raw_loc}'. Must be one of the 25 Sri Lankan districts."
         )
 
-    # Legacy/demo mock test support if specifically monkeypatched
-    if _cost_meta.get("data_source") == "synthetic_demo" and hasattr(_cost_model, "predict"):
-        import pandas as pd
-        features = pd.DataFrame([{
-            "SquareFootage": req.square_footage,
-            "Floors": req.num_floors or 1,
-            "Location": canonical_district,
-            "Quality": req.quality_tier,
-            "Type": req.project_type,
-        }])
-        pred_cost = float(_cost_model.predict(features)[0])
-        return PredictResponse(
-            estimated_cost=pred_cost,
-            confidence_score=None,
-            estimated_range_min=pred_cost * 0.85,
-            estimated_range_max=pred_cost * 1.15,
-            estimated_range_display=f"LKR {pred_cost*0.85:,.0f} to LKR {pred_cost*1.15:,.0f}",
-            bottom_up_estimate=pred_cost,
-            ml_correction_factor=1.0,
-            cost_breakdown={},
-            quantities_summary={},
-            real_projects_count=0,
-            validation_mape=None,
-            validation_status="Not enough real data yet (based on 0 real projects)",
-            model_source=_cost_meta.get("data_source", "synthetic_demo"),
-            model_trained_on=None,
-            training_samples=0,
-            feature_contributions=[],
-            district=canonical_district,
-            town=req.town.strip() if req.town else None,
-            location_note="Synthetic demo model (not validated against real projects)",
-            features_used={"sq_ft": req.square_footage, "type": req.project_type, "district": canonical_district},
-        )
-
     # 1. Run Hybrid Prediction
-    hybrid_res = predict_cost_hybrid(
-        floor_area_sqft=req.square_footage,
-        num_floors=req.num_floors,
-        district=canonical_district,
-        project_type=req.project_type,
-        quality_tier=req.quality_tier,
-        structure_type=req.structure_type,
-        site_condition=req.site_condition,
-    )
+    try:
+        hybrid_res = predict_cost_hybrid(
+            floor_area_sqft=req.square_footage,
+            num_floors=req.num_floors,
+            district=canonical_district,
+            project_type=req.project_type,
+            quality_tier=req.quality_tier,
+            structure_type=req.structure_type,
+            site_condition=req.site_condition,
+        )
+    except ModelNotReady as exc:
+        raise HTTPException(503, 'Verified cost model is not ready: ' + str(exc)) from None
 
     # 2. Regional data availability note
     real_count = hybrid_res.get("real_projects_count", 0)
-    location_note = f"Calibrated using hybrid quantity models and {real_count} real project records."
+    location_note = f"Trained on {hybrid_res.get('training_samples', 0)} independently verified projects. Current verified training repository: {real_count}."
+    if hybrid_res.get('prediction_warnings'):
+        location_note += ' Review required: ' + '; '.join(hybrid_res['prediction_warnings']) + '. Prediction range is unavailable outside training coverage.'
     try:
         db = client_for_token(current_user["token"])
         proj_res = db.table("projects").select("id, location, status").ilike("location", f"%{canonical_district}%").execute()
@@ -420,15 +337,8 @@ def predict_cost(
     except Exception:
         pass
 
-    # Feature contribution breakdown for frontend compatibility
-    breakdown = hybrid_res.get("cost_breakdown") or {}
-    total = sum(breakdown.values()) or 1.0
-    contributions = [
-        {"name": "Materials", "value": round((breakdown.get("materials_lkr", 0) / total) * 100, 1)},
-        {"name": "Labour", "value": round((breakdown.get("labour_lkr", 0) / total) * 100, 1)},
-        {"name": "Equipment & Plant", "value": round((breakdown.get("equipment_lkr", 0) / total) * 100, 1)},
-        {"name": "Overheads & Preliminaries", "value": round((breakdown.get("overhead_lkr", 0) / total) * 100, 1)},
-    ]
+    contributions = [{'name':row.get('name') or row.get('key') or row.get('feature'), 'value':row.get('importance_pct',row.get('value'))}
+                     for row in hybrid_res.get('feature_importances',[]) if row.get('importance_pct',row.get('value')) is not None]
 
     return PredictResponse(
         estimated_cost=hybrid_res["estimated_cost_lkr"],
@@ -443,9 +353,10 @@ def predict_cost(
         real_projects_count=real_count,
         validation_mape=hybrid_res.get("validation_mape"),
         validation_status=hybrid_res.get("validation_status"),
-        model_source=_cost_meta.get("model_type", "Log-Scale Cost-Per-SqFt Regressor"),
-        model_trained_on=_cost_meta.get("trained_at"),
-        training_samples=real_count,
+        model_source=hybrid_res["model_source"],
+        disclaimer=hybrid_res['disclaimer'],
+        model_trained_on=hybrid_res.get("trained_at"),
+        training_samples=hybrid_res.get("training_samples"),
         feature_contributions=contributions,
         district=canonical_district,
         town=req.town.strip() if req.town else None,
@@ -496,7 +407,7 @@ def get_insights(
     raw_projects = []
     try:
         project_query = db.table("projects").select(
-            "id, name, status, total_budget, spent_cost, pm_id, location, is_test"
+            "id, name, status, total_budget, spent_cost, pm_id, location, start_date, end_date, completion_percentage, is_test"
         )
         if role == "pm":
             project_query = project_query.eq("pm_id", pm_id or caller_id)
@@ -505,7 +416,7 @@ def get_insights(
     except Exception:
         try:
             project_query = db.table("projects").select(
-                "id, name, status, total_budget, spent_cost, pm_id, location"
+                "id, name, status, total_budget, spent_cost, pm_id, location, start_date, end_date, completion_percentage"
             )
             if role == "pm":
                 project_query = project_query.eq("pm_id", pm_id or caller_id)
@@ -599,90 +510,19 @@ def get_insights(
     }
 
     # ---- 2. Feature Importance (100% normalized across all 9 features) ----
-    feature_importance = _feature_importance_list(_cost_model)
+    cost_state = model_status('cost_predictor')
+    delay_state = model_status('delay_classifier')
+    feature_importance = cost_meta_data.get('feature_importances', []) if cost_state['ready'] else []
     cost_driver_note = cost_meta_data.get(
         "cost_driver_note",
         "The model predicts log cost per sq ft, so floor area has a small direct importance by design."
     )
     cost_driver_is_indicative = (real_count < 30)
 
-    # ---- 3. Per-project Delay Risk & Labour Count (Excluding test data) ----
-    project_risks: List[Dict] = []
-    labour_count = 0
-    milestones = []
-    pos = []
-
-    def _fetch_milestones():
-        try:
-            return db.table("milestones").select(
-                "project_id, status, due_date, completion_percentage"
-            ).in_("project_id", project_ids).execute().data or []
-        except Exception as e:
-            logger.warning("Failed fetching milestones: %s", e)
-            return []
-
-    def _fetch_pos():
-        try:
-            return db.table("purchase_orders").select(
-                "project_id, status, expected_date"
-            ).in_("project_id", project_ids).execute().data or []
-        except Exception as e:
-            logger.warning("Failed fetching purchase orders: %s", e)
-            return []
-
-    def _fetch_attendance():
-        try:
-            att_res = db.table("attendance").select("id", count="exact", head=True).execute()
-            return att_res.count if att_res.count is not None else len(att_res.data or [])
-        except Exception as e:
-            logger.warning("Failed fetching attendance: %s", e)
-            return 0
-
-    from concurrent.futures import ThreadPoolExecutor
-    if project_ids:
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            f_mil = pool.submit(_fetch_milestones)
-            f_pos = pool.submit(_fetch_pos)
-            f_att = pool.submit(_fetch_attendance)
-            milestones = f_mil.result()
-            pos = f_pos.result()
-            labour_count = f_att.result()
-    else:
-        labour_count = _fetch_attendance()
-
-    if project_ids:
-        today = datetime.date.today().isoformat()
-        mils_by_proj = defaultdict(list)
-        for m in milestones:
-            mils_by_proj[m.get("project_id")].append(m)
-
-        pos_by_proj = defaultdict(list)
-        for o in pos:
-            pos_by_proj[o.get("project_id")].append(o)
-
-        for project in projects:
-            pid = project["id"]
-            p_mils = mils_by_proj[pid]
-            p_pos  = pos_by_proj[pid]
-            spent_cost = float(project.get("spent_cost") or 0)
-            total_budget = float(project.get("total_budget") or 0)
-
-            risk_info = compute_rule_based_delay_risk(
-                project_id=pid,
-                project_name=project.get("name", "Unnamed"),
-                milestones=p_mils,
-                purchase_orders=p_pos,
-                attendance_count=labour_count,
-                total_budget=total_budget,
-                spent_cost=spent_cost,
-            )
-
-            if risk_info.get("is_over_budget"):
-                project_health["trending_over_budget"] += 1
-
-            project_risks.append(risk_info)
-
-    project_risks.sort(key=lambda x: x["delay_risk"], reverse=True)
+    # One engine, with only caller-visible project evidence.
+    from services.delay_risk_service import project_delay_risks
+    project_risks, labour_count = project_delay_risks(db, projects)
+    project_health['trending_over_budget'] = sum(bool(r.get('is_over_budget')) for r in project_risks)
 
     # Accuracy Metrics (Held-out cross validation only)
     mape_val = cost_meta_data.get("validation_mape")
@@ -772,9 +612,11 @@ def get_insights(
             "total_workers": labour_count,
             "productivity_score": None,
         },
-        "active_model": cost_meta_data.get("model_type", "Log-Scale Cost-Per-SqFt Regressor"),
-        "accuracy_score": accuracy_display,
-        "accuracy_status": accuracy_status,
+        "active_model": cost_state.get('model_type') if cost_state['ready'] else 'No verified trained model',
+        "cost_ml_ready": cost_state['ready'],
+        "model_readiness": {'cost':cost_state,'delay':delay_state},
+        "accuracy_score": accuracy_display if cost_state["ready"] else None,
+        "accuracy_status": accuracy_status if cost_state["ready"] else "No verified ML model available",
         "evaluation_method": evaluation_method,
         "validation_mape": mape_val,
         "validation_mae": mae_val,
@@ -788,8 +630,8 @@ def get_insights(
         "historical_projects": historical_summary,
         "historical_summary_metrics": table_summary,
         "model_info": {
-            "cost_model": cost_meta_data,
-            "delay_model": {"type": "Rule-Based Deterministic", "factors": ["Milestones", "Purchase Orders", "Budget Overrun"]},
+            "cost_model": cost_state,
+            "delay_model": delay_state,
         },
     }
 
@@ -806,7 +648,13 @@ def retrain_models(current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ("admin", "super_admin"):
         raise HTTPException(403, "Only administrators and project managers can trigger model retraining.")
 
-    meta = train_and_evaluate_cost_model()
+    if os.environ.get('VERCEL'):
+        raise HTTPException(409, 'Train verified models offline with backend/data_pipeline/train_models.py, then deploy the matching artifacts. Vercel function storage is not durable model storage.')
+
+    try:
+        meta = train_and_evaluate_cost_model()
+    except ModelNotReady as exc:
+        raise HTTPException(409, str(exc)) from None
     _INSIGHTS_CACHE.clear()
     _load_models()
 
@@ -857,9 +705,8 @@ def import_historical_projects_endpoint(
         )
         # Automatically retrain model if rows were inserted
         if res.get("inserted", 0) > 0:
-            train_and_evaluate_cost_model()
+            res['training_status'] = 'awaiting_independent_verification'
             _INSIGHTS_CACHE.clear()
-            _load_models()
         return res
     except Exception as e:
         logger.error("Error importing historical projects: %s", e)
@@ -899,9 +746,8 @@ async def import_historical_projects_file_endpoint(
             imported_by=user_identity,
         )
         if res.get("inserted", 0) > 0:
-            train_and_evaluate_cost_model()
+            res['training_status'] = 'awaiting_independent_verification'
             _INSIGHTS_CACHE.clear()
-            _load_models()
         return res
     except Exception as e:
         logger.error("Error importing historical projects from file: %s", e)
